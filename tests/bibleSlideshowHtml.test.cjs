@@ -14,9 +14,10 @@ function loadBuilder() {
       "import { formatEnglishDisplayText } from '../../utils/displayText';",
       "const formatEnglishDisplayText = (value) => String(value || '');",
     );
-  // The builder's local imports: the shared highlighting layer and numerals.
+  // The builder's local imports: the shared highlighting layer, numerals and document metrics.
   const localModules = {
     './textHighlights': evaluateModule(fs.readFileSync('src/components/vine/textHighlights.ts', 'utf8'), 'textHighlights.ts', require),
+    './documentPresentationMetrics': evaluateModule(fs.readFileSync('src/components/vine/documentPresentationMetrics.js', 'utf8'), 'documentPresentationMetrics.js', require),
     '../../utils/bibleNumerals': evaluateModule(fs.readFileSync('src/utils/bibleNumerals.ts', 'utf8'), 'bibleNumerals.ts', require),
   };
   const localRequire = (name) => localModules[name] || require(name);

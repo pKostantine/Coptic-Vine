@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -281,7 +282,7 @@ export default function SaintHymnPicker({
               onChangeText={setQuery}
               placeholder={label(LABELS.search)}
               placeholderTextColor={COLORS.muted}
-              style={[styles.searchInput, localized, EDITABLE_TEXT_SELECTION_STYLE]}
+              style={[styles.searchInput, Platform.OS === 'web' && styles.searchInputWeb, localized, EDITABLE_TEXT_SELECTION_STYLE]}
               autoCorrect={false}
               autoCapitalize="none"
               returnKeyType="search"
@@ -474,6 +475,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   searchInput: { color: COLORS.white, flex: 1, fontSize: 16, paddingVertical: SPACING.sm + 2 },
+  // The rounded search row already frames the field; the browser's own focus
+  // ring drew a second, square box inside it.
+  searchInputWeb: {
+    outlineStyle: 'none',
+    outlineWidth: 0,
+    boxShadow: 'none',
+  } as any,
   list: { flex: 1, marginTop: SPACING.sm },
   loading: { flex: 1, paddingVertical: SPACING.xl },
   message: { color: COLORS.muted, flex: 1, fontSize: 14, paddingVertical: SPACING.lg, textAlign: 'center' },

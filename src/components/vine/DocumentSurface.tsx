@@ -253,8 +253,19 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       }));
       let clearingSelection = false;
 
+      // These listeners are on the whole page, and the document stays mounted
+      // under screens opened from it (Book Settings and its saint search, for
+      // one). A text field's caret is a selection too: clearing it on every
+      // selectionchange threw away keystrokes while the field still showed
+      // focus. Fields keep their own selection.
+      const isEditable = (node: EventTarget | null | undefined) => {
+        const element = node instanceof Element ? node : node instanceof Node ? node.parentElement : null;
+        return Boolean(element?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'));
+      };
+
       const clearSelection = () => {
         if (clearingSelection || typeof window === 'undefined') return;
+        if (isEditable(document.activeElement)) return;
         const selection = window.getSelection?.();
         if (!selection?.rangeCount) return;
         clearingSelection = true;
@@ -263,6 +274,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       };
 
       const preventSelection = (event: Event) => {
+        if (isEditable(event.target)) return;
         event.preventDefault();
         clearSelection();
       };

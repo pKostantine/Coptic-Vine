@@ -16,6 +16,19 @@ export const DOCUMENT_CONTROL_METRICS = Object.freeze({
   openButtonMinHeight: 168,
 });
 
+/**
+ * The space between language columns, as a fraction of the reading font size
+ * in pixels. That size already reflects the device as well as the user's
+ * setting (size 9 is 38px in a desktop browser and 34px on a phone), so the
+ * gap follows both. Tuned to 16px at desktop size 9.
+ */
+export const LANGUAGE_COLUMN_GAP_RATIO = 16 / 38;
+
+export function getLanguageColumnGap(fontSize) {
+  const safeFontSize = Math.max(Number(fontSize) || 18, 1);
+  return Math.round(safeFontSize * LANGUAGE_COLUMN_GAP_RATIO);
+}
+
 export function getDocumentChromeMetrics(fontSize) {
   const safeFontSize = Math.max(Number(fontSize) || 18, 1);
   const titleFontSize = Math.max(Math.round(safeFontSize * 0.5), 14);

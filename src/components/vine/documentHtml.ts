@@ -6,7 +6,7 @@ import type {
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
 import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
-import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from './documentPresentationMetrics';
+import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGap } from './documentPresentationMetrics';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
 export interface DocumentVerse {
@@ -217,6 +217,7 @@ export function buildDocumentHtml(
     titleFontSize: sectionTitleFontSize,
     titleLineHeight: sectionTitleLineHeight,
   } = getDocumentChromeMetrics(fontSize);
+  const languageColumnGap = getLanguageColumnGap(fontSize);
   const copticFontSize = Math.round(fontSize * 1.25);
   const arabicFontSize = Math.round(fontSize * 1.15);
   const verseLineHeight = Math.round(fontSize * 1.3);
@@ -322,6 +323,7 @@ export function buildDocumentHtml(
         box-sizing: border-box;
         display: grid;
         width: 100%;
+        column-gap: ${languageColumnGap}px;
       }
       .title-row {
         align-items: center;
@@ -336,6 +338,7 @@ export function buildDocumentHtml(
         width: calc(100% - ${DOCUMENT_CONTROL_METRICS.collapseButtonSize * 2}px);
       }
       .title-text-group {
+        column-gap: ${languageColumnGap}px;
         display: grid;
         width: 100%;
       }

@@ -4,6 +4,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { resolveRubricKey } from "../../utils/verseRubric";
 import JustifiedText, { measureJustifiedLinesWeb } from "./JustifiedText";
+import { getLanguageColumnGap } from "./documentPresentationMetrics";
 import {
   getSlideshowLanguageFontSize,
   getSlideshowLanguageLineHeight,
@@ -197,7 +198,11 @@ export default function VerseBlock({
   const columnLanguages = spanningLanguage
     ? rowLanguages.filter((language) => language.key !== "coptic")
     : rowLanguages;
-  const rowColumnWidth = tableWidth / Math.max(columnLanguages.length, 1);
+  // The same gap scroll mode puts between language columns, taken out of the
+  // row before it is split so the columns still fill the table exactly.
+  const languageGap = getLanguageColumnGap(fontSize);
+  const rowColumnWidth =
+    (tableWidth - languageGap * Math.max(columnLanguages.length - 1, 0)) / Math.max(columnLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
   const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);
   const speakerRowHeight = hasSpeakerLabel
@@ -297,7 +302,7 @@ export default function VerseBlock({
   function renderSpeakerRow(languages, speakerColumnWidth) {
     if (!speakerRowHeight || !languages.length) return null;
     return (
-      <View style={styles.speakerRow}>
+      <View style={[styles.speakerRow, { columnGap: languageGap }]}>
         {languages.map((language) => (
           <View
             key={`speaker-${language.key}`}
@@ -348,7 +353,7 @@ export default function VerseBlock({
   return (
     <View style={styles.spanningRowGroup}>
       {renderSpeakerRow(rowLanguages, rowColumnWidth)}
-      <View style={styles.row}>{rowLanguages.map((language) => renderLanguageCell(language))}</View>
+      <View style={[styles.row, { columnGap: languageGap }]}>{rowLanguages.map((language) => renderLanguageCell(language))}</View>
     </View>
   );
 }

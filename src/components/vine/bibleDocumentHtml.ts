@@ -1,6 +1,7 @@
 import { COLORS } from '../../constants/theme';
 import { formatCopticNumber, formatGreekNumber } from '../../utils/bibleNumerals';
 import { formatEnglishDisplayText } from '../../utils/displayText';
+import { getLanguageColumnGap } from './documentPresentationMetrics';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
 export interface BibleDisplayVerse {
@@ -205,7 +206,7 @@ export function buildBibleChapterHtml({
         box-sizing: border-box;
         display: grid;
         grid-template-columns: ${columnTemplate};
-        gap: 16px;
+        gap: ${getLanguageColumnGap(safeFontSize)}px;
         border-bottom: 1px solid var(--border-color);
         padding: 15px 0;
       }

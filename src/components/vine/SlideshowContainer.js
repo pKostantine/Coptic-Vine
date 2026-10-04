@@ -4,7 +4,7 @@ import { COLORS, SPACING } from "../../constants/theme";
 import { getAlternatingVerseColorIndex } from "../../utils/versePresentation";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
-import { DOCUMENT_CONTROL_METRICS } from "./documentPresentationMetrics";
+import { DOCUMENT_CONTROL_METRICS, getLanguageColumnGap } from "./documentPresentationMetrics";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
 import {
@@ -1074,7 +1074,9 @@ const SlideItem = memo(function SlideItem({
       visibleLanguages,
       titleHelpers,
     );
-    const titleColumnWidth = titleTableWidth / Math.max(titleLanguages.length, 1);
+    const titleGap = getLanguageColumnGap(fontSize);
+    const titleColumnWidth =
+      (titleTableWidth - titleGap * Math.max(titleLanguages.length - 1, 0)) / Math.max(titleLanguages.length, 1);
     // A hymn whose own title row declares "Silent Prayer" reads visually
     // distinct — dimmer/italic — since none of its content is spoken aloud.
     const isSilentPrayerHymn = item.titlePrayerType === "Silent Prayer";
@@ -1086,7 +1088,7 @@ const SlideItem = memo(function SlideItem({
           onMeasured?.(event.nativeEvent.layout.height, measurementSignature);
         }}
       >
-        <View style={[styles.titleTable, { marginHorizontal: titleInset, width: titleTableWidth }]}>
+        <View style={[styles.titleTable, { columnGap: titleGap, marginHorizontal: titleInset, width: titleTableWidth }]}>
           {titleLanguages.map(
             (language) => (
               <View
