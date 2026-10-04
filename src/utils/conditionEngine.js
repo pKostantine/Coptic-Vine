@@ -11,7 +11,10 @@ import { contentDataClient as supabase } from "../services/contentDataClient";
 // most rows have no condition at all, and "no condition" means "always
 // show", never "never show".
 
-const TOKEN_RE = /[A-Za-z][A-Za-z0-9_.:]*/g;
+// A flag name may start with a digit: saint flags such as 318AssembledAtNicea
+// do. Starting identifiers only at a letter split those into a stray number
+// and a name, which no longer parses.
+const TOKEN_RE = /[A-Za-z0-9][A-Za-z0-9_.:]*/g;
 
 /**
  * Whether one required condition atom is satisfied by the active flags.
@@ -41,24 +44,26 @@ export function evaluateCondition(condition, flags) {
   const trimmed = String(condition || "").trim();
   if (!trimmed) return true;
 
-  const tokens = [...new Set(trimmed.match(TOKEN_RE) || [])].sort(
-    (a, b) => b.length - a.length,
-  );
-
   // Substituted per atom, leaving &&/||/!/() untouched — the parser still has
   // to handle "(StMark:Psali1 || Paope.30) && AdamDays" exactly as before, so
   // the hierarchy is resolved here rather than by rewriting condition strings.
-  let expr = trimmed;
-  for (const token of tokens) {
-    const value = isConditionAtomSatisfied(token, flags);
-    expr = expr.split(token).join(value ? "true" : "false");
-  }
+  // One pass over the string, so a name can never match inside another name
+  // or inside a "true"/"false" already written in.
+  const expr = trimmed.replace(TOKEN_RE, (token) =>
+    isConditionAtomSatisfied(token, flags) ? "true" : "false",
+  );
 
   // eslint-disable-next-line no-eval -- expr now only contains true/false/&&/||/!/()
   try {
     // eslint-disable-next-line no-new-func
     return Boolean(new Function(`"use strict"; return (${expr});`)());
   } catch {
+    // A condition that does not parse hides its row, exactly as a false one
+    // would, so a typo in the data ("Joyful 29") silently removes a verse.
+    // Say so while developing.
+    if (typeof __DEV__ !== "undefined" && __DEV__) {
+      console.warn(`Unparseable condition, treated as false: ${trimmed}`);
+    }
     return false;
   }
 }
