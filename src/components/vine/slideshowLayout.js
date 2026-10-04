@@ -165,11 +165,14 @@ function hasVisibleTitleText(title) {
 }
 
 function buildPaginationUnits(items) {
-  return items.map((item) => ({
+  return items.map((item, index) => ({
     items: [item],
     breakBefore:
       (item.type === "title" && !item.isCollapsed && hasVisibleTitleText(item.title)) ||
-      item.type === "button",
+      item.type === "button" ||
+      // The Antiphonary's Vatos half opens its own slide, so the Vatos pill
+      // lands on its first verse rather than partway down Adam's last slide.
+      (item.verse?.tune === "vatos" && items[index - 1]?.verse?.tune === "adam"),
   }));
 }
 

@@ -1698,7 +1698,10 @@ export async function hydrateSupabaseServiceHymn(schema, table, date, extraConte
 
   const flags = await getContextFlags(date, { ...structuralFlags, ...extraContext }, weekdayDate);
   // A Holy Week hour's evangelist is its own, not the calendar date's.
-  return hydrateWithFlags(schema, table, { ...flags, ...(await paschaGospelAuthorFlags(flags)) }, depth, isoDate);
+  const sections = await hydrateWithFlags(schema, table, { ...flags, ...(await paschaGospelAuthorFlags(flags)) }, depth, isoDate);
+  // The Antiphonary opened as a book of its own, not through a service's
+  // button, gets the same Adam/Vatos marks its tune pills navigate by.
+  return schema === "psalmody" && table === "antiphonary" ? addTuneMarkersToAntiphonarySections(sections) : sections;
 }
 
 // A single misconfigured or inaccessible nested schema (e.g. one not yet

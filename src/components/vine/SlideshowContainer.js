@@ -64,6 +64,7 @@ export default function SlideshowContainer({
   titleHelpers,
   selectedSectionId,
   restoreRequest,
+  jumpRequest,
   onCurrentSectionChange,
   onOpenSelector,
   viewportHeightOverride,
@@ -87,6 +88,10 @@ export default function SlideshowContainer({
   const measurementSignatureRef = useRef("");
   const lastAppliedSelectedSectionId = useRef(null);
   const lastAppliedRestoreTokenRef = useRef(null);
+  // Seeded with whatever request is already standing, so a remount (the
+  // Slideshow Mode flip, a modal reopening) never replays an old pill jump
+  // over the position it is restoring.
+  const lastAppliedJumpTokenRef = useRef(jumpRequest?.token ?? null);
   const pendingHeightsRef = useRef({});
   const pendingLanguageHeightsRef = useRef({});
   const pendingMeasurementFrameRef = useRef(null);
@@ -464,6 +469,34 @@ export default function SlideshowContainer({
     setCurrentAnchor(createSlideAnchor(targetItem ? [targetItem] : targetSlide));
   }, [restoreRequest?.token, slides, selectedSectionId, viewportHeight, viewportHeightOverride]);
 
+  // A pill tapped above the document. The Antiphonary's Adam and Vatos pills
+  // go to the slide holding the first verse chanted in that tune: Adam's is
+  // the opening of the day's entry, Vatos's the verse after the "through the
+  // intercessions/prayers of..." line (see addTuneMarkersToAntiphonarySections).
+  // Both tunes share one section, so a section jump would land Vatos at the
+  // start of the entry too. Every other pill goes to its section's first slide.
+  useLayoutEffect(() => {
+    if (!jumpRequest || lastAppliedJumpTokenRef.current === jumpRequest.token) return;
+    if (!(viewportHeight || viewportHeightOverride)) return;
+    const isTargetItem = jumpRequest.tune
+      ? (item) => item.verse?.tune === jumpRequest.tune
+      : (item) => item.sectionId === jumpRequest.sectionId;
+    const targetSlideIndex = slides.findIndex((slide) => slide.some(isTargetItem));
+    if (targetSlideIndex < 0) return; // still measuring/loading this deck
+    const targetItem = slides[targetSlideIndex].find(isTargetItem);
+    lastAppliedJumpTokenRef.current = jumpRequest.token;
+    // Count whatever section is selected as applied, so the section-jump
+    // effect below does not pull the reader straight back to it.
+    lastAppliedSelectedSectionId.current = selectedSectionId ?? null;
+    pendingRestoreSectionIdRef.current = null;
+    pendingRestoreCandidatesRef.current = [];
+    navigationIndexRef.current = targetSlideIndex;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-off jump, keyed by the request's token
+    setCurrentSlideIndex(targetSlideIndex);
+    setCurrentAnchor(createSlideAnchor([targetItem]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the token is the request's identity
+  }, [jumpRequest?.token, slides, selectedSectionId, viewportHeight, viewportHeightOverride]);
+
   useEffect(() => {
     // A fresh, explicit content-selector pick always wins over (and cancels)
     // whatever the reset effect above was hoping to auto-restore — otherwise
@@ -557,9 +590,17 @@ export default function SlideshowContainer({
 
     const currentSlide = slides[resolvedSlideIndex];
     const pendingSectionId = pendingRestoreSectionIdRef.current;
+    // Paging anchors to a slide's first item, so this is ordinarily the hymn
+    // the slide opens with. A jump anchors to the hymn it was asked for, which
+    // can start partway down a slide -- a Minimizable hymn's title opens no
+    // slide of its own -- and that hymn, not the end of the one before it, is
+    // where the reader now is.
+    const anchoredSectionId = currentAnchor?.sectionId;
     const currentSectionId = pendingSectionId && currentSlide?.some(item => item.sectionId === pendingSectionId)
       ? pendingSectionId
-      : findSlideSectionId(currentSlide);
+      : anchoredSectionId && currentSlide?.some(item => item.sectionId === anchoredSectionId)
+        ? anchoredSectionId
+        : findSlideSectionId(currentSlide);
     if (!currentSectionId) return;
 
     // A section-level fallback may still be pending when the exact anchored
@@ -574,8 +615,8 @@ export default function SlideshowContainer({
     // stops changing (it never resets back to undefined on its own).
     pendingRestoreSectionIdRef.current = null;
     preservedSectionIdRef.current = currentSectionId;
-    onCurrentSectionChange?.(currentSectionId);
-  }, [onCurrentSectionChange, resolvedSlideIndex, slides, viewportHeight, viewportHeightOverride]);
+    onCurrentSectionChange?.(currentSectionId, currentSlide?.find((item) => item.verse?.tune)?.verse.tune ?? null);
+  }, [currentAnchor, onCurrentSectionChange, resolvedSlideIndex, slides, viewportHeight, viewportHeightOverride]);
 
   const goToSlide = useCallback((requestedIndex) => {
     const nextIndex = Math.min(Math.max(requestedIndex, 0), Math.max(slides.length - 1, 0));

@@ -1,17 +1,22 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type GestureResponderEvent, Modal, PanResponder, type PanResponderGestureState, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { type GestureResponderEvent, Modal, PanResponder, type PanResponderGestureState, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
 import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
-import DocumentSurface from '../DocumentSurface';
+import DocumentSurface, { type SlideJumpRequest } from '../DocumentSurface';
+import {
+  ANTIPHONARY_GROUPS, findAntiphonaryIntroduction, getActiveAntiphonaryGroup, getVerseTune,
+  type AntiphonaryGroup, type AntiphonaryTune,
+} from '../antiphonaryNavigation';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
+import DocumentPillBar from '../ui/DocumentPillBar';
 import DocumentTopBar from '../ui/DocumentTopBar';
 import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
@@ -41,12 +46,6 @@ interface DocumentModalProps {
   parentBookmarkId?: string;
   onClose: () => void;
 }
-
-const ANTIPHONARY_GROUPS: { key: 'introduction' | 'adam' | 'vatos'; label: string }[] = [
-  { key: 'introduction', label: 'Introduction' },
-  { key: 'adam', label: 'Adam' },
-  { key: 'vatos', label: 'Vatos' },
-];
 
 // COPTIC_PAULINE_EPISTLE/COPTIC_CATHOLIC_EPISTLE/COPTIC_PRAXIS (see
 // SUBDOCUMENT_MAP in hymnLibrary.js) each include one untitled reading
@@ -156,7 +155,10 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // same hymn, with nothing lost.
   const [overlayScreen, setOverlayScreen] = useState<'calendar' | 'seasons' | 'settings' | null>(null);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  // The Antiphonary only: the tune of the verse being read, for its pills.
+  const [currentTune, setCurrentTune] = useState<AntiphonaryTune | null>(null);
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
+  const [slideJumpRequest, setSlideJumpRequest] = useState<SlideJumpRequest | null>(null);
   const documentRef = useRef<DocumentWebViewHandle>(null);
   const { width: screenWidth } = useWindowDimensions();
   // The app closes and navigates a subdocument entirely by edge swipe and so
@@ -184,7 +186,10 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       // anything covers the document: the layout shift a modal opening
       // causes is enough to make the reading-line tracker briefly report a
       // section the reader never actually scrolled to.
-      if (!isCovered && action.sectionId) setCurrentSectionId(action.sectionId);
+      if (!isCovered && action.sectionId) {
+        setCurrentSectionId(action.sectionId);
+        setCurrentTune(getVerseTune(sections, action.verseId));
+      }
       return;
     }
 
@@ -225,13 +230,19 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     }
   };
 
+  function requestSlideJump(target: Omit<SlideJumpRequest, 'token'>) {
+    setSlideJumpRequest((current) => ({ ...target, token: (current?.token ?? 0) + 1 }));
+  }
+
   function jumpToSection(id: string) {
     // Where the reader asked to be, straight away: a pick from the content
     // list lands while the list still covers this document, and reports are
     // ignored then, so this would otherwise still hold wherever they were
     // before -- the top -- for anything that remounts the reader.
     setCurrentSectionId(id);
-    if (preferences.slideshowMode) setSelectedSlideSectionId(id);
+    // A request rather than a selection: picking the hymn selected last time,
+    // after paging away from it, still goes back to it.
+    if (preferences.slideshowMode) requestSlideJump({ sectionId: id });
     else documentRef.current?.scrollToSection(id);
   }
 
@@ -281,29 +292,40 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferences.slideshowMode]);
 
-  function selectAntiphonaryGroup(group: 'introduction' | 'adam' | 'vatos') {
+  function selectAntiphonaryGroup(group: AntiphonaryGroup) {
     if (!sections) return;
 
     if (group === 'adam' || group === 'vatos') {
-      // scrollToTune only exists on the WebView reader (it finds the first
-      // [data-tune] element) -- slideshow mode has no equivalent single-verse
-      // jump, so find whichever section holds the first verse tagged with
-      // this tune (see addTuneMarkersToAntiphonarySections in
-      // hymnLibrary.js) and jump there at section granularity instead.
-      if (preferences.slideshowMode) {
-        const targetSection = sections.find((section) => section.verses.some((verse) => verse.tune === group));
-        if (targetSection) setSelectedSlideSectionId(targetSection.id);
-        return;
-      }
-      documentRef.current?.scrollToTune(group);
+      // Both renderers land on the first verse tagged with this tune (see
+      // addTuneMarkersToAntiphonarySections in hymnLibrary.js): Adam at the
+      // opening of the day's entry, Vatos at the verse after its "through the
+      // intercessions/prayers of..." line. Slideshow mode goes to the slide
+      // holding that verse. A section jump cannot do it, because both tunes
+      // sit in the same section, so Vatos would open at the entry's start.
+      if (preferences.slideshowMode) requestSlideJump({ tune: group });
+      else documentRef.current?.scrollToTune(group);
       return;
     }
 
-    const introSection = sections.find((section) => /^introduction$/i.test(section.title?.english || ''));
-    if (!introSection) return;
-    if (preferences.slideshowMode) setSelectedSlideSectionId(introSection.id);
-    else documentRef.current?.scrollToSection(introSection.id);
+    const introSection = findAntiphonaryIntroduction(sections);
+    if (introSection) jumpToSection(introSection.id);
   }
+
+  // The pill for wherever the reader is. In a subdocument, a titleless hymn
+  // (an inline continuation, say) has no pill of its own, so the nearest one
+  // before it stands in -- the content selector resolves its row the same way.
+  const activePillKey = useMemo(() => {
+    if (!sections) return null;
+    if (isAntiphonary) return getActiveAntiphonaryGroup(sections, currentSectionId, currentTune);
+    if (!currentSectionId) return null;
+    const pillIds = new Set(sectionPills.map(({ section }) => section.id));
+    const index = sections.findIndex((section) => section.id === currentSectionId);
+    if (index < 0) return null;
+    for (let i = index; i >= 0; i -= 1) {
+      if (pillIds.has(sections[i].id)) return sections[i].id;
+    }
+    return sectionPills[0]?.section.id ?? null;
+  }, [sections, isAntiphonary, currentSectionId, currentTune, sectionPills]);
 
   // Capture-phase gesture handler for the two screen-edge swipes: left-edge
   // right-swipe closes this modal; right-edge left-swipe opens the content
@@ -415,25 +437,17 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           />
         ) : null}
         {isAntiphonary ? (
-          <View style={styles.selectorBar}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorContent}>
-              {ANTIPHONARY_GROUPS.map((group) => (
-                <Pressable key={group.key} style={styles.selectorPill} onPress={() => selectAntiphonaryGroup(group.key)}>
-                  <Text numberOfLines={1} style={styles.selectorPillText}>{group.label}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
+          <DocumentPillBar
+            pills={ANTIPHONARY_GROUPS}
+            activeKey={activePillKey}
+            onSelect={(key) => selectAntiphonaryGroup(key as AntiphonaryGroup)}
+          />
         ) : sectionPills.length > 1 ? (
-          <View style={styles.selectorBar}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorContent}>
-              {sectionPills.map(({ section, label }) => (
-                <Pressable key={section.id} style={styles.selectorPill} onPress={() => jumpToSection(section.id)}>
-                  <Text numberOfLines={1} style={styles.selectorPillText}>{label}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
+          <DocumentPillBar
+            pills={sectionPills.map(({ section, label }) => ({ key: section.id, label }))}
+            activeKey={activePillKey}
+            onSelect={jumpToSection}
+          />
         ) : null}
         {!sections ? (
           <LoadingScreen />
@@ -447,7 +461,11 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 collapseMemoryScope={collapseMemoryScope}
                 onAction={handleAction}
                 selectedSectionId={selectedSlideSectionId}
-                onCurrentSectionChange={setCurrentSectionId}
+                jumpRequest={slideJumpRequest}
+                onCurrentSectionChange={(id, tune) => {
+                  setCurrentSectionId(id);
+                  setCurrentTune(tune);
+                }}
                 onOpenSelector={() => setSelectorOpen(true)}
                 initialScrollSectionId={currentSectionId}
                 onCollapseToggle={setSelectedSlideSectionId}
@@ -546,37 +564,4 @@ const styles = StyleSheet.create({
   documentFrame: { flex: 1, position: 'relative' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
   loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
-  // Ported from the old app's modalSelector/modalSelectorContent/
-  // modalSelectorItem/modalSelectorText (HymnDisplayScreen.js) — same dark
-  // bar of scrollable, outlined pills, one per top-level section, used
-  // there for Doxologies/Synaxarium/Melodies/Litanies (and Antiphonary's
-  // fixed 3 groups); ported forward as a single generic row so every
-  // subdocument gets it, not just those specific document types.
-  selectorBar: {
-    backgroundColor: '#111111',
-    borderBottomColor: COLORS.border,
-    borderBottomWidth: 1,
-    maxHeight: 58,
-  },
-  selectorContent: {
-    alignItems: 'center',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  selectorPill: {
-    borderColor: COLORS.border,
-    borderRadius: RADII.md,
-    borderWidth: 1,
-    flexShrink: 0,
-    justifyContent: 'center',
-    minHeight: 36,
-    paddingHorizontal: SPACING.md,
-  },
-  selectorPillText: {
-    color: COLORS.text,
-    flexShrink: 0,
-    fontSize: 14,
-    fontWeight: '800',
-  },
 });

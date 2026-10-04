@@ -10,6 +10,14 @@ import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../uti
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
 import type { DocumentRestoreRequest } from '../../utils/sectionRestore';
 import type { SermonHighlight } from '../../types/sermonPlanner';
+import type { AntiphonaryTune } from './antiphonaryNavigation';
+
+/** A slideshow jump to the slide holding the first verse chanted in `tune` (the Antiphonary's Adam/Vatos pills), else the first slide of `sectionId`. */
+export interface SlideJumpRequest {
+  token: number;
+  sectionId?: string;
+  tune?: AntiphonaryTune;
+}
 
 interface DocumentSurfaceProps {
   sections: DocumentSection[];
@@ -18,12 +26,15 @@ interface DocumentSurfaceProps {
   collapseMemoryScope: string;
   onAction?: (action: DocumentAction) => void;
   selectedSectionId?: string | null;
-  onCurrentSectionChange?: (id: string) => void;
+  /** Slideshow only: the section on the current slide, and the Antiphonary tune of its first tuned verse (null anywhere else). */
+  onCurrentSectionChange?: (id: string, tune: AntiphonaryTune | null) => void;
   onOpenSelector?: () => void;
   /** Where a freshly mounted WebView (scroll mode) should scroll to on its very first load — see DocumentWebView's initialSectionId. Slideshow mode has its own equivalent via selectedSectionId, which (unlike this) can also drive jumps after the initial mount. */
   initialScrollSectionId?: string | null;
   /** Frozen pre-settings/calendar anchor, resolved against the new visible document. */
   restoreRequest?: DocumentRestoreRequest | null;
+  /** Slideshow only: a one-off jump from a pill. Unlike selectedSectionId, each new token jumps again, even back to the section already selected. */
+  jumpRequest?: SlideJumpRequest | null;
   /** Current on/off state of the in-document "Coptic Gospel Rite" toggle button (only rendered where GOSPEL_RITE content is spliced in). */
   copticGospelRite?: boolean;
   /** Forces every verse's person-type indicator (Priest:/Deacon:/etc.) hidden, in both the scroll and slideshow renderers — the Agpeya's own top-level documents default to this (see ServiceDocument.tsx), since the Hours are prayed by one person with no one to address a speaker role to; a subdocument/Antiphonary modal (DocumentModal.tsx) never sets this, so an Hour opened as a subdocument of a liturgical service keeps its real speaker roles. */
@@ -123,6 +134,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       suppressAllSpeakerLabels = false,
       initialScrollSectionId,
       restoreRequest,
+      jumpRequest,
       onCollapseToggle,
       keyboardNavigationEnabled = true,
       sermonPlannerMode = false,
@@ -320,6 +332,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           titleHelpers={titleHelpers}
           selectedSectionId={selectedSectionId}
           restoreRequest={restoreRequest}
+          jumpRequest={jumpRequest}
           onCurrentSectionChange={onCurrentSectionChange}
           onOpenSelector={onOpenSelector}
           viewportHeightOverride={undefined}

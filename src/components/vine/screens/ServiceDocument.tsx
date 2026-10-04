@@ -4,12 +4,17 @@ import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import DocumentPillBar from '../ui/DocumentPillBar';
 import DocumentTopBar from '../ui/DocumentTopBar';
 import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
-import DocumentSurface from '../DocumentSurface';
+import DocumentSurface, { type SlideJumpRequest } from '../DocumentSurface';
+import {
+  ANTIPHONARY_GROUPS, findAntiphonaryIntroduction, getActiveAntiphonaryGroup, getVerseTune,
+  type AntiphonaryGroup, type AntiphonaryTune,
+} from '../antiphonaryNavigation';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
@@ -113,6 +118,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   } = useReadingPreferences();
   const { effectiveDate, vespersEffectiveDate } = useCalendar();
   const isSermonPlanner = schema === 'liturgy' && table === 'sermon_planner';
+  // The Antiphonary read as a book of its own keeps the Introduction/Adam/Vatos
+  // pills it has when a service opens it.
+  const isAntiphonary = schema === 'psalmody' && table === 'antiphonary';
   const documentPreferences = useMemo(() => {
     if (!isSermonPlanner) return preferences;
     return {
@@ -213,6 +221,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // Slideshow mode doesn't need this: SlideshowContainer already restores
   // its own verse-level position internally whenever it repaginates.
   const [currentVerseId, setCurrentVerseId] = useState<string | null>(null);
+  // The Antiphonary only: the tune of the verse being read, for its pills.
+  const [currentTune, setCurrentTune] = useState<AntiphonaryTune | null>(null);
+  const [slideJumpRequest, setSlideJumpRequest] = useState<SlideJumpRequest | null>(null);
   const currentSectionIdRef = useRef(currentSectionId);
   // Seeded synchronously (not via an effect) from the module-level store: a
   // child effect inside SlideshowContainer reports "slide 0" the instant it
@@ -677,6 +688,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         setLastDocumentPosition(documentPositionKey, action.sectionId);
       }
       setCurrentVerseId(action.verseId || null);
+      if (isAntiphonary) setCurrentTune(getVerseTune(sections, action.verseId));
       return;
     }
 
@@ -749,6 +761,36 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     documentRef.current?.setPreservedSection(triggerSectionId);
     documentRef.current?.scrollToSection(triggerSectionId);
   };
+
+  const requestSlideJump = (target: Omit<SlideJumpRequest, 'token'>) =>
+    setSlideJumpRequest((current) => ({ ...target, token: (current?.token ?? 0) + 1 }));
+
+  // From the content selector, or the Antiphonary's Introduction pill. A pill
+  // jumps by request in slideshow mode, not by selection, so tapping it again
+  // after paging away from it still goes back.
+  const jumpToSection = (id: string, { byRequest = false } = {}) => {
+    currentSectionIdRef.current = id;
+    setCurrentSectionId(id);
+    setLastDocumentPosition(documentPositionKey, id);
+    if (!preferences.slideshowMode) documentRef.current?.scrollToSection(id);
+    else if (byRequest) requestSlideJump({ sectionId: id });
+    else setSelectedSlideSectionId(id);
+  };
+
+  // As the Antiphonary modal's pills do (selectAntiphonaryGroup in DocumentModal.tsx).
+  const selectAntiphonaryGroup = (group: AntiphonaryGroup) => {
+    if (!readySections) return;
+    if (group === 'adam' || group === 'vatos') {
+      if (preferences.slideshowMode) requestSlideJump({ tune: group });
+      else documentRef.current?.scrollToTune(group);
+      return;
+    }
+    const introSection = findAntiphonaryIntroduction(readySections);
+    if (introSection) jumpToSection(introSection.id, { byRequest: true });
+  };
+  const activeAntiphonaryGroup = isAntiphonary && readySections
+    ? getActiveAntiphonaryGroup(readySections, currentSectionId, currentTune)
+    : null;
 
   const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
   const selectorSwipeStartX = Math.max(screenWidth - selectorEdgeWidth, 0);
@@ -831,6 +873,13 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         <LoadingScreen />
       ) : (
         <>
+          {isAntiphonary ? (
+            <DocumentPillBar
+              pills={ANTIPHONARY_GROUPS}
+              activeKey={activeAntiphonaryGroup}
+              onSelect={(key) => selectAntiphonaryGroup(key as AntiphonaryGroup)}
+            />
+          ) : null}
           <View style={styles.documentFrame}>
           <DocumentSurface
             ref={documentRef}
@@ -840,7 +889,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             collapseMemoryScope={documentPositionKey}
             onAction={handleAction}
             selectedSectionId={selectedSlideSectionId}
-            onCurrentSectionChange={(id) => {
+            jumpRequest={slideJumpRequest}
+            onCurrentSectionChange={(id, tune) => {
               // Only SlideshowContainer ever calls this — a report arriving
               // while slideshowMode is actually false can only be a stale
               // callback from an instance that's already mid-unmount (e.g.
@@ -853,6 +903,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               currentSectionIdRef.current = id;
               setCurrentSectionId(id);
               setLastDocumentPosition(documentPositionKey, id);
+              setCurrentTune(tune);
             }}
             onOpenSelector={() => setSelectorOpen(true)}
             copticGospelRite={copticGospelRite}
@@ -897,16 +948,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             sections={readySections}
             currentSectionId={currentSectionId}
             onClose={() => setSelectorOpen(false)}
-            onSelectSection={(id) => {
-              currentSectionIdRef.current = id;
-              setCurrentSectionId(id);
-              setLastDocumentPosition(documentPositionKey, id);
-              if (preferences.slideshowMode) {
-                setSelectedSlideSectionId(id);
-              } else {
-                documentRef.current?.scrollToSection(id);
-              }
-            }}
+            onSelectSection={(id) => jumpToSection(id)}
             onOpenHyperlink={(hyperlinkKey) => openHyperlink(hyperlinkKey, { fromSelector: true })}
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}

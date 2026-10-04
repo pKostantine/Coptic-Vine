@@ -227,6 +227,17 @@ test("pagination starts a tall verse fresh instead of leaving a one-line orphan"
   assert.equal(slides[1][0].sourceItemId, item.id);
 });
 
+test("the Antiphonary's Vatos half opens its own slide", () => {
+  const tuned = (index, tune) => verseItem({ id: `entry-verse-${index}`, sectionId: "entry", verse: { ...verseItem().verse, tune } });
+  const items = [tuned(0, "adam"), tuned(1, "adam"), tuned(2, "vatos"), tuned(3, "vatos")];
+  const heights = Object.fromEntries(items.map((item) => [item.id, 40]));
+  const slides = paginateItems(items, heights, {}, 1000, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides.map((slide) => slide.map((entry) => entry.id)), [
+    ["entry-verse-0", "entry-verse-1"],
+    ["entry-verse-2", "entry-verse-3"],
+  ]);
+});
+
 test("line anchors follow the same content when page capacity changes", () => {
   const item = verseItem();
   const before = splitVerse(item, { availableHeight: 320, lineCount: 15 }).slides;
