@@ -160,6 +160,10 @@ export default function MusicLyricsView({
                       active && styles.lineTextActive,
                       active && fullscreen && styles.lineTextActiveFullscreen,
                       active && fullscreen && compact && styles.lineTextActiveFullscreenCompact,
+                      // Last, so the line being sung keeps Coptic's larger
+                      // size instead of being shrunk by the rule above it.
+                      active && fullscreen && selectedSet.locale === 'cop' && styles.copticActiveFullscreen,
+                      active && fullscreen && compact && selectedSet.locale === 'cop' && styles.copticActiveFullscreenCompact,
                     ]}
                   >
                     {line.text}
@@ -210,18 +214,20 @@ const styles = StyleSheet.create({
   line: { paddingVertical: 7, borderRadius: 8 },
   lineText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 20, lineHeight: 30, fontWeight: '600', opacity: 0.55 },
   lineTextCompact: { fontSize: 16, lineHeight: 24 },
-  lineTextFullscreen: { fontSize: 40, lineHeight: 56, textAlign: 'center', opacity: 0.38 },
-  lineTextFullscreenCompact: { fontSize: 22, lineHeight: 31 },
+  lineTextFullscreen: { fontSize: 48, lineHeight: 66, textAlign: 'center', opacity: 0.38 },
+  lineTextFullscreenCompact: { fontSize: 30, lineHeight: 42 },
   lineTextActive: { color: COLORS.white, opacity: 1 },
   lineTextUnsynced: { color: COLORS.white, opacity: 1 },
-  lineTextActiveFullscreen: { fontSize: 42, lineHeight: 58 },
-  lineTextActiveFullscreenCompact: { fontSize: 24, lineHeight: 33 },
+  lineTextActiveFullscreen: { fontSize: 52, lineHeight: 70 },
+  lineTextActiveFullscreenCompact: { fontSize: 33, lineHeight: 45 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicPanel: { textAlign: 'right' },
   coptic: { fontFamily: TYPOGRAPHY.musicCoptic, fontSize: 23, lineHeight: 33 },
   copticCompact: { fontSize: 18, lineHeight: 27 },
-  copticFullscreen: { fontSize: 44, lineHeight: 62 },
-  copticFullscreenCompact: { fontSize: 26, lineHeight: 36 },
+  copticFullscreen: { fontSize: 54, lineHeight: 74 },
+  copticFullscreenCompact: { fontSize: 34, lineHeight: 47 },
+  copticActiveFullscreen: { fontSize: 58, lineHeight: 78 },
+  copticActiveFullscreenCompact: { fontSize: 37, lineHeight: 50 },
   empty: { alignItems: 'center', paddingVertical: SPACING.xl, paddingHorizontal: SPACING.md },
   emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700' },
   emptyTitleFullscreen: { fontSize: 28 },
