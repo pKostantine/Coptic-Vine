@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import { disableNativeNotificationDevice } from '@/services/notificationService';
 import { disableWebPushDevice } from '@/services/webPushService';
+import { settleWithin } from '@/utils/settleWithin';
 import { supabase } from '@/utils/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -33,6 +34,9 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/** How long sign-out waits for the notification detach before going ahead regardless. */
+const DEVICE_DETACH_TIMEOUT_MS = 4000;
 
 function accountRedirectUrl() {
   return Linking.createURL('account');
@@ -207,15 +211,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signOut = useCallback(async () => {
-    const detachResults = await Promise.allSettled([
-      disableNativeNotificationDevice(),
-      disableWebPushDevice(),
-    ]);
-    for (const result of detachResults) {
-      if (result.status === 'rejected') {
-        console.warn('Unable to detach this device from Coptic Vine notifications before sign-out:', result.reason);
-      }
-    }
+    // Detaching this device from notifications is courtesy work, and the
+    // session has to go whatever happens to it.
+    await settleWithin(
+      [disableNativeNotificationDevice(), disableWebPushDevice()],
+      DEVICE_DETACH_TIMEOUT_MS,
+      'Unable to detach this device from Coptic Vine notifications before sign-out',
+    );
+
     const { error } = await supabase.auth.signOut();
     authError(error, 'Unable to sign out.');
   }, []);

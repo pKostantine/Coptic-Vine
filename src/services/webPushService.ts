@@ -86,8 +86,14 @@ export async function disableWebPushDevice(): Promise<void> {
 
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      // getRegistration() resolves with undefined when this page has no
+      // service worker. `ready` does not: with nothing registered it stays
+      // pending for the life of the page rather than rejecting, so awaiting it
+      // here hung sign-out for everyone who had never enabled notifications --
+      // the one path that registers the worker (syncWebPushDevice) only runs
+      // after permission is granted.
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = await registration?.pushManager.getSubscription();
       await subscription?.unsubscribe();
     } catch (error) {
       console.warn('Unable to unsubscribe the browser push subscription:', error);
