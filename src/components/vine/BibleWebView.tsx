@@ -39,6 +39,13 @@ interface BibleWebViewProps {
   onAction?: (action: BibleWebViewAction) => void;
 }
 
+/**
+ * Suppresses the platform's own text-selection menu. react-native-webview
+ * documents an empty menuItems array as hiding it, on both iOS and Android.
+ * Used where the page draws its own toolbar over the selection instead.
+ */
+const NO_NATIVE_SELECTION_MENU: [] = [];
+
 /** Native (iOS/Android) Bible chapter renderer — see bibleDocumentHtml.ts for the shared HTML builder. BibleWebView.web.tsx is the web counterpart (plain iframe). */
 const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, scrollEnabled = true, selectText = false, highlights, onAction }, ref) => {
   const webviewRef = useRef<WebView>(null);
@@ -81,6 +88,10 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
       showsVerticalScrollIndicator={scrollEnabled}
       javaScriptEnabled
       textInteractionEnabled={selectText}
+      // Selectable text and the highlight toolbar are the same condition here
+      // (chapter.tsx passes `highlighting: effectiveSelectText`), so wherever
+      // the reader can select, the page already offers its own menu.
+      {...(selectText ? { menuItems: NO_NATIVE_SELECTION_MENU } : null)}
       onMessage={handleMessage}
       onLoadEnd={() => {
         drawHighlights();

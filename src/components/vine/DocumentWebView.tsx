@@ -51,6 +51,16 @@ interface DocumentWebViewProps {
  * shared HTML builder. Uses react-native-webview, which doesn't support web;
  * DocumentWebView.web.tsx is the web counterpart (plain iframe).
  */
+
+/**
+ * Suppresses the platform's own text-selection menu. react-native-webview
+ * documents an empty menuItems array as hiding it, on both iOS and Android.
+ * Used where the page draws its own toolbar over the selection instead.
+ */
+const NO_NATIVE_SELECTION_MENU: [] = [];
+
+/**
+ */
 const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
   (
     {
@@ -314,6 +324,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         showsVerticalScrollIndicator={false}
         javaScriptEnabled
         textInteractionEnabled={selectText || sermonPlannerMode}
+        // Only the Sermon Planner draws its own toolbar. A plain document with
+        // Select text on keeps the platform's menu, which is the only way to
+        // copy from it.
+        {...(sermonPlannerMode ? { menuItems: NO_NATIVE_SELECTION_MENU } : null)}
         onMessage={handleMessage}
         onLoadStart={() => {
           loadingRef.current = true;

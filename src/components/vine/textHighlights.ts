@@ -45,6 +45,10 @@ export function textHighlightStyles() {
       .sermon-annotatable-text {
         -webkit-user-select: text;
         user-select: text;
+        /* The colour toolbar is this text's menu. Suppressing the callout
+           stops iOS offering its own on top of it; the contextmenu handler
+           below covers a desktop right-click and Android's long press. */
+        -webkit-touch-callout: none;
       }
       mark.sermon-highlight {
         border-radius: 3px;
@@ -640,6 +644,13 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
         document.addEventListener('pointercancel', function () { mouseDown = false; });
         document.addEventListener('touchend', function () { setTimeout(showPaletteForSelection, 80); }, { passive: true });
         document.addEventListener('keyup', function () { setTimeout(showPaletteForSelection, 0); });
+        // This page carries its own selection toolbar, so the platform's menu
+        // is a second, competing one over the same selection. Only loaded on
+        // the Bible reader and the Sermon Planner, which is why a plain
+        // document with Select text on keeps its ordinary menu.
+        document.addEventListener('contextmenu', function (event) {
+          event.preventDefault();
+        });
 
         function caretAtPoint(x, y) {
           if (document.caretPositionFromPoint) {

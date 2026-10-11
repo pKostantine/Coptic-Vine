@@ -411,7 +411,10 @@ export default function SaintHymnPicker({
                   fontSize={previewFontSize}
                   visibleColumns={previewVisibleColumns}
                   appLanguage={preferences.appLanguage}
-                  selectText={false}
+                  // The preview is here to be read and quoted from, so its
+                  // text selects and copies. The card around it stays
+                  // unselectable chrome.
+                  selectText
                   displayComments={preferences.displayComments}
                   displaySilentPrayers={preferences.displaySilentPrayers}
                   bishopPresent={preferences.bishopPresent}
