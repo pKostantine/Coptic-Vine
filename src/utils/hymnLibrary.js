@@ -1120,33 +1120,6 @@ async function resolveProphecySections(section, flags, depth, isoDate, coptic) {
   return sections;
 }
 
-/** Merges every nested section's verses into ONE flat list under the calling section's own title/prayer_type — see the isInlinePlacement branch in hydrateWithFlags for why. */
-function mergeNestedSectionsAsOneHymn(callingSection, nestedSections) {
-  const verses = applyInheritedPreRefrainItalic(
-    nestedSections.flatMap((s) => s.verses || []),
-    callingSection.titlePrayerType,
-  );
-  const titlePrayerType = callingSection.titlePrayerType || null;
-  const dominantPrayerType = getDominantPrayerType(titlePrayerType, verses);
-  const alternateEvery =
-    dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)
-      ? ALTERNATE_EVERY[dominantPrayerType]
-      : null;
-  return {
-    id: callingSection.id,
-    hymn_key: callingSection.hymn_key,
-    title: callingSection.title,
-    titlePrayerType,
-    collapsible: Boolean(callingSection.collapsible),
-    defaultCollapsed: Boolean(callingSection.defaultCollapsed),
-    verses,
-    prayerType: dominantPrayerType,
-    alternateEvery,
-    reverseAlternating: dominantPrayerType === "Reverse Alternating",
-    forceWhiteVerses: !alternateEvery,
-  };
-}
-
 // ─── Raw row fetch (ported from stuff for claude/slideshowData.js) ──────────
 
 // Every column rather than a list: implying_conditions exists only on the

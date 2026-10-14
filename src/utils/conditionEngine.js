@@ -53,9 +53,8 @@ export function evaluateCondition(condition, flags) {
     isConditionAtomSatisfied(token, flags) ? "true" : "false",
   );
 
-  // eslint-disable-next-line no-eval -- expr now only contains true/false/&&/||/!/()
+  // expr now only contains true/false/&&/||/!/().
   try {
-    // eslint-disable-next-line no-new-func
     return Boolean(new Function(`"use strict"; return (${expr});`)());
   } catch {
     // A condition that does not parse hides its row, exactly as a false one

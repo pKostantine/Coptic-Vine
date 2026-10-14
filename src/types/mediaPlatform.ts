@@ -432,12 +432,12 @@ export interface PublishedMusicReleaseTrack {
     fileSizeBytes: number | null;
     checksum: string | null;
   };
-  artists: Array<{
+  artists: {
     id: string;
     displayName: string;
     role: MusicTrackArtistRole;
     sortOrder: number;
-  }>;
+  }[];
 }
 
 export interface PublishedMusicRelease {
