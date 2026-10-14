@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Href, Stack, useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
+import { Href, Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,7 +36,6 @@ import {
   resolveDocumentRestore, visibleDocumentSectionIds, type DocumentRestoreRequest,
 } from '../../../utils/sectionRestore';
 import { goBack } from '../../../utils/navigation';
-import { bookForPath, recordRecentDocument } from '../../../utils/recentDocuments';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
 import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
@@ -194,15 +193,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const conditionsKey = JSON.stringify([schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags]);
   const [loadedConditionsKey, setLoadedConditionsKey] = useState<string | null>(null);
   const readySections = loadedConditionsKey === conditionsKey ? sections : null;
-  // Remembered for the Books page's "Continue reading" once the document has
-  // shown — never one that failed or is still loading. A hyperlink to the
-  // next service replaces the route, so the new document is remembered too.
-  const pathname = usePathname();
-  const hydrated = readySections !== null;
-  useEffect(() => {
-    if (!hydrated) return;
-    recordRecentDocument({ key: bookmarkId, href: pathname, title: { english: title, arabic, french }, book: bookForPath(pathname) });
-  }, [hydrated, pathname, bookmarkId, title, arabic, french]);
   const restoreSettingsSignature = JSON.stringify([
     documentPreferences.visibleLanguages, preferences.fontScale, preferences.orientationMode,
     preferences.selectText, preferences.slideshowMode, preferences.displayComments,
