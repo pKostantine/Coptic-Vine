@@ -80,7 +80,7 @@ export function applyLyricLineTimestamp<T extends EditableLyricLine>(
 }
 
 export function parseLrc(lrc: string): ParsedLrcLine[] {
-  const parsed: Array<Omit<ParsedLrcLine, 'sequence' | 'startMs'> & { startMs: number }> = [];
+  const parsed: (Omit<ParsedLrcLine, 'sequence' | 'startMs'> & { startMs: number })[] = [];
 
   lrc.split(/\r?\n/).forEach((rawLine, sourceIndex) => {
     const timestamps = [...rawLine.matchAll(TIMESTAMP_RE)];

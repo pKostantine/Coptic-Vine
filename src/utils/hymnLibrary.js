@@ -282,6 +282,9 @@ function isReadingSentinel(value) {
   return READING_SENTINELS.has(normalizeReadingSentinel(value)) || isPaschaRiteReading(value);
 }
 
+// Each holds the one date being read. A failed load is dropped from it
+// (below), so a lost connection while opening a service doesn't leave that
+// date failing on every retry until the app restarts.
 let readingsForDateCache = null; // { isoDate, promise }
 let synaxariumCache = null; // { isoDate, promise }
 
@@ -297,6 +300,9 @@ function getReadingsForDate(isoDate) {
         }),
       );
     });
+  promise.catch(() => {
+    if (readingsForDateCache?.promise === promise) readingsForDateCache = null;
+  });
   readingsForDateCache = { isoDate, promise };
   return promise;
 }
@@ -370,6 +376,7 @@ function getBibleBookTitleByKey(bookKey) {
       if (error) throw createReadableSupabaseError(error, "bible.books");
       return data ? { english: data.title_english || "", arabic: data.title_arabic || "", french: data.title_french || "" } : null;
     })();
+    cached.catch(() => bibleBookTitleCache.delete(bookKey));
     bibleBookTitleCache.set(bookKey, cached);
   }
   return cached;
@@ -590,6 +597,9 @@ function getSynaxariumForDate(isoDate) {
       if (error) throw new Error(`Unable to load synaxarium for ${isoDate}: ${error.message}`);
       return data || { entries: [] };
     });
+  promise.catch(() => {
+    if (synaxariumCache?.promise === promise) synaxariumCache = null;
+  });
   synaxariumCache = { isoDate, promise };
   return promise;
 }
@@ -1108,33 +1118,6 @@ async function resolveProphecySections(section, flags, depth, isoDate, coptic) {
     if (prophecy) sections.push({ ...prophecy, bishopOnly: section.bishopOnly, priestOnly: section.priestOnly });
   }
   return sections;
-}
-
-/** Merges every nested section's verses into ONE flat list under the calling section's own title/prayer_type — see the isInlinePlacement branch in hydrateWithFlags for why. */
-function mergeNestedSectionsAsOneHymn(callingSection, nestedSections) {
-  const verses = applyInheritedPreRefrainItalic(
-    nestedSections.flatMap((s) => s.verses || []),
-    callingSection.titlePrayerType,
-  );
-  const titlePrayerType = callingSection.titlePrayerType || null;
-  const dominantPrayerType = getDominantPrayerType(titlePrayerType, verses);
-  const alternateEvery =
-    dominantPrayerType && Object.prototype.hasOwnProperty.call(ALTERNATE_EVERY, dominantPrayerType)
-      ? ALTERNATE_EVERY[dominantPrayerType]
-      : null;
-  return {
-    id: callingSection.id,
-    hymn_key: callingSection.hymn_key,
-    title: callingSection.title,
-    titlePrayerType,
-    collapsible: Boolean(callingSection.collapsible),
-    defaultCollapsed: Boolean(callingSection.defaultCollapsed),
-    verses,
-    prayerType: dominantPrayerType,
-    alternateEvery,
-    reverseAlternating: dominantPrayerType === "Reverse Alternating",
-    forceWhiteVerses: !alternateEvery,
-  };
 }
 
 // ─── Raw row fetch (ported from stuff for claude/slideshowData.js) ──────────

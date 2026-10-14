@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useMemo } from 'react';
@@ -12,6 +13,8 @@ import { bookmarkKeyFor, CATEGORIES, DIVINE_LITURGY_SERVICES, HOLY_WEEK_HOURS, h
 import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { isBibleBookmark } from '@/components/vine/screens/BibleBookmarks';
+
+import { tr } from '../utils/appText';
 
 interface BookmarkEntry {
   id: string;
@@ -80,10 +83,11 @@ const BOOKMARK_INDEX = buildBookmarkIndex();
 /** Bookmarks screen — ported from HomeScreen.js's bookmarks Modal (rendered as its own route here instead of a Modal). */
 export default function BookmarksScreen() {
   const router = useRouter();
-  const { bookmarks, preferences } = useReadingPreferences();
+  const { bookmarks, preferences, toggleBookmark } = useReadingPreferences();
   // French shows in the English (left-to-right) slot.
   const showEnglish = preferences.appLanguage !== 'ar';
   const showArabic = preferences.appLanguage === 'ar';
+  const title = tr('Bookmarks', 'Signets', 'العلامات');
 
   // Bible chapters have their own bookmarks, in the Bible (BibleBookmarks).
   const entries = useMemo(() => {
@@ -116,28 +120,46 @@ export default function BookmarksScreen() {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <Head>
-        <title>Coptic Vine Bookmarks</title>
+        <title>{`${title} — Coptic Vine`}</title>
       </Head>
-      <AppHeader title="Bookmarks" canGoBack onBack={() => goBack(router, '/books')} />
+      <AppHeader
+        title={{ english: 'Bookmarks', arabic: 'العلامات', french: 'Signets' }}
+        canGoBack
+        onBack={() => goBack(router, '/books')}
+        visibleLanguages={{ english: showEnglish, arabic: showArabic }}
+      />
       {entries.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No bookmarks yet.</Text>
+          <Text style={[styles.emptyText, showArabic && styles.arabic]}>{tr('No bookmarks yet', 'Aucun signet pour l’instant', 'لا توجد علامات بعد')}</Text>
+          <Text style={[styles.emptyHint, showArabic && styles.arabic]}>
+            {tr('Bookmark a service from its content list.', 'Ajoutez un service aux signets depuis sa table des matières.', 'احفظ خدمة من قائمة محتوياتها.')}
+          </Text>
         </View>
       ) : (
         <NowPlayingAwareFlatList
           contentContainerStyle={styles.listContent}
           data={entries}
           keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <MenuRow
-              title={preferences.appLanguage === 'fr' ? item.french || item.title : item.title}
-              arabic={item.arabic}
-              showEnglish={showEnglish}
-              showArabic={showArabic}
-              position={menuRowPosition(index, entries.length)}
-              onPress={() => router.push(item.href as never)}
-            />
-          )}
+          renderItem={({ item, index }) => {
+            const rowTitle = preferences.appLanguage === 'fr' ? item.french || item.title : item.title;
+            const spoken = showArabic && item.arabic ? item.arabic : rowTitle;
+            return (
+              <MenuRow
+                title={rowTitle}
+                arabic={item.arabic}
+                showEnglish={showEnglish}
+                showArabic={showArabic}
+                position={menuRowPosition(index, entries.length)}
+                onPress={() => router.push(item.href as never)}
+                // Its bookmark, lit: pressing it takes the row off the list.
+                trailingAction={{
+                  icon: 'bookmark',
+                  label: tr(`Remove ${spoken} from bookmarks`, `Retirer ${spoken} des signets`, `إزالة ${spoken} من العلامات`),
+                  onPress: () => toggleBookmark(item.id),
+                }}
+              />
+            );
+          }}
         />
       )}
     </SafeAreaView>
@@ -146,7 +168,9 @@ export default function BookmarksScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  emptyState: { flex: 1, justifyContent: 'center', padding: SPACING.lg },
-  emptyText: { fontFamily: TYPOGRAPHY.title, fontSize: 20, textAlign: 'center', color: COLORS.white },
+  emptyState: { alignItems: 'center', flex: 1, gap: SPACING.xs, justifyContent: 'center', padding: SPACING.lg },
+  emptyText: { fontFamily: TYPOGRAPHY.title, fontSize: 20, fontWeight: '700', textAlign: 'center', color: COLORS.white },
+  emptyHint: { color: 'rgba(255, 255, 255, 0.6)', fontFamily: TYPOGRAPHY.body, fontSize: 14, textAlign: 'center' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   listContent: { alignSelf: 'center', maxWidth: 640, padding: SPACING.md, paddingBottom: SPACING.xl, width: '100%' },
 });

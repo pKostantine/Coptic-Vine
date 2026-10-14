@@ -1,3 +1,4 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useId, useRef } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -6,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useBottomChrome } from '../../../context/BottomChromeContext';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { tr } from '../../../utils/appText';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import Icon from './Icon';
@@ -25,9 +27,14 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   const layout = useLayoutMode();
   const tablet = layout === 'tablet';
   const isArabic = preferences.appLanguage === 'ar';
-  const labels = isArabic
-    ? { home: 'الرئيسية', books: 'الكتب', music: 'الترانيم', learn: 'التعلّم', account: 'الحساب' }
-    : { home: 'Home', books: 'Books', music: 'Music', learn: 'Learn', account: 'Account' };
+  // The same five names the desktop sidebar shows (SideBar.tsx).
+  const labels = {
+    home: tr('Home', 'Accueil', 'الرئيسية'),
+    books: tr('Books', 'Livres', 'الكتب'),
+    music: tr('Music', 'Musique', 'الترانيم'),
+    learn: tr('Learn', 'Apprendre', 'التعلّم'),
+    account: tr('Account', 'Compte', 'الحساب'),
+  };
   const labelStyle = [styles.tabLabel, isCompactLandscape && styles.tabLabelLandscape, tablet && styles.tabLabelTablet, isArabic && styles.tabLabelArabic];
   const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape, tablet && styles.tabTablet];
   const iconSize = isCompactLandscape ? 22 : tablet ? 24 : 27;
@@ -73,32 +80,32 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
       style={styles.shell}
       onLayout={(event) => reportHeight(event.nativeEvent.layout.height)}
     >
-      <View style={[styles.bar, tablet && styles.barTablet, Platform.OS === 'web' && { paddingBottom: insets.bottom + (tablet ? 14 : 0) }]}>
-      <Pressable accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
+      <View accessibilityRole="tablist" style={[styles.bar, tablet && styles.barTablet, Platform.OS === 'web' && { paddingBottom: insets.bottom + (tablet ? 14 : 0) }]}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'home' }} accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
         {active === 'home' ? indicator() : null}
         <Icon name="home-outline" size={iconSize} color={active === 'home' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'home' && styles.tabLabelActive]}>{labels.home}</Text>
       </Pressable>
 
-      <Pressable accessibilityLabel={labels.books} style={tabStyle} onPress={() => router.replace('/books')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'books' }} accessibilityLabel={labels.books} style={tabStyle} onPress={() => router.replace('/books')}>
         {active === 'books' ? indicator() : null}
         <Icon name="library-outline" size={iconSize} color={active === 'books' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'books' && styles.tabLabelActive]}>{labels.books}</Text>
       </Pressable>
 
-      <Pressable accessibilityLabel={labels.music} style={tabStyle} onPress={() => router.replace('/music')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'music' }} accessibilityLabel={labels.music} style={tabStyle} onPress={() => router.replace('/music')}>
         {active === 'music' ? indicator() : null}
         <Icon name="musical-notes" size={iconSize} color={active === 'music' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'music' && styles.tabLabelActive]}>{labels.music}</Text>
       </Pressable>
 
-      <Pressable accessibilityLabel={labels.learn} style={tabStyle} onPress={() => router.replace('/learn')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'learn' }} accessibilityLabel={labels.learn} style={tabStyle} onPress={() => router.replace('/learn')}>
         {active === 'learn' ? indicator(styles.learningIndicator) : null}
         <Icon name="school-outline" size={iconSize} color={active === 'learn' ? COLORS.learning : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'learn' && styles.tabLabelLearning]}>{labels.learn}</Text>
       </Pressable>
 
-      <Pressable accessibilityLabel={labels.account} style={tabStyle} onPress={() => router.replace('/account')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'account' }} accessibilityLabel={labels.account} style={tabStyle} onPress={() => router.replace('/account')}>
         {active === 'account' ? indicator() : null}
         <Icon name="person-circle-outline" size={iconSize} color={active === 'account' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'account' && styles.tabLabelActive]}>{labels.account}</Text>

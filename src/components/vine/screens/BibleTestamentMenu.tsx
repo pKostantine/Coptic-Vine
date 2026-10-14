@@ -1,11 +1,12 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import BookPage, { BookRow, RowList, SectionHeading } from './BookPage';
+import LoadFailure from '../ui/LoadFailure';
 import { sectionIndexFor, TESTAMENTS, type Testament } from '../../../constants/bibleTestaments';
-import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { COLORS, SPACING } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { appText, tr } from '../../../utils/appText';
 import { getBibleBooks, getBibleChapterKeys, getCachedBibleChapterKeys, type BibleBook } from '../../../utils/bibleService';
@@ -45,6 +46,8 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
   const look = TESTAMENTS[testament];
   const [loaded, setLoaded] = useState<LoadedBooks | null>(null);
   const [error, setError] = useState<{ testament: Testament; message: string } | null>(null);
+  // Bumped by Retry on a failed load: a new value re-runs the load below.
+  const [attempt, setAttempt] = useState(0);
   // Bumped as each book's chapter list arrives, so its count appears.
   const [, setChaptersLoaded] = useState(0);
 
@@ -63,7 +66,7 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
     return () => {
       cancelled = true;
     };
-  }, [testament]);
+  }, [testament, attempt]);
 
   const books = loaded?.testament === testament ? loaded.books : null;
   const failure = error?.testament === testament ? error.message : null;
@@ -99,7 +102,14 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
       action={{ icon: 'search-outline', label: tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس'), onPress: () => router.push('/bible/search') }}
     >
       {failure ? (
-        <Text style={styles.error}>{failure}</Text>
+        <LoadFailure
+          error={failure}
+          layout="inline"
+          onRetry={() => {
+            setError(null);
+            setAttempt((count) => count + 1);
+          }}
+        />
       ) : !books ? (
         <ActivityIndicator style={styles.loading} color={COLORS.gold} />
       ) : (
@@ -127,5 +137,4 @@ export default function BibleTestamentMenu({ testament }: { testament: Testament
 
 const styles = StyleSheet.create({
   loading: { marginTop: SPACING.xl },
-  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 16, marginHorizontal: 16, marginTop: SPACING.lg, textAlign: 'center' },
 });

@@ -15,7 +15,9 @@ export default function ToggleRow({ label, isArabic = false, active, onPress, di
   const effectiveActive = active && !disabled;
   return (
     <Pressable
-      accessibilityLabel={`Toggle ${label}`}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: effectiveActive, disabled }}
       onPress={disabled ? undefined : onPress}
       style={[styles.languageOption, disabled && styles.languageOptionDisabled]}
     >

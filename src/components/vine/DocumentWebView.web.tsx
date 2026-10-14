@@ -211,7 +211,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     const handleLoad = () => {
       applyBottomInset();
       const win = iframeRef.current?.contentWindow as
-        | (Window & { scrollToSection?: (candidates: Array<{ sectionId: string; edge: 'start' | 'end' }>) => void })
+        | (Window & { scrollToSection?: (candidates: { sectionId: string; edge: 'start' | 'end' }[]) => void })
         | null
         | undefined;
       // The whole chain, not just the remembered section: this load is

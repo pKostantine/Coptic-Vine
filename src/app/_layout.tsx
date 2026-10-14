@@ -22,6 +22,14 @@ import { useLayoutMode } from '@/utils/useLayoutMode';
 
 SplashScreen.preventAutoHideAsync();
 
+/**
+ * A page that throws while rendering is shown as a notice with a way back,
+ * rather than a blank window (or, in development, the red box). Expo Router
+ * reads this export from every route; here on the root layout it catches
+ * whatever no nearer route has.
+ */
+export { default as ErrorBoundary } from '@/components/vine/screens/AppErrorScreen';
+
 type StackOrientation = 'default' | 'landscape_right' | 'landscape_left' | 'portrait_up';
 
 const STACK_ORIENTATIONS: Record<OrientationMode, StackOrientation> = {

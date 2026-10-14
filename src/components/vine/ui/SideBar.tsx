@@ -1,7 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, type PressableStateCallbackType, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
@@ -22,6 +22,15 @@ const SECTIONS: { key: AppSection; href: string; icon: IconName; label: { englis
   { key: 'learn', href: '/learn', icon: 'school-outline', label: { english: 'Learn', french: 'Apprendre', arabic: 'التعلّم' } },
   { key: 'account', href: '/account', icon: 'person-circle-outline', label: { english: 'Account', french: 'Compte', arabic: 'الحساب' } },
 ];
+
+/**
+ * react-native-web reports the pointer hovering over a Pressable in its style
+ * callback's state; React Native's own types stop at `pressed`. The sidebar
+ * only ever renders on a desktop browser, so the field is there to read.
+ */
+function isHovered(state: PressableStateCallbackType): boolean {
+  return Boolean((state as PressableStateCallbackType & { hovered?: boolean }).hovered);
+}
 
 /** Which section a page belongs to, for the item the sidebar marks. */
 export function sectionForPath(pathname: string): AppSection {
@@ -84,11 +93,11 @@ export default function SideBar({ pathname }: { pathname: string }) {
             accessibilityState={{ selected: on }}
             accessibilityLabel={label}
             onPress={() => router.replace(section.href as never)}
-            style={({ hovered, pressed }) => [
+            style={(state) => [
               styles.item,
               arabic && styles.rowReverse,
               on && { backgroundColor: section.key === 'learn' ? COLORS.learningSoft : COLORS.goldSoft },
-              !on && (hovered || pressed) && styles.itemHover,
+              !on && (isHovered(state) || state.pressed) && styles.itemHover,
             ]}
           >
             <Icon name={section.icon} size={21} color={on ? accent : COLORS.muted} />

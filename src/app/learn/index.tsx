@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/vine/ui/AppHeader';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import LoadFailure from '@/components/vine/ui/LoadFailure';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -25,6 +26,8 @@ export default function LearningHomeScreen() {
   const [home, setHome] = useState<LearningHomePayload | null>(null);
   const [library, setLibrary] = useState<LearningItemLibraryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by Retry on a failed load: a new value re-runs the load below.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -39,7 +42,7 @@ export default function LearningHomeScreen() {
         if (active) setError(cause instanceof Error ? cause.message : 'Unable to load Learn & Study.');
       });
     return () => { active = false; };
-  }, [locale, user?.id]);
+  }, [locale, user?.id, attempt]);
 
   const continueLearning = library?.items.filter((item) => item.state === 'learning').slice(0, 4) ?? [];
 
@@ -83,7 +86,16 @@ export default function LearningHomeScreen() {
         </View>
 
         {!home && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <LoadFailure
+            error={error}
+            layout="inline"
+            onRetry={() => {
+              setError(null);
+              setAttempt((count) => count + 1);
+            }}
+          />
+        ) : null}
 
         {continueLearning.length ? (
           <>
@@ -174,7 +186,6 @@ const styles = StyleSheet.create({
   discoveryBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 5 },
   chevron: { color: COLORS.learning, fontSize: 28 },
   loader: { marginVertical: SPACING.xl },
-  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center', margin: SPACING.lg },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',

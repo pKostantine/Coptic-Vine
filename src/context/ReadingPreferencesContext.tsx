@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
+import { Platform } from 'react-native';
 
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
 import { markPendingDocumentRestoresDirty } from '../utils/lastDocumentPosition';
@@ -122,6 +123,13 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
   useEffect(() => {
     if (ready) saveBookmarks(bookmarks);
   }, [bookmarks, ready]);
+
+  // The page's own language, for the browser: screen readers, hyphenation
+  // and font fallback follow it. The layout stays as the app draws it.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    document.documentElement.lang = preferences.appLanguage;
+  }, [preferences.appLanguage]);
 
   useEffect(() => {
     if (!ready || authLoading) return;

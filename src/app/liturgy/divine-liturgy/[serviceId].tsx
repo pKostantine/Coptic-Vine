@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
+import NotFoundScreen from '@/components/vine/screens/NotFoundScreen';
 import ServiceDocument from '@/components/vine/screens/ServiceDocument';
 import { DIVINE_LITURGY_SERVICES } from '@/constants/manifest';
 
@@ -7,7 +8,7 @@ export default function DivineLiturgyDocument() {
   const { serviceId } = useLocalSearchParams<{ serviceId: string }>();
   const service = DIVINE_LITURGY_SERVICES.find((s) => s.id === serviceId);
 
-  if (!service) return null;
+  if (!service) return <NotFoundScreen backHref="/liturgy" />;
 
   return (
     <ServiceDocument

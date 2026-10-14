@@ -20,7 +20,7 @@ import LearningArtwork from '@/components/learning/LearningArtwork';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';

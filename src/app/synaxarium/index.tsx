@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/vine/ui/AppHeader';
 import Icon from '@/components/vine/ui/Icon';
+import LoadFailure from '@/components/vine/ui/LoadFailure';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -118,6 +119,8 @@ export default function SynaxariumBrowserScreen() {
   const [rows, setRows] = useState<SynaxariumYearRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by Retry on a failed load: a new value re-runs the load below.
+  const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -139,7 +142,7 @@ export default function SynaxariumBrowserScreen() {
       });
 
     return () => { active = false; };
-  }, [liveIso]);
+  }, [liveIso, attempt]);
 
   const days = useMemo(() => groupRows(rows), [rows]);
   const normalizedQuery = useMemo(() => normalizeSearch(query), [query]);
@@ -233,12 +236,7 @@ export default function SynaxariumBrowserScreen() {
           </Text>
         </View>
       ) : error ? (
-        <View style={styles.centerState}>
-          <Text style={[styles.errorTitle, isArabic && styles.arabic]}>
-            {tr('Unable to load Synaxarium', 'Impossible de charger le Synaxaire', 'تعذر تحميل السنكسار')}
-          </Text>
-          <Text style={[styles.stateText, isArabic && styles.arabic]}>{error}</Text>
-        </View>
+        <LoadFailure error={error} onRetry={() => setAttempt((count) => count + 1)} />
       ) : visibleDays.length === 0 ? (
         <View style={styles.centerState}>
           <Icon name="search-outline" size={30} color={COLORS.goldBright} />

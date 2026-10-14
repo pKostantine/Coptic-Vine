@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/vine/ui/AppHeader';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import LoadFailure from '@/components/vine/ui/LoadFailure';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -23,6 +24,8 @@ export default function MusicHomeScreen() {
   const isArabic = locale === 'ar';
   const [data, setData] = useState<MusicHomePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by Retry on a failed load: a new value re-runs the load below.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -31,7 +34,7 @@ export default function MusicHomeScreen() {
       .then((payload) => { if (active) setData(payload); })
       .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Unable to load music.'); });
     return () => { active = false; };
-  }, [locale]);
+  }, [locale, attempt]);
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -52,7 +55,7 @@ export default function MusicHomeScreen() {
         </View>
 
         {!data && !error ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <LoadFailure error={error} layout="inline" onRetry={() => setAttempt((count) => count + 1)} /> : null}
 
         {data ? (
           <>
@@ -119,7 +122,6 @@ const styles = StyleSheet.create({
   heroTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 28, fontWeight: '700', marginTop: SPACING.sm },
   heroBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, marginTop: SPACING.sm, maxWidth: 560 },
   loader: { marginVertical: SPACING.xl },
-  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, margin: SPACING.md, textAlign: 'center' },
   sectionHeading: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700', marginHorizontal: SPACING.md, marginTop: SPACING.lg, marginBottom: SPACING.md },
   horizontalList: { paddingHorizontal: SPACING.md, gap: SPACING.md },
   releaseCard: { width: 154 },

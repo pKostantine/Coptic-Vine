@@ -53,9 +53,8 @@ export function evaluateCondition(condition, flags) {
     isConditionAtomSatisfied(token, flags) ? "true" : "false",
   );
 
-  // eslint-disable-next-line no-eval -- expr now only contains true/false/&&/||/!/()
+  // expr now only contains true/false/&&/||/!/().
   try {
-    // eslint-disable-next-line no-new-func
     return Boolean(new Function(`"use strict"; return (${expr});`)());
   } catch {
     // A condition that does not parse hides its row, exactly as a false one
@@ -95,6 +94,13 @@ function rememberInCache(cache, key, value) {
     cache.delete(cache.keys().next().value);
   }
   cache.set(key, value);
+  // A load that failed is forgotten, so the next ask tries again rather than
+  // reading the failure back for the rest of the session — only while it is
+  // still the entry for its key, so a later retry's promise is never evicted
+  // by an earlier failure settling.
+  value.catch(() => {
+    if (cache.get(key) === value) cache.delete(key);
+  });
 }
 
 function utcWeekdayForIsoDate(isoDate) {
@@ -281,7 +287,7 @@ function getGospelBookKey(readingReference) {
         if (error) throw new Error(`Unable to resolve Gospel book ${bookNumber}: ${error.message}`);
         return data || null;
       });
-    gospelBookKeyCache.set(bookNumber, cached);
+    rememberInCache(gospelBookKeyCache, bookNumber, cached);
   }
   return cached;
 }

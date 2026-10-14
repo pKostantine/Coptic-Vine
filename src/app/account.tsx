@@ -15,7 +15,8 @@ import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { pickAndUploadProfileAvatar, removeProfileAvatar } from '@/services/profileAvatarService';
-import type { AppLanguage } from '@/utils/preferencesStorage';
+import { authMessage } from '@/utils/authMessages';
+import { getCurrentAppLanguage, type AppLanguage } from '@/utils/preferencesStorage';
 
 import { tr } from '../utils/appText';
 // Each language also named in itself, so it can be found whatever the app is showing.
@@ -32,7 +33,7 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>Account - Coptic Vine</title></Head>
+      <Head><title>{`${tr('Account', 'Compte', 'الحساب')} — Coptic Vine`}</title></Head>
       <AppHeader
         title={{ english: 'Account', arabic: 'الحساب', french: 'Compte' }}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
@@ -67,7 +68,7 @@ function SignedOutAccount() {
 
   const validateEmail = () => {
     const normalized = email.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(normalized)) throw new Error('Enter a valid email address.');
+    if (!/^\S+@\S+\.\S+$/.test(normalized)) throw new Error(tr('Enter a valid email address.', 'Saisissez une adresse e-mail valide.', 'أدخل بريدًا إلكترونيًا صالحًا.'));
     return normalized;
   };
 
@@ -77,10 +78,10 @@ function SignedOutAccount() {
     setNotice(null);
     try {
       const normalizedEmail = validateEmail();
-      if (password.length < 8) throw new Error('Your password must be at least 8 characters.');
+      if (password.length < 8) throw new Error(tr('Your password must be at least 8 characters.', 'Votre mot de passe doit contenir au moins 8 caractères.', 'يجب أن تتكوّن كلمة المرور من 8 أحرف على الأقل.'));
       if (mode === 'signUp') {
-        if (!displayName.trim()) throw new Error('Enter your name.');
-        if (password !== confirmPassword) throw new Error('The passwords do not match.');
+        if (!displayName.trim()) throw new Error(tr('Enter your name.', 'Saisissez votre nom.', 'أدخل اسمك.'));
+        if (password !== confirmPassword) throw new Error(tr('The passwords do not match.', 'Les mots de passe ne correspondent pas.', 'كلمتا المرور غير متطابقتين.'));
       }
       setBusy(true);
       if (mode === 'signIn') {
@@ -89,11 +90,15 @@ function SignedOutAccount() {
         const result = await auth.signUpWithEmail(normalizedEmail, password, displayName);
         if (result.confirmationRequired) {
           setConfirmationEmail(normalizedEmail);
-          setNotice('Check your email and open the confirmation link to finish creating your account.');
+          setNotice(tr(
+            'Check your email and open the confirmation link to finish creating your account.',
+            'Consultez votre e-mail et ouvrez le lien de confirmation pour terminer la création de votre compte.',
+            'افتح بريدك الإلكتروني واضغط على رابط التأكيد لإكمال إنشاء حسابك.',
+          ));
         }
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to continue.');
+      setError(cause instanceof Error ? cause.message : tr('Unable to continue.', 'Impossible de continuer.', 'تعذّر المتابعة.'));
     } finally {
       setBusy(false);
     }
@@ -107,7 +112,7 @@ function SignedOutAccount() {
     try {
       await auth.signInWithGoogle();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to sign in with Google.');
+      setError(cause instanceof Error ? cause.message : authMessage('signInWithGoogle'));
     } finally {
       setBusy(false);
     }
@@ -120,9 +125,9 @@ function SignedOutAccount() {
       const normalizedEmail = validateEmail();
       setBusy(true);
       await auth.sendPasswordReset(normalizedEmail);
-      setNotice('Password reset instructions are on their way. Check your email.');
+      setNotice(tr('Password reset instructions are on their way. Check your email.', 'Les instructions de réinitialisation sont en route. Consultez votre e-mail.', 'تم إرسال تعليمات إعادة تعيين كلمة المرور. تحقّق من بريدك الإلكتروني.'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to send a reset email.');
+      setError(cause instanceof Error ? cause.message : authMessage('passwordReset'));
     } finally {
       setBusy(false);
     }
@@ -134,9 +139,9 @@ function SignedOutAccount() {
     setError(null);
     try {
       await auth.resendSignupConfirmation(confirmationEmail);
-      setNotice('A new confirmation email has been sent.');
+      setNotice(tr('A new confirmation email has been sent.', 'Un nouvel e-mail de confirmation a été envoyé.', 'تم إرسال بريد تأكيد جديد.'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to resend the confirmation email.');
+      setError(cause instanceof Error ? cause.message : authMessage('resendConfirmation'));
     } finally {
       setBusy(false);
     }
@@ -156,7 +161,7 @@ function SignedOutAccount() {
           style={[styles.segment, mode === 'signIn' && styles.segmentActive]}
           onPress={() => { setMode('signIn'); setError(null); setNotice(null); }}
         >
-          <Text style={[styles.segmentText, mode === 'signIn' && styles.segmentTextActive]}>Sign in</Text>
+          <Text style={[styles.segmentText, mode === 'signIn' && styles.segmentTextActive, isArabic && styles.arabicText]}>{tr('Sign in', 'Se connecter', 'تسجيل الدخول')}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="tab"
@@ -164,61 +169,61 @@ function SignedOutAccount() {
           style={[styles.segment, mode === 'signUp' && styles.segmentActive]}
           onPress={() => { setMode('signUp'); setError(null); setNotice(null); }}
         >
-          <Text style={[styles.segmentText, mode === 'signUp' && styles.segmentTextActive]}>Create account</Text>
+          <Text style={[styles.segmentText, mode === 'signUp' && styles.segmentTextActive, isArabic && styles.arabicText]}>{tr('Create account', 'Créer un compte', 'إنشاء حساب')}</Text>
         </Pressable>
       </View>
 
-      <Pressable disabled={busy} style={styles.googleButton} onPress={() => void googleSignIn()}>
+      <Pressable accessibilityRole="button" disabled={busy} style={styles.googleButton} onPress={() => void googleSignIn()}>
         <Text style={styles.googleMark}>G</Text>
-        <Text style={styles.googleButtonText}>Continue with Google</Text>
+        <Text style={[styles.googleButtonText, isArabic && styles.arabicText]}>{tr('Continue with Google', 'Continuer avec Google', 'المتابعة عبر Google')}</Text>
       </Pressable>
 
       <View style={styles.dividerRow}>
         <View style={styles.divider} />
-        <Text style={styles.dividerText}>or use email</Text>
+        <Text style={[styles.dividerText, isArabic && styles.arabicText]}>{tr('or use email', 'ou avec votre e-mail', 'أو عبر البريد الإلكتروني')}</Text>
         <View style={styles.divider} />
       </View>
 
       {mode === 'signUp' ? (
-        <Field label="Name">
-          <TextInput autoCapitalize="words" autoComplete="name" value={displayName} onChangeText={setDisplayName} placeholder="Your name" placeholderTextColor={COLORS.muted} style={styles.input} />
+        <Field label={tr('Name', 'Nom', 'الاسم')}>
+          <TextInput autoCapitalize="words" autoComplete="name" value={displayName} onChangeText={setDisplayName} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={COLORS.muted} style={styles.input} />
         </Field>
       ) : null}
 
-      <Field label="Email">
+      <Field label={tr('Email', 'E-mail', 'البريد الإلكتروني')}>
         <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={COLORS.muted} style={styles.input} />
       </Field>
 
-      <Field label="Password">
+      <Field label={tr('Password', 'Mot de passe', 'كلمة المرور')}>
         <View style={styles.passwordField}>
-          <TextInput autoCapitalize="none" autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} secureTextEntry={!showPassword} value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor={COLORS.muted} style={styles.passwordInput} />
-          <Pressable accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword((current) => !current)} style={styles.showButton}>
+          <TextInput autoCapitalize="none" autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} secureTextEntry={!showPassword} value={password} onChangeText={setPassword} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={COLORS.muted} style={styles.passwordInput} />
+          <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? tr('Hide password', 'Masquer le mot de passe', 'إخفاء كلمة المرور') : tr('Show password', 'Afficher le mot de passe', 'إظهار كلمة المرور')} onPress={() => setShowPassword((current) => !current)} style={styles.showButton}>
             <Icon name="eye-outline" size={20} color={showPassword ? COLORS.gold : COLORS.muted} />
           </Pressable>
         </View>
       </Field>
 
       {mode === 'signUp' ? (
-        <Field label="Confirm password">
-          <TextInput autoCapitalize="none" autoComplete="new-password" secureTextEntry={!showPassword} value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Enter it again" placeholderTextColor={COLORS.muted} style={styles.input} />
+        <Field label={tr('Confirm password', 'Confirmer le mot de passe', 'تأكيد كلمة المرور')}>
+          <TextInput autoCapitalize="none" autoComplete="new-password" secureTextEntry={!showPassword} value={confirmPassword} onChangeText={setConfirmPassword} placeholder={tr('Enter it again', 'Saisissez-le à nouveau', 'أدخلها مرة أخرى')} placeholderTextColor={COLORS.muted} style={styles.input} />
         </Field>
       ) : null}
 
       {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
       {notice ? <Text accessibilityRole="alert" style={styles.noticeText}>{notice}</Text> : null}
 
-      <Pressable disabled={busy} style={[styles.primaryButton, busy && styles.disabled]} onPress={() => void submit()}>
-        {busy ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.primaryButtonText}>{mode === 'signIn' ? 'Sign in' : 'Create account'}</Text>}
+      <Pressable accessibilityRole="button" disabled={busy} style={[styles.primaryButton, busy && styles.disabled]} onPress={() => void submit()}>
+        {busy ? <ActivityIndicator color={COLORS.black} /> : <Text style={[styles.primaryButtonText, isArabic && styles.arabicText]}>{mode === 'signIn' ? tr('Sign in', 'Se connecter', 'تسجيل الدخول') : tr('Create account', 'Créer un compte', 'إنشاء حساب')}</Text>}
       </Pressable>
 
       {mode === 'signIn' ? (
-        <Pressable disabled={busy} style={styles.textButton} onPress={() => void resetPassword()}>
-          <Text style={styles.textButtonText}>Forgot your password?</Text>
+        <Pressable accessibilityRole="button" disabled={busy} style={styles.textButton} onPress={() => void resetPassword()}>
+          <Text style={[styles.textButtonText, isArabic && styles.arabicText]}>{tr('Forgot your password?', 'Mot de passe oublié ?', 'هل نسيت كلمة المرور؟')}</Text>
         </Pressable>
       ) : null}
       {confirmationEmail ? (
-        <Pressable disabled={busy} style={styles.textButton} onPress={() => void resendConfirmation()}>
-          <Text style={styles.textButtonText}>Resend confirmation email</Text>
+        <Pressable accessibilityRole="button" disabled={busy} style={styles.textButton} onPress={() => void resendConfirmation()}>
+          <Text style={[styles.textButtonText, isArabic && styles.arabicText]}>{tr('Resend confirmation email', 'Renvoyer l’e-mail de confirmation', 'إعادة إرسال بريد التأكيد')}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -243,7 +248,8 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const provider = user.app_metadata.provider === 'google' ? 'Google' : 'Email';
+  const provider = user.app_metadata.provider === 'google' ? 'Google' : tr('Email', 'E-mail', 'البريد الإلكتروني');
+  const verified = user.email_confirmed_at ? tr(' · Verified', ' · Vérifié', ' · موثّق') : '';
   const initials = (currentName || user.email || 'CV')
     .split(/\s+/)
     .map((part) => part[0])
@@ -256,7 +262,7 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
     const normalizedEmail = email.trim().toLowerCase();
     if (!trimmed || busy) return;
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      setError('Enter a valid email address.');
+      setError(tr('Enter a valid email address.', 'Saisissez une adresse e-mail valide.', 'أدخل بريدًا إلكترونيًا صالحًا.'));
       return;
     }
     const emailChanged = normalizedEmail !== (user.email ?? '').toLowerCase();
@@ -267,10 +273,10 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
       await auth.updateDisplayName(trimmed);
       if (emailChanged) await auth.updateEmail(normalizedEmail);
       setNotice(emailChanged
-        ? 'Profile saved. Check your email to confirm the new address.'
-        : 'Your profile has been updated.');
+        ? tr('Profile saved. Check your email to confirm the new address.', 'Profil enregistré. Consultez votre e-mail pour confirmer la nouvelle adresse.', 'تم حفظ الملف الشخصي. تحقّق من بريدك الإلكتروني لتأكيد العنوان الجديد.')
+        : tr('Your profile has been updated.', 'Votre profil a été mis à jour.', 'تم تحديث ملفك الشخصي.'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to update your profile.');
+      setError(cause instanceof Error ? cause.message : authMessage('updateProfile'));
     } finally {
       setBusy(false);
     }
@@ -285,9 +291,9 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
       const nextUrl = await pickAndUploadProfileAvatar(user.id);
       if (!nextUrl) return;
       await auth.updateAvatarUrl(nextUrl);
-      setNotice('Your profile photo has been updated.');
+      setNotice(tr('Your profile photo has been updated.', 'Votre photo de profil a été mise à jour.', 'تم تحديث صورة ملفك الشخصي.'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to update your profile photo.');
+      setError(cause instanceof Error ? cause.message : authMessage('updatePhoto'));
     } finally {
       setAvatarBusy(false);
     }
@@ -301,9 +307,9 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
     try {
       await auth.updateAvatarUrl(null);
       await removeProfileAvatar(user.id);
-      setNotice('Your profile photo has been removed.');
+      setNotice(tr('Your profile photo has been removed.', 'Votre photo de profil a été supprimée.', 'تمت إزالة صورة ملفك الشخصي.'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to remove your profile photo.');
+      setError(cause instanceof Error ? cause.message : authMessage('removePhoto'));
     } finally {
       setAvatarBusy(false);
     }
@@ -313,11 +319,11 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
     setError(null);
     setNotice(null);
     if (newPassword.length < 8) {
-      setError('Your new password must be at least 8 characters.');
+      setError(tr('Your new password must be at least 8 characters.', 'Votre nouveau mot de passe doit contenir au moins 8 caractères.', 'يجب أن تتكوّن كلمة المرور الجديدة من 8 أحرف على الأقل.'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('The passwords do not match.');
+      setError(tr('The passwords do not match.', 'Les mots de passe ne correspondent pas.', 'كلمتا المرور غير متطابقتين.'));
       return;
     }
     setBusy(true);
@@ -326,9 +332,9 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
       setNewPassword('');
       setConfirmPassword('');
       setShowPasswordEditor(false);
-      setNotice('Your password has been updated.');
+      setNotice(tr('Your password has been updated.', 'Votre mot de passe a été mis à jour.', 'تم تحديث كلمة المرور.'));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to update your password.');
+      setError(cause instanceof Error ? cause.message : authMessage('updatePassword'));
     } finally {
       setBusy(false);
     }
@@ -340,7 +346,7 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
     try {
       await auth.signOut();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to sign out.');
+      setError(cause instanceof Error ? cause.message : authMessage('signOut'));
       setBusy(false);
     }
   };
@@ -358,24 +364,25 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
           </View>
 
           <View style={styles.profileIdentity}>
-            <Text numberOfLines={1} style={styles.identityName}>{currentName || 'Coptic Vine listener'}</Text>
+            <Text numberOfLines={1} style={[styles.identityName, isArabic && styles.arabicText]}>{currentName || tr('Coptic Vine listener', 'Auditeur Coptic Vine', 'مستمع كوبتك فاين')}</Text>
             <Text numberOfLines={1} style={styles.identityEmail}>{user.email}</Text>
-            <Text style={styles.identityMeta}>{provider} account{user.email_confirmed_at ? ' · Verified' : ''}</Text>
+            <Text style={[styles.identityMeta, isArabic && styles.arabicText]}>{tr(`${provider} account`, `Compte ${provider}`, `حساب ${provider}`)}{verified}</Text>
           </View>
         </View>
 
         <View style={styles.profilePhotoActions}>
           <Pressable
+            accessibilityRole="button"
             disabled={avatarBusy}
             style={[styles.photoButton, avatarBusy && styles.disabled]}
             onPress={() => void changePhoto()}
           >
             {avatarBusy ? <ActivityIndicator size="small" color={COLORS.goldBright} /> : <Icon name="person-circle-outline" size={18} color={COLORS.goldBright} />}
-            <Text style={styles.photoButtonText}>{avatarUrl ? 'Change photo' : 'Add photo'}</Text>
+            <Text style={[styles.photoButtonText, isArabic && styles.arabicText]}>{avatarUrl ? tr('Change photo', 'Changer la photo', 'تغيير الصورة') : tr('Add photo', 'Ajouter une photo', 'إضافة صورة')}</Text>
           </Pressable>
           {customAvatarUrl ? (
-            <Pressable disabled={avatarBusy} style={styles.removePhotoButton} onPress={() => void clearPhoto()}>
-              <Text style={styles.removePhotoText}>Remove</Text>
+            <Pressable accessibilityRole="button" disabled={avatarBusy} style={styles.removePhotoButton} onPress={() => void clearPhoto()}>
+              <Text style={[styles.removePhotoText, isArabic && styles.arabicText]}>{tr('Remove', 'Supprimer', 'إزالة')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -383,8 +390,8 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
 
       {recoveryMode ? (
         <View style={[styles.section, styles.recoverySection]}>
-          <Text style={styles.sectionTitle}>Choose a new password</Text>
-          <Text style={styles.sectionBody}>Finish recovering your account by setting a new password.</Text>
+          <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Choose a new password', 'Choisissez un nouveau mot de passe', 'اختر كلمة مرور جديدة')}</Text>
+          <Text style={[styles.sectionBody, isArabic && styles.arabic]}>{tr('Finish recovering your account by setting a new password.', 'Terminez la récupération de votre compte en définissant un nouveau mot de passe.', 'أكمل استعادة حسابك بتعيين كلمة مرور جديدة.')}</Text>
           <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
         </View>
       ) : null}
@@ -394,27 +401,32 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
         <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
           {tr('Choose the name that appears on your Coptic Vine account.', 'Choisissez le nom qui apparaît sur votre compte Coptic Vine.', 'عدّل الاسم الذي يظهر في حساب كوبتك فاين الخاص بك.')}
         </Text>
-        <Field label="Display name">
-          <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholder="Your name" placeholderTextColor={COLORS.muted} />
+        <Field label={tr('Display name', 'Nom affiché', 'الاسم المعروض')}>
+          <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={COLORS.muted} />
         </Field>
-        <Field label="Email">
+        <Field label={tr('Email', 'E-mail', 'البريد الإلكتروني')}>
           <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} style={styles.input} placeholder="you@example.com" placeholderTextColor={COLORS.muted} />
         </Field>
-        <Pressable disabled={busy || !displayName.trim() || !email.trim()} style={[styles.secondaryButton, (busy || !displayName.trim() || !email.trim()) && styles.disabled]} onPress={() => void saveProfile()}>
-          <Text style={styles.secondaryButtonText}>Save profile</Text>
+        <Pressable accessibilityRole="button" disabled={busy || !displayName.trim() || !email.trim()} style={[styles.secondaryButton, (busy || !displayName.trim() || !email.trim()) && styles.disabled]} onPress={() => void saveProfile()}>
+          <Text style={[styles.secondaryButtonText, isArabic && styles.arabicText]}>{tr('Save profile', 'Enregistrer le profil', 'حفظ الملف الشخصي')}</Text>
         </Pressable>
       </View>
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Security', 'Sécurité', 'الأمان')}</Text>
-        <Text style={styles.accountDetailLabel}>Sign-in method</Text>
-        <Text style={styles.accountDetailValue}>{provider}{user.email_confirmed_at ? ' · Verified' : ''}</Text>
+        <Text style={[styles.accountDetailLabel, isArabic && styles.arabic]}>{tr('Sign-in method', 'Méthode de connexion', 'طريقة تسجيل الدخول')}</Text>
+        <Text style={[styles.accountDetailValue, isArabic && styles.arabic]}>{provider}{verified}</Text>
 
         {!recoveryMode ? (
-          <Pressable style={styles.disclosureRow} onPress={() => setShowPasswordEditor((current) => !current)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showPasswordEditor }}
+            style={[styles.disclosureRow, isArabic && styles.rowReverse]}
+            onPress={() => setShowPasswordEditor((current) => !current)}
+          >
             <View>
-              <Text style={styles.disclosureText}>Change password</Text>
-              <Text style={styles.disclosureDescription}>Set a new password for email sign-in.</Text>
+              <Text style={[styles.disclosureText, isArabic && styles.arabic]}>{tr('Change password', 'Changer le mot de passe', 'تغيير كلمة المرور')}</Text>
+              <Text style={[styles.disclosureDescription, isArabic && styles.arabic]}>{tr('Set a new password for email sign-in.', 'Définissez un nouveau mot de passe pour la connexion par e-mail.', 'عيّن كلمة مرور جديدة لتسجيل الدخول بالبريد الإلكتروني.')}</Text>
             </View>
             <Icon name={showPasswordEditor ? 'chevron-down' : 'chevron-forward'} size={18} color={COLORS.goldBright} />
           </Pressable>
@@ -428,8 +440,8 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
       </View>
 
       <View style={[styles.section, styles.signOutSection]}>
-        <Pressable disabled={busy} style={styles.signOutButton} onPress={() => void signOut()}>
-          <Text style={styles.signOutText}>Sign out</Text>
+        <Pressable accessibilityRole="button" disabled={busy} style={styles.signOutButton} onPress={() => void signOut()}>
+          <Text style={[styles.signOutText, isArabic && styles.arabicText]}>{tr('Sign out', 'Se déconnecter', 'تسجيل الخروج')}</Text>
         </Pressable>
       </View>
     </>
@@ -446,14 +458,14 @@ function PasswordEditor({ password, confirmation, onPasswordChange, onConfirmati
 }) {
   return (
     <View style={styles.passwordEditor}>
-      <Field label="New password">
-        <TextInput secureTextEntry autoComplete="new-password" value={password} onChangeText={onPasswordChange} placeholder="At least 8 characters" placeholderTextColor={COLORS.muted} style={styles.input} />
+      <Field label={tr('New password', 'Nouveau mot de passe', 'كلمة المرور الجديدة')}>
+        <TextInput secureTextEntry autoComplete="new-password" value={password} onChangeText={onPasswordChange} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={COLORS.muted} style={styles.input} />
       </Field>
-      <Field label="Confirm new password">
-        <TextInput secureTextEntry autoComplete="new-password" value={confirmation} onChangeText={onConfirmationChange} placeholder="Enter it again" placeholderTextColor={COLORS.muted} style={styles.input} />
+      <Field label={tr('Confirm new password', 'Confirmer le nouveau mot de passe', 'تأكيد كلمة المرور الجديدة')}>
+        <TextInput secureTextEntry autoComplete="new-password" value={confirmation} onChangeText={onConfirmationChange} placeholder={tr('Enter it again', 'Saisissez-le à nouveau', 'أدخلها مرة أخرى')} placeholderTextColor={COLORS.muted} style={styles.input} />
       </Field>
-      <Pressable disabled={busy} style={[styles.primaryButton, busy && styles.disabled]} onPress={onSave}>
-        <Text style={styles.primaryButtonText}>Update password</Text>
+      <Pressable accessibilityRole="button" disabled={busy} style={[styles.primaryButton, busy && styles.disabled]} onPress={onSave}>
+        <Text style={[styles.primaryButtonText, getCurrentAppLanguage() === 'ar' && styles.arabicText]}>{tr('Update password', 'Mettre à jour le mot de passe', 'تحديث كلمة المرور')}</Text>
       </Pressable>
     </View>
   );
@@ -479,7 +491,7 @@ function AppSettingsSection() {
         <Text style={[styles.sectionTitle, styles.sectionHeadingTitle, isArabic && styles.arabic]}>{tr('App settings', 'Paramètres de l’application', 'إعدادات التطبيق')}</Text>
         <Text style={[styles.syncStatus, user && contentSyncStatus === 'error' && styles.syncStatusError]}>{syncLabel}</Text>
       </View>
-      <Text style={styles.fieldLabel}>App language</Text>
+      <Text style={[styles.fieldLabel, isArabic && styles.arabic]}>{tr('App language', 'Langue de l’application', 'لغة التطبيق')}</Text>
       <View style={styles.languageOptions}>
         {APP_LANGUAGE_OPTIONS.map((option) => {
           const active = preferences.appLanguage === option.key;
@@ -494,28 +506,40 @@ function AppSettingsSection() {
           );
         })}
       </View>
-      <SettingsLink label="Book settings" description="Reading languages, text, slideshow, and display" onPress={() => router.push('/book-settings')} />
+      <SettingsLink
+        label={tr('Book settings', 'Réglages des livres', 'إعدادات الكتب')}
+        description={tr('Reading languages, text, slideshow, and display', 'Langues de lecture, texte, diaporama et affichage', 'لغات القراءة والنص والعرض التقديمي والشاشة')}
+        arabic={isArabic}
+        onPress={() => router.push('/book-settings')}
+      />
       {Platform.OS !== 'web' ? (
-        <SettingsLink label="Downloads and storage" description="Manage books, music, and learning saved offline" onPress={() => router.push('/downloads')} />
+        <SettingsLink
+          label={tr('Downloads and storage', 'Téléchargements et stockage', 'التنزيلات والتخزين')}
+          description={tr('Manage books, music, and learning saved offline', 'Gérez les livres, la musique et les leçons enregistrés hors ligne', 'إدارة الكتب والموسيقى والدروس المحفوظة دون اتصال')}
+          arabic={isArabic}
+          onPress={() => router.push('/downloads')}
+        />
       ) : null}
     </View>
   );
 }
 
-function SettingsLink({ label, description, onPress }: { label: string; description: string; onPress: () => void }) {
+function SettingsLink({ label, description, arabic, onPress }: { label: string; description: string; arabic: boolean; onPress: () => void }) {
   return (
-    <Pressable style={styles.settingsLink} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${label}. ${description}`} style={[styles.settingsLink, arabic && styles.rowReverse]} onPress={onPress}>
       <View style={styles.settingsLinkText}>
-        <Text style={styles.settingsLinkLabel}>{label}</Text>
-        <Text style={styles.settingsLinkDescription}>{description}</Text>
+        <Text style={[styles.settingsLinkLabel, arabic && styles.arabic]}>{label}</Text>
+        <Text style={[styles.settingsLinkDescription, arabic && styles.arabic]}>{description}</Text>
       </View>
-      <Icon name="chevron-forward" size={18} color={COLORS.goldBright} />
+      <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.goldBright} />
     </Pressable>
   );
 }
 
+/** A labelled input. The label follows the App Language's direction, read from the module store so the many fields need no prop for it. */
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text>{children}</View>;
+  const arabic = getCurrentAppLanguage() === 'ar';
+  return <View style={styles.field}><Text style={[styles.fieldLabel, arabic && styles.arabic]}>{label}</Text>{children}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -602,4 +626,6 @@ const styles = StyleSheet.create({
   settingsLinkLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
   settingsLinkDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 17, marginTop: 3 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  rowReverse: { flexDirection: 'row-reverse' },
 });

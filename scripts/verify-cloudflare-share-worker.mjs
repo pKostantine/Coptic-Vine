@@ -39,6 +39,13 @@ if (config.main !== './workers/web-app/src/index.js') {
   throw new Error('Wrangler main must point to the web app Worker entry point.');
 }
 
+// Worker Previews (what Workers Builds deploys for every branch that is not
+// master) read their settings from this block and refuse to run without it.
+// The Worker has no bindings or variables of its own, so it stays empty.
+if (!config.previews || typeof config.previews !== 'object' || Array.isArray(config.previews)) {
+  throw new Error('Wrangler config must carry a `previews` block, or branch previews cannot be deployed.');
+}
+
 if (
   config.assets?.directory !== './dist'
   || config.assets?.binding !== 'ASSETS'
