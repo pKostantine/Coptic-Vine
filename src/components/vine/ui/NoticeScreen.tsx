@@ -35,7 +35,7 @@ export default function NoticeScreen({ title, body, detail, actions = [], arabic
         <Image
           accessible
           accessibilityLabel="Coptic Vine"
-          source={require('../../../../assets/images/coptic-vine-seal.png')}
+          source={require('../../../../assets/images/coptic-vine-seal-screen.png')}
           style={styles.seal}
         />
         <View style={styles.divider} pointerEvents="none">

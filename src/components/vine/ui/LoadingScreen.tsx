@@ -22,7 +22,7 @@ export default function LoadingScreen() {
         },
       ]}
     >
-      <Image source={require('../../../../assets/images/coptic-vine-seal.png')} style={styles.logo} />
+      <Image source={require('../../../../assets/images/coptic-vine-seal-screen.png')} style={styles.logo} />
       <Text style={[styles.text, getCurrentAppLanguage() === 'ar' && styles.arabic]}>{tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}</Text>
     </View>
   );

@@ -178,7 +178,7 @@ export default function HomeScreen() {
           <Image
             accessible
             accessibilityLabel="Coptic Vine"
-            source={require('../../../../assets/images/coptic-vine-seal.png')}
+            source={require('../../../../assets/images/coptic-vine-seal-screen.png')}
             style={styles.logo}
           />
         </View>
