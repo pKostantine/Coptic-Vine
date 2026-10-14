@@ -68,7 +68,7 @@
     "test:offline": "node --test tests/offlineDownloadRequests.test.cjs tests/bookDownloads.test.cjs tests/signOutDetach.test.cjs tests/authSignOut.test.cjs",
     "test:playback": "node --test tests/playbackEngine.test.cjs",
     "test:music-ui": "node --test tests/musicLibraryPlaylistUi.test.cjs",
-    "test:share": "node --test tests/shareWorker.test.mjs",
+    "test:share": "node --test tests/shareWorker.test.mjs tests/webManifest.test.cjs",
     "build": "expo export -p web",
     "postbuild": "node scripts/verify-cloudflare-share-worker.mjs",
     "deploy": "npm run build && wrangler deploy"

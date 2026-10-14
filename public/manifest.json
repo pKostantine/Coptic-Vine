@@ -1,0 +1,20 @@
+{
+  "name": "Coptic Vine",
+  "short_name": "Coptic Vine",
+  "description": "Cross-platform Coptic Orthodox worship app for multilingual liturgical books, Scripture, and hymns.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14301B",
+  "theme_color": "#14301B",
+  "lang": "en",
+  "dir": "auto",
+  "categories": ["books", "education", "lifestyle"],
+  "icons": [
+    { "src": "/icons/coptic-vine-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/coptic-vine-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/coptic-vine-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
