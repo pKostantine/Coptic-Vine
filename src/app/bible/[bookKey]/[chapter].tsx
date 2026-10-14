@@ -33,6 +33,7 @@ import { writeRichClipboard } from '@/utils/richClipboard';
 import { appText, type AppText } from '@/utils/appText';
 import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
+import { useReadingKeepAwake } from '@/utils/useReadingKeepAwake';
 import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
@@ -234,6 +235,9 @@ export default function BibleChapterDocument() {
   const latestSettingsSignatureRef = useRef(settingsSignature);
   latestSettingsSignatureRef.current = settingsSignature;
   const focusedRef = useRef(true);
+  // The ref serves the scroll reports; this state drives the screen staying on.
+  const [readerFocused, setReaderFocused] = useState(true);
+  useReadingKeepAwake(preferences.keepScreenAwake && readerFocused);
   const blurredSnapshotRef = useRef<{ verse: string | null; signature: string } | null>(null);
   // Language buttons live INSIDE the verse selector. Keep its opening verse
   // fixed across every chapter HTML replacement until the selector closes.
@@ -254,6 +258,7 @@ export default function BibleChapterDocument() {
   // background iframe/WebView scroll report replace the frozen verse.
   useFocusEffect(useCallback(() => {
     focusedRef.current = true;
+    setReaderFocused(true);
     const snapshot = blurredSnapshotRef.current;
     blurredSnapshotRef.current = null;
     if (snapshot && snapshot.signature !== latestSettingsSignatureRef.current && snapshot.verse) {
@@ -268,6 +273,7 @@ export default function BibleChapterDocument() {
         signature: latestSettingsSignatureRef.current,
       };
       focusedRef.current = false;
+      setReaderFocused(false);
     };
   }, [bookKey, chapter, psalmNumbering]));
 

@@ -25,6 +25,7 @@ import { useCalendar } from '../../../context/CalendarContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useSermonPlanner } from '../../../hooks/useSermonPlanner';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
+import { useReadingKeepAwake } from '../../../utils/useReadingKeepAwake';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { getEpistleConditionFlags } from '../../../utils/readingsService';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
@@ -201,6 +202,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     preferences.selectedSaintHymns, preferences.appLanguage, effectiveDate, vespersEffectiveDate,
   ]);
   const [readerFocused, setReaderFocused] = useState(true);
+  // A liturgy runs for hours: the screen stays on while this is the screen being read.
+  useReadingKeepAwake(preferences.keepScreenAwake && readerFocused);
   const [restoreRequest, setRestoreRequest] = useState<DocumentRestoreRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumped by Retry on a failed load: a new value re-runs the hydration below.
