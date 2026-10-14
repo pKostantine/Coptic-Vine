@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
+import NotFoundScreen from '@/components/vine/screens/NotFoundScreen';
 import ServiceDocument from '@/components/vine/screens/ServiceDocument';
 import { RAISING_OF_INCENSE_OPTIONS } from '@/constants/manifest';
 
@@ -7,7 +8,7 @@ export default function RaisingOfIncenseDocument() {
   const { serviceId } = useLocalSearchParams<{ serviceId: string }>();
   const option = RAISING_OF_INCENSE_OPTIONS.find((o) => o.id === serviceId);
 
-  if (!option) return null;
+  if (!option) return <NotFoundScreen backHref="/liturgy" />;
 
   return (
     <ServiceDocument
