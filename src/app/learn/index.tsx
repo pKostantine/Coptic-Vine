@@ -59,7 +59,7 @@ export default function LearningHomeScreen() {
 
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.discoveryGrid}>
-          <Pressable style={styles.discoveryCard} onPress={() => router.push('/learn/cantors')}>
+          <Pressable accessibilityRole="button" style={styles.discoveryCard} onPress={() => router.push('/learn/cantors')}>
             <View style={styles.discoveryIcon}><Text style={styles.discoveryGlyph}>♬</Text></View>
             <View style={styles.discoveryText}>
               <Text style={[styles.discoveryTitle, isArabic && styles.arabic]}>
@@ -71,7 +71,7 @@ export default function LearningHomeScreen() {
             </View>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
-          <Pressable style={styles.discoveryCard} onPress={() => router.push('/learn/seasons')}>
+          <Pressable accessibilityRole="button" style={styles.discoveryCard} onPress={() => router.push('/learn/seasons')}>
             <View style={styles.discoveryIcon}><Text style={styles.discoveryGlyph}>✦</Text></View>
             <View style={styles.discoveryText}>
               <Text style={[styles.discoveryTitle, isArabic && styles.arabic]}>
@@ -107,7 +107,7 @@ export default function LearningHomeScreen() {
             />
             <View style={styles.continueList}>
               {continueLearning.map((item, index) => (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={item.itemKind + ':' + item.itemId}
                   style={styles.continueCard}
                   onPress={() => item.itemKind === 'lesson'
@@ -148,7 +148,7 @@ function SectionHeading({
   return (
     <View style={styles.sectionHeader}>
       <Text style={[styles.sectionHeading, isArabic && styles.arabic]}>{title}</Text>
-      <Pressable onPress={onAction}><Text style={[styles.sectionAction, isArabic && styles.arabic]}>{action}</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={onAction}><Text style={[styles.sectionAction, isArabic && styles.arabic]}>{action}</Text></Pressable>
     </View>
   );
 }

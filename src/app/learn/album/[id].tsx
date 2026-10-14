@@ -62,17 +62,17 @@ export default function LearningAlbumScreen() {
             <View style={styles.heroInfo}>
               <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{tr('LEARNING ALBUM', 'ALBUM D’APPRENTISSAGE', 'ألبوم تعلّم')}</Text>
               <Text style={[styles.title, isArabic && styles.arabic]}>{album.title}</Text>
-              <Pressable onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: album.cantor.id } })}>
+              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: album.cantor.id } })}>
                 <Text style={[styles.cantor, isArabic && styles.arabic]}>{album.cantor.displayName}</Text>
               </Pressable>
               {album.season ? (
-                <Pressable onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: album.season!.id } })}>
+                <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: album.season!.id } })}>
                   <Text style={[styles.season, isArabic && styles.arabic]}>{album.season.title}</Text>
                 </Pressable>
               ) : null}
               {album.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{album.description}</Text> : null}
               <View style={styles.actions}>
-                <Pressable disabled={!queue.length} style={[styles.playAll, !queue.length && styles.disabled]} onPress={() => queue.length && playQueue(queue, 0)}>
+                <Pressable accessibilityRole="button" disabled={!queue.length} style={[styles.playAll, !queue.length && styles.disabled]} onPress={() => queue.length && playQueue(queue, 0)}>
                   <Text style={styles.playAllText}>▶  {tr('Play All', 'Tout lire', 'تشغيل الكل')}</Text>
                 </Pressable>
                 {downloadRequest ? (

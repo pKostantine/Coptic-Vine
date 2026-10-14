@@ -121,7 +121,7 @@ export default function MusicArtistScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <View style={styles.header}>
-        <Pressable onPress={() => goBack(router, '/music')} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} onPress={() => goBack(router, '/music')} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
         <Text style={styles.headerTitle}>Artist</Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -177,7 +177,7 @@ export default function MusicArtistScreen() {
           <Text style={styles.sectionTitle}>Releases</Text>
           <View style={styles.grid}>
             {artist.releases.map((release) => (
-              <Pressable key={release.id} style={styles.releaseCard} onPress={() => router.push(`/music/release/${release.id}`)}>
+              <Pressable accessibilityRole="button" key={release.id} style={styles.releaseCard} onPress={() => router.push(`/music/release/${release.id}`)}>
                 <MusicArtwork asset={release.coverAsset} size={148} label={release.title} />
                 <Text numberOfLines={1} style={styles.releaseTitle}>{release.title}</Text>
                 <Text numberOfLines={1} style={styles.releaseMeta}>

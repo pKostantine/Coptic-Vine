@@ -273,7 +273,7 @@ export default function MusicPlaylistScreen() {
               <View style={styles.actions}>
                 {playlist.tracks.length ? (
                   <>
-                  <Pressable style={styles.playButton} onPress={() => playQueue(queue, 0)}><Text style={styles.playButtonText}>▶ {tr('Play', 'Lire', 'تشغيل')}</Text></Pressable>
+                  <Pressable accessibilityRole="button" style={styles.playButton} onPress={() => playQueue(queue, 0)}><Text style={styles.playButtonText}>▶ {tr('Play', 'Lire', 'تشغيل')}</Text></Pressable>
                   {Platform.OS !== 'web' ? (
                     <MusicDownloadButton
                       packageKey={`music_playlist:${playlist.id}:${locale}`}
@@ -284,13 +284,13 @@ export default function MusicPlaylistScreen() {
                   </>
                 ) : null}
                 {playlist.visibility === 'public' ? (
-                  <Pressable style={styles.actionButton} onPress={() => void sharePlaylist()}>
+                  <Pressable accessibilityRole="button" style={styles.actionButton} onPress={() => void sharePlaylist()}>
                     <Icon name="share-outline" size={18} color={COLORS.goldBright} />
                     <Text style={styles.actionButtonText}>{tr('Share', 'Partager', 'مشاركة')}</Text>
                   </Pressable>
                 ) : null}
                 {playlist.isOwner ? (
-                  <Pressable style={styles.actionButton} onPress={() => setEditing((current) => !current)}>
+                  <Pressable accessibilityRole="button" style={styles.actionButton} onPress={() => setEditing((current) => !current)}>
                     <Icon name="settings-outline" size={18} color={COLORS.goldBright} />
                     <Text style={styles.actionButtonText}>{editing ? (tr('Close', 'Fermer', 'إغلاق')) : (tr('Edit', 'Modifier', 'تعديل'))}</Text>
                   </Pressable>
@@ -310,11 +310,11 @@ export default function MusicPlaylistScreen() {
                     {tr('Without a custom image, the cover automatically follows the first track.', 'Sans image personnalisée, la couverture reprend celle du premier titre.', 'بدون صورة مخصصة، يتبع الغلاف تلقائياً صورة أول ترنيمة.')}
                   </Text>
                   <View style={styles.coverActions}>
-                    <Pressable disabled={coverBusy} style={[styles.coverButton, coverBusy && styles.disabled]} onPress={() => void choosePlaylistCover()}>
+                    <Pressable accessibilityRole="button" disabled={coverBusy} style={[styles.coverButton, coverBusy && styles.disabled]} onPress={() => void choosePlaylistCover()}>
                       <Text style={styles.coverButtonText}>{playlist.hasCustomCover ? (tr('Replace', 'Remplacer', 'استبدال')) : (tr('Choose image', 'Choisir une image', 'اختيار صورة'))}</Text>
                     </Pressable>
                     {playlist.hasCustomCover ? (
-                      <Pressable disabled={coverBusy} style={[styles.coverRemoveButton, coverBusy && styles.disabled]} onPress={() => void clearPlaylistCover()}>
+                      <Pressable accessibilityRole="button" disabled={coverBusy} style={[styles.coverRemoveButton, coverBusy && styles.disabled]} onPress={() => void clearPlaylistCover()}>
                         <Text style={styles.coverRemoveText}>{tr('Remove', 'Retirer', 'إزالة')}</Text>
                       </Pressable>
                     ) : null}
@@ -331,17 +331,17 @@ export default function MusicPlaylistScreen() {
                 ))}
               </View>
               <Text style={styles.visibilityHelp}>{editVisibility === 'public' ? 'Anyone with the link can open and play this playlist.' : 'Only you can open this playlist.'}</Text>
-              <Pressable disabled={!editName.trim() || saving} style={[styles.saveButton, (!editName.trim() || saving) && styles.disabled]} onPress={() => void savePlaylist()}>
+              <Pressable accessibilityRole="button" disabled={!editName.trim() || saving} style={[styles.saveButton, (!editName.trim() || saving) && styles.disabled]} onPress={() => void savePlaylist()}>
                 {saving ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.saveButtonText}>{tr('Save changes', 'Enregistrer', 'حفظ التغييرات')}</Text>}
               </Pressable>
               {!confirmDelete ? (
-                <Pressable style={styles.deleteButton} onPress={() => setConfirmDelete(true)}><Text style={styles.deleteButtonText}>{tr('Delete playlist', 'Supprimer la playlist', 'حذف قائمة التشغيل')}</Text></Pressable>
+                <Pressable accessibilityRole="button" style={styles.deleteButton} onPress={() => setConfirmDelete(true)}><Text style={styles.deleteButtonText}>{tr('Delete playlist', 'Supprimer la playlist', 'حذف قائمة التشغيل')}</Text></Pressable>
               ) : (
                 <View style={styles.deleteConfirm}>
                   <Text style={styles.deleteConfirmText}>Delete this playlist? This cannot be undone.</Text>
                   <View style={styles.deleteActions}>
-                    <Pressable style={styles.cancelDeleteButton} onPress={() => setConfirmDelete(false)}><Text style={styles.cancelDeleteText}>Cancel</Text></Pressable>
-                    <Pressable disabled={saving} style={styles.confirmDeleteButton} onPress={() => void deletePlaylist()}><Text style={styles.confirmDeleteText}>Delete</Text></Pressable>
+                    <Pressable accessibilityRole="button" style={styles.cancelDeleteButton} onPress={() => setConfirmDelete(false)}><Text style={styles.cancelDeleteText}>Cancel</Text></Pressable>
+                    <Pressable accessibilityRole="button" disabled={saving} style={styles.confirmDeleteButton} onPress={() => void deletePlaylist()}><Text style={styles.confirmDeleteText}>Delete</Text></Pressable>
                   </View>
                 </View>
               )}

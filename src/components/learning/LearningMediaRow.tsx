@@ -35,7 +35,7 @@ export default function LearningMediaRow({
 }) {
   return (
     <View style={[styles.row, active && styles.rowActive]}>
-      <Pressable style={styles.main} onPress={onPress}>
+      <Pressable accessibilityRole="button" style={styles.main} onPress={onPress}>
         <View style={[styles.indexBadge, mediaType === 'video' && styles.videoBadge]}>
           <Text style={[styles.index, active && styles.activeText]}>{index + 1}</Text>
         </View>

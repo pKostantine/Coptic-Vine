@@ -33,10 +33,10 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         <Text style={styles.crashTitle}>Library could not be displayed</Text>
         <Text selectable style={styles.crashBody}>{error.message}</Text>
         <View style={styles.crashActions}>
-          <Pressable style={styles.primaryButton} onPress={() => void retry()}>
+          <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => void retry()}>
             <Text style={styles.primaryButtonText}>Try again</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => router.replace('/music')}>
+          <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => router.replace('/music')}>
             <Text style={styles.secondaryButtonText}>Back to Music</Text>
           </Pressable>
         </View>
@@ -147,7 +147,7 @@ export default function MusicLibraryScreen() {
             <Text style={[styles.authBody, isArabic && styles.arabic]}>
               {tr('Likes, playlists, follows, and listening history are tied to your account.', 'Vos favoris, playlists, abonnements et historique d’écoute sont liés à votre compte.', 'الإعجابات وقوائم التشغيل وسجل الاستماع مرتبطة بحسابك.')}
             </Text>
-            <Pressable style={styles.primaryButton} onPress={() => router.push('/account')}>
+            <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => router.push('/account')}>
               <Text style={styles.primaryButtonText}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text>
             </Pressable>
           </View>
@@ -181,7 +181,7 @@ export default function MusicLibraryScreen() {
             {library.recentTracks.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalRow}>
                 {library.recentTracks.slice(0, 10).map((recent, index) => (
-                  <Pressable key={recent.track.id} style={styles.recentCard} onPress={() => playQueue(recentQueue, index)}>
+                  <Pressable accessibilityRole="button" key={recent.track.id} style={styles.recentCard} onPress={() => playQueue(recentQueue, index)}>
                     <MusicArtwork asset={recent.release?.coverAsset} size={144} label={recent.track.title} />
                     <Text numberOfLines={1} style={[styles.recentTitle, isArabic && styles.arabic]}>{recent.track.title}</Text>
                     <Text numberOfLines={1} style={[styles.recentMeta, isArabic && styles.arabic]}>
@@ -201,7 +201,7 @@ export default function MusicLibraryScreen() {
             {library.recentReleases.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalRow}>
                 {library.recentReleases.slice(0, 10).map((release) => (
-                  <Pressable key={release.id} style={styles.recentCard} onPress={() => router.push(`/music/release/${release.id}`)}>
+                  <Pressable accessibilityRole="button" key={release.id} style={styles.recentCard} onPress={() => router.push(`/music/release/${release.id}`)}>
                     <MusicArtwork asset={release.coverAsset} size={144} label={release.title} />
                     <Text numberOfLines={1} style={[styles.recentTitle, isArabic && styles.arabic]}>{release.title}</Text>
                     <Text numberOfLines={1} style={[styles.recentMeta, isArabic && styles.arabic]}>{release.primaryArtist?.displayName ?? release.releaseType}</Text>
@@ -232,7 +232,7 @@ function RecentHeading({
   return (
     <View style={styles.sectionHeading}>
       <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{title}</Text>
-      <Pressable onPress={onPress} style={styles.seeAllButton}>
+      <Pressable accessibilityRole="button" onPress={onPress} style={styles.seeAllButton}>
         <Text style={[styles.seeAllText, isArabic && styles.arabic]}>{action}</Text>
       </Pressable>
     </View>

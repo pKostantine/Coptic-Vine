@@ -102,10 +102,10 @@ export default function LearningLessonScreen() {
           {data.lesson.mediaType === 'video' ? (
             <View style={styles.videoSection}>
               <View style={styles.modeSwitch}>
-                <Pressable onPress={() => setVideoMode('video')} style={[styles.modeButton, videoMode === 'video' && styles.modeButtonActive]}>
+                <Pressable accessibilityRole="button" onPress={() => setVideoMode('video')} style={[styles.modeButton, videoMode === 'video' && styles.modeButtonActive]}>
                   <Text style={[styles.modeText, videoMode === 'video' && styles.modeTextActive]}>{tr('Video', 'Vidéo', 'فيديو')}</Text>
                 </Pressable>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   disabled={!data.lesson.audioAsset}
                   onPress={() => {
                     setVideoMode('audio');
@@ -121,7 +121,7 @@ export default function LearningLessonScreen() {
               ) : (
                 <View style={styles.audioHero}>
                   <View style={styles.audioIcon}><Text style={styles.audioGlyph}>♪</Text></View>
-                  <Pressable style={styles.audioButton} onPress={playAudio}>
+                  <Pressable accessibilityRole="button" style={styles.audioButton} onPress={playAudio}>
                     <Text style={styles.audioButtonText}>{currentItem?.id === data.lesson.id && playing ? 'Now Playing' : 'Play audio-only lesson'}</Text>
                   </Pressable>
                   <Text style={styles.dataNote}>Uses the smaller audio rendition instead of streaming video.</Text>
@@ -131,7 +131,7 @@ export default function LearningLessonScreen() {
           ) : (
             <View style={styles.audioHero}>
               <View style={styles.audioIcon}><Text style={styles.audioGlyph}>♪</Text></View>
-              <Pressable style={styles.audioButton} onPress={playAudio}>
+              <Pressable accessibilityRole="button" style={styles.audioButton} onPress={playAudio}>
                 <Text style={styles.audioButtonText}>
                   {currentItem?.id === data.lesson.id && playing
                     ? (tr('Now Playing', 'En cours de lecture', 'قيد التشغيل'))
@@ -148,7 +148,7 @@ export default function LearningLessonScreen() {
                 : (tr('AUDIO LESSON', 'LEÇON AUDIO', 'درس صوتي'))}
             </Text>
             <Text style={[styles.title, isArabic && styles.arabic]}>{data.lesson.title}</Text>
-            <Pressable onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: data.lessonSet.id } })}>
+            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: data.lessonSet.id } })}>
               <Text style={[styles.setTitle, isArabic && styles.arabic]}>{data.lessonSet.title}</Text>
             </Pressable>
             <Text style={[styles.cantor, isArabic && styles.arabic]}>{data.lessonSet.cantor.displayName}</Text>

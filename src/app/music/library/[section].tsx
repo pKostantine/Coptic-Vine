@@ -190,7 +190,7 @@ export default function MusicLibraryFolderScreen() {
         <View style={styles.emptyCard}>
           <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{tr('Sign in required', 'Connexion requise', 'تسجيل الدخول مطلوب')}</Text>
           <Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Open your account to access this list.', 'Ouvrez votre compte pour accéder à cette liste.', 'افتح حسابك للوصول إلى هذه القائمة.')}</Text>
-          <Pressable style={styles.primaryButton} onPress={() => router.push('/account')}><Text style={styles.primaryButtonText}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text></Pressable>
+          <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => router.push('/account')}><Text style={styles.primaryButtonText}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text></Pressable>
         </View>
       );
     }
@@ -237,7 +237,7 @@ export default function MusicLibraryFolderScreen() {
       const playlists = library.playlists.filter((playlist) => includesSearch([playlist.name, playlist.description], normalizedQuery));
       return (
         <>
-          <Pressable style={styles.newPlaylistButton} onPress={() => setShowCreator((current) => !current)}>
+          <Pressable accessibilityRole="button" style={styles.newPlaylistButton} onPress={() => setShowCreator((current) => !current)}>
             <Icon name={showCreator ? 'close' : 'add'} size={18} color={COLORS.black} />
             <Text style={styles.newPlaylistText}>{showCreator ? (tr('Cancel', 'Annuler', 'إلغاء')) : (tr('New playlist', 'Nouvelle playlist', 'قائمة جديدة'))}</Text>
           </Pressable>
@@ -247,18 +247,18 @@ export default function MusicLibraryFolderScreen() {
               <TextInput value={newPlaylistDescription} onChangeText={setNewPlaylistDescription} placeholder={tr('Description (optional)', 'Description (facultatif)', 'الوصف (اختياري)')} placeholderTextColor={COLORS.muted} style={[styles.input, styles.descriptionInput, isArabic && styles.arabicInput]} multiline />
               <View style={styles.visibilityControl}>
                 {(['private', 'public'] as const).map((visibility) => (
-                  <Pressable key={visibility} style={[styles.visibilityButton, newPlaylistVisibility === visibility && styles.visibilityActive]} onPress={() => setNewPlaylistVisibility(visibility)}>
+                  <Pressable accessibilityRole="button" accessibilityState={{ selected: newPlaylistVisibility === visibility }} key={visibility} style={[styles.visibilityButton, newPlaylistVisibility === visibility && styles.visibilityActive]} onPress={() => setNewPlaylistVisibility(visibility)}>
                     <Text style={[styles.visibilityText, newPlaylistVisibility === visibility && styles.visibilityTextActive]}>{visibility === 'private' ? (tr('Private', 'Privée', 'خاصة')) : (tr('Public', 'Publique', 'عامة'))}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Pressable disabled={!newPlaylistName.trim() || creating} style={[styles.createButton, (!newPlaylistName.trim() || creating) && styles.disabled]} onPress={() => void createPlaylist()}>
+              <Pressable accessibilityRole="button" disabled={!newPlaylistName.trim() || creating} style={[styles.createButton, (!newPlaylistName.trim() || creating) && styles.disabled]} onPress={() => void createPlaylist()}>
                 {creating ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.createButtonText}>{tr('Create playlist', 'Créer une playlist', 'إنشاء')}</Text>}
               </Pressable>
             </View>
           ) : null}
           {playlists.length ? <View style={styles.list}>{playlists.map((playlist) => (
-            <Pressable key={playlist.id} style={styles.entityRow} onPress={() => router.push(`/music/playlist/${playlist.id}`)}>
+            <Pressable accessibilityRole="button" key={playlist.id} style={styles.entityRow} onPress={() => router.push(`/music/playlist/${playlist.id}`)}>
               <MusicArtwork asset={playlist.coverAsset} size={58} label={playlist.name} />
               <View style={styles.entityInfo}>
                 <Text numberOfLines={1} style={[styles.entityTitle, isArabic && styles.arabic]}>{playlist.name}</Text>
@@ -276,7 +276,7 @@ export default function MusicLibraryFolderScreen() {
         .filter((release) => includesSearch([release.title, release.subtitle, release.primaryArtist?.displayName], normalizedQuery));
       return releases.length ? <View style={styles.list}>{releases.map((release) => (
         <View key={release.id} style={styles.entityRow}>
-          <Pressable style={styles.entityMain} onPress={() => router.push(`/music/release/${release.id}`)}>
+          <Pressable accessibilityRole="button" style={styles.entityMain} onPress={() => router.push(`/music/release/${release.id}`)}>
             <MusicArtwork asset={release.coverAsset} size={58} label={release.title} />
             <View style={styles.entityInfo}>
               <Text numberOfLines={1} style={[styles.entityTitle, isArabic && styles.arabic]}>{release.title}</Text>
@@ -296,14 +296,14 @@ export default function MusicLibraryFolderScreen() {
       const artists = library.followedArtists.filter((artist) => includesSearch([artist.displayName, artist.biography], normalizedQuery));
       return artists.length ? <View style={styles.list}>{artists.map((artist) => (
         <View key={artist.id} style={styles.entityRow}>
-          <Pressable style={styles.entityMain} onPress={() => router.push(`/music/artist/${artist.id}`)}>
+          <Pressable accessibilityRole="button" style={styles.entityMain} onPress={() => router.push(`/music/artist/${artist.id}`)}>
             <MusicArtwork asset={artist.profileImageAsset} size={58} rounded label={artist.displayName} />
             <View style={styles.entityInfo}>
               <Text numberOfLines={1} style={[styles.entityTitle, isArabic && styles.arabic]}>{artist.displayName}</Text>
               <Text style={[styles.entityMeta, isArabic && styles.arabic]}>{tr('Following', 'Suivi', 'فنان متابَع')}</Text>
             </View>
           </Pressable>
-          <Pressable style={styles.textAction} onPress={() => void unfollowArtist(artist.id)}><Text style={styles.textActionLabel}>{tr('Unfollow', 'Ne plus suivre', 'إلغاء')}</Text></Pressable>
+          <Pressable accessibilityRole="button" style={styles.textAction} onPress={() => void unfollowArtist(artist.id)}><Text style={styles.textActionLabel}>{tr('Unfollow', 'Ne plus suivre', 'إلغاء')}</Text></Pressable>
         </View>
       ))}</View> : <Empty query={normalizedQuery} isArabic={isArabic} />;
     }
@@ -319,7 +319,7 @@ export default function MusicLibraryFolderScreen() {
           <Text numberOfLines={1} style={[styles.entityTitle, isArabic && styles.arabic]}>{item.title}</Text>
           <Text style={[styles.entityMeta, isArabic && styles.arabic]}>{item.status} · {bytes(item.bytesWritten)}</Text>
         </View>
-        <Pressable style={styles.textAction} onPress={() => void removeDownload(item.packageKey)}><Text style={styles.textActionLabel}>{tr('Remove', 'Retirer', 'إزالة')}</Text></Pressable>
+        <Pressable accessibilityRole="button" style={styles.textAction} onPress={() => void removeDownload(item.packageKey)}><Text style={styles.textActionLabel}>{tr('Remove', 'Retirer', 'إزالة')}</Text></Pressable>
       </View>
     ))}</View> : <Empty query={normalizedQuery} isArabic={isArabic} />;
   })();

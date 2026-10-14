@@ -54,6 +54,13 @@ if (
   throw new Error('Wrangler static asset configuration is incomplete.');
 }
 
+// public/_headers hardens every static asset response (nosniff, a referrer
+// policy, no camera/microphone/geolocation); the export must carry it.
+const headersFile = await readFile(new URL('../dist/_headers', import.meta.url), 'utf8').catch(() => '');
+if (!/^\/\*\s*\n(?:\s+[\w-]+: .+\n?)+/m.test(headersFile) || !headersFile.includes('X-Content-Type-Options: nosniff')) {
+  throw new Error('dist/_headers is missing or does not harden every asset response (see public/_headers).');
+}
+
 for (const pagesArtifact of ['../dist/_worker.js', '../dist/_routes.json']) {
   try {
     await access(new URL(pagesArtifact, import.meta.url));

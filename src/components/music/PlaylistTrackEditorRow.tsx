@@ -94,7 +94,7 @@ export default function PlaylistTrackEditorRow({
           <View style={styles.actions}>
             <Pressable
               accessibilityLabel={`Remove ${track.title} from playlist`}
-              accessibilityRole="button"
+              accessible={false}
               onPress={(event) => {
                 event.stopPropagation();
                 onRemove();

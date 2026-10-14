@@ -135,7 +135,7 @@ export default function MusicLyricsView({
             {selectedSet.lines.map((line) => {
               const active = line.id === activeLineId;
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={line.id}
                   disabled={line.startMs == null}
                   onLayout={(event) => lineOffsets.current.set(line.id, event.nativeEvent.layout.y)}

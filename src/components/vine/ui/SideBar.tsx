@@ -78,7 +78,7 @@ export default function SideBar({ pathname }: { pathname: string }) {
   return (
     <View style={[styles.side, { paddingTop: insets.top + 24 }]}>
       <View style={[styles.brand, arabic && styles.rowReverse]}>
-        <Image source={require('../../../../assets/images/coptic-vine-seal.png')} style={styles.seal} accessibilityIgnoresInvertColors />
+        <Image source={require('../../../../assets/images/coptic-vine-seal-screen.png')} style={styles.seal} accessibilityIgnoresInvertColors />
         <Text style={styles.wordmark} numberOfLines={1}>Coptic Vine</Text>
       </View>
 

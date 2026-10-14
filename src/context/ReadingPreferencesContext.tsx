@@ -48,6 +48,7 @@ interface ReadingPreferencesContextValue {
   /** Clears every saint hymn choice for one saint, given its base token. */
   clearSaintHymns: (base: string) => void;
   toggleInMonastery: () => void;
+  toggleKeepScreenAwake: () => void;
   bookmarks: string[];
   isBookmarked: (id: string) => boolean;
   toggleBookmark: (id: string) => void;
@@ -334,6 +335,10 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => ({ ...prev, inMonastery: !prev.inMonastery }));
   }, []);
 
+  const toggleKeepScreenAwake = useCallback(() => {
+    setPreferences((prev) => ({ ...prev, keepScreenAwake: !prev.keepScreenAwake }));
+  }, []);
+
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks]);
 
   const toggleBookmark = useCallback((id: string) => {
@@ -362,6 +367,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleSaintHymn,
       clearSaintHymns,
       toggleInMonastery,
+      toggleKeepScreenAwake,
       bookmarks,
       isBookmarked,
       toggleBookmark,
@@ -387,6 +393,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleSaintHymn,
       clearSaintHymns,
       toggleInMonastery,
+      toggleKeepScreenAwake,
       bookmarks,
       isBookmarked,
       toggleBookmark,

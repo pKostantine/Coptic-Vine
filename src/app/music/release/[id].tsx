@@ -205,14 +205,14 @@ export default function MusicReleaseScreen() {
           <View style={[styles.meta, desktop && styles.metaDesktop]}>
             <Text style={[styles.title, desktop && styles.desktopText, isArabic && styles.arabic]}>{release.title}</Text>
             {release.subtitle ? <Text style={[styles.subtitle, desktop && styles.desktopText, isArabic && styles.arabic]}>{release.subtitle}</Text> : null}
-            <Pressable disabled={!release.primaryArtist?.id} onPress={() => release.primaryArtist?.id && router.push(`/music/artist/${release.primaryArtist.id}`)}>
+            <Pressable accessibilityRole="button" disabled={!release.primaryArtist?.id} onPress={() => release.primaryArtist?.id && router.push(`/music/artist/${release.primaryArtist.id}`)}>
               <Text style={[styles.artist, desktop && styles.desktopText, isArabic && styles.arabic]}>{artistName}</Text>
             </Pressable>
             <Text style={[styles.releaseMeta, desktop && styles.desktopText, isArabic && styles.arabic]}>{releaseMeta}</Text>
             {release.description ? <Text style={[styles.description, desktop && styles.descriptionDesktop, isArabic && styles.arabic]}>{release.description}</Text> : null}
 
             <View style={[styles.actions, desktop && styles.actionsDesktop]}>
-              <Pressable style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
+              <Pressable accessibilityRole="button" style={styles.playAll} onPress={() => queue.length && playQueue(queue, 0)}>
                 <Icon name="play" size={16} color={COLORS.black} />
                 <Text style={styles.playAllText}>{tr('Play', 'Lire', 'تشغيل')}</Text>
               </Pressable>
@@ -226,7 +226,7 @@ export default function MusicReleaseScreen() {
                 <Icon name={releaseLiked ? 'heart' : 'heart-outline'} size={19} color={releaseLiked ? COLORS.goldBright : COLORS.white} />
                 <Text style={styles.actionButtonText}>{tr('Like', 'J’aime', 'إعجاب')}</Text>
               </Pressable>
-              <Pressable style={styles.actionButton} onPress={() => void handleShareRelease()}>
+              <Pressable accessibilityRole="button" style={styles.actionButton} onPress={() => void handleShareRelease()}>
                 <Icon name="share-outline" size={19} color={COLORS.goldBright} />
                 <Text style={styles.actionButtonText}>{tr('Share', 'Partager', 'مشاركة')}</Text>
               </Pressable>
@@ -271,10 +271,10 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => voi
         <Text style={styles.errorBoundaryTitle}>Release could not be displayed</Text>
         <Text style={styles.error}>{error.message || 'An unexpected error occurred while opening this release.'}</Text>
         <View style={styles.errorBoundaryActions}>
-          <Pressable style={styles.retryButton} onPress={retry}>
+          <Pressable accessibilityRole="button" style={styles.retryButton} onPress={retry}>
             <Text style={styles.retryButtonText}>Try again</Text>
           </Pressable>
-          <Pressable style={styles.backLink} onPress={() => router.replace('/music')}>
+          <Pressable accessibilityRole="button" style={styles.backLink} onPress={() => router.replace('/music')}>
             <Text style={styles.backLinkText}>Back to Music</Text>
           </Pressable>
         </View>

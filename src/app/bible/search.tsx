@@ -301,7 +301,7 @@ export default function BibleSearchScreen() {
         ))}
       </View>
 
-      <Pressable style={styles.filtersToggle} onPress={() => setFiltersOpen((open) => !open)}>
+      <Pressable accessibilityRole="button" style={styles.filtersToggle} onPress={() => setFiltersOpen((open) => !open)}>
         <Icon name={filtersOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={COLORS.gold} />
         <Text style={[styles.filtersToggleText, localized]}>
           {label(LABELS.filters)}
@@ -377,7 +377,7 @@ export default function BibleSearchScreen() {
             loadingMore ? (
               <ActivityIndicator color={COLORS.gold} style={styles.footerLoading} />
             ) : canLoadMore ? (
-              <Pressable style={styles.loadMore} onPress={() => void runSearch(results.length)}>
+              <Pressable accessibilityRole="button" style={styles.loadMore} onPress={() => void runSearch(results.length)}>
                 <Text style={[styles.loadMoreText, localized]}>{label(LABELS.loadMore)}</Text>
               </Pressable>
             ) : null
@@ -443,7 +443,7 @@ function ResultRow({
   const title = appText({ english: result.titleEnglish, arabic: result.titleArabic, french: titleFrench });
 
   return (
-    <Pressable style={styles.resultRow} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={styles.resultRow} onPress={onPress}>
       <Text style={[styles.resultReference, isArabic && styles.arabicText]}>
         {title} {result.chapterNumber}:{result.verseNumber}
       </Text>

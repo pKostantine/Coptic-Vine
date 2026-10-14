@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/constants/theme';
+import { motionDuration, useReducedMotion } from '../../utils/useReducedMotion';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 // How far down you have to drag before the sheet closes instead of settling.
@@ -62,12 +63,13 @@ export default function PlayerSheet({
   // the closed position on the very next frame.
   if (visible && !mounted) setMounted(true);
 
+  const reduced = useReducedMotion();
   useEffect(() => {
     if (!mounted) return;
     dragY.setValue(0);
     const animation = Animated.timing(progress, {
       toValue: visible ? 1 : 0,
-      duration: visible ? 260 : 200,
+      duration: motionDuration(visible ? 260 : 200, reduced),
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: USE_NATIVE_DRIVER,
     });
@@ -75,7 +77,7 @@ export default function PlayerSheet({
       if (finished && !visible) setMounted(false);
     });
     return () => animation.stop();
-  }, [dragY, mounted, progress, visible]);
+  }, [dragY, mounted, progress, reduced, visible]);
 
   // Attached to the sheet as a whole rather than just the handle. Inner scroll
   // views claim vertical gestures that start on them, so this responds on the

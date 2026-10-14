@@ -83,7 +83,7 @@ export default function MusicTrackActionsMenu({
   return (
     <>
       <Pressable
-        accessibilityRole="button"
+        accessible={false}
         accessibilityLabel={tr('Track options', 'Options du titre', 'خيارات المقطع')}
         hitSlop={4}
         onPress={(event) => {

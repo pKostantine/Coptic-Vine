@@ -39,6 +39,8 @@ export interface DocumentVerse {
   forceWhiteText?: boolean;
   /** prayer_type "Invincible Coptic" (hymnLibrary sets this alongside prayerType): this Coptic renders whatever the Coptic language toggles say, and — when the verse carries no translation of its own — spans the row instead of taking a column. */
   invincibleCoptic?: boolean;
+  /** readingReference lines only: which of the day's readings this citation opens — its reading_rules service and reading_type ("Vespers"/"Psalm", "Pauline"/"Pauline Epistle"; Holy Week's name no service) — so a list of the day's readings can open the document at it (findReadingSectionId in documentReadings.ts). */
+  reading?: { service: string | null; readingType: string | null };
 }
 
 export interface DocumentSection {

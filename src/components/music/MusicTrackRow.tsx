@@ -42,7 +42,7 @@ export default function MusicTrackRow({
   const credit = formatMusicTrackPerformers(track);
 
   return (
-    <Pressable style={[styles.row, active && styles.rowActive]} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={[styles.row, active && styles.rowActive]} onPress={onPress}>
       {artwork ?? <Text style={[styles.index, active && styles.activeText]}>{index + 1}</Text>}
       <View style={styles.info}>
         {onTitlePress ? (
@@ -69,7 +69,7 @@ export default function MusicTrackRow({
       <Text style={styles.duration}>{formatDuration(track.durationMs)}</Text>
       {showLikeButton && onToggleLike ? (
         <Pressable
-          accessibilityRole="button"
+          accessible={false}
           accessibilityLabel={liked ? 'Unlike track' : 'Like track'}
           onPress={(event) => {
             event.stopPropagation();

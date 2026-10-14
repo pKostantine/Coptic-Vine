@@ -23,7 +23,7 @@ export default function LearningCollectionCard({
 }) {
   const isLessonSet = kind === 'lesson_set';
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={styles.card} onPress={onPress}>
       {artwork ? (
         <LearningArtwork asset={artwork} size={68} radius={8} label={title} />
       ) : (

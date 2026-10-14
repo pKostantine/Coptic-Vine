@@ -110,8 +110,8 @@ export default function LearningPlaylistPicker({
         <Icon name="playlist-add" size={20} color={COLORS.learningBright} />
       </Pressable>
       <Modal animationType="fade" transparent visible={open} onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => undefined}>
+        <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} style={styles.backdrop} onPress={() => setOpen(false)}>
+          <Pressable accessible={false} style={styles.sheet} onPress={() => undefined}>
             <View style={styles.header}>
               <View style={styles.headerCopy}>
                 <Text style={[styles.title, isArabic && styles.arabic]}>{tr('Add to My Learning', 'Ajouter à Mon apprentissage', 'أضف إلى تعلّمي')}</Text>
@@ -128,7 +128,7 @@ export default function LearningPlaylistPicker({
                 {BUILT_IN_LISTS.map((entry) => {
                   const selected = currentState === entry.state;
                   return (
-                    <Pressable
+                    <Pressable accessibilityRole="button"
                       key={entry.state}
                       disabled={selected || Boolean(addingId)}
                       onPress={() => void selectBuiltIn(entry.state)}
@@ -148,7 +148,7 @@ export default function LearningPlaylistPicker({
 
                 <Text style={[styles.groupLabel, styles.customLabel, isArabic && styles.arabic]}>{tr('CUSTOM PLAYLISTS', 'PLAYLISTS PERSONNELLES', 'قوائم مخصّصة')}</Text>
                 {playlists.map((playlist) => (
-                  <Pressable key={playlist.id} disabled={Boolean(addingId)} style={styles.playlist} onPress={() => void addToCustom(playlist)}>
+                  <Pressable accessibilityRole="button" key={playlist.id} disabled={Boolean(addingId)} style={styles.playlist} onPress={() => void addToCustom(playlist)}>
                     <View style={styles.playlistIcon}><Icon name="list-outline" size={21} color={COLORS.learningBright} /></View>
                     <View style={styles.playlistInfo}>
                       <Text numberOfLines={1} style={[styles.playlistName, isArabic && styles.arabic]}>{playlist.name}</Text>

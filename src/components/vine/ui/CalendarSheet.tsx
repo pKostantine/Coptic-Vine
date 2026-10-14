@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../constants/theme';
 import { tr } from '../../../utils/appText';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
+import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import CalendarPanel from './CalendarPanel';
 
 interface CalendarSheetProps {
@@ -46,16 +47,17 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
 
   if (visible && !mounted) setMounted(true);
 
+  const reduced = useReducedMotion();
   useEffect(() => {
     if (visible) {
       drag.setValue(0);
-      Animated.timing(progress, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+      Animated.timing(progress, { toValue: 1, duration: motionDuration(260, reduced), useNativeDriver: true }).start();
     } else if (mounted) {
-      Animated.timing(progress, { toValue: 0, duration: 200, useNativeDriver: true }).start(({ finished }) => {
+      Animated.timing(progress, { toValue: 0, duration: motionDuration(200, reduced), useNativeDriver: true }).start(({ finished }) => {
         if (finished) setMounted(false);
       });
     }
-  }, [visible, mounted, progress, drag]);
+  }, [visible, mounted, progress, drag, reduced]);
 
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
   const [panResponder] = useState(() =>

@@ -314,7 +314,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>Nothing playing</Text>
           <Text style={styles.emptyBody}>Choose a track from Music to start listening.</Text>
-          <Pressable style={styles.primaryButton} onPress={() => router.replace('/music')}><Text style={styles.primaryButtonText}>Browse Music</Text></Pressable>
+          <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => router.replace('/music')}><Text style={styles.primaryButtonText}>Browse Music</Text></Pressable>
         </View>
       </SafeAreaView>
     );

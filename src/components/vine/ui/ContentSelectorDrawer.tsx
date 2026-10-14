@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
+import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection, pickDocumentTitle } from '../documentHtml';
@@ -91,14 +92,15 @@ export default function ContentSelectorDrawer({
 
   const [slide] = useState(() => new Animated.Value(0));
 
+  const reduced = useReducedMotion();
   useEffect(() => {
     Animated.timing(slide, {
       toValue: visible ? 0 : 1,
-      duration: 220,
+      duration: motionDuration(220, reduced),
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [visible, slide]);
+  }, [visible, slide, reduced]);
 
   const listable = sections.filter((section) => {
     // "Our Father" always has a title but should never clutter the jump-to list.

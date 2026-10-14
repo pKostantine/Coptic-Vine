@@ -307,7 +307,7 @@ export default function SaintHymnPicker({
                 const count = countFor(item);
                 const single = item.options.length === 1;
                 return (
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     style={[styles.saintRow, count > 0 && styles.saintRowActive]}
                     onPress={() => openSaint(item)}
                   >
@@ -353,7 +353,7 @@ export default function SaintHymnPicker({
             {expanded?.options.map((option) => {
               const active = selectedSet.has(option.token);
               return (
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
                   key={option.token}
                   style={[styles.optionRow, active && styles.optionRowActive]}
                   onPress={() => onToggle(option.token)}
@@ -375,11 +375,11 @@ export default function SaintHymnPicker({
             })}
             <View style={styles.popoverActions}>
               {expanded && countFor(expanded) > 0 ? (
-                <Pressable style={styles.popoverAction} onPress={() => onClearSaint(expanded.base)}>
+                <Pressable accessibilityRole="button" style={styles.popoverAction} onPress={() => onClearSaint(expanded.base)}>
                   <Text style={[styles.popoverActionText, localized]}>{label(LABELS.clear)}</Text>
                 </Pressable>
               ) : null}
-              <Pressable style={styles.popoverAction} onPress={() => setExpandedBase(null)}>
+              <Pressable accessibilityRole="button" style={styles.popoverAction} onPress={() => setExpandedBase(null)}>
                 <Text style={[styles.popoverActionText, localized]}>{label(LABELS.done)}</Text>
               </Pressable>
             </View>
@@ -424,7 +424,7 @@ export default function SaintHymnPicker({
             )}
 
             <View style={styles.popoverActions}>
-              <Pressable style={styles.popoverAction} onPress={() => setPreview(null)}>
+              <Pressable accessibilityRole="button" style={styles.popoverAction} onPress={() => setPreview(null)}>
                 <Text style={[styles.popoverActionText, localized]}>{label(LABELS.close)}</Text>
               </Pressable>
             </View>

@@ -534,7 +534,7 @@ function SearchResultRow({
 
       {track && onToggleLike ? (
         <Pressable
-          accessibilityRole="button"
+          accessible={false}
           accessibilityLabel={liked ? 'Unlike track' : 'Like track'}
           onPress={(event) => {
             event.stopPropagation();

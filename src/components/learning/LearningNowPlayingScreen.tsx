@@ -369,7 +369,7 @@ function SheetButtons({ onLyrics, onQueue, count, isArabic }: { onLyrics: () => 
 
 function SheetButton({ icon, label, count, onPress }: { icon: 'book' | 'list-outline'; label: string; count?: number; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={styles.sheetButton}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.sheetButton}>
       <Icon name={icon} size={19} color={COLORS.learningBright} />
       <Text style={styles.sheetButtonText}>{label}</Text>
       {count != null ? <Text style={styles.sheetCount}>{count}</Text> : null}

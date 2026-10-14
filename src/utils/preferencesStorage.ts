@@ -75,6 +75,12 @@ export interface ReadingPreferences {
   inMonastery: boolean;
   /** Menu-chrome-only language (main menu + submenus/list screens) — never affects the text rendered inside an actual document, which is governed by visibleLanguages instead. */
   appLanguage: AppLanguage;
+  /**
+   * Keeps the screen on while a service or a chapter is open. A device
+   * choice rather than a synced one: a phone on a pew wants it, a laptop at
+   * home may not.
+   */
+  keepScreenAwake: boolean;
 }
 
 export type SyncedReadingPreferences = Pick<ReadingPreferences,
@@ -126,6 +132,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   appLanguage: 'en',
   selectedSaintHymns: [],
   inMonastery: false,
+  keepScreenAwake: true,
 };
 
 let currentAppLanguage: AppLanguage = DEFAULT_READING_PREFERENCES.appLanguage;
@@ -211,6 +218,7 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   merged.selectedSaintHymns = Array.isArray(merged.selectedSaintHymns)
     ? merged.selectedSaintHymns.filter((token): token is string => typeof token === 'string' && token.includes(':'))
     : [];
+  merged.keepScreenAwake = booleanValue(stored?.keepScreenAwake, DEFAULT_READING_PREFERENCES.keepScreenAwake);
   return merged;
 }
 

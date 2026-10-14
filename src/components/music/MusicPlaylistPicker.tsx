@@ -141,7 +141,7 @@ export default function MusicPlaylistPicker({
                     const added = addedIds.has(playlist.id);
                     const busy = busyId === playlist.id;
                     return (
-                      <Pressable key={playlist.id} disabled={busy || added} style={styles.playlistRow} onPress={() => void addToPlaylist(playlist.id)}>
+                      <Pressable accessibilityRole="button" key={playlist.id} disabled={busy || added} style={styles.playlistRow} onPress={() => void addToPlaylist(playlist.id)}>
                         <View style={styles.playlistInfo}>
                           <Text numberOfLines={1} style={styles.playlistName}>{playlist.name}</Text>
                           <Text style={styles.playlistMeta}>{playlist.trackCount} track{playlist.trackCount === 1 ? '' : 's'} - {playlist.visibility}</Text>
@@ -164,7 +164,7 @@ export default function MusicPlaylistPicker({
                     </Pressable>
                   ))}
                 </View>
-                <Pressable disabled={!newName.trim() || creating} style={[styles.createButton, (!newName.trim() || creating) && styles.disabled]} onPress={() => void createAndAdd()}>
+                <Pressable accessibilityRole="button" disabled={!newName.trim() || creating} style={[styles.createButton, (!newName.trim() || creating) && styles.disabled]} onPress={() => void createAndAdd()}>
                   {creating ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.createButtonText}>Create and add track</Text>}
                 </Pressable>
               </View>
