@@ -53,7 +53,7 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3",
-    "wrangler": "^4.133.0"
+    "wrangler": "^4.151.0"
   },
   "scripts": {
     "start": "expo start",
@@ -71,7 +71,8 @@
     "test:share": "node --test tests/shareWorker.test.mjs tests/webManifest.test.cjs",
     "build": "expo export -p web",
     "postbuild": "node scripts/verify-cloudflare-share-worker.mjs",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "preview": "npm run build && wrangler preview"
   },
   "private": true
 }
