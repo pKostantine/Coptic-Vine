@@ -9,6 +9,7 @@ import BibleWebView, { BibleWebViewHandle } from '@/components/vine/BibleWebView
 import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/vine/bibleDocumentHtml';
 import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
 import Icon from '@/components/vine/ui/Icon';
+import LoadFailure from '@/components/vine/ui/LoadFailure';
 import LoadingScreen from '@/components/vine/ui/LoadingScreen';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -212,6 +213,8 @@ export default function BibleChapterDocument() {
   const [loadedVerses, setLoadedVerses] = useState<LoadedBibleVerses | null>(null);
   const [chapterKeys, setChapterKeys] = useState<number[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by Retry on a failed load: a new value re-runs both loads below.
+  const [reloadToken, setReloadToken] = useState(0);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   // A verse arrived at from a search hit or a shared link. Held in state as
   // well as in the URL so that leaving this chapter drops it -- otherwise the
@@ -301,7 +304,7 @@ export default function BibleChapterDocument() {
     if (!bookKey) return;
     getBibleBook(bookKey).then(setBook).catch((err) => setError(err.message));
     getBibleChapterKeys(bookKey, psalmNumbering).then(setChapterKeys).catch((err) => setError(err.message));
-  }, [bookKey, psalmNumbering]);
+  }, [bookKey, psalmNumbering, reloadToken]);
 
   useEffect(() => {
     if (!bookKey || !chapter) return;
@@ -317,7 +320,7 @@ export default function BibleChapterDocument() {
     return () => {
       cancelled = true;
     };
-  }, [bookKey, chapter, psalmNumbering]);
+  }, [bookKey, chapter, psalmNumbering, reloadToken]);
 
   const verseRequestKey = bookKey && chapter ? `${bookKey}:${chapter}:${psalmNumbering}` : '';
   const verses = loadedVerses?.requestKey === verseRequestKey ? loadedVerses.verses : null;
@@ -470,9 +473,13 @@ export default function BibleChapterDocument() {
         onTrailingPress={openVerseSelector}
       />
       {error ? (
-        <View style={styles.center}>
-          <Text style={styles.error}>{error}</Text>
-        </View>
+        <LoadFailure
+          error={error}
+          onRetry={() => {
+            setError(null);
+            setReloadToken((token) => token + 1);
+          }}
+        />
       ) : !chapterHtml ? (
         <LoadingScreen />
       ) : (

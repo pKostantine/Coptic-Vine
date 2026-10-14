@@ -282,6 +282,9 @@ function isReadingSentinel(value) {
   return READING_SENTINELS.has(normalizeReadingSentinel(value)) || isPaschaRiteReading(value);
 }
 
+// Each holds the one date being read. A failed load is dropped from it
+// (below), so a lost connection while opening a service doesn't leave that
+// date failing on every retry until the app restarts.
 let readingsForDateCache = null; // { isoDate, promise }
 let synaxariumCache = null; // { isoDate, promise }
 
@@ -297,6 +300,9 @@ function getReadingsForDate(isoDate) {
         }),
       );
     });
+  promise.catch(() => {
+    if (readingsForDateCache?.promise === promise) readingsForDateCache = null;
+  });
   readingsForDateCache = { isoDate, promise };
   return promise;
 }
@@ -370,6 +376,7 @@ function getBibleBookTitleByKey(bookKey) {
       if (error) throw createReadableSupabaseError(error, "bible.books");
       return data ? { english: data.title_english || "", arabic: data.title_arabic || "", french: data.title_french || "" } : null;
     })();
+    cached.catch(() => bibleBookTitleCache.delete(bookKey));
     bibleBookTitleCache.set(bookKey, cached);
   }
   return cached;
@@ -590,6 +597,9 @@ function getSynaxariumForDate(isoDate) {
       if (error) throw new Error(`Unable to load synaxarium for ${isoDate}: ${error.message}`);
       return data || { entries: [] };
     });
+  promise.catch(() => {
+    if (synaxariumCache?.promise === promise) synaxariumCache = null;
+  });
   synaxariumCache = { isoDate, promise };
   return promise;
 }

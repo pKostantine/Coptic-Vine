@@ -95,6 +95,13 @@ function rememberInCache(cache, key, value) {
     cache.delete(cache.keys().next().value);
   }
   cache.set(key, value);
+  // A load that failed is forgotten, so the next ask tries again rather than
+  // reading the failure back for the rest of the session — only while it is
+  // still the entry for its key, so a later retry's promise is never evicted
+  // by an earlier failure settling.
+  value.catch(() => {
+    if (cache.get(key) === value) cache.delete(key);
+  });
 }
 
 function utcWeekdayForIsoDate(isoDate) {
@@ -281,7 +288,7 @@ function getGospelBookKey(readingReference) {
         if (error) throw new Error(`Unable to resolve Gospel book ${bookNumber}: ${error.message}`);
         return data || null;
       });
-    gospelBookKeyCache.set(bookNumber, cached);
+    rememberInCache(gospelBookKeyCache, bookNumber, cached);
   }
   return cached;
 }

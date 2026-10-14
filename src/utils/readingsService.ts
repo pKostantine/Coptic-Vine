@@ -434,6 +434,9 @@ function getBookKeyByCalendarNumber(bookNum: number): Promise<string | null> {
   let cached = bookKeyByCalendarNumberCache.get(bookNum);
   if (!cached) {
     cached = loadBookKeyByCalendarNumber(bookNum);
+    // A failed lookup is not kept, so a retry asks again rather than
+    // re-reading the failure.
+    cached.catch(() => bookKeyByCalendarNumberCache.delete(bookNum));
     bookKeyByCalendarNumberCache.set(bookNum, cached);
   }
   return cached;
@@ -683,6 +686,7 @@ function getReadingBookTitle(bookNum: number): Promise<{ english: string; arabic
         ? { english: data.title_english || '', arabic: data.title_arabic || '', french: data.title_french || '', bookKey }
         : { english: '', arabic: '', french: '', bookKey };
     })();
+    cached.catch(() => bookTitleCache.delete(bookNum));
     bookTitleCache.set(bookNum, cached);
   }
   return cached;

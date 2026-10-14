@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Href, Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { PanResponder, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import DocumentPillBar from '../ui/DocumentPillBar';
@@ -9,6 +9,7 @@ import DocumentTopBar from '../ui/DocumentTopBar';
 import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
+import LoadFailure from '../ui/LoadFailure';
 import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface, { type SlideJumpRequest } from '../DocumentSurface';
 import {
@@ -18,7 +19,7 @@ import {
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
-import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { COLORS } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useCalendar } from '../../../context/CalendarContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -202,6 +203,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const [readerFocused, setReaderFocused] = useState(true);
   const [restoreRequest, setRestoreRequest] = useState<DocumentRestoreRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by Retry on a failed load: a new value re-runs the hydration below.
+  const [reloadToken, setReloadToken] = useState(0);
   // In-document toggle button state, rendered wherever GOSPEL_RITE is spliced in.
   const copticGospelRite = preferences.copticGospelRite;
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -392,7 +395,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey]);
+  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle
@@ -866,9 +869,12 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         />
       ) : null}
       {error ? (
-        <View style={styles.center}>
-          <Text style={styles.error}>{error}</Text>
-        </View>
+        // The native reader draws no header, so the failure itself has to offer the way back.
+        <LoadFailure
+          error={error}
+          onRetry={() => setReloadToken((token) => token + 1)}
+          onBack={isMobileDocument ? leaveDocument : undefined}
+        />
       ) : !readySections ? (
         <LoadingScreen />
       ) : (
@@ -1003,7 +1009,4 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   documentFrame: { flex: 1, position: 'relative' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
-  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
-  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, textAlign: 'center' },
 });
