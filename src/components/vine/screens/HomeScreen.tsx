@@ -11,6 +11,7 @@ import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
 import { CrownOrnament, VineDivider } from '@/components/vine/ui/Ornaments';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
+import { SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { getSeasonIndicatorFullName } from '@/constants/seasonNames';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -19,11 +20,11 @@ import { getCopticDate, getDayOverview, type CopticDate } from '@/utils/calendar
 import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 import { formatCopticDayMonth, formatDayMonthDate } from '@/utils/localeFormat';
 import { agpeyaHourAt } from '@/utils/agpeyaHours';
-import { citationText, EXPECTED_READINGS, READING_LABELS } from '@/utils/lectionaryOutline';
-import { getServiceReadingCitations, getSundayMessageForDate, type ReadingCitation } from '@/utils/readingsService';
+import { LECTIONARY_ROUTE_IDS, LECTIONARY_SERVICES, lectionaryHref, readingLinesFor, withPropheciesAsOneLine } from '@/utils/lectionaryOutline';
+import { getServiceReadingCitations, getSundayMessageForDate, type LectionaryService, type ReadingCitation } from '@/utils/readingsService';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
-import { appText, tr } from '../../../utils/appText';
+import { appText, entryLabel, tr } from '../../../utils/appText';
 
 function addUtcDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -93,9 +94,9 @@ export default function HomeScreen() {
   const [todayEvents, setTodayEvents] = useState<HomeSynaxariumEvent[]>([]);
   const [tomorrowEvents, setTomorrowEvents] = useState<HomeSynaxariumEvent[]>([]);
   const [synaxLoading, setSynaxLoading] = useState(true);
-  // The Liturgy's readings, kept with the day they were read for; null
+  // Each service's readings, kept with the day they were read for; null
   // citations mean the day's could not be loaded (the outline still shows).
-  const [readings, setReadings] = useState<{ key: string; citations: ReadingCitation[] | null } | null>(null);
+  const [readings, setReadings] = useState<{ key: string; citations: Record<LectionaryService, ReadingCitation[]> | null } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -120,7 +121,7 @@ export default function HomeScreen() {
   useEffect(() => {
     let active = true;
     getServiceReadingCitations(readingsDate)
-      .then(({ Liturgy }) => { if (active) setReadings({ key: readingsIso, citations: Liturgy }); })
+      .then((citations) => { if (active) setReadings({ key: readingsIso, citations }); })
       .catch(() => { if (active) setReadings({ key: readingsIso, citations: null }); });
     return () => { active = false; };
   }, [readingsDate, readingsIso]);
@@ -148,21 +149,24 @@ export default function HomeScreen() {
     : tr("Last Sunday's Message", 'Message de dimanche dernier', 'رسالة الأحد الماضي');
   const sundayDate = formatDayMonthDate(sunday.date, arabic);
   const events = synaxDay === 'today' ? todayEvents : tomorrowEvents;
-  const liturgyReadings = readings?.key === readingsIso ? readings : null;
+  const dayReadings = readings?.key === readingsIso ? readings : null;
   const readingsTitle = livePeriod === 'evening'
     ? tr('Tomorrow’s Readings', 'Lectures de demain', 'قراءات الغد')
     : tr('Today’s Readings', 'Lectures du jour', 'قراءات اليوم');
-  const readingLines = EXPECTED_READINGS.Liturgy.map((kind) => {
-    const citation = liturgyReadings?.citations?.find((entry) => entry.kind === kind);
+  // Each service's readings as the Lectionary lists them, a Lenten Matins'
+  // several prophecies on one line here. Still loading shows an ellipsis; a
+  // day whose readings could not be loaded, a dash.
+  const serviceReadings = LECTIONARY_SERVICES.map((service) => {
+    const entry = SERVICES_BY_CATEGORY.lectionary.find((candidate) => candidate.id === LECTIONARY_ROUTE_IDS[service]);
     return {
-      kind,
-      label: appText(READING_LABELS[kind]),
-      // Still loading shows an ellipsis; a day whose readings could not be loaded, a dash.
-      value: citation ? citationText(citation, arabic) : liturgyReadings ? null : '…',
+      service,
+      title: entry ? entryLabel(entry) : service,
+      lines: withPropheciesAsOneLine(readingLinesFor(service, dayReadings?.citations?.[service], arabic))
+        .map((line) => ({ ...line, label: appText(line.label), value: line.value ?? (dayReadings ? null : '…') })),
     };
   });
-  // "CATHOLIQUE" and "ÉVANGILE" run wider than the English kinds; the column makes room for them.
-  const readingKindWidth = readingLines.some((line) => line.label.length > 8) ? 100 : 74;
+  // "CATHOLIQUE", "ÉVANGILE" and "PROPHECIES" run wider than the English kinds; the column makes room for them.
+  const readingKindWidth = serviceReadings.some(({ lines }) => lines.some((line) => line.label.length > 8)) ? 100 : 74;
   // The iPad sets Home in two columns, the desktop in three (Coptic Vine, "Layout and spacing").
   const wideLayout = layout !== 'phone';
   const card = [styles.card, wideLayout && styles.cardWide];
@@ -212,30 +216,49 @@ export default function HomeScreen() {
       </View>
     </>
   );
+  // Each reading opens its service at that reading (lectionaryHref); the
+  // service's name opens the service, the card's title the Lectionary.
   const readingsCard = (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${readingsTitle}. ${tr('Open the Liturgy readings', 'Ouvrir les lectures de la liturgie', 'افتح قراءات القداس')}`}
-      onPress={() => router.push('/lectionary/liturgy' as never)}
-      style={({ pressed }) => [card, styles.readings, pressed && styles.pressed]}
-    >
-      <View style={[styles.readingsHeader, arabic && styles.rowReverse]}>
+    <View style={[card, styles.readings]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${readingsTitle}. ${tr('Open the Lectionary', 'Ouvrir le lectionnaire', 'افتح القطمارس')}`}
+        onPress={() => router.push('/lectionary' as never)}
+        style={({ pressed }) => [styles.readingsHeader, arabic && styles.rowReverse, pressed && styles.pressed]}
+      >
         <View style={styles.flex}>
-          <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Lectionary · Liturgy', 'Lectionnaire · Liturgie', 'القطمارس · القداس')}</Text>
+          <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Lectionary', 'Lectionnaire', 'القطمارس')}</Text>
           <Text style={[styles.readingsTitle, arabic && styles.arabic]} numberOfLines={1}>{readingsTitle}</Text>
           <Text style={[styles.readingsDate, arabic && styles.arabic]}>{formatDayMonthDate(readingsDate, arabic)}</Text>
         </View>
         <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />
-      </View>
-      <View style={styles.readingList}>
-        {readingLines.map((line, index) => (
-          <View key={line.kind} style={[styles.readingRow, index === readingLines.length - 1 && styles.readingRowLast, arabic && styles.rowReverse]}>
-            <Text style={[styles.readingKind, { width: readingKindWidth }, arabic && styles.readingKindArabic]} numberOfLines={1}>{arabic ? line.label : line.label.toUpperCase()}</Text>
-            <Text style={[styles.readingValue, !line.value && styles.readingMissing, arabic && styles.arabic]} numberOfLines={1}>{line.value ?? '—'}</Text>
-          </View>
-        ))}
-      </View>
-    </Pressable>
+      </Pressable>
+      {serviceReadings.map(({ service, title, lines }) => (
+        <View key={service} style={styles.readingService}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${tr('Open', 'Ouvrir', 'افتح')} ${title}`}
+            onPress={() => router.push(lectionaryHref(service) as never)}
+            style={({ pressed }) => [styles.readingServiceHeader, arabic && styles.rowReverse, pressed && styles.pressed]}
+          >
+            <Text style={[styles.readingServiceTitle, arabic && styles.arabic]} numberOfLines={1}>{title}</Text>
+            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={14} color={COLORS.gold} />
+          </Pressable>
+          {lines.map((line, index) => (
+            <Pressable
+              key={line.key}
+              accessibilityRole="button"
+              accessibilityLabel={`${title}: ${line.label}${line.value ? `, ${line.value}` : ''}`}
+              onPress={() => router.push(lectionaryHref(service, line) as never)}
+              style={({ pressed }) => [styles.readingRow, index === lines.length - 1 && styles.readingRowLast, arabic && styles.rowReverse, pressed && styles.pressed]}
+            >
+              <Text style={[styles.readingKind, { width: readingKindWidth }, arabic && styles.readingKindArabic]} numberOfLines={1}>{arabic ? line.label : line.label.toUpperCase()}</Text>
+              <Text style={[styles.readingValue, !line.value && styles.readingMissing, arabic && styles.arabic]} numberOfLines={1}>{line.value ?? '—'}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ))}
+    </View>
   );
   const messageCard = (
     <>
@@ -441,12 +464,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   prayButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
-  readings: { paddingBottom: 6 },
-  readingsHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 14 },
+  readings: { paddingBottom: 10 },
+  readingsHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingBottom: 4, paddingHorizontal: 18, paddingTop: 14 },
   readingsTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', marginTop: 2 },
   readingsDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
-  readingList: { paddingHorizontal: 18, paddingTop: 6 },
-  readingRow: { alignItems: 'center', borderBottomColor: 'rgba(255, 255, 255, 0.07)', borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 9 },
+  readingService: { paddingHorizontal: 18, paddingTop: 8 },
+  readingServiceHeader: { alignItems: 'center', flexDirection: 'row', gap: 8, paddingBottom: 2, paddingTop: 4 },
+  readingServiceTitle: { color: COLORS.gold, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 14.5, fontWeight: '700' },
+  readingRow: { alignItems: 'center', borderBottomColor: 'rgba(255, 255, 255, 0.07)', borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 8 },
   readingRowLast: { borderBottomWidth: 0 },
   readingKind: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 },
   readingKindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },

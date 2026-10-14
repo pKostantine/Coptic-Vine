@@ -466,6 +466,29 @@ async function buildReadingCitation(readingRow) {
   };
 }
 
+/**
+ * Which of the day's readings a reading_rules row is, as the row files it:
+ * its service and reading_type ("Vespers"/"Psalm", "Pauline"/"Pauline
+ * Epistle"). Holy Week's rows name no service.
+ */
+function readingIdentity(row) {
+  if (!row) return null;
+  return { service: row.service || null, readingType: row.reading_type || null };
+}
+
+/**
+ * The citation line read before a reading ("Matthew 25:1-13"). It carries
+ * which reading it is (`reading`, see readingIdentity) so a list of the day's
+ * readings can open the document at this one — findReadingSectionId in
+ * documentReadings.ts looks for exactly this line.
+ */
+function readingReferenceVerse(citation, reading) {
+  if (!citation) return [];
+  const verse = { type: "readingReference", english: citation.english, arabic: citation.arabic, french: citation.french || citation.english, coptic: "" };
+  return [reading ? { ...verse, reading } : verse];
+}
+
+/** A sentinel's verses and citation, and which reading they are (`reading`, see readingIdentity). */
 async function resolveReadingSentinelVerses(sentinel, isoDate, flags) {
   const prophecyKey = normalizeReadingSentinel(sentinel);
   if (Object.prototype.hasOwnProperty.call(PROPHECY_READING_SENTINELS, prophecyKey)) {
@@ -475,18 +498,18 @@ async function resolveReadingSentinelVerses(sentinel, isoDate, flags) {
     // The Coptic prophecies are the ones there is Coptic for — a reading
     // bible.verses has no Coptic text of stays out of them rather than
     // repeating its English there.
-    if (!verses.length || (withCoptic && !verses.some((verse) => verse.coptic))) return { verses: [], citation: null };
-    return { verses, citation: await buildReadingCitation(reading) };
+    if (!verses.length || (withCoptic && !verses.some((verse) => verse.coptic))) return { verses: [], citation: null, reading: null };
+    return { verses, citation: await buildReadingCitation(reading), reading: readingIdentity(reading) };
   }
   const paschaRite = PASCHA_RITE_READINGS[normalizeReadingSentinel(sentinel)];
-  if (paschaRite) return resolvePaschaRiteReading(paschaRite, flags);
+  if (paschaRite) return { ...(await resolvePaschaRiteReading(paschaRite, flags)), reading: { service: null, readingType: paschaRite.readingType } };
   const mapping = READING_SENTINEL_MAP[normalizeReadingSentinel(sentinel)];
-  if (!mapping) return { verses: [], citation: null };
+  if (!mapping) return { verses: [], citation: null, reading: null };
   const readings = await getReadingsForDate(isoDate);
   const match = selectSentinelReading(mapping, readings);
   const verses = buildReadingVerses(match, mapping.withCoptic, mapping.readingType === "Psalm");
   const citation = verses.length ? await buildReadingCitation(match) : null;
-  return { verses, citation };
+  return { verses, citation, reading: { service: mapping.service, readingType: mapping.readingType } };
 }
 
 // A nested reading sentinel that becomes its own section (see
@@ -553,10 +576,10 @@ function titleWithCitation(title, citation, isPsalm) {
  * per-day value, not a stable name to navigate by.
  */
 async function resolveReadingSentinelSplice(sentinel, isoDate, titleShown, minimization, sectionId, flags) {
-  const { verses, citation } = await resolveReadingSentinelVerses(sentinel, isoDate, flags);
+  const { verses, citation, reading } = await resolveReadingSentinelVerses(sentinel, isoDate, flags);
   if (!verses.length) return null;
 
-  const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, french: citation.french || citation.english, coptic: "" }] : [];
+  const citationVerse = readingReferenceVerse(citation, reading);
 
   if (titleShown) {
     const key = normalizeReadingSentinel(sentinel);
@@ -721,11 +744,9 @@ function omitSynaxariumPreamble(sections) {
 
 /** Same as resolveReadingSentinelVerses but wraps the result as a titled section (for Subdocument/order-table-level Inline placements, which need a section object, not a bare verse list). The computed Bible citation is prepended to the verses as its own readingReference line — right before the actual reading text, never before the calling table's own intro/conclusion rows, which sit outside this section entirely. */
 async function resolveReadingSentinelSection(section, isoDate, flags) {
-  const { verses, citation } = await resolveReadingSentinelVerses(section.hymn_key, isoDate, flags);
+  const { verses, citation, reading } = await resolveReadingSentinelVerses(section.hymn_key, isoDate, flags);
   if (!verses.length) return null;
-  const versesWithCitation = citation
-    ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, coptic: "" }, ...verses]
-    : verses;
+  const versesWithCitation = [...readingReferenceVerse(citation, reading), ...verses];
   return applyCopticCaseToSection({
     id: section.id,
     hymn_key: section.hymn_key,
@@ -964,7 +985,7 @@ async function resolvePaschaReadingSections(section, flags, depth, isoDate) {
     const verses = buildReadingVerses(reading, false, false);
     if (!verses.length) continue;
     const citation = await buildReadingCitation(reading);
-    const citationVerse = citation ? [{ type: "readingReference", english: citation.english, arabic: citation.arabic, french: citation.french || citation.english, coptic: "" }] : [];
+    const citationVerse = readingReferenceVerse(citation, readingIdentity(row));
     sections.push(applyCopticCaseToSection({
       id,
       hymn_key: section.hymn_key,

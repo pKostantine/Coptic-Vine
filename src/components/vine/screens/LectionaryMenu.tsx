@@ -13,22 +13,19 @@ import { COLORS } from '../../../constants/theme';
 import { useCalendar } from '../../../context/CalendarContext';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { appText, entryLabel, tr } from '../../../utils/appText';
-import { citationText, EXPECTED_READINGS as EXPECTED, numberedLabel, READING_LABELS, type ReadingName } from '../../../utils/lectionaryOutline';
+import { LECTIONARY_ROUTE_IDS, lectionaryHref, readingLinesFor, type ReadingLine } from '../../../utils/lectionaryOutline';
 import { formatCopticDayMonth, formatDayMonthYearDate } from '../../../utils/localeFormat';
 import { getServiceReadingCitations, type LectionaryService, type ReadingCitation } from '../../../utils/readingsService';
-
-type ReadingLine = { key: string; label: ReadingName; value: string | null };
-
-const SERVICE_IDS: Record<LectionaryService, string> = { Vespers: 'vespers', Matins: 'matins', Liturgy: 'liturgy' };
 
 type DayReadings = { key: string; citations: Record<LectionaryService, ReadingCitation[]> };
 
 /**
  * The Lectionary (Coptic Vine design, "Book Pages"): the day it reads — stepped a day
- * at a time — then each service's readings, reading by reading. Vespers and
- * Matins each read a Psalm and a Gospel (a Lenten Matins its prophecies
- * first); the Liturgy the Pauline, Catholic, Acts, Psalm and Gospel. Then the
- * books read alongside them: the Antiphonary and the Sermon Planner.
+ * at a time — then each service's readings, reading by reading, each opening
+ * the service at that reading. Vespers and Matins each read a Psalm and a
+ * Gospel (a Lenten Matins its prophecies first); the Liturgy the Pauline,
+ * Catholic, Acts, Psalm and Gospel. Then the books read alongside them: the
+ * Antiphonary and the Sermon Planner.
  */
 export default function LectionaryMenu() {
   const router = useRouter();
@@ -40,6 +37,7 @@ export default function LectionaryMenu() {
   const byId = (id: string) => services.find((service) => service.id === id);
   const bookmarked = (service: ServiceDef) => isBookmarked(bookmarkKeyFor(service.schema, service.table, service.id));
   const open = (service: ServiceDef) => router.push(`/lectionary/${service.id}` as never);
+  const openReading = (service: LectionaryService, line: ReadingLine) => router.push(lectionaryHref(service, line) as never);
   // The readings are the rite's: after the eve, the next morning's.
   const dateKey = effectiveDate.toISOString().slice(0, 10);
   const [readings, setReadings] = useState<DayReadings | null>(null);
@@ -54,30 +52,11 @@ export default function LectionaryMenu() {
   }, [dateKey]);
 
   const today = readings?.key === dateKey ? readings : null;
-  const cite = (citation: ReadingCitation) => citationText(citation, arabic);
-
-  /** The service's readings in reading order, falling back to its outline for any not (yet) known. */
-  const linesFor = (service: LectionaryService): ReadingLine[] => {
-    const citations = today?.citations[service] ?? [];
-    // A Lenten Matins reads its prophecies first, each numbered when there are several.
-    const prophecies = service === 'Matins' ? citations.filter((citation) => citation.kind === 'Prophecy') : [];
-    return [
-      ...prophecies.map((citation, index, all) => ({
-        key: `Prophecy-${index + 1}`,
-        label: numberedLabel(READING_LABELS.Prophecy, all.length > 1 ? index + 1 : null),
-        value: cite(citation),
-      })),
-      ...EXPECTED[service].map((kind) => {
-        const found = citations.find((citation) => citation.kind === kind);
-        return { key: kind, label: READING_LABELS[kind], value: found ? cite(found) : null };
-      }),
-    ];
-  };
 
   const serviceSection = (service: LectionaryService) => {
-    const def = byId(SERVICE_IDS[service]);
+    const def = byId(LECTIONARY_ROUTE_IDS[service]);
     if (!def) return null;
-    const lines = linesFor(service);
+    const lines = readingLinesFor(service, today?.citations[service], arabic);
     // "PROPHECY 2" is wider than the other kinds; its list makes room for it.
     const kindWidth = lines.some((line) => line.key.startsWith('Prophecy')) ? 96 : 74;
     return (
@@ -95,7 +74,7 @@ export default function LectionaryMenu() {
               value={line.value}
               arabic={arabic}
               kindWidth={kindWidth}
-              onPress={() => open(def)}
+              onPress={() => openReading(service, line)}
             />
           ))}
         </RowList>

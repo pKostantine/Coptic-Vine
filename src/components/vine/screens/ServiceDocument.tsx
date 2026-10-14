@@ -26,6 +26,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useSermonPlanner } from '../../../hooks/useSermonPlanner';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { useReadingKeepAwake } from '../../../utils/useReadingKeepAwake';
+import { findReadingSectionId, parseReadingParam } from '../../../utils/documentReadings';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { getEpistleConditionFlags } from '../../../utils/readingsService';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
@@ -314,8 +315,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     [isSermonPlanner, readySections],
   );
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
-  // to a saved subdocument bookmark) — fire once when sections first load.
-  const { sub: initialSubdocumentKey } = useLocalSearchParams<{ sub?: string }>();
+  // to a saved subdocument bookmark) and ?reading=Psalm (lectionaryHref, from
+  // a list of the day's readings) — each acted on once, when sections first load.
+  const { sub: initialSubdocumentKey, reading: openAtReading } = useLocalSearchParams<{ sub?: string; reading?: string }>();
   // Hyperlinks replace only the source document. The route underneath is still
   // the place from which that source document was opened (its submenu,
   // Bookmarks, and so on), so every exit should pop back to that existing route.
@@ -324,6 +326,13 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     goBack(router, backHref);
   }, [router, backHref]);
   const initialSubOpenedRef = useRef(false);
+  const openedAtReadingRef = useRef(false);
+  // What the reader's settings show, for the decision made as a document
+  // arrives (below): those settings are deliberately not what re-hydrates it.
+  const readingVisibilityRef = useRef({ displaySilentPrayers: preferences.displaySilentPrayers, bishopPresent: preferences.bishopPresent, copticGospelRite });
+  useEffect(() => {
+    readingVisibilityRef.current = { displaySilentPrayers: preferences.displaySilentPrayers, bishopPresent: preferences.bishopPresent, copticGospelRite };
+  }, [preferences.displaySilentPrayers, preferences.bishopPresent, copticGospelRite]);
 
   useEffect(() => {
     let cancelled = false;
@@ -373,6 +382,35 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           const newSections = withAppendedHyperlink(result as DocumentSection[], appendHyperlinkKey);
           setSections(newSections);
           setLoadedConditionsKey(conditionsKey);
+          // Opened at one of its readings (?reading=Psalm, see lectionaryHref):
+          // the document starts at that reading rather than where it was last
+          // left. Decided here, with the sections, so the reader mounts already
+          // knowing where to land (initialScrollSectionId, selectedSectionId).
+          // Once only — a later hydration (the date or a setting changing)
+          // leaves the reader where they are — and not when coming back from
+          // Settings or the Calendar, which restores their place instead (the
+          // pending restore the effect below consumes).
+          const readingTarget = openedAtReadingRef.current ? null : parseReadingParam(openAtReading);
+          if (readingTarget) {
+            openedAtReadingRef.current = true;
+            const sectionId = getPendingDocumentRestore(documentPositionKey)
+              ? null
+              : findReadingSectionId(newSections, readingTarget, readingVisibilityRef.current);
+            if (sectionId) {
+              // The reader's own first report, from before it lands there,
+              // must not overwrite it (see pendingScrollRestoreSectionIdRef).
+              pendingScrollRestoreSectionIdRef.current = sectionId;
+              setTimeout(() => {
+                if (pendingScrollRestoreSectionIdRef.current === sectionId) {
+                  pendingScrollRestoreSectionIdRef.current = null;
+                }
+              }, 4000);
+              currentSectionIdRef.current = sectionId;
+              setCurrentSectionId(sectionId);
+              setSelectedSlideSectionId(sectionId);
+              setLastDocumentPosition(documentPositionKey, sectionId);
+            }
+          }
           // If a subdocument is open, refresh its sections from the new hydration
           // so date/settings changes update the subdocument content without closing it.
           setSubdocumentModal((current) => {
@@ -398,7 +436,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken]);
+  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, documentPositionKey]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle
