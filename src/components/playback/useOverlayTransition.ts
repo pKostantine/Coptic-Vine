@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Platform } from 'react-native';
 
+import { motionDuration, useReducedMotion } from '../../utils/useReducedMotion';
+
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 /**
@@ -12,6 +14,7 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 export function useOverlayTransition(visible: boolean, { duration = 240 } = {}) {
   const [mounted, setMounted] = useState(visible);
   const [progress] = useState(() => new Animated.Value(visible ? 1 : 0));
+  const reduced = useReducedMotion();
 
   // Mount during the render that opens it, so the entry animation can start
   // from the closed position on the next frame.
@@ -21,7 +24,7 @@ export function useOverlayTransition(visible: boolean, { duration = 240 } = {}) 
     if (!mounted) return;
     const animation = Animated.timing(progress, {
       toValue: visible ? 1 : 0,
-      duration: visible ? duration : Math.round(duration * 0.8),
+      duration: motionDuration(visible ? duration : Math.round(duration * 0.8), reduced),
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: USE_NATIVE_DRIVER,
     });
@@ -29,7 +32,7 @@ export function useOverlayTransition(visible: boolean, { duration = 240 } = {}) 
       if (finished && !visible) setMounted(false);
     });
     return () => animation.stop();
-  }, [duration, mounted, progress, visible]);
+  }, [duration, mounted, progress, reduced, visible]);
 
   return { mounted, progress };
 }

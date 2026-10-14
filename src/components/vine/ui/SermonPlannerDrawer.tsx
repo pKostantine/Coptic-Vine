@@ -26,6 +26,7 @@ import type { SermonPlanSyncStatus } from '@/hooks/useSermonPlanner';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import type { SermonPlannerVisibleLanguages } from '@/utils/preferencesStorage';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
+import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 import Icon from './Icon';
 
 const HIGHLIGHT_COLORS: Record<SermonHighlightColor, string> = {
@@ -110,14 +111,15 @@ export default function SermonPlannerDrawer({
   const [highlightLayouts, setHighlightLayouts] = useState<Record<string, number>>({});
   const visibleLanguageCount = Object.values(visibleLanguages).filter(Boolean).length;
 
+  const reduced = useReducedMotion();
   useEffect(() => {
     Animated.timing(slide, {
       toValue: visible ? 0 : 1,
-      duration: 220,
+      duration: motionDuration(220, reduced),
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [slide, visible]);
+  }, [reduced, slide, visible]);
 
   useEffect(() => {
     if (!visible || !activeHighlightId) return;

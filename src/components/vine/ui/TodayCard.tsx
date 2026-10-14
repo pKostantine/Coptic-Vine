@@ -4,6 +4,7 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 
 import { DAY_BLOCK_GRADIENT_END, DAY_BLOCK_GRADIENT_START, type DayBlockTheme } from '../../../constants/seasonAppearance';
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
+import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import Icon, { type IconName } from './Icon';
 import { VineDivider } from './Ornaments';
 
@@ -237,10 +238,11 @@ export function ThemeBackground({ theme }: { theme: DayBlockTheme }) {
 
 function FadeIn({ animate, children }: { animate: boolean; children: ReactNode }) {
   const [opacity] = useState(() => new Animated.Value(animate ? 0 : 1));
+  const reduced = useReducedMotion();
   useEffect(() => {
     if (!animate) return;
-    Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: Platform.OS !== 'web' }).start();
-  }, [animate, opacity]);
+    Animated.timing(opacity, { toValue: 1, duration: motionDuration(220, reduced), useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [animate, opacity, reduced]);
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
       {children}

@@ -18,6 +18,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import { musicService } from '@/services/musicService';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
+import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 import MiniPlayerCard from './MiniPlayerCard';
 
 import { tr } from '../../utils/appText';
@@ -83,11 +84,12 @@ export default function GlobalNowPlayingOverlay() {
   // a tab bar, and a transform can run on the native driver.
   const targetLift = tabBarInset > 0 ? Math.max(0, tabBarInset - insets.bottom) : 0;
   const [liftAnimation] = useState(() => new Animated.Value(targetLift));
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     const animation = Animated.timing(liftAnimation, {
       toValue: targetLift,
-      duration: 260,
+      duration: motionDuration(260, reduced),
       easing: Easing.out(Easing.cubic),
       // Moving between two screens that both have a tab bar briefly reports no
       // tab bar at all, because the outgoing bar unregisters before the
@@ -98,16 +100,16 @@ export default function GlobalNowPlayingOverlay() {
     });
     animation.start();
     return () => animation.stop();
-  }, [liftAnimation, targetLift]);
+  }, [liftAnimation, reduced, targetLift]);
 
   useEffect(() => {
     Animated.timing(collapseAnimation, {
       toValue: isCollapsed ? 1 : 0,
-      duration: 220,
+      duration: motionDuration(220, reduced),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [collapseAnimation, isCollapsed]);
+  }, [collapseAnimation, isCollapsed, reduced]);
 
   // The desktop sidebar steps aside while a full player is open, so the player
   // gets the whole window. Reported per overlay and cleared on unmount, the
