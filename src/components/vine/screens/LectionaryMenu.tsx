@@ -13,35 +13,13 @@ import { COLORS } from '../../../constants/theme';
 import { useCalendar } from '../../../context/CalendarContext';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { appText, entryLabel, tr } from '../../../utils/appText';
-import { formatCopticDayMonth, formatDayMonthYearDate, toEasternArabicDigits } from '../../../utils/localeFormat';
-import { getServiceReadingCitations, type LectionaryReadingKind, type LectionaryService, type ReadingCitation } from '../../../utils/readingsService';
+import { citationText, EXPECTED_READINGS as EXPECTED, numberedLabel, READING_LABELS, type ReadingName } from '../../../utils/lectionaryOutline';
+import { formatCopticDayMonth, formatDayMonthYearDate } from '../../../utils/localeFormat';
+import { getServiceReadingCitations, type LectionaryService, type ReadingCitation } from '../../../utils/readingsService';
 
-type Name = { english: string; arabic: string; french?: string };
-type ReadingLine = { key: string; label: Name; value: string | null };
-
-const READING_LABELS: Record<LectionaryReadingKind, Name> = {
-  Psalm: { english: 'Psalm', arabic: 'المزمور', french: 'Psaume' },
-  Gospel: { english: 'Gospel', arabic: 'الإنجيل', french: 'Évangile' },
-  Prophecy: { english: 'Prophecy', arabic: 'النبوة', french: 'Prophétie' },
-  Pauline: { english: 'Pauline', arabic: 'البولس', french: 'Paul' },
-  Catholic: { english: 'Catholic', arabic: 'الكاثوليكون', french: 'Catholique' },
-  Praxis: { english: 'Acts', arabic: 'الإبركسيس', french: 'Actes' },
-};
-
-/** What each service always reads — its outline until the day's citations arrive, and wherever one can't be found. */
-const EXPECTED: Record<LectionaryService, LectionaryReadingKind[]> = {
-  Vespers: ['Psalm', 'Gospel'],
-  Matins: ['Psalm', 'Gospel'],
-  Liturgy: ['Pauline', 'Catholic', 'Praxis', 'Psalm', 'Gospel'],
-};
+type ReadingLine = { key: string; label: ReadingName; value: string | null };
 
 const SERVICE_IDS: Record<LectionaryService, string> = { Vespers: 'vespers', Matins: 'matins', Liturgy: 'liturgy' };
-
-/** "Prophecy 2" / "النبوة ٢" when several are read. */
-function numberedLabel(label: Name, number: number | null): Name {
-  if (number === null) return label;
-  return { english: `${label.english} ${number}`, arabic: toEasternArabicDigits(`${label.arabic} ${number}`), french: `${label.french ?? label.english} ${number}` };
-}
 
 type DayReadings = { key: string; citations: Record<LectionaryService, ReadingCitation[]> };
 
@@ -76,7 +54,7 @@ export default function LectionaryMenu() {
   }, [dateKey]);
 
   const today = readings?.key === dateKey ? readings : null;
-  const cite = (citation: ReadingCitation) => (arabic ? toEasternArabicDigits(citation.arabic) : tr(citation.english, citation.french || citation.english, citation.arabic));
+  const cite = (citation: ReadingCitation) => citationText(citation, arabic);
 
   /** The service's readings in reading order, falling back to its outline for any not (yet) known. */
   const linesFor = (service: LectionaryService): ReadingLine[] => {

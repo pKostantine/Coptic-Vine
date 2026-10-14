@@ -19,10 +19,11 @@ import { getCopticDate, getDayOverview, type CopticDate } from '@/utils/calendar
 import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 import { formatCopticDayMonth, formatDayMonthDate } from '@/utils/localeFormat';
 import { agpeyaHourAt } from '@/utils/agpeyaHours';
-import { getSundayMessageForDate } from '@/utils/readingsService';
+import { citationText, EXPECTED_READINGS, READING_LABELS } from '@/utils/lectionaryOutline';
+import { getServiceReadingCitations, getSundayMessageForDate, type ReadingCitation } from '@/utils/readingsService';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
-import { tr } from '../../../utils/appText';
+import { appText, tr } from '../../../utils/appText';
 
 function addUtcDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -80,6 +81,9 @@ export default function HomeScreen() {
   const sundayIso = isoDate(sunday.date);
   const tomorrow = useMemo(() => addUtcDays(liveDate, 1), [liveDate]);
   const hour = agpeyaHourAt(now.getHours());
+  // The readings are the rite's: from the evening, the next morning's.
+  const readingsDate = livePeriod === 'evening' ? tomorrow : liveDate;
+  const readingsIso = isoDate(readingsDate);
 
   const [coptic, setCoptic] = useState<CopticDate | null>(null);
   const [sundayMessage, setSundayMessage] = useState<string | null>(null);
@@ -89,6 +93,9 @@ export default function HomeScreen() {
   const [todayEvents, setTodayEvents] = useState<HomeSynaxariumEvent[]>([]);
   const [tomorrowEvents, setTomorrowEvents] = useState<HomeSynaxariumEvent[]>([]);
   const [synaxLoading, setSynaxLoading] = useState(true);
+  // The Liturgy's readings, kept with the day they were read for; null
+  // citations mean the day's could not be loaded (the outline still shows).
+  const [readings, setReadings] = useState<{ key: string; citations: ReadingCitation[] | null } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -109,6 +116,14 @@ export default function HomeScreen() {
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the Sunday's date, not the Date instance
   }, [sundayIso]);
+
+  useEffect(() => {
+    let active = true;
+    getServiceReadingCitations(readingsDate)
+      .then(({ Liturgy }) => { if (active) setReadings({ key: readingsIso, citations: Liturgy }); })
+      .catch(() => { if (active) setReadings({ key: readingsIso, citations: null }); });
+    return () => { active = false; };
+  }, [readingsDate, readingsIso]);
 
   useEffect(() => {
     let active = true;
@@ -133,6 +148,21 @@ export default function HomeScreen() {
     : tr("Last Sunday's Message", 'Message de dimanche dernier', 'رسالة الأحد الماضي');
   const sundayDate = formatDayMonthDate(sunday.date, arabic);
   const events = synaxDay === 'today' ? todayEvents : tomorrowEvents;
+  const liturgyReadings = readings?.key === readingsIso ? readings : null;
+  const readingsTitle = livePeriod === 'evening'
+    ? tr('Tomorrow’s Readings', 'Lectures de demain', 'قراءات الغد')
+    : tr('Today’s Readings', 'Lectures du jour', 'قراءات اليوم');
+  const readingLines = EXPECTED_READINGS.Liturgy.map((kind) => {
+    const citation = liturgyReadings?.citations?.find((entry) => entry.kind === kind);
+    return {
+      kind,
+      label: appText(READING_LABELS[kind]),
+      // Still loading shows an ellipsis; a day whose readings could not be loaded, a dash.
+      value: citation ? citationText(citation, arabic) : liturgyReadings ? null : '…',
+    };
+  });
+  // "CATHOLIQUE" and "ÉVANGILE" run wider than the English kinds; the column makes room for them.
+  const readingKindWidth = readingLines.some((line) => line.label.length > 8) ? 100 : 74;
   // The iPad sets Home in two columns, the desktop in three (Coptic Vine, "Layout and spacing").
   const wideLayout = layout !== 'phone';
   const card = [styles.card, wideLayout && styles.cardWide];
@@ -181,6 +211,31 @@ export default function HomeScreen() {
         </Pressable>
       </View>
     </>
+  );
+  const readingsCard = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${readingsTitle}. ${tr('Open the Liturgy readings', 'Ouvrir les lectures de la liturgie', 'افتح قراءات القداس')}`}
+      onPress={() => router.push('/lectionary/liturgy' as never)}
+      style={({ pressed }) => [card, styles.readings, pressed && styles.pressed]}
+    >
+      <View style={[styles.readingsHeader, arabic && styles.rowReverse]}>
+        <View style={styles.flex}>
+          <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Lectionary · Liturgy', 'Lectionnaire · Liturgie', 'القطمارس · القداس')}</Text>
+          <Text style={[styles.readingsTitle, arabic && styles.arabic]} numberOfLines={1}>{readingsTitle}</Text>
+          <Text style={[styles.readingsDate, arabic && styles.arabic]}>{formatDayMonthDate(readingsDate, arabic)}</Text>
+        </View>
+        <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />
+      </View>
+      <View style={styles.readingList}>
+        {readingLines.map((line, index) => (
+          <View key={line.kind} style={[styles.readingRow, index === readingLines.length - 1 && styles.readingRowLast, arabic && styles.rowReverse]}>
+            <Text style={[styles.readingKind, { width: readingKindWidth }, arabic && styles.readingKindArabic]} numberOfLines={1}>{arabic ? line.label : line.label.toUpperCase()}</Text>
+            <Text style={[styles.readingValue, !line.value && styles.readingMissing, arabic && styles.arabic]} numberOfLines={1}>{line.value ?? '—'}</Text>
+          </View>
+        ))}
+      </View>
+    </Pressable>
   );
   const messageCard = (
     <>
@@ -281,6 +336,7 @@ export default function HomeScreen() {
             <View style={styles.columnNarrow}>
               {heroBlock}
               {prayCard}
+              {readingsCard}
             </View>
             <View style={styles.columnWide}>{messageCard}</View>
             <View style={styles.columnWide}>{synaxCard}</View>
@@ -291,6 +347,7 @@ export default function HomeScreen() {
             <View style={styles.columnWide}>
               {heroBlock}
               {prayCard}
+              {readingsCard}
             </View>
             <View style={styles.columnWide}>
               {messageCard}
@@ -301,6 +358,7 @@ export default function HomeScreen() {
           <View style={styles.column}>
             {heroBlock}
             {prayCard}
+            {readingsCard}
             {messageCard}
             {synaxCard}
           </View>
@@ -383,6 +441,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   prayButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
+  readings: { paddingBottom: 6 },
+  readingsHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 14 },
+  readingsTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', marginTop: 2 },
+  readingsDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
+  readingList: { paddingHorizontal: 18, paddingTop: 6 },
+  readingRow: { alignItems: 'center', borderBottomColor: 'rgba(255, 255, 255, 0.07)', borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 9 },
+  readingRowLast: { borderBottomWidth: 0 },
+  readingKind: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 },
+  readingKindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  readingValue: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600' },
+  readingMissing: { color: 'rgba(255, 255, 255, 0.35)' },
   message: { borderColor: 'rgba(227, 181, 59, 0.3)' },
   crown: { alignItems: 'center', left: 8, opacity: 0.85, position: 'absolute', right: 8, top: 8 },
   messageBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 44 },
