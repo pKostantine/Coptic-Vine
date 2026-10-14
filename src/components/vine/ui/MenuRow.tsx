@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { toEasternArabicDigits } from '../../../utils/localeFormat';
-import Icon from './Icon';
+import Icon, { type IconName } from './Icon';
 
 /** Where a row sits in its group: the group's rounded outline is drawn by its first and last rows. */
 export type MenuRowPosition = 'only' | 'first' | 'middle' | 'last';
@@ -38,6 +38,12 @@ interface MenuRowProps {
   onPress?: () => void;
   onPressIn?: () => void;
   onHoverIn?: () => void;
+  /**
+   * A button after the row — the bookmark that takes a saved row off its
+   * list. Drawn beside the row rather than inside it: a button nested in a
+   * button is invalid on web.
+   */
+  trailingAction?: { icon: IconName; label: string; onPress: () => void };
 }
 
 /**
@@ -60,6 +66,7 @@ export default function MenuRow({
   onPress,
   onPressIn,
   onHoverIn,
+  trailingAction,
 }: MenuRowProps) {
   const showArabic = showArabicProp && Boolean(arabic);
   const arabicOnly = showArabic && !showEnglish;
@@ -67,22 +74,19 @@ export default function MenuRow({
   const isTop = position === 'first' || position === 'only';
   const isBottom = position === 'last' || position === 'only';
   const night = tone === 'night';
+  // The group's outline and the row's own padding: on the row itself, or on
+  // the frame that holds the row and its trailing button side by side.
+  const frameStyle = [
+    styles.row,
+    night && styles.rowNight,
+    isTop && styles.top,
+    isBottom && styles.bottom,
+  ];
+  const paddingStyle = arabicOnly ? styles.rowArabic : styles.rowEnglish;
+  const pressedStyle = night ? styles.pressedNight : styles.pressed;
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      onPressIn={onPressIn}
-      onHoverIn={onHoverIn}
-      style={({ pressed }) => [
-        styles.row,
-        night && styles.rowNight,
-        isTop && styles.top,
-        isBottom && styles.bottom,
-        arabicOnly ? styles.rowArabic : styles.rowEnglish,
-        pressed && (night ? styles.pressedNight : styles.pressed),
-      ]}
-    >
+  const content = (
+    <>
       {leading ? <View style={[styles.leading, arabicOnly ? styles.leadingArabic : styles.leadingEnglish]}>{leading}</View> : null}
       <View style={[styles.body, arabicOnly ? styles.bodyArabic : styles.bodyEnglish, !isTop && styles.divided]}>
         <View style={styles.text}>
@@ -103,6 +107,43 @@ export default function MenuRow({
         {isBookmarked ? <Icon name="bookmark" size={16} color={COLORS.gold} /> : null}
         <Icon name={arabicOnly ? 'chevron-back' : 'chevron-forward'} size={16} color={accent ?? (night ? COLORS.nightLine : 'rgba(227, 181, 59, 0.7)')} />
       </View>
+    </>
+  );
+
+  if (trailingAction) {
+    return (
+      <View style={[...frameStyle, styles.framed, arabicOnly && styles.mirrored]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onPress}
+          onPressIn={onPressIn}
+          onHoverIn={onHoverIn}
+          style={({ pressed }) => [styles.inner, paddingStyle, pressed && pressedStyle]}
+        >
+          {content}
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={trailingAction.label}
+          hitSlop={8}
+          onPress={trailingAction.onPress}
+          style={({ pressed }) => [styles.trailing, pressed && pressedStyle]}
+        >
+          <Icon name={trailingAction.icon} size={20} color={COLORS.gold} />
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onHoverIn={onHoverIn}
+      style={({ pressed }) => [...frameStyle, paddingStyle, pressed && pressedStyle]}
+    >
+      {content}
     </Pressable>
   );
 }
@@ -118,6 +159,10 @@ const styles = StyleSheet.create({
   rowNight: { backgroundColor: COLORS.nightSurface, borderColor: COLORS.nightLine },
   rowEnglish: { flexDirection: 'row', paddingLeft: 16 },
   rowArabic: { flexDirection: 'row-reverse', paddingRight: 16 },
+  // A framed row: the pressed wash stays inside the group's rounded outline.
+  framed: { flexDirection: 'row', overflow: 'hidden' },
+  inner: { alignItems: 'center', alignSelf: 'stretch', flex: 1, minWidth: 0 },
+  trailing: { alignItems: 'center', alignSelf: 'stretch', justifyContent: 'center', paddingHorizontal: 16 },
   top: { borderTopLeftRadius: RADIUS, borderTopRightRadius: RADIUS, borderTopWidth: 1 },
   bottom: { borderBottomLeftRadius: RADIUS, borderBottomRightRadius: RADIUS, borderBottomWidth: 1 },
   pressed: { backgroundColor: COLORS.surfaceSoft },

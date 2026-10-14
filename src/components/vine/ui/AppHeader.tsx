@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
-import { appText, type AppText } from '../../../utils/appText';
+import { appText, tr, type AppText } from '../../../utils/appText';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import Icon, { IconName } from './Icon';
@@ -36,10 +36,10 @@ export default function AppHeader({
   onBack,
   rightLeadingIcon,
   onRightLeadingPress,
-  rightLeadingAccessibilityLabel = 'Toggle full screen',
+  rightLeadingAccessibilityLabel,
   rightIcon,
   onRightPress,
-  rightAccessibilityLabel = 'Open settings',
+  rightAccessibilityLabel,
   visibleLanguages,
   showBrowserFullscreen = true,
   tint,
@@ -48,6 +48,9 @@ export default function AppHeader({
   const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
+  const backLabel = tr('Go back', 'Retour', 'رجوع');
+  const leadingLabel = rightLeadingAccessibilityLabel ?? tr('Toggle full screen', 'Plein écran', 'ملء الشاشة');
+  const trailingLabel = rightAccessibilityLabel ?? tr('Open settings', 'Ouvrir les réglages', 'افتح الإعدادات');
   const titleParts = typeof title === 'string' ? { english: title, arabic: '' } : title;
   // Headers show whichever single language the user has selected app-wide —
   // never both at once — unless a caller explicitly overrides this (none
@@ -76,7 +79,7 @@ export default function AppHeader({
       <View style={styles.topRow}>
         <View style={[styles.side, { width: sideWidth }]}>
           {canGoBack ? (
-            <Pressable accessibilityLabel="Go back" style={styles.iconButton} onPress={onBack}>
+            <Pressable accessibilityRole="button" accessibilityLabel={backLabel} style={styles.iconButton} onPress={onBack}>
               <Icon name="chevron-back" size={24} color={COLORS.gold} />
             </Pressable>
           ) : null}
@@ -98,7 +101,8 @@ export default function AppHeader({
         <View style={[styles.side, styles.sideEnd, { width: sideWidth }]}>
           {hasRightLeadingAction ? (
             <Pressable
-              accessibilityLabel={rightLeadingAccessibilityLabel}
+              accessibilityRole="button"
+              accessibilityLabel={leadingLabel}
               style={styles.iconButton}
               onPress={effectiveRightLeadingPress}
             >
@@ -106,7 +110,7 @@ export default function AppHeader({
             </Pressable>
           ) : null}
           {hasRightAction ? (
-            <Pressable accessibilityLabel={rightAccessibilityLabel} style={styles.iconButton} onPress={onRightPress}>
+            <Pressable accessibilityRole="button" accessibilityLabel={trailingLabel} style={styles.iconButton} onPress={onRightPress}>
               <Icon name={rightIcon as IconName} size={23} color={COLORS.gold} />
             </Pressable>
           ) : null}

@@ -1,7 +1,10 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
+import { tr } from '../../../utils/appText';
+import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
 
 /** Continues the native splash screen's look (the same deep green, the same seal) instead of cutting to a bare "Loading…" text while a document's content loads from Supabase. */
 export default function LoadingScreen() {
@@ -20,7 +23,7 @@ export default function LoadingScreen() {
       ]}
     >
       <Image source={require('../../../../assets/images/coptic-vine-seal.png')} style={styles.logo} />
-      <Text style={styles.text}>Loading…</Text>
+      <Text style={[styles.text, getCurrentAppLanguage() === 'ar' && styles.arabic]}>{tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}</Text>
     </View>
   );
 }
@@ -46,4 +49,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 30,
   },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });
