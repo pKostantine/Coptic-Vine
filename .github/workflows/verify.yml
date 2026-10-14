@@ -7,6 +7,7 @@ on:
     branches:
       - master
       - "fix/**"
+      - "claude/**"
   workflow_dispatch:
 
 permissions:
@@ -27,6 +28,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
       - name: Lint changed surfaces
         run: >
           npx eslint
@@ -43,15 +46,14 @@ jobs:
           src/services/offlineDatabase.ts
           src/services/profileAvatarService.ts
       - name: Lint Library route
-        run: npx eslint "src/app/music/library.tsx" --rule "react-hooks/set-state-in-effect: off" --rule "react-hooks/exhaustive-deps: off"
-      - name: Playback tests
-        run: npm run test:playback
-      - name: Offline request tests
-        run: npm run test:offline
-      - name: Slideshow and Bible regression tests
-        run: npm run test:slideshow
-      - name: Reading font-size and migration tests
-        run: npm run test:reading
+        # A folded scalar: `: off` inside a plain one-line scalar is not valid
+        # YAML, and GitHub rejected the whole workflow file on this line.
+        run: >-
+          npx eslint "src/app/music/library.tsx"
+          --rule "react-hooks/set-state-in-effect: off"
+          --rule "react-hooks/exhaustive-deps: off"
+      - name: Every test suite
+        run: npm test
       - name: Validate media processor (including multi-GB video)
         working-directory: workers/media-processor
         run: npm ci --no-audit --no-fund && npm test
