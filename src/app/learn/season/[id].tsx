@@ -55,7 +55,7 @@ export default function LearningSeasonScreen() {
           <SectionTitle title={tr('Hymn Curriculum', 'Programme d’hymnes', 'منهج الألحان')} isArabic={isArabic} />
           <View style={styles.hymnList}>
             {season.hymns.map((hymn, index) => (
-              <Pressable key={hymn.id} style={styles.hymn} onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: hymn.id } })}>
+              <Pressable accessibilityRole="button" key={hymn.id} style={styles.hymn} onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: hymn.id } })}>
                 <View style={styles.hymnNumber}><Text style={styles.hymnNumberText}>{index + 1}</Text></View>
                 <View style={styles.hymnInfo}>
                   <Text style={[styles.hymnTitle, isArabic && styles.arabic]}>{hymn.title}</Text>

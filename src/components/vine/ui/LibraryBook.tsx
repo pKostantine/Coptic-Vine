@@ -55,7 +55,7 @@ export default function LibraryBook({
 
   const download = onDownloadPress ? (
     <Pressable
-      accessibilityRole="button"
+      accessible={false}
       accessibilityLabel={`${installed ? 'Manage download' : downloading ? 'Pause download' : 'Download'}: ${title}`}
       hitSlop={10}
       onPress={(event) => { event.stopPropagation(); onDownloadPress(); }}

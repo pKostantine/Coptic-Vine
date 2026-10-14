@@ -143,7 +143,7 @@ export default function LearningPlaylistScreen() {
               )}
             </Text>
             <View style={styles.actions}>
-              <Pressable disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
+              <Pressable accessibilityRole="button" disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
                 <Text style={styles.playAllText}>▶  {tr('Play Audio', 'Lire l’audio', 'تشغيل الصوت')}</Text>
               </Pressable>
               {downloadRequest ? (

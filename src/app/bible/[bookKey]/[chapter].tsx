@@ -608,7 +608,7 @@ export default function BibleChapterDocument() {
                             <View style={styles.psalmStanzaLine} />
                           </View>
                         ) : null}
-                        <Pressable style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
+                        <Pressable accessibilityRole="button" style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
                           <Text
                             style={[
                               styles.selectorVerseNumber,

@@ -125,7 +125,7 @@ export default function LearningQueueList({
             />
           </View>
         </View>
-        <Pressable disabled={queue.length <= 1} onPress={onClear} style={styles.clearButton}>
+        <Pressable accessibilityRole="button" disabled={queue.length <= 1} onPress={onClear} style={styles.clearButton}>
           <Icon name="close" size={12} color={queue.length <= 1 ? COLORS.muted : COLORS.learningBright} />
           <Text style={[styles.clearText, queue.length <= 1 && styles.disabledText]}>{tr('Clear upcoming', 'Vider la suite', 'مسح التالي')}</Text>
         </Pressable>
@@ -206,7 +206,7 @@ function LearningQueueRow({
         <View style={styles.handle} {...panResponder.panHandlers}>
           <Icon name="reorder" size={20} color={lifted ? COLORS.learningBright : COLORS.muted} />
         </View>
-        <Pressable disabled={dragging} onPress={() => onSelect(index)} style={styles.rowMain}>
+        <Pressable accessibilityRole="button" disabled={dragging} onPress={() => onSelect(index)} style={styles.rowMain}>
           <LearningArtwork asset={item.coverAsset} size={42} radius={6} label={item.containerTitle} />
           <View style={styles.rowCopy}>
             <Text numberOfLines={1} style={[styles.rowTitle, active && styles.rowTitleActive]}>{item.title}</Text>

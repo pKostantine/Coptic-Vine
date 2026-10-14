@@ -81,7 +81,7 @@ export default function LearningHymnScreen() {
               <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Belongs to', 'Appartient à', 'يُرتّل في')}</Text>
               <View style={styles.chips}>
                 {hymn.seasons.map((season) => (
-                  <Pressable key={season.id} style={styles.chip} onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: season.id } })}>
+                  <Pressable accessibilityRole="button" key={season.id} style={styles.chip} onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: season.id } })}>
                     <Text style={[styles.chipText, isArabic && styles.arabic]}>{season.title}</Text>
                   </Pressable>
                 ))}
@@ -94,7 +94,7 @@ export default function LearningHymnScreen() {
               <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Related Hymns', 'Hymnes associées', 'ألحان مرتبطة')}</Text>
               <View style={styles.relatedList}>
                 {hymn.relatedHymns.map((related) => (
-                  <Pressable key={related.id} style={styles.related} onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: related.id } })}>
+                  <Pressable accessibilityRole="button" key={related.id} style={styles.related} onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: related.id } })}>
                     <View style={styles.relatedInfo}>
                       <Text style={[styles.relatedTitle, isArabic && styles.arabic]}>{related.title}</Text>
                       <Text style={[styles.relatedType, isArabic && styles.arabic]}>{related.relationshipType.replace(/_/g, ' ')}</Text>

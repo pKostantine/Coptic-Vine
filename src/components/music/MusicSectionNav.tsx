@@ -16,7 +16,7 @@ export default function MusicSectionNav({ active }: { active: MusicSection }) {
   return (
     <View style={styles.container}>
       {items.map((item) => (
-        <Pressable
+        <Pressable accessibilityRole="button"
           key={item.id}
           onPress={() => router.replace(item.route)}
           style={[styles.item, active === item.id && styles.itemActive]}

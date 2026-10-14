@@ -63,7 +63,7 @@ export default function MusicHomeScreen() {
             {data.latestReleases.length ? (
               <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                 {data.latestReleases.map((release) => (
-                  <Pressable key={release.id} style={styles.releaseCard} onPress={() => router.push(`/music/release/${release.id}`)}>
+                  <Pressable accessibilityRole="button" key={release.id} style={styles.releaseCard} onPress={() => router.push(`/music/release/${release.id}`)}>
                     <MusicArtwork asset={release.coverAsset} size={154} label={release.title} />
                     <Text numberOfLines={1} style={[styles.cardTitle, isArabic && styles.arabic]}>{release.title}</Text>
                     <Text numberOfLines={1} style={[styles.cardSubtitle, isArabic && styles.arabic]}>
@@ -79,7 +79,7 @@ export default function MusicHomeScreen() {
             {data.artists.length ? (
               <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                 {data.artists.map((artist) => (
-                  <Pressable key={artist.id} style={styles.artistCard} onPress={() => router.push(`/music/artist/${artist.id}`)}>
+                  <Pressable accessibilityRole="button" key={artist.id} style={styles.artistCard} onPress={() => router.push(`/music/artist/${artist.id}`)}>
                     <MusicArtwork asset={artist.profileImageAsset} size={116} rounded label={artist.displayName} />
                     <Text numberOfLines={1} style={[styles.artistName, isArabic && styles.arabic]}>{artist.displayName}</Text>
                   </Pressable>

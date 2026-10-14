@@ -260,7 +260,7 @@ export default function LearningLibraryScreen() {
             const busy = movingId === item.itemId;
             return (
               <View key={item.itemKind + ':' + item.itemId} style={styles.itemRow}>
-                <Pressable style={styles.itemMain} onPress={() => openItem(item)}>
+                <Pressable accessibilityRole="button" style={styles.itemMain} onPress={() => openItem(item)}>
                   <LearningArtwork asset={item.coverAsset} size={54} radius={7} label={item.containerTitle} />
                   <View style={styles.itemCopy}>
                     <Text numberOfLines={1} style={[styles.itemTitle, isArabic && styles.arabic]}>{item.title}</Text>
@@ -303,7 +303,7 @@ export default function LearningLibraryScreen() {
               <Icon name="school-outline" size={32} color={COLORS.learning} />
               <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{labels[activeState].empty}</Text>
               {!authenticated ? (
-                <Pressable onPress={() => router.push('/account')}>
+                <Pressable accessibilityRole="button" onPress={() => router.push('/account')}>
                   <Text style={styles.emptyAction}>{tr('Sign in', 'Se connecter', 'تسجيل الدخول')}</Text>
                 </Pressable>
               ) : null}
@@ -342,7 +342,7 @@ export default function LearningLibraryScreen() {
         </View>
         <View style={styles.playlistList}>
           {playlistLibrary.playlists.map((playlist) => (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={playlist.id}
               style={styles.playlistRow}
               onPress={() => router.push({ pathname: '/learn/playlist/[id]', params: { id: playlist.id } })}

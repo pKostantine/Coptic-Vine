@@ -54,7 +54,7 @@ export default function DocumentPillBar({ pills, activeKey, onSelect }: Document
         onContentSizeChange={(width) => setContentWidth(width)}
       >
         {pills.map((pill) => (
-          <Pressable
+          <Pressable accessibilityRole="button"
             key={pill.key}
             // No button role: a focused <button> keeps the slideshow's arrow
             // keys (and a presenter's clicker) from turning the page, so a

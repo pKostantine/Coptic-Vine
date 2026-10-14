@@ -73,7 +73,7 @@ export default function LearningProgressControl({
           {tr('You can listen and watch without an account, but learning states are tied to your Coptic Vine account.', 'Vous pouvez écouter et regarder sans compte, mais votre progression est liée à votre compte Coptic Vine.', 'يمكنك الاستماع والمشاهدة بدون حساب، لكن حالات التعلّم مرتبطة بحساب كوبتك فاين.')}
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Pressable style={styles.accountButton} onPress={() => router.push('/account')}>
+        <Pressable accessibilityRole="button" style={styles.accountButton} onPress={() => router.push('/account')}>
           <Text style={styles.accountButtonText}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text>
         </Pressable>
       </View>
@@ -95,7 +95,7 @@ export default function LearningProgressControl({
         {options.map((option) => {
           const selected = state === option.id;
           return (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={option.id}
               disabled={Boolean(saving)}
               onPress={() => void choose(option.id)}

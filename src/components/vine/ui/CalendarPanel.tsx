@@ -310,8 +310,8 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
       </View>
 
       <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
-        <Pressable style={[styles.pickerBackdrop, DISABLED_TEXT_SELECTION_STYLE]} onPress={() => setPickerOpen(false)}>
-          <Pressable style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
+        <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} style={[styles.pickerBackdrop, DISABLED_TEXT_SELECTION_STYLE]} onPress={() => setPickerOpen(false)}>
+          <Pressable accessible={false} style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
             <View style={[styles.pickerColumns, isArabic && styles.rowReverse]}>
               <View style={styles.pickerColumn}>
                 <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>{tr('Month', 'Mois', 'الشهر')}</Text>
@@ -320,7 +320,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
                     const isSelected = value === displayedMonth;
                     const label = mode === 'gregorian' ? gregorianMonthName(value) : formatCopticMonthName(COPTIC_MONTHS[value - 1], isArabic);
                     return (
-                      <Pressable
+                      <Pressable accessibilityRole="button" accessibilityState={{ selected: isSelected }}
                         key={value}
                         style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
                         onPress={() => {
@@ -347,7 +347,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
                   {pickerYears.map((value) => {
                     const isSelected = value === displayedYear;
                     return (
-                      <Pressable
+                      <Pressable accessibilityRole="button" accessibilityState={{ selected: isSelected }}
                         key={value}
                         style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
                         onPress={() => {
