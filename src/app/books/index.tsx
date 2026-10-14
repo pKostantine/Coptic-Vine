@@ -11,6 +11,7 @@ import CalendarSheet from '@/components/vine/ui/CalendarSheet';
 import DayBlock from '@/components/vine/ui/DayBlock';
 import LibraryBook from '@/components/vine/ui/LibraryBook';
 import PageTitle from '@/components/vine/ui/PageTitle';
+import RecentDocuments from '@/components/vine/ui/RecentDocuments';
 import { useLiturgicalDay } from '@/components/vine/ui/useLiturgicalDay';
 import { CATEGORIES, HOLY_WEEK_DAYS, holyWeekDayHref, type CategoryDef } from '@/constants/manifest';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
@@ -164,6 +165,7 @@ export default function BooksHome() {
             {title}
             <View style={styles.gutter}>
               {dayBlock}
+              <RecentDocuments arabic={arabic} />
               {library}
             </View>
           </View>
@@ -172,6 +174,7 @@ export default function BooksHome() {
             <View style={layout === 'desktop' ? styles.dayColumn : styles.half}>
               {title}
               {dayBlock}
+              <RecentDocuments arabic={arabic} flush />
             </View>
             <View style={styles.half}>{library}</View>
           </View>

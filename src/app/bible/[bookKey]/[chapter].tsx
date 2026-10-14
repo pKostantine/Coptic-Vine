@@ -29,6 +29,7 @@ import {
 } from '@/utils/bibleService';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { goBack } from '@/utils/navigation';
+import { bookForPath, recordRecentDocument } from '@/utils/recentDocuments';
 import { writeRichClipboard } from '@/utils/richClipboard';
 import { appText, type AppText } from '@/utils/appText';
 import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
@@ -335,6 +336,19 @@ export default function BibleChapterDocument() {
   const headerTitleEnglish = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'en');
   const headerTitleArabic = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'ar');
   const headerTitleFrench = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'fr');
+  // Remembered for the Books page's "Continue reading" once the chapter has
+  // shown. The Psalms' numbering is part of what was read, so it is part of
+  // the key and of the route that opens it again.
+  useEffect(() => {
+    if (!book || !verses || !bookKey || !chapter) return;
+    const href = `/bible/${bookKey}/${chapter}${psalmNumbering === 'masoretic' ? '?numbering=masoretic' : ''}`;
+    recordRecentDocument({
+      key: `bible:${bookKey}:${chapter}:${psalmNumbering}`,
+      href,
+      title: { english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench },
+      book: bookForPath(href),
+    });
+  }, [book, verses, bookKey, chapter, psalmNumbering, headerTitleEnglish, headerTitleArabic, headerTitleFrench]);
   const copyReference = useMemo(() => getBibleChapterReferences(book, bookKey, currentChapterNumber), [book, bookKey, currentChapterNumber]);
   const preface = book?.bookKey === 'psalms' ? getDisplayedPsalmPreface() : null;
   const selectorText = SELECTOR_TEXT[preferences.appLanguage];
