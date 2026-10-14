@@ -1,4 +1,4 @@
-import type { Session, User } from '@supabase/supabase-js';
+import { isAuthRetryableFetchError, type Session, type User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import { disableNativeNotificationDevice } from '@/services/notificationService';
 import { disableWebPushDevice } from '@/services/webPushService';
+import { authMessage } from '@/utils/authMessages';
 import { settleWithin } from '@/utils/settleWithin';
 import { supabase } from '@/utils/supabase';
 
@@ -45,7 +46,7 @@ function accountRedirectUrl() {
 function authError(error: { message: string } | null, fallback: string) {
   if (!error) return;
   if (/provider is not enabled|unsupported provider/i.test(error.message)) {
-    throw new Error('Google sign-in is not enabled for Coptic Vine yet. Please use email for now.');
+    throw new Error(authMessage('googleNotEnabled'));
   }
   throw new Error(error.message || fallback);
 }
@@ -64,7 +65,7 @@ async function applyAuthCallback(url: string) {
   const code = getParameter('code');
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    authError(error, 'Unable to finish signing in.');
+    authError(error, authMessage('finishSignIn'));
     return;
   }
 
@@ -75,7 +76,7 @@ async function applyAuthCallback(url: string) {
       access_token: accessToken,
       refresh_token: refreshToken,
     });
-    authError(error, 'Unable to finish signing in.');
+    authError(error, authMessage('finishSignIn'));
   }
 }
 
@@ -128,7 +129,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    authError(error, 'Unable to sign in.');
+    authError(error, authMessage('signIn'));
   }, []);
 
   const signUpWithEmail = useCallback(async (email: string, password: string, displayName: string) => {
@@ -140,7 +141,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         data: { full_name: displayName.trim() },
       },
     });
-    authError(error, 'Unable to create your account.');
+    authError(error, authMessage('createAccount'));
     return { confirmationRequired: data.session == null };
   }, []);
 
@@ -153,15 +154,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
         skipBrowserRedirect: Platform.OS !== 'web',
       },
     });
-    authError(error, 'Unable to start Google sign-in.');
+    authError(error, authMessage('startGoogle'));
 
     if (Platform.OS !== 'web') {
-      if (!data.url) throw new Error('Google did not return a sign-in URL.');
+      if (!data.url) throw new Error(authMessage('googleNoUrl'));
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       if (result.type === 'success') {
         await applyAuthCallback(result.url);
       } else if (result.type !== 'dismiss' && result.type !== 'cancel') {
-        throw new Error('Google sign-in did not complete.');
+        throw new Error(authMessage('googleIncomplete'));
       }
     }
   }, []);
@@ -170,7 +171,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: accountRedirectUrl(),
     });
-    authError(error, 'Unable to send a password reset email.');
+    authError(error, authMessage('passwordReset'));
   }, []);
 
   const resendSignupConfirmation = useCallback(async (email: string) => {
@@ -179,14 +180,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
       email,
       options: { emailRedirectTo: accountRedirectUrl() },
     });
-    authError(error, 'Unable to resend the confirmation email.');
+    authError(error, authMessage('resendConfirmation'));
   }, []);
 
   const updateDisplayName = useCallback(async (displayName: string) => {
     const { error } = await supabase.auth.updateUser({
       data: { full_name: displayName.trim() },
     });
-    authError(error, 'Unable to update your profile.');
+    authError(error, authMessage('updateProfile'));
   }, []);
 
   const updateEmail = useCallback(async (email: string) => {
@@ -194,19 +195,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
       { email: email.trim().toLowerCase() },
       { emailRedirectTo: accountRedirectUrl() },
     );
-    authError(error, 'Unable to update your email address.');
+    authError(error, authMessage('updateEmail'));
   }, []);
 
   const updateAvatarUrl = useCallback(async (avatarUrl: string | null) => {
     const { error } = await supabase.auth.updateUser({
       data: { chc_avatar_url: avatarUrl },
     });
-    authError(error, 'Unable to update your profile photo.');
+    authError(error, authMessage('updatePhoto'));
   }, []);
 
   const updatePassword = useCallback(async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
-    authError(error, 'Unable to update your password.');
+    authError(error, authMessage('updatePassword'));
     setRecoveryMode(false);
   }, []);
 
@@ -220,7 +221,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     );
 
     const { error } = await supabase.auth.signOut();
-    authError(error, 'Unable to sign out.');
+    // The client drops this device's session before it reports that the
+    // server could not be reached, so a sign-out with no connection has
+    // still signed this device out (only the refresh token outlives it on
+    // the server, until it expires). Anything else is a real failure.
+    if (error && !isAuthRetryableFetchError(error)) authError(error, authMessage('signOut'));
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
