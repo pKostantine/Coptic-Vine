@@ -14,6 +14,7 @@ import {
   getItemSignature,
   getMeasurementBatch,
   getPageTurnForKey,
+  isKeyKeptByFocusedControl,
   getPageTurnForSwipe,
   getPageTurnForTap,
   getPageTurnForViewportTap,
@@ -644,7 +645,7 @@ export default function SlideshowContainer({
     }
 
     function handleKeyDown(event) {
-      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || isEditableKeyboardTarget(event.target)) return;
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || isKeyKeptByFocusedControl(event.target, event.key)) return;
       const pageTurn = getPageTurnForKey(event.key);
       if (!pageTurn) return;
       event.preventDefault();
@@ -1459,12 +1460,6 @@ function dropEmptySlides(slides) {
 
 function getVisibleLanguageCount(visibleLanguages = {}) {
   return ["english", "french", "coptic", "arabic"].filter((language) => visibleLanguages[language]).length || 1;
-}
-
-function isEditableKeyboardTarget(target) {
-  if (!target || typeof target !== "object") return false;
-  const tagName = String(target.tagName || "").toLowerCase();
-  return target.isContentEditable || ["button", "input", "select", "textarea", "a"].includes(tagName);
 }
 
 function isInteractivePointerTarget(target) {

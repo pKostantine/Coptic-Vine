@@ -23,6 +23,7 @@ import {
   getVisibleVerseLanguages,
   hasRenderableSlideshowLanguageBody,
   hashSlideshowText,
+  isKeyKeptByFocusedControl,
   joinRenderedLines,
   paginateItems,
 } from "../src/components/vine/slideshowLayout.js";
@@ -355,6 +356,29 @@ test("tap, keyboard, clicker, and adjacent-page controls are deterministic", () 
   assert.equal(getPageTurnForKey("Escape"), null);
   assert.deepEqual(getAdjacentSlideIndexes(4, 10), [3, 4, 5]);
   assert.deepEqual(getAdjacentSlideIndexes(0, 1), [0]);
+});
+
+test("a focused button keeps only the keys that press it; the rest still turn the page", () => {
+  const element = (tagName, role = null, insideArrowKeyWidget = false) => ({
+    tagName,
+    isContentEditable: false,
+    getAttribute: (name) => (name === "role" ? role : null),
+    closest: () => (insideArrowKeyWidget || ["slider", "tab", "menuitem"].includes(role) ? {} : null),
+  });
+  for (const pill of [element("BUTTON"), element("DIV", "button"), element("A")]) {
+    for (const key of ["ArrowRight", "ArrowLeft", "PageDown", "PageUp", "Home", "End"]) {
+      assert.equal(isKeyKeptByFocusedControl(pill, key), false, key);
+    }
+    assert.equal(isKeyKeptByFocusedControl(pill, "Enter"), true);
+    assert.equal(isKeyKeptByFocusedControl(pill, " "), true);
+  }
+  // Typed into, or moved through with the arrows: every key is theirs.
+  for (const control of [element("INPUT"), element("TEXTAREA"), element("DIV", "slider"), element("BUTTON", "tab"), element("BUTTON", null, true)]) {
+    assert.equal(isKeyKeptByFocusedControl(control, "ArrowRight"), true);
+  }
+  assert.equal(isKeyKeptByFocusedControl({ tagName: "DIV", isContentEditable: true }, "ArrowRight"), true);
+  assert.equal(isKeyKeptByFocusedControl(element("DIV"), "Enter"), false);
+  assert.equal(isKeyKeptByFocusedControl(null, "Enter"), false);
 });
 
 test("the visible native slide stays in flex flow while neighbors preload as overlays", () => {

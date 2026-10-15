@@ -54,11 +54,14 @@ export default function DocumentPillBar({ pills, activeKey, onSelect }: Document
         onContentSizeChange={(width) => setContentWidth(width)}
       >
         {pills.map((pill) => (
-          <Pressable accessibilityRole="button"
+          <Pressable
             key={pill.key}
-            // No button role: a focused <button> keeps the slideshow's arrow
-            // keys (and a presenter's clicker) from turning the page, so a
-            // tapped pill would leave the reader stuck on its slide.
+            // A real button, announced as the selected one where the reader
+            // is. The slideshow leaves a focused button only Space and Enter,
+            // so the arrow keys and a clicker still turn the page after a pill
+            // is tapped (isKeyKeptByFocusedControl in slideshowLayout.js).
+            accessibilityRole="button"
+            accessibilityState={{ selected: pill.key === activeKey }}
             style={[styles.pill, pill.key === activeKey && styles.pillActive]}
             onLayout={(event) => {
               const { x, width } = event.nativeEvent.layout;

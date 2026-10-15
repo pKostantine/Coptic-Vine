@@ -893,6 +893,35 @@ export function getMeasurementBatch(
   return prioritized.slice(0, limit);
 }
 
+// Widgets that move with the arrow keys themselves (WAI-ARIA's composite
+// widgets, and a slider), so a page-turn key pressed in one is theirs.
+const ARROW_KEY_WIDGET_SELECTOR = [
+  "slider", "spinbutton", "scrollbar", "tab", "tablist", "radio", "radiogroup",
+  "menu", "menubar", "menuitem", "menuitemradio", "menuitemcheckbox",
+  "listbox", "option", "combobox", "tree", "treeitem", "grid", "gridcell",
+].map((role) => `[role="${role}"]`).join(",");
+const PRESS_KEYS = [" ", "Spacebar", "Enter"];
+
+/**
+ * Whether the focused element keeps this key for itself instead of letting it
+ * turn the page. Anything typed into, and any widget that moves with the
+ * arrow keys, keeps them all. A button or link keeps only Space and Enter,
+ * the keys that press it: the arrows, Page Up/Down, Home and End still turn
+ * the page. So a control can be a real button for a screen reader and still
+ * not leave a reader -- or a presenter's clicker -- stuck on the slide they
+ * were on when they tapped it.
+ */
+export function isKeyKeptByFocusedControl(target, key) {
+  if (!target || typeof target !== "object") return false;
+  if (target.isContentEditable) return true;
+  const tagName = String(target.tagName || "").toLowerCase();
+  if (["input", "select", "textarea"].includes(tagName)) return true;
+  if (typeof target.closest === "function" && target.closest(ARROW_KEY_WIDGET_SELECTOR)) return true;
+  const role = typeof target.getAttribute === "function" ? target.getAttribute("role") : null;
+  const isPressable = tagName === "button" || tagName === "a" || ["button", "link", "switch", "checkbox"].includes(role);
+  return isPressable && PRESS_KEYS.includes(key);
+}
+
 export function getPageTurnForKey(key) {
   if (["ArrowRight", "ArrowDown", "PageDown", " ", "Spacebar", "Enter"].includes(key)) return "next";
   if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(key)) return "previous";
