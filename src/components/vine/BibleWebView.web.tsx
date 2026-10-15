@@ -11,6 +11,8 @@ interface BibleWebViewProps {
   selectText?: boolean;
   highlights?: BibleHighlight[];
   onAction?: (action: BibleWebViewAction) => void;
+  /** The page the chapter is read on (constants/documentThemes.ts), painted behind the HTML as it loads. */
+  backgroundColor?: string;
 }
 
 type BibleFrameWindow = Window & {
@@ -19,7 +21,7 @@ type BibleFrameWindow = Window & {
 };
 
 /** Web Bible chapter renderer — plain iframe, same HTML builder as the native renderer. */
-const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, highlights, onAction }, ref) => {
+const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, highlights, onAction, backgroundColor = COLORS.black }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const restoreVerseRef = useRef(restoreVerse);
   restoreVerseRef.current = restoreVerse;
@@ -70,7 +72,7 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
           win?.selectBibleVerse?.(verse);
         }
       }}
-      style={{ flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor: COLORS.black }}
+      style={{ flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor }}
     />
   );
 });

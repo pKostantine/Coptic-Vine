@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { COLORS, RADII, SPACING } from '../../../constants/theme';
+import { NIGHT_DOCUMENT_THEME, withAlpha, type DocumentTheme } from '../../../constants/documentThemes';
+import { RADII, SPACING } from '../../../constants/theme';
 
 export interface DocumentPill {
   key: string;
@@ -13,6 +14,8 @@ interface DocumentPillBarProps {
   /** The pill for wherever the reader is: lit gold, and brought to the middle of the row. */
   activeKey: string | null;
   onSelect: (key: string) => void;
+  /** The page the bar sits on — see constants/documentThemes.ts. */
+  theme?: DocumentTheme;
 }
 
 /**
@@ -25,7 +28,7 @@ interface DocumentPillBarProps {
  * row the reader has scrolled along themselves stays where they left it until
  * the next hymn comes.
  */
-export default function DocumentPillBar({ pills, activeKey, onSelect }: DocumentPillBarProps) {
+export default function DocumentPillBar({ pills, activeKey, onSelect, theme = NIGHT_DOCUMENT_THEME }: DocumentPillBarProps) {
   const scrollRef = useRef<ScrollView>(null);
   const [barWidth, setBarWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
@@ -45,7 +48,7 @@ export default function DocumentPillBar({ pills, activeKey, onSelect }: Document
   }, [activeKey, pillLayouts, barWidth, contentWidth]);
 
   return (
-    <View style={styles.bar} onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}>
+    <View style={[styles.bar, { backgroundColor: theme.colors.strip, borderBottomColor: theme.colors.border }]} onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -62,7 +65,12 @@ export default function DocumentPillBar({ pills, activeKey, onSelect }: Document
             // is tapped (isKeyKeptByFocusedControl in slideshowLayout.js).
             accessibilityRole="button"
             accessibilityState={{ selected: pill.key === activeKey }}
-            style={[styles.pill, pill.key === activeKey && styles.pillActive]}
+            style={[
+              styles.pill,
+              pill.key === activeKey
+                ? { backgroundColor: theme.colors.stripActive, borderColor: withAlpha(theme.colors.accent, 0.72) }
+                : { borderColor: theme.colors.border },
+            ]}
             onLayout={(event) => {
               const { x, width } = event.nativeEvent.layout;
               setPillLayouts((current) =>
@@ -71,7 +79,7 @@ export default function DocumentPillBar({ pills, activeKey, onSelect }: Document
             }}
             onPress={() => onSelect(pill.key)}
           >
-            <Text numberOfLines={1} style={styles.pillText}>{pill.label}</Text>
+            <Text numberOfLines={1} style={[styles.pillText, { color: theme.colors.text }]}>{pill.label}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -81,8 +89,6 @@ export default function DocumentPillBar({ pills, activeKey, onSelect }: Document
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: '#111111',
-    borderBottomColor: COLORS.border,
     borderBottomWidth: 1,
     maxHeight: 58,
   },
@@ -93,7 +99,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   pill: {
-    borderColor: COLORS.border,
     borderRadius: RADII.md,
     borderWidth: 1,
     flexShrink: 0,
@@ -101,14 +106,9 @@ const styles = StyleSheet.create({
     minHeight: 36,
     paddingHorizontal: SPACING.md,
   },
-  // The content selector's own "you are here" (selectorItemActive in
-  // ContentSelectorDrawer.tsx).
-  pillActive: {
-    backgroundColor: '#171513',
-    borderColor: 'rgba(227, 181, 59, 0.72)',
-  },
+  // The lit pill is the content selector's own "you are here"
+  // (selectorItemActive in ContentSelectorDrawer.tsx), in the page's colours.
   pillText: {
-    color: COLORS.text,
     flexShrink: 0,
     fontSize: 14,
     fontWeight: '800',

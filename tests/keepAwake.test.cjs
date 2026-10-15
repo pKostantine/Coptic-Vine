@@ -21,7 +21,9 @@ function load(path, stubs = {}) {
 
 /** preferencesStorage.ts on the web, with the device-class and font modules it reads at import stubbed. */
 function loadPreferences() {
+  const theme = load('src/constants/theme.ts');
   return load('src/utils/preferencesStorage.ts', {
+    '../constants/documentThemes': load('src/constants/documentThemes.ts', { './theme': theme }),
     'expo-device': { deviceType: 1, osName: 'iOS' },
     'react-native': { Dimensions: { get: () => ({ width: 390, height: 844 }) }, Platform: { OS: 'web' } },
     './readingFontSize': {

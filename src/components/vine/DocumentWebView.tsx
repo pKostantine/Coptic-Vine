@@ -8,6 +8,7 @@ import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
 import type { SermonHighlight } from '../../types/sermonPlanner';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
+import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
 
@@ -44,6 +45,8 @@ interface DocumentWebViewProps {
   bottomContentInset?: number;
   sermonPlannerMode?: boolean;
   sermonHighlights?: SermonHighlight[];
+  /** The page the document is read on — see constants/documentThemes.ts. */
+  theme?: DocumentTheme;
 }
 
 /**
@@ -82,6 +85,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       collapsedSectionIds,
       sermonPlannerMode = false,
       sermonHighlights = [],
+      theme = NIGHT_DOCUMENT_THEME,
     },
     ref,
   ) => {
@@ -279,6 +283,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               // Applied after load instead — see applyBottomInset.
               bottomContentInset: 0,
               sermonPlannerMode,
+              theme,
               nativeSwipeNavigation: true,
             })
           : null,
@@ -296,6 +301,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticGospelRite,
         suppressAllSpeakerLabels,
         sermonPlannerMode,
+        theme,
       ],
     );
 
@@ -305,8 +311,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     if (!html) {
       return (
-        <View style={styles.loading}>
-          <ActivityIndicator color={COLORS.gold} />
+        <View style={[styles.loading, { backgroundColor: theme.colors.page }]}>
+          <ActivityIndicator color={theme.colors.accent} />
         </View>
       );
     }
@@ -319,7 +325,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         // new source on every render, and the point of the build above is that
         // a re-render caused by a collapse toggle changes nothing to reload.
         source={source}
-        style={styles.webview}
+        style={[styles.webview, { backgroundColor: theme.colors.page }]}
         scrollEnabled
         showsVerticalScrollIndicator={false}
         javaScriptEnabled

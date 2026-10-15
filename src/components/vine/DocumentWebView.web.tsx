@@ -1,12 +1,12 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-import { COLORS } from '../../constants/theme';
 import { sectionRestoreCandidates, type DocumentRestoreRequest } from '../../utils/sectionRestore';
 import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
 import type { SermonHighlight } from '../../types/sermonPlanner';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
+import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
 
@@ -43,6 +43,8 @@ interface DocumentWebViewProps {
   bottomContentInset?: number;
   sermonPlannerMode?: boolean;
   sermonHighlights?: SermonHighlight[];
+  /** The page the document is read on — see constants/documentThemes.ts. */
+  theme?: DocumentTheme;
 }
 
 /**
@@ -73,6 +75,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       collapsedSectionIds,
       sermonPlannerMode = false,
       sermonHighlights = [],
+      theme = NIGHT_DOCUMENT_THEME,
     },
     ref,
   ) => {
@@ -276,6 +279,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               // Applied after load instead — see applyBottomInset.
               bottomContentInset: 0,
               sermonPlannerMode,
+              theme,
             })
           : null,
       [
@@ -292,6 +296,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticGospelRite,
         suppressAllSpeakerLabels,
         sermonPlannerMode,
+        theme,
       ],
     );
 
@@ -304,8 +309,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     if (!html) {
       return (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.black }}>
-          <ActivityIndicator color={COLORS.gold} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.page }}>
+          <ActivityIndicator color={theme.colors.accent} />
         </View>
       );
     }
@@ -316,7 +321,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         sandbox="allow-same-origin allow-scripts"
         srcDoc={html}
         onLoad={handleLoad}
-        style={{ flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor: COLORS.black }}
+        style={{ flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor: theme.colors.page }}
       />
     );
   },

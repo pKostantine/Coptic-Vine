@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import DocumentThemePicker from '@/components/vine/ui/DocumentThemePicker';
 import FontScaleControl from '@/components/vine/ui/FontScaleControl';
 import Icon from '@/components/vine/ui/Icon';
 import SaintHymnPicker from '@/components/vine/ui/SaintHymnPicker';
@@ -24,7 +25,7 @@ const ORIENTATION_OPTIONS: { key: OrientationMode; label: string; arabic: string
   { key: 'portrait', label: 'Portrait', arabic: 'عمودي', french: 'Portrait' }, { key: 'auto', label: 'Auto Rotate', arabic: 'تدوير تلقائي', french: 'Rotation automatique' },
 ];
 const SETTINGS_LABELS = {
-  settings: { english: 'Book Settings', arabic: 'إعدادات الكتب', french: 'Réglages des livres' }, languages: { english: 'Languages', arabic: 'اللغات', french: 'Langues' }, orientation: { english: 'Orientation', arabic: 'الاتجاه', french: 'Orientation' },
+  settings: { english: 'Book Settings', arabic: 'إعدادات الكتب', french: 'Réglages des livres' }, page: { english: 'Page', arabic: 'الصفحة', french: 'Page' }, languages: { english: 'Languages', arabic: 'اللغات', french: 'Langues' }, orientation: { english: 'Orientation', arabic: 'الاتجاه', french: 'Orientation' },
   display: { english: 'Display', arabic: 'العرض', french: 'Affichage' }, slideshowMode: { english: 'Slideshow Mode', arabic: 'وضع العرض التقديمي', french: 'Mode diaporama' }, selectText: { english: 'Select Text', arabic: 'تحديد النص', french: 'Sélectionner le texte' },
   displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات', french: 'Afficher les commentaires' }, displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية', french: 'Afficher les prières secrètes' }, displayNowPlayingBar: { english: 'Display Now Playing Bar', arabic: 'عرض شريط التشغيل الحالي', french: 'Afficher la barre de lecture' },
   keepScreenAwake: { english: 'Keep Screen On While Reading', arabic: 'إبقاء الشاشة مضاءة أثناء القراءة', french: 'Garder l’écran allumé pendant la lecture' },
@@ -52,7 +53,7 @@ interface BookSettingsPanelProps {
 export function BookSettingsPanel({ wide = false, onOpenSaintHymns, onOpenDownloads }: BookSettingsPanelProps) {
   // A desktop sets the text size with − and + rather than a track.
   const desktop = useLayoutMode() === 'desktop';
-  const { preferences, toggleLanguage, setFontScale, setFontScaleValue, setOrientationMode, toggleSelectText, toggleSlideshowMode, toggleDisplayComments, toggleDisplaySilentPrayers, toggleDisplayNowPlayingBar, toggleInMonastery, toggleKeepScreenAwake } = useReadingPreferences();
+  const { preferences, toggleLanguage, setFontScale, setFontScaleValue, setOrientationMode, toggleSelectText, toggleSlideshowMode, toggleDisplayComments, toggleDisplaySilentPrayers, toggleDisplayNowPlayingBar, toggleInMonastery, toggleKeepScreenAwake, setDocumentTheme } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
   const chosen = (preferences.selectedSaintHymns || []).length;
   const selectedCount = chosen === 1
@@ -105,7 +106,10 @@ export function BookSettingsPanel({ wide = false, onOpenSaintHymns, onOpenDownlo
   );
   const display = (
     <>
-      {kicker(SETTINGS_LABELS.display, wide)}
+      {/* The page a document is read on, as a book app offers them. */}
+      {kicker(SETTINGS_LABELS.page, wide)}
+      <DocumentThemePicker selected={preferences.documentTheme} onSelect={setDocumentTheme} isArabic={arabic} />
+      {kicker(SETTINGS_LABELS.display)}
       <View style={[styles.rows, !wide && styles.rowsPhone]}>
         <FontScaleControl fontScale={preferences.fontScale} isArabic={arabic} label={labelText(SETTINGS_LABELS.textSize)} onStep={setFontScale} onSetValue={setFontScaleValue} compact={!wide} stepper={desktop} />
         <ToggleRow label={labelText(SETTINGS_LABELS.slideshowMode)} isArabic={arabic} active={preferences.slideshowMode} onPress={toggleSlideshowMode} minHeight={rowHeight} />

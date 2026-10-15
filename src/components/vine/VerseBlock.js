@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
-import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
+import { SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { resolveRubricKey } from "../../utils/verseRubric";
 import JustifiedText, { measureJustifiedLinesWeb } from "./JustifiedText";
 import { getLanguageColumnGap } from "./documentPresentationMetrics";
@@ -12,8 +12,6 @@ import {
   hasSeasonalPrefixLine as hasVisibleSeasonalPrefixLine,
 } from "./slideshowLayout";
 
-const REFRAIN_TAN = COLORS.refrain;
-const SILENT_PRAYER_GRAY = COLORS.silent;
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   ? {
       WebkitTouchCallout: "none",
@@ -54,15 +52,16 @@ export default function VerseBlock({
   // preserved personRole instead (see resolvePersonRole in hymnLibrary.js).
   const rubricType = verse.personRole || verse.type;
   const isSeasonalHoosVerse = Boolean(verse.seasonalHoosVersePrefix);
+  // Every colour is the page's (theme, see constants/documentThemes.ts).
   const rowTextColor =
     isComment
-      ? COLORS.comment
+      ? theme.colors.comment
       : isSilentPrayer
-      ? SILENT_PRAYER_GRAY
+      ? theme.colors.silent
       : isRefrainLabel || isRefrain
-      ? REFRAIN_TAN
+      ? theme.colors.refrain
       : isReadingReference
-      ? COLORS.comment
+      ? theme.colors.comment
       : // "White"/"Blue" prayer_type forces that alternating color directly on
       // this one verse — surrounding verses alternate exactly as if it
       // weren't there (see the shared versePresentation helper, which
@@ -76,7 +75,7 @@ export default function VerseBlock({
       // default alternation — and off the same shared predicate, since the
       // two renderers must never disagree about this.
       usePeopleLineColor
-      ? COLORS.peopleLight
+      ? theme.colors.peopleText
       : forceWhiteText || verse.forceWhiteText || isRefrain || isRecitedPrayer || isReading || (colorIndex ?? index) % 2 === 0
       ? theme.colors.text
       : theme.colors.rowBlue;
@@ -256,6 +255,7 @@ export default function VerseBlock({
         {!hasVisibleBody ? null : isJustified ? (
           Platform.OS === "web" ? (
             <CssJustifiedVerseBody
+              theme={theme}
               language={language}
               textStyle={textStyle}
               selectableText={selectableText}
@@ -266,6 +266,7 @@ export default function VerseBlock({
             />
           ) : (
             <JustifiedVerseBody
+              theme={theme}
             language={language}
             textStyle={textStyle}
             selectableText={selectableText}
@@ -292,7 +293,7 @@ export default function VerseBlock({
               })
             }
           >
-            {renderLanguageText(language)}
+            {renderLanguageText(language, theme)}
           </Text>
         )}
       </View>
@@ -321,7 +322,7 @@ export default function VerseBlock({
                 style={[
                   ...language.styles,
                   {
-                    color: getSpeakerColor(rubricType, bishopPresent),
+                    color: getSpeakerColor(rubricType, bishopPresent, theme),
                     fontFamily: language.fontFamily,
                     fontSize: language.fontSize,
                     fontStyle: bodyFontStyle,
@@ -374,7 +375,7 @@ export default function VerseBlock({
  * split for how rarely it fires. It's unaffected everywhere else (scroll
  * mode, and every non-justified slideshow verse type).
  */
-function CssJustifiedVerseBody({ language, textStyle, selectableText, columnWidth, fontStyle, fontWeight, onMetric }) {
+function CssJustifiedVerseBody({ language, textStyle, selectableText, columnWidth, fontStyle, fontWeight, onMetric, theme }) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
@@ -398,7 +399,7 @@ function CssJustifiedVerseBody({ language, textStyle, selectableText, columnWidt
 
   let prefixNode = null;
   if (parts) {
-    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>;
+    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: theme.colors.refrain }]}>{parts.prefix}</Text>;
   } else if (language.seasonalHoosVersePrefixSpacer) {
     prefixNode = (
       <Text selectable={selectableText} style={[prefixStyle, { color: "transparent" }]}>
@@ -415,13 +416,13 @@ function CssJustifiedVerseBody({ language, textStyle, selectableText, columnWidt
         style={[textStyle, { textAlign: "justify", textJustify: "inter-word" }]}
         onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}
       >
-        {renderTextWithBibleVerseNumber(bodyText, bibleVerseNumber)}
+        {renderTextWithBibleVerseNumber(bodyText, bibleVerseNumber, theme)}
       </Text>
     </>
   );
 }
 
-function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, onMetric }) {
+function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, onMetric, theme }) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
@@ -429,7 +430,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
   let prefixNode = null;
 
   if (parts) {
-    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>;
+    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: theme.colors.refrain }]}>{parts.prefix}</Text>;
   } else if (language.seasonalHoosVersePrefixSpacer) {
     prefixNode = (
       <Text selectable={selectableText} style={[prefixStyle, { color: "transparent" }]}>{language.seasonalHoosVersePrefixSpacer}</Text>
@@ -437,7 +438,8 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
   }
 
   const fullText = getJustifiedBodyText(language);
-  const wordStyles = useMemo(() => getMetropolitanWordStyles(fullText), [fullText]);
+  const metropolitanColor = theme.colors.metropolitan;
+  const wordStyles = useMemo(() => getMetropolitanWordStyles(fullText, metropolitanColor), [fullText, metropolitanColor]);
 
   return (
     <>
@@ -451,7 +453,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         fontWeight={fontWeight}
         width={columnWidth}
         rtl={language.key === "arabic"}
-        firstWordStyle={bibleVerseNumber ? { color: COLORS.gold, fontWeight: "700" } : null}
+        firstWordStyle={bibleVerseNumber ? { color: theme.colors.gold, fontWeight: "700" } : null}
         wordStyles={wordStyles}
         forceLines={forceLines}
         minWordsToJustify={minWordsToJustify}
@@ -474,7 +476,7 @@ function getJustifiedBodyText(language) {
   return bibleVerseNumber ? `${bibleVerseNumber} ${bodyText}` : bodyText;
 }
 
-function renderLanguageText(language) {
+function renderLanguageText(language, theme) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
   const bibleVerseNumber = formatBibleVerseNumber(
@@ -495,27 +497,27 @@ function renderLanguageText(language) {
       );
     }
 
-    return renderTextWithBibleVerseNumber(language.text, bibleVerseNumber);
+    return renderTextWithBibleVerseNumber(language.text, bibleVerseNumber, theme);
   }
 
   return (
     <>
-      <Text style={[prefixStyle, { color: REFRAIN_TAN }]}>{parts.prefix}</Text>
+      <Text style={[prefixStyle, { color: theme.colors.refrain }]}>{parts.prefix}</Text>
       {"\n"}
       {parts.body}
     </>
   );
 }
 
-function renderTextWithBibleVerseNumber(text, bibleVerseNumber) {
-  const content = renderTextWithMetropolitanHighlight(text);
+function renderTextWithBibleVerseNumber(text, bibleVerseNumber, theme) {
+  const content = renderTextWithMetropolitanHighlight(text, theme.colors.metropolitan);
   if (!bibleVerseNumber) {
     return content;
   }
 
   return (
     <>
-      <Text style={{ color: COLORS.gold, fontWeight: "700" }}>{bibleVerseNumber} </Text>
+      <Text style={{ color: theme.colors.gold, fontWeight: "700" }}>{bibleVerseNumber} </Text>
       {content}
     </>
   );
@@ -529,7 +531,7 @@ function renderTextWithBibleVerseNumber(text, bibleVerseNumber) {
 // highlightMetropolitanBrackets in documentHtml.ts.
 const METROPOLITAN_BRACKET_PATTERN = /\(([^()]*(?:metropolitan|ⲙⲏⲧⲣⲟⲡⲟⲗⲓⲧ|مطران)[^()]*)\)/giu;
 
-function getMetropolitanWordStyles(text) {
+function getMetropolitanWordStyles(text, color) {
   const raw = String(text || "");
   METROPOLITAN_BRACKET_PATTERN.lastIndex = 0;
   const ranges = [];
@@ -546,14 +548,14 @@ function getMetropolitanWordStyles(text) {
     const start = match.index;
     const end = start + match[0].length;
     if (ranges.some((range) => start < range.end && end > range.start)) {
-      stylesByWord[wordIndex] = { color: COLORS.metropolitanBrackets };
+      stylesByWord[wordIndex] = { color };
     }
     wordIndex += 1;
   }
   return stylesByWord;
 }
 
-function renderTextWithMetropolitanHighlight(text) {
+function renderTextWithMetropolitanHighlight(text, color) {
   const raw = String(text || "");
   if (!raw || !METROPOLITAN_BRACKET_PATTERN.test(raw)) return raw;
   METROPOLITAN_BRACKET_PATTERN.lastIndex = 0;
@@ -567,7 +569,7 @@ function renderTextWithMetropolitanHighlight(text) {
       nodes.push(raw.slice(lastIndex, match.index));
     }
     nodes.push(
-      <Text key={`metropolitan-${key++}`} style={{ color: COLORS.metropolitanBrackets }}>
+      <Text key={`metropolitan-${key++}`} style={{ color }}>
         {match[0]}
       </Text>,
     );
@@ -720,14 +722,14 @@ function getSpeakerLabel(type, language, bishopPresent) {
   return "";
 }
 
-function getSpeakerColor(type, bishopPresent) {
+function getSpeakerColor(type, bishopPresent, theme) {
   return {
-    bishop: COLORS.bishop,
-    deacon: COLORS.deacon,
-    people: COLORS.people,
-    priest: COLORS.priest,
-    reader: COLORS.reader,
-  }[getSpeakerRole(type, bishopPresent)] || COLORS.people;
+    bishop: theme.colors.priest,
+    deacon: theme.colors.deacon,
+    people: theme.colors.people,
+    priest: theme.colors.priest,
+    reader: theme.colors.deacon,
+  }[getSpeakerRole(type, bishopPresent)] || theme.colors.people;
 }
 
 // "Bishop/Priest" (verse.type === "bishopOrPriest") resolves to "bishop" or

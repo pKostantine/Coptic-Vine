@@ -37,6 +37,8 @@ interface BibleWebViewProps {
   /** The book's highlights, drawn over whichever of their verses this chapter shows. */
   highlights?: BibleHighlight[];
   onAction?: (action: BibleWebViewAction) => void;
+  /** The page the chapter is read on (constants/documentThemes.ts), painted behind the HTML as it loads. */
+  backgroundColor?: string;
 }
 
 /**
@@ -47,7 +49,7 @@ interface BibleWebViewProps {
 const NO_NATIVE_SELECTION_MENU: [] = [];
 
 /** Native (iOS/Android) Bible chapter renderer — see bibleDocumentHtml.ts for the shared HTML builder. BibleWebView.web.tsx is the web counterpart (plain iframe). */
-const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, scrollEnabled = true, selectText = false, highlights, onAction }, ref) => {
+const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, scrollEnabled = true, selectText = false, highlights, onAction, backgroundColor = COLORS.black }, ref) => {
   const webviewRef = useRef<WebView>(null);
   const restoreVerseRef = useRef(restoreVerse);
   restoreVerseRef.current = restoreVerse;
@@ -81,7 +83,7 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
       ref={webviewRef}
       originWhitelist={['*']}
       source={{ html }}
-      style={styles.webview}
+      style={[styles.webview, { backgroundColor }]}
       scrollEnabled={scrollEnabled}
       bounces={false}
       showsHorizontalScrollIndicator={false}

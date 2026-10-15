@@ -19,6 +19,7 @@ import {
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { BookSettingsSheet } from './SettingsScreen';
+import { getDocumentTheme } from '../../../constants/documentThemes';
 import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
 import { COLORS } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
@@ -159,6 +160,10 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
+  // The page the document is read on (constants/documentThemes.ts); the
+  // screen around the reader is painted with it too, so the page runs edge
+  // to edge.
+  const documentTheme = getDocumentTheme(preferences.documentTheme);
   // Qualified by the entry point only where the document is reachable from
   // more than one, so bookmarks for every other document keep their existing
   // ids. Without this, a bookmark made in Vespers and one made in Matins were
@@ -201,7 +206,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     preferences.selectText, preferences.slideshowMode, preferences.displayComments,
     preferences.displaySilentPrayers, preferences.displayNowPlayingBar,
     preferences.bishopPresent, preferences.copticGospelRite, preferences.inMonastery,
-    preferences.selectedSaintHymns, preferences.appLanguage, effectiveDate, vespersEffectiveDate,
+    preferences.selectedSaintHymns, preferences.appLanguage, preferences.documentTheme, effectiveDate, vespersEffectiveDate,
   ]);
   const [readerFocused, setReaderFocused] = useState(true);
   // A liturgy runs for hours: the screen stays on while this is the screen being read.
@@ -892,7 +897,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   return (
     <SafeAreaView
       edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
-      style={styles.safeArea}
+      style={[styles.safeArea, { backgroundColor: documentTheme.colors.page }]}
       {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
     >
       {/* The native stack's own default edge-swipe-to-go-back gesture isn't
@@ -935,6 +940,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               pills={ANTIPHONARY_GROUPS}
               activeKey={activeAntiphonaryGroup}
               onSelect={(key) => selectAntiphonaryGroup(key as AntiphonaryGroup)}
+              theme={documentTheme}
             />
           ) : null}
           <View style={styles.documentFrame}>

@@ -18,10 +18,6 @@ function evaluateModule(source, filename, moduleRequire) {
 function loadBibleBuilder() {
   const source = fs.readFileSync('src/components/vine/bibleDocumentHtml.ts', 'utf8')
     .replace(
-      "import { COLORS } from '../../constants/theme';",
-      "const COLORS = { white: '#fff', border: '#222', gold: '#ca2', priest: '#d45', refrain: '#8d9' };",
-    )
-    .replace(
       "import { formatEnglishDisplayText } from '../../utils/displayText';",
       "const formatEnglishDisplayText = (value) => String(value || '');",
     );
@@ -29,6 +25,12 @@ function loadBibleBuilder() {
     './textHighlights': evaluateModule(fs.readFileSync('src/components/vine/textHighlights.ts', 'utf8'), 'textHighlights.ts', require),
     './documentPresentationMetrics': evaluateModule(fs.readFileSync('src/components/vine/documentPresentationMetrics.js', 'utf8'), 'documentPresentationMetrics.js', require),
     '../../utils/bibleNumerals': evaluateModule(fs.readFileSync('src/utils/bibleNumerals.ts', 'utf8'), 'bibleNumerals.ts', require),
+    // The pages a chapter can be read on, with the real design tokens behind them.
+    '../../constants/documentThemes': evaluateModule(
+      fs.readFileSync('src/constants/documentThemes.ts', 'utf8'),
+      'documentThemes.ts',
+      (name) => (name === './theme' ? evaluateModule(fs.readFileSync('src/constants/theme.ts', 'utf8'), 'theme.ts', require) : require(name)),
+    ),
   };
   return evaluateModule(source, 'bibleDocumentHtml.ts', (name) => localModules[name] || require(name)).buildBibleChapterHtml;
 }
