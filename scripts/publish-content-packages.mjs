@@ -5,6 +5,15 @@
  *
  *   PUBLISH_TOKEN=... node scripts/publish-content-packages.mjs
  *   PUBLISH_TOKEN_FILE=path/to/token node scripts/publish-content-packages.mjs
+ *   PUBLISH_TOKEN=... node scripts/publish-content-packages.mjs --changed
+ *
+ * With --changed (as .github/workflows/publish-content.yml runs it every half
+ * hour) only the books whose tables changed since the last publish are
+ * rebuilt -- the database notes when each packaged table was last written to
+ * (get_offline_content_changes) -- and the run ends at once when nothing has.
+ * The calendar's window is moved on when the month turns, and everything is
+ * rebuilt once a week, for what no table records: a function rewritten, a
+ * book's plan changed.
  *   node scripts/publish-content-packages.mjs --dry-run
  *
  * --dry-run builds every package and reports its chunks without uploading
@@ -47,6 +56,9 @@ const ANON_KEY = env('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 const CONTENT_URL = (env('CONTENT_PACKAGES_URL') || env('EXPO_PUBLIC_CONTENT_PACKAGES_URL')).replace(/\/+$/, '');
 const PUBLISH_TOKEN = (process.env.PUBLISH_TOKEN || (process.env.PUBLISH_TOKEN_FILE ? readFileSync(process.env.PUBLISH_TOKEN_FILE, 'utf8') : '')).trim();
 const DRY_RUN = process.argv.includes('--dry-run');
+const CHANGED_ONLY = process.argv.includes('--changed');
+/** How long a --changed run goes before it rebuilds everything anyway. */
+const FULL_REBUILD_MS = 7 * 24 * 60 * 60 * 1000;
 
 if (!SUPABASE_URL || !ANON_KEY) throw new Error('EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are needed (from .env).');
 if (!CONTENT_URL && !DRY_RUN) throw new Error('EXPO_PUBLIC_CONTENT_PACKAGES_URL is needed (from .env).');
@@ -249,16 +261,80 @@ function resolveGraph(roots, dependencies) {
   return ordered;
 }
 
+/** The manifest devices read now, or null if there is none yet. */
+async function currentManifest() {
+  if (!CONTENT_URL) return null;
+  const response = await fetch(`${CONTENT_URL}/manifest.json`, { headers: { 'cache-control': 'no-cache' } }).catch(() => null);
+  return response?.ok ? response.json() : null;
+}
+
+/** When each packaged table last changed, by the database's clock; null where the database doesn't record it. */
+async function contentChanges() {
+  try { return await rpc('public', 'get_offline_content_changes'); }
+  catch (error) {
+    console.warn(`The database doesn't say which tables changed (${error.message.slice(0, 80)}).`);
+    return null;
+  }
+}
+
 const plan = await rpc('public', 'get_offline_package_plan');
 const dependencies = new Map();
 for (const { resource, dependency } of plan.dependencies) dependencies.set(resource, [...(dependencies.get(resource) || []), dependency]);
 const dates = windowDates();
-console.log(`Packaging ${plan.resources.length} resources; calendar ${dates[0]} to ${dates[dates.length - 1]}.`);
+const changes = await contentChanges();
+const previous = await currentManifest();
+const books = Object.fromEntries(plan.books.map((book) => [book.key, { key: book.key, title: book.title, titleArabic: book.titleArabic, resources: resolveGraph(book.roots, dependencies) }]));
+
+/**
+ * The resources to build this run: all of them, or with --changed only those
+ * whose tables changed since the last publish (and the calendar and the
+ * Synaxarium when their window has moved on). Everything is built when there
+ * is nothing to compare against, when the books' plan has changed, or when the
+ * last full build is a week old.
+ */
+function resourcesToBuild() {
+  const all = new Set(plan.resources.map((resource) => resource.id));
+  if (!CHANGED_ONLY) return { ids: all, full: true, reason: 'a full build' };
+  if (!previous) return { ids: all, full: true, reason: 'no manifest yet' };
+  // Without the database's record of changes there is no telling what moved:
+  // a scheduled run rebuilds nothing rather than everything every half hour.
+  if (!changes) return { ids: new Set(), full: false, reason: 'the database keeps no record of changes yet' };
+  const lastFull = Date.parse(previous.fullBuildAt || previous.publishedAt);
+  if (!(Date.now() - lastFull < FULL_REBUILD_MS)) return { ids: all, full: true, reason: 'the weekly full build' };
+  const sameResources = all.size === Object.keys(previous.resources || {}).length && [...all].every((id) => previous.resources[id]);
+  const sameBooks = JSON.stringify(Object.values(books).map((book) => [book.key, book.resources]))
+    === JSON.stringify(Object.values(books).map((book) => [book.key, previous.books?.[book.key]?.resources]));
+  const sameDependencies = plan.resources.every((resource) => JSON.stringify(dependencies.get(resource.id) || []) === JSON.stringify(previous.resources[resource.id]?.dependencies || []));
+  if (!sameResources || !sameBooks || !sameDependencies) return { ids: all, full: true, reason: 'the books\' plan changed' };
+
+  const since = Date.parse(previous.changesThrough || previous.publishedAt);
+  const ids = new Set();
+  for (const change of changes.changes) {
+    if (!(Date.parse(change.changedAt) > since)) continue;
+    for (const resource of plan.resources) {
+      if (resource.schema === change.schema && resource.tables.includes(change.table)) ids.add(resource.id);
+    }
+  }
+  if (previous.calendarWindow?.start !== dates[0]) { ids.add('calendar'); ids.add('synaxarium'); }
+  return { ids, full: false, reason: ids.size ? `changed since ${new Date(since).toISOString()}` : 'nothing changed' };
+}
+
+const build = resourcesToBuild();
+if (!build.ids.size) {
+  console.log(`Up to date: ${build.reason}.`);
+  process.exit(0);
+}
+console.log(`Packaging ${build.ids.size} of ${plan.resources.length} resources (${build.reason}); calendar ${dates[0]} to ${dates[dates.length - 1]}.`);
 
 const resources = {};
 let uploaded = 0;
 let reused = 0;
 for (const resource of plan.resources) {
+  if (!build.ids.has(resource.id)) {
+    // Unchanged: as it was published, its chunks already in place.
+    resources[resource.id] = { ...previous.resources[resource.id], dependencies: dependencies.get(resource.id) || [] };
+    continue;
+  }
   const started = Date.now();
   const built = await buildResource(resource, dates);
   if (!DRY_RUN) await pool(built.chunks, 6, async (chunk) => {
@@ -278,17 +354,27 @@ for (const resource of plan.resources) {
   console.log(`  ${resource.id.padEnd(26)} ${String(built.chunks.length).padStart(5)} chunks  ${(built.size / 1024 / 1024).toFixed(1).padStart(6)} MB  ${((Date.now() - started) / 1000).toFixed(0)}s`);
 }
 
-const books = Object.fromEntries(plan.books.map((book) => [book.key, { key: book.key, title: book.title, titleArabic: book.titleArabic, resources: resolveGraph(book.roots, dependencies) }]));
 for (const book of Object.values(books)) {
   for (const id of book.resources) if (!resources[id]) throw new Error(`${book.key} needs ${id}, which produced no package.`);
 }
 if (!resources.calendar) throw new Error('No calendar package was built.');
 const publishedAt = new Date().toISOString();
-const manifest = { formatVersion: 1, snapshotId: `${publishedAt}-${sha256(encoder.encode(JSON.stringify(resources))).slice(0, 8)}`, publishedAt, books, resources };
+const manifest = {
+  formatVersion: 1,
+  snapshotId: `${publishedAt}-${sha256(encoder.encode(JSON.stringify(resources))).slice(0, 8)}`,
+  publishedAt,
+  // What the next --changed run measures from: the database's clock as this
+  // run began, so a change made while it ran is caught next time.
+  changesThrough: changes?.now ?? publishedAt,
+  fullBuildAt: build.full ? publishedAt : previous?.fullBuildAt ?? publishedAt,
+  calendarWindow: { start: dates[0], end: dates[dates.length - 1] },
+  books,
+  resources,
+};
 if (DRY_RUN) {
   const chunkCount = Object.values(resources).reduce((sum, resource) => sum + resource.chunks.length, 0);
   console.log(`Dry run: ${Object.keys(books).length} books, ${chunkCount} chunks built; nothing uploaded.`);
 } else {
   await put('manifest.json', JSON.stringify(manifest), 'application/json');
-  console.log(`Published ${Object.keys(books).length} books: ${uploaded} chunks uploaded, ${reused} already there.`);
+  console.log(`Published ${Object.keys(books).length} books (${[...build.ids].join(', ')} rebuilt): ${uploaded} chunks uploaded, ${reused} already there.`);
 }

@@ -78,6 +78,18 @@ export interface ManagedContentResource {
   updatedAt: string;
 }
 
+/** What a check for updates found. */
+export interface BookUpdateCheck {
+  /** The downloaded books with a newer edition published. */
+  updates: DownloadableBookKey[];
+  /** Whether the calendar has a newer edition. */
+  calendar: boolean;
+  /** Whether those updates are being downloaded now (asked for, or automatic updates on Wi-Fi). */
+  downloading: boolean;
+  /** When the books were last published. */
+  publishedAt: string;
+}
+
 export interface BookDownloadManager {
   install(bookKey: DownloadableBookKey): Promise<void>;
   /** Every book not downloaded, paused or failed, together; rejects with the first failure only. */
@@ -86,7 +98,7 @@ export interface BookDownloadManager {
   resume(bookKey: DownloadableBookKey): Promise<void>;
   retry(bookKey: DownloadableBookKey): Promise<void>;
   remove(bookKey: DownloadableBookKey): Promise<void>;
-  checkForUpdates(manual?: boolean): Promise<void>;
+  checkForUpdates(manual?: boolean): Promise<BookUpdateCheck>;
   ensureCalendar(): Promise<void>;
   listBooks(): Promise<BookDownloadProgress[]>;
   listResources(): Promise<ManagedContentResource[]>;

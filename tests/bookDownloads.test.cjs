@@ -552,3 +552,42 @@ test('Downloads & Storage: an X cancels a paused or failed book, a bin removes w
   // Nothing on the page turns round for Arabic: rows, the storage bar and chevrons keep the English layout.
   assert.doesNotMatch(page, /rowReverse|row-reverse|chevron-back|textAlign: 'right'/);
 });
+
+test('a change in the database reaches the books: rebuilt when their tables change, found when the app checks', () => {
+  const publisher = fs.readFileSync('scripts/publish-content-packages.mjs', 'utf8');
+  // Only the resources whose tables changed since the last publish are rebuilt,
+  // measured by the database's clock, with the rest carried over as published.
+  assert.match(publisher, /const CHANGED_ONLY = process\.argv\.includes\('--changed'\);/);
+  assert.match(publisher, /rpc\('public', 'get_offline_content_changes'\)/);
+  assert.match(publisher, /const since = Date\.parse\(previous\.changesThrough \|\| previous\.publishedAt\);/);
+  assert.match(publisher, /resource\.schema === change\.schema && resource\.tables\.includes\(change\.table\)/);
+  assert.match(publisher, /resources\[resource\.id\] = \{ \.\.\.previous\.resources\[resource\.id\], dependencies:/);
+  // A moved calendar window, a changed plan, or a week since the last full build rebuild more.
+  assert.match(publisher, /if \(previous\.calendarWindow\?\.start !== dates\[0\]\) \{ ids\.add\('calendar'\); ids\.add\('synaxarium'\); \}/);
+  assert.match(publisher, /const FULL_REBUILD_MS = 7 \* 24 \* 60 \* 60 \* 1000;/);
+  assert.match(publisher, /changesThrough: changes\?\.now \?\? publishedAt,/);
+  assert.match(publisher, /console\.log\(`Up to date: \$\{build\.reason\}\.`\);\n  process\.exit\(0\);/);
+
+  // It runs every half hour on GitHub, and by hand.
+  const workflow = fs.readFileSync('.github/workflows/publish-content.yml', 'utf8');
+  assert.match(workflow, /cron: "\*\/30 \* \* \* \*"/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /PUBLISH_TOKEN: \$\{\{ secrets\.PUBLISH_TOKEN \}\}/);
+  assert.match(workflow, /node scripts\/publish-content-packages\.mjs \$\{\{ inputs\.everything && ' ' \|\| '--changed' \}\}/);
+  // Unconfigured, it does nothing: no secret, no run; no record of changes, no rebuild.
+  assert.match(workflow, /if \[ -z "\$PUBLISH_TOKEN" \]; then/);
+  assert.match(publisher, /if \(!changes\) return \{ ids: new Set\(\), full: false,/);
+
+  // A check says what it found and starts the downloads without waiting for them.
+  const manager = fs.readFileSync('src/services/bookDownloadManager.ts', 'utf8');
+  assert.match(manager, /async checkForUpdates\(manual = false\): Promise<BookUpdateCheck>/);
+  assert.match(manager, /for \(const bookKey of updates\) void this\.install\(bookKey\)\.catch\(\(\) => undefined\);/);
+  assert.match(manager, /return \{ updates, calendar, downloading, publishedAt: manifest\.publishedAt \};/);
+  const page = fs.readFileSync('src/app/downloads.tsx', 'utf8');
+  assert.match(page, /tr\('Updates found', 'Mises à jour trouvées', 'توجد تحديثات'\)/);
+  assert.match(page, /tr\('Everything is up to date', 'Tout est à jour', 'كل شيء محدّث'\)/);
+  // Coming back to the app looks for new editions on any connection, every ten minutes at most.
+  const bootstrap = fs.readFileSync('src/components/BookSyncBootstrap.tsx', 'utf8');
+  assert.match(bootstrap, /const UPDATE_CHECK_INTERVAL_MS = 10 \* 60 \* 1000;/);
+  assert.ok(bootstrap.indexOf('checkForUpdates(false)') < bootstrap.indexOf("if (!isWifi(network.type)) return;"), 'the check comes before the Wi-Fi gate');
+});

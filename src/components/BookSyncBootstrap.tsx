@@ -2,11 +2,13 @@ import * as Network from 'expo-network';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
-import { bookDownloadManager, getAutomaticBookUpdatesEnabled } from '@/services/bookDownloadManager';
+import { bookDownloadManager } from '@/services/bookDownloadManager';
 import { warmCalendar } from '@/utils/calendarService';
 
 /** Long enough for the first screen to have drawn and loaded what it needs itself. */
 const CALENDAR_WARM_DELAY_MS = 2000;
+/** How often coming back to the app looks for newly published books. */
+const UPDATE_CHECK_INTERVAL_MS = 10 * 60 * 1000;
 
 function isWifi(type: Network.NetworkStateType | undefined): boolean {
   return type === Network.NetworkStateType.WIFI || type === Network.NetworkStateType.ETHERNET;
@@ -26,6 +28,7 @@ export default function BookSyncBootstrap() {
   useEffect(() => {
     let active = true;
     let syncing = false;
+    let lastUpdateCheck = 0;
     const sync = async () => {
       if (!active || syncing) return;
       const network = await Network.getNetworkStateAsync();
@@ -36,6 +39,14 @@ export default function BookSyncBootstrap() {
         // first connection of any kind, whatever the cellular choice, and
         // kept current the same way. Books wait for Wi-Fi below.
         await bookDownloadManager.ensureCalendar();
+        // Look for new editions of the downloaded books on any connection, at
+        // most every ten minutes: a book with one shows "Update available".
+        // checkForUpdates downloads them itself only on Wi-Fi with automatic
+        // updates on.
+        if (Date.now() - lastUpdateCheck > UPDATE_CHECK_INTERVAL_MS) {
+          lastUpdateCheck = Date.now();
+          await bookDownloadManager.checkForUpdates(false);
+        }
         if (!isWifi(network.type)) return;
         // A dropped connection marks only the incomplete chunk failed. Resume
         // user-requested initial installs when Wi-Fi returns; intentionally
@@ -43,7 +54,6 @@ export default function BookSyncBootstrap() {
         const interrupted = (await bookDownloadManager.listBooks())
           .filter((book) => book.status === 'failed' && book.totalBytes != null);
         for (const book of interrupted) await bookDownloadManager.retry(book.bookKey);
-        if (await getAutomaticBookUpdatesEnabled()) await bookDownloadManager.checkForUpdates(false);
       } catch (error) {
         // Offline/unreachable startup is expected. Installed content remains
         // active and the network listener retries when Wi-Fi returns.

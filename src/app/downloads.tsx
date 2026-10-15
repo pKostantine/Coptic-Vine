@@ -126,9 +126,32 @@ function NativeDownloadsScreen() {
   const run = async (action: () => Promise<void>) => {
     try { await action(); } catch (error) { if (error instanceof Error && error.message !== 'Download paused.') Alert.alert(tr('Download', 'Téléchargement', 'التنزيل'), error.message); }
   };
+  // A check says what it found: the books it is updating, or that every
+  // downloaded book is the latest edition published.
   const checkForUpdates = async () => {
     setChecking(true);
-    try { await run(() => bookDownloadManager.checkForUpdates(true)); } finally { setChecking(false); }
+    try {
+      const found = await bookDownloadManager.checkForUpdates(true);
+      const names = found.updates.map((key) => books.find((book) => book.bookKey === key)?.title ?? key);
+      const published = found.publishedAt ? lastChecked(found.publishedAt, reading.appLanguage) : '';
+      if (names.length) {
+        Alert.alert(
+          tr('Updates found', 'Mises à jour trouvées', 'توجد تحديثات'),
+          tr(`Updating ${names.join(', ')} now.`, `Mise à jour de ${names.join(', ')} en cours.`, `جارٍ تحديث ${names.join('، ')}.`),
+        );
+      } else if (found.calendar) {
+        Alert.alert(tr('Calendar updated', 'Calendrier mis à jour', 'تم تحديث التقويم'), tr('A newer calendar is downloading now.', 'Un calendrier plus récent est en cours de téléchargement.', 'يتم الآن تنزيل تقويم أحدث.'));
+      } else {
+        Alert.alert(
+          tr('Everything is up to date', 'Tout est à jour', 'كل شيء محدّث'),
+          published
+            ? tr(`Your books are the latest editions, published ${published}.`, `Vos livres sont les dernières éditions, publiées ${published}.`, `كتبك هي أحدث الإصدارات، المنشورة ${published}.`)
+            : tr('Your books are the latest editions.', 'Vos livres sont les dernières éditions.', 'كتبك هي أحدث الإصدارات.'),
+        );
+      }
+    } catch (error) {
+      Alert.alert(tr('Couldn’t check for updates', 'Impossible de rechercher les mises à jour', 'تعذّر البحث عن تحديثات'), error instanceof Error ? error.message : '');
+    } finally { setChecking(false); }
   };
   const maintenance = async (kind: 'validate' | 'cleanup') => {
     setBusy(true);

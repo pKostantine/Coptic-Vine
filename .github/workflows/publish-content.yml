@@ -1,0 +1,51 @@
+name: Publish book packages
+
+# Rebuilds the downloadable books whose content changed in the database and
+# publishes them to the content Worker, where the app finds them when it
+# checks for updates (scripts/publish-content-packages.mjs). Every half hour:
+# a run with nothing changed ends in seconds. Run it by hand from the Actions
+# tab to publish at once, or to rebuild everything.
+#
+# Needs the repository secret PUBLISH_TOKEN: the content Worker's publish
+# token (workers/content-packages). The database's public URL and key, and the
+# Worker's address, come from .env.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      everything:
+        description: Rebuild every book, not only the ones that changed
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One publish at a time; a run that finds another going waits for it.
+concurrency:
+  group: publish-content
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The script uses Node's own modules only: nothing to install.
+      - name: Publish
+        env:
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        # Until the secret is set there is nothing to publish with: the run
+        # says so and ends, rather than failing every half hour.
+        run: |
+          if [ -z "$PUBLISH_TOKEN" ]; then
+            echo "::notice::Set the PUBLISH_TOKEN repository secret to publish book packages."
+            exit 0
+          fi
+          node scripts/publish-content-packages.mjs ${{ inputs.everything && ' ' || '--changed' }}

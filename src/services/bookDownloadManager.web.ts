@@ -12,7 +12,7 @@ class WebBookDownloadManager implements BookDownloadManager {
   resume(_key: DownloadableBookKey) { return Promise.reject(unavailable()); }
   retry(_key: DownloadableBookKey) { return Promise.reject(unavailable()); }
   remove(_key: DownloadableBookKey) { return Promise.reject(unavailable()); }
-  checkForUpdates(_manual?: boolean) { return Promise.resolve(); }
+  checkForUpdates(_manual?: boolean) { return Promise.resolve({ updates: [], calendar: false, downloading: false, publishedAt: '' }); }
   ensureCalendar() { return Promise.resolve(); }
   listBooks(): Promise<BookDownloadProgress[]> { return Promise.resolve([]); }
   listResources() { return Promise.resolve([]); }

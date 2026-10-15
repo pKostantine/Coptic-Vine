@@ -31,6 +31,7 @@ import { getPackageFiles, refreshPackageProgress, setPackageState, updateOffline
 import type {
   BookDownloadManager,
   BookDownloadProgress,
+  BookUpdateCheck,
   ContentPackagePayload,
   ContentResourceManifest,
   ContentRootManifest,
@@ -418,9 +419,11 @@ class NativeBookDownloadManager implements BookDownloadManager {
     this.emit();
   }
 
-  async checkForUpdates(manual = false): Promise<void> {
+  async checkForUpdates(manual = false): Promise<BookUpdateCheck> {
     await this.initialize();
     const manifest = await this.fetchManifest(true);
+    const calendarActive = await getActiveResourceVersion('calendar');
+    const calendar = Boolean(calendarActive) && calendarActive !== manifest.resources.calendar.version;
     const books = await listStoredBooks();
     const updates: DownloadableBookKey[] = [];
     for (const book of books.filter((item) => ['installed', 'update_available'].includes(item.status))) {
@@ -432,11 +435,15 @@ class NativeBookDownloadManager implements BookDownloadManager {
     const network = await Network.getNetworkStateAsync();
     const wifi = network.isConnected !== false && [Network.NetworkStateType.WIFI, Network.NetworkStateType.ETHERNET].includes(network.type as any);
     const automatic = await getAutomaticBookUpdatesEnabled();
-    if (manual || (wifi && automatic)) {
-      await this.ensureCalendar();
-      for (const bookKey of updates) await this.install(bookKey);
+    const downloading = manual || (wifi && automatic);
+    if (downloading) {
+      // Started, not waited for: each book shows its own progress on
+      // Downloads & Storage, and a failure stays on its own row.
+      void this.ensureCalendar().catch(() => undefined);
+      for (const bookKey of updates) void this.install(bookKey).catch(() => undefined);
     }
     this.emit();
+    return { updates, calendar, downloading, publishedAt: manifest.publishedAt };
   }
 
   async listBooks(): Promise<BookDownloadProgress[]> { await this.initialize(); return listStoredBooks(); }
