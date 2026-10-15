@@ -1,5 +1,4 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -25,12 +24,12 @@ const ORIENTATION_OPTIONS: { key: OrientationMode; label: string; arabic: string
   { key: 'portrait', label: 'Portrait', arabic: 'عمودي', french: 'Portrait' }, { key: 'auto', label: 'Auto Rotate', arabic: 'تدوير تلقائي', french: 'Rotation automatique' },
 ];
 const SETTINGS_LABELS = {
-  settings: { english: 'Book Settings', arabic: 'إعدادات الكتب', french: 'Réglages des livres' }, page: { english: 'Page', arabic: 'الصفحة', french: 'Page' }, languages: { english: 'Languages', arabic: 'اللغات', french: 'Langues' }, orientation: { english: 'Orientation', arabic: 'الاتجاه', french: 'Orientation' },
+  settings: { english: 'Book Settings', arabic: 'إعدادات الكتب', french: 'Réglages des livres' }, languages: { english: 'Languages', arabic: 'اللغات', french: 'Langues' }, orientation: { english: 'Orientation', arabic: 'الاتجاه', french: 'Orientation' },
   display: { english: 'Display', arabic: 'العرض', french: 'Affichage' }, slideshowMode: { english: 'Slideshow Mode', arabic: 'وضع العرض التقديمي', french: 'Mode diaporama' }, selectText: { english: 'Select Text', arabic: 'تحديد النص', french: 'Sélectionner le texte' },
-  displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات', french: 'Afficher les commentaires' }, displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية', french: 'Afficher les prières secrètes' }, displayNowPlayingBar: { english: 'Display Now Playing Bar', arabic: 'عرض شريط التشغيل الحالي', french: 'Afficher la barre de lecture' },
+  comments: { english: 'Comments', arabic: 'التعليقات', french: 'Commentaires' }, silentPrayers: { english: 'Silent Prayers', arabic: 'الصلوات السرية', french: 'Prières secrètes' }, displayNowPlayingBar: { english: 'Display Now Playing Bar', arabic: 'عرض شريط التشغيل الحالي', french: 'Afficher la barre de lecture' },
   keepScreenAwake: { english: 'Keep Screen On While Reading', arabic: 'إبقاء الشاشة مضاءة أثناء القراءة', french: 'Garder l’écran allumé pendant la lecture' },
   content: { english: 'Content', arabic: 'المحتوى', french: 'Contenu' }, saintHymns: { english: 'Saint Hymns', arabic: 'ألحان القديسين', french: 'Hymnes des saints' }, inMonastery: { english: 'In Monastery', arabic: 'في الدير', french: 'Au monastère' },
-  textSize: { english: 'Text size', arabic: 'حجم النص', french: 'Taille du texte' }, downloads: { english: 'Downloads & Storage', arabic: 'التنزيلات والتخزين', french: 'Téléchargements et stockage' },
+  textSize: { english: 'Text size', arabic: 'حجم النص', french: 'Taille du texte' },
 };
 
 type Label = { english?: string; label?: string; arabic: string; french?: string };
@@ -40,8 +39,6 @@ interface BookSettingsPanelProps {
   /** Two columns — Languages and Content beside Display — on the iPad and desktop. */
   wide?: boolean;
   onOpenSaintHymns: () => void;
-  /** The Downloads & Storage row, where there is one: not over a document, and not in a browser. */
-  onOpenDownloads?: () => void;
 }
 
 /**
@@ -50,7 +47,7 @@ interface BookSettingsPanelProps {
  * the content — the saints' hymns and the monastery — each group under a
  * small gold heading. Always in BookSettingsSheet, wherever it is opened from.
  */
-export function BookSettingsPanel({ wide = false, onOpenSaintHymns, onOpenDownloads }: BookSettingsPanelProps) {
+export function BookSettingsPanel({ wide = false, onOpenSaintHymns }: BookSettingsPanelProps) {
   // A desktop sets the text size with − and + rather than a track.
   const desktop = useLayoutMode() === 'desktop';
   const { preferences, toggleLanguage, setFontScale, setFontScaleValue, setOrientationMode, toggleSelectText, toggleSlideshowMode, toggleDisplayComments, toggleDisplaySilentPrayers, toggleDisplayNowPlayingBar, toggleInMonastery, toggleKeepScreenAwake, setDocumentTheme } = useReadingPreferences();
@@ -106,16 +103,15 @@ export function BookSettingsPanel({ wide = false, onOpenSaintHymns, onOpenDownlo
   );
   const display = (
     <>
-      {/* The page a document is read on, as a book app offers them. */}
-      {kicker(SETTINGS_LABELS.page, wide)}
-      <DocumentThemePicker selected={preferences.documentTheme} onSelect={setDocumentTheme} isArabic={arabic} />
-      {kicker(SETTINGS_LABELS.display)}
+      {kicker(SETTINGS_LABELS.display, wide)}
+      {/* First under Display: the page a document is read on, as a book app offers them. */}
+      <View style={styles.pagePicker}>
+        <DocumentThemePicker selected={preferences.documentTheme} onSelect={setDocumentTheme} isArabic={arabic} />
+      </View>
       <View style={[styles.rows, !wide && styles.rowsPhone]}>
         <FontScaleControl fontScale={preferences.fontScale} isArabic={arabic} label={labelText(SETTINGS_LABELS.textSize)} onStep={setFontScale} onSetValue={setFontScaleValue} compact={!wide} stepper={desktop} />
         <ToggleRow label={labelText(SETTINGS_LABELS.slideshowMode)} isArabic={arabic} active={preferences.slideshowMode} onPress={toggleSlideshowMode} minHeight={rowHeight} />
         <ToggleRow label={labelText(SETTINGS_LABELS.selectText)} isArabic={arabic} active={preferences.selectText} disabled={preferences.slideshowMode} onPress={toggleSelectText} minHeight={rowHeight} />
-        <ToggleRow label={labelText(SETTINGS_LABELS.displayComments)} isArabic={arabic} active={preferences.displayComments} onPress={toggleDisplayComments} minHeight={rowHeight} />
-        <ToggleRow label={labelText(SETTINGS_LABELS.displaySilentPrayers)} isArabic={arabic} active={preferences.displaySilentPrayers} onPress={toggleDisplaySilentPrayers} minHeight={rowHeight} />
         <ToggleRow label={labelText(SETTINGS_LABELS.displayNowPlayingBar)} isArabic={arabic} active={preferences.displayNowPlayingBar} onPress={toggleDisplayNowPlayingBar} minHeight={rowHeight} />
         <ToggleRow label={labelText(SETTINGS_LABELS.keepScreenAwake)} isArabic={arabic} active={preferences.keepScreenAwake} onPress={toggleKeepScreenAwake} minHeight={rowHeight} />
       </View>
@@ -135,18 +131,9 @@ export function BookSettingsPanel({ wide = false, onOpenSaintHymns, onOpenDownlo
           <Text style={[styles.linkValue, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{selectedCount}</Text>
           <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
         </Pressable>
+        <ToggleRow label={labelText(SETTINGS_LABELS.comments)} isArabic={arabic} active={preferences.displayComments} onPress={toggleDisplayComments} minHeight={rowHeight} />
+        <ToggleRow label={labelText(SETTINGS_LABELS.silentPrayers)} isArabic={arabic} active={preferences.displaySilentPrayers} onPress={toggleDisplaySilentPrayers} minHeight={rowHeight} />
         <ToggleRow label={labelText(SETTINGS_LABELS.inMonastery)} isArabic={arabic} active={preferences.inMonastery} onPress={toggleInMonastery} minHeight={rowHeight} />
-        {onOpenDownloads && Platform.OS !== 'web' ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={labelText(SETTINGS_LABELS.downloads)}
-            onPress={onOpenDownloads}
-            style={({ pressed }) => [styles.linkRow, { minHeight: rowHeight }, arabic && styles.rowReverse, pressed && styles.linkRowPressed]}
-          >
-            <Text style={[styles.linkLabel, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{labelText(SETTINGS_LABELS.downloads)}</Text>
-            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
-          </Pressable>
-        ) : null}
       </View>
     </>
   );
@@ -189,7 +176,6 @@ interface BookSettingsSheetProps {
  * on the iPad and desktop.
  */
 export function BookSettingsSheet({ visible, onClose, inDocument = false }: BookSettingsSheetProps) {
-  const router = useRouter();
   const layout = useLayoutMode();
   const wide = layout !== 'phone';
   const { preferences, toggleSaintHymn, clearSaintHymns } = useReadingPreferences();
@@ -208,11 +194,6 @@ export function BookSettingsSheet({ visible, onClose, inDocument = false }: Book
         <BookSettingsPanel
           wide={wide}
           onOpenSaintHymns={() => setSaintPickerOpen(true)}
-          // Closed first, so Downloads isn't opened underneath the sheet.
-          onOpenDownloads={inDocument ? undefined : () => {
-            onClose();
-            router.push('/downloads');
-          }}
         />
       </View>
       {/* Inside the sheet's own modal, so iOS presents it over the sheet. */}
@@ -223,6 +204,8 @@ export function BookSettingsSheet({ visible, onClose, inDocument = false }: Book
 
 const styles = StyleSheet.create({
   // With the frame's own 10pt top, 16pt sides and 22pt foot: the dialog's 24pt top and 26pt elsewhere.
+  // The page swatches, the first thing under Display, above its rows.
+  pagePicker: { marginBottom: 10 },
   dialogBody: { paddingBottom: 4, paddingHorizontal: 10, paddingTop: 14 },
   columns: { flexDirection: 'row', gap: 28 },
   column: { flex: 1, minWidth: 0 },
