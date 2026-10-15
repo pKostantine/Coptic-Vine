@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 
+import { annotateNativeLines, splitParagraphs, splitWords } from "./textLines";
+
 const IS_WEB = Platform.OS === "web";
 const DISABLED_SELECTION_STYLE = IS_WEB
   ? {
@@ -20,16 +22,6 @@ const DISABLED_SELECTION_STYLE = IS_WEB
 // "space-between" alone produces true word-only justification with no
 // pixel math of our own needed at render time.
 const WORD_INTRINSIC_STYLE = { width: "auto", flexBasis: "auto", flexShrink: 0, alignSelf: "flex-start" };
-
-function splitWords(text) {
-  return String(text || "")
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function splitParagraphs(text) {
-  return String(text || "").replace(/\r\n?/g, "\n").split("\n");
-}
 
 function getLineWordOffsets(lines) {
   let offset = 0;
@@ -236,41 +228,14 @@ function nativeLineCacheKey(text, fontSize, fontFamily, fontWeight, fontStyle, w
   return `${fontFamily}|${fontSize}|${fontWeight}|${fontStyle}|${width}|${text}`;
 }
 
-function annotateNativeLines(nativeLines, text) {
-  const paragraphs = splitParagraphs(text).map(splitWords);
-  let paragraphIndex = 0;
-  let wordsInParagraph = 0;
-
-  return nativeLines.map((line, lineIndex) => {
-    const words = splitWords(line.text);
-    while (paragraphIndex < paragraphs.length && paragraphs[paragraphIndex].length === 0) {
-      if (!words.length) {
-        paragraphIndex += 1;
-        return { words: [], isBlank: true, isParagraphEnd: true };
-      }
-      paragraphIndex += 1;
-    }
-
-    wordsInParagraph += words.length;
-    const paragraphWordCount = paragraphs[paragraphIndex]?.length || 0;
-    const isParagraphEnd =
-      paragraphIndex >= paragraphs.length - 1 ||
-      wordsInParagraph >= paragraphWordCount ||
-      lineIndex === nativeLines.length - 1;
-
-    if (isParagraphEnd) {
-      paragraphIndex += 1;
-      wordsInParagraph = 0;
-    }
-
-    return { words, isParagraphEnd };
-  });
-}
+// Text with no words has no lines, and no layout event would ever say so:
+// a probe for it would be waited on for ever.
+const NO_LINES = Object.freeze([]);
 
 function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width) {
   const cacheKey = nativeLineCacheKey(text, fontSize, fontFamily, fontWeight, fontStyle, width);
   const [state, setState] = useState(null); // { forKey, lines }
-  const cached = nativeLineCache.get(cacheKey);
+  const cached = splitWords(text).length ? nativeLineCache.get(cacheKey) : NO_LINES;
   const lines = cached ?? (state && state.forKey === cacheKey ? state.lines : null);
 
   function handleTextLayout(event) {
@@ -415,7 +380,11 @@ export default function JustifiedText({
       {lines.map((line, index) => {
         const lineWords = line.words;
         const isFirstLine = index === firstContentLineIndex;
-        const isLastLine = index === lastIndex || line.isParagraphEnd;
+        // Only a paragraph's own last line is left ragged. Lines handed in by
+        // pagination carry that from the measurement, so the last line of a
+        // page whose paragraph carries on over the turn stays justified like
+        // the lines above it.
+        const isLastLine = forceLines ? Boolean(line.isParagraphEnd) : index === lastIndex || line.isParagraphEnd;
 
         if (line.isBlank) {
           return (

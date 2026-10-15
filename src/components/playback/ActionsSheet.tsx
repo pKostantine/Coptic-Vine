@@ -1,19 +1,18 @@
-'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet } from 'react-native';
 
 import Icon, { type IconName } from '@/components/vine/ui/Icon';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS } from '@/constants/theme';
 
-import { tr } from '../../utils/appText';
-import { useModalOrientations } from '@/hooks/useModalOrientations';
+import ActionSheetFrame, { SheetHeader, SheetRow, SheetRowGroup } from './ActionSheetFrame';
 
 /**
- * The sheet of actions a row offers — a track's, a lesson's — rising from the
- * bottom over a dimmed page: the item it is about across the top, then its
- * rows. Music and Learn & Study share it so a queue holding both kinds offers
- * them the same way.
+ * The sheet of actions a row offers — a track's, a lesson's — over a dimmed
+ * page (Coptic Vine Player design, "More menu"): the item it is about across
+ * the top, its artwork, a gold kicker and its name, then its rows. Music and
+ * Learn & Study share it so a queue holding both kinds offers them the same
+ * way, and a row that opens more (Add to playlist) swaps the rows for its own
+ * content in the same sheet rather than stacking a second one on top.
  */
 
 interface ActionsMenuTriggerProps {
@@ -22,7 +21,7 @@ interface ActionsMenuTriggerProps {
   onPress: () => void;
 }
 
-/** The "⋮" that opens the sheet, sized to the row it sits in. */
+/** The "⋯" that opens the sheet, sized to the row it sits in. */
 export function ActionsMenuTrigger({ label, size, onPress }: ActionsMenuTriggerProps) {
   return (
     <Pressable
@@ -50,39 +49,27 @@ interface ActionsSheetProps {
   visible: boolean;
   onClose: () => void;
   closeLabel: string;
-  /** The item's picture, drawn beside its name. */
+  /** The item's picture, drawn beside its name (52 square, 10 round). */
   artwork: ReactNode;
   title: string;
+  /** The gold line over the title: the release a track is from, or what the sheet is doing. */
   subtitle?: string | null;
+  /** Kept for the menus that pass it: the sheet sets Arabic by the text itself. */
   isArabic?: boolean;
+  /**
+   * Whether the children are rows, set out as the menu's list. Content that
+   * brings its own headings (a playlist picker) passes false.
+   */
+  rows?: boolean;
   children: ReactNode;
 }
 
-export default function ActionsSheet({ visible, onClose, closeLabel, artwork, title, subtitle, isArabic = false, children }: ActionsSheetProps) {
-  const modalOrientations = useModalOrientations();
-  if (!visible) return null;
+export default function ActionsSheet({ visible, onClose, closeLabel, artwork, title, subtitle, rows = true, children }: ActionsSheetProps) {
   return (
-    <Modal supportedOrientations={modalOrientations} animationType="fade" transparent visible onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <Pressable accessibilityLabel={closeLabel} style={styles.backdrop} onPress={onClose} />
-        <SafeAreaView edges={['bottom']} style={styles.sheet}>
-          <View style={styles.grabber} />
-          <View style={styles.sheetHeader}>
-            {artwork}
-            <View style={styles.sheetHeaderText}>
-              <Text numberOfLines={1} style={[styles.title, isArabic && styles.arabic]}>{title}</Text>
-              {subtitle ? (
-                <Text numberOfLines={1} style={[styles.subtitle, isArabic && styles.arabic]}>{subtitle}</Text>
-              ) : null}
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-              <Icon name="close" size={20} color={COLORS.muted} />
-            </Pressable>
-          </View>
-          <View style={styles.actions}>{children}</View>
-        </SafeAreaView>
-      </View>
-    </Modal>
+    <ActionSheetFrame visible={visible} onClose={onClose} closeLabel={closeLabel}>
+      <SheetHeader artwork={artwork} kicker={subtitle} title={title} />
+      {rows ? <SheetRowGroup first>{children}</SheetRowGroup> : children}
+    </ActionSheetFrame>
   );
 }
 
@@ -90,22 +77,13 @@ interface ActionRowProps {
   icon: IconName;
   label: string;
   onPress: () => void;
-  /** The icon's colour: the gold of Music, the teal of Learn & Study. */
+  /** The icon's colour; gold unless a row asks otherwise. */
   accentColor?: string;
 }
 
-export function ActionRow({ icon, label, onPress, accentColor = COLORS.goldBright }: ActionRowProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.actionRow, pressed && styles.actionPressed]}
-    >
-      <Icon name={icon} size={20} color={accentColor} />
-      <Text style={styles.actionText}>{label}</Text>
-    </Pressable>
-  );
+/** A menu row that goes somewhere or does something: its icon on a gold tile, its label, a chevron. */
+export function ActionRow({ icon, label, onPress, accentColor = COLORS.gold }: ActionRowProps) {
+  return <SheetRow icon={icon} label={label} onPress={onPress} iconColor={accentColor} trailing="chevron" />;
 }
 
 const styles = StyleSheet.create({
@@ -118,77 +96,4 @@ const styles = StyleSheet.create({
   },
   triggerHovered: { backgroundColor: COLORS.goldSoft, borderColor: COLORS.goldLine },
   triggerPressed: { backgroundColor: COLORS.goldSoft, opacity: 0.78 },
-  pressed: { opacity: 0.7 },
-  modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: 'rgba(0,0,0,0.70)',
-  },
-  sheet: {
-    alignSelf: 'center',
-    width: '100%',
-    maxWidth: 620,
-    backgroundColor: COLORS.black,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderTopLeftRadius: RADII.lg,
-    borderTopRightRadius: RADII.lg,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.lg,
-  },
-  grabber: {
-    alignSelf: 'center',
-    width: 42,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.border,
-    marginTop: 9,
-    marginBottom: SPACING.md,
-  },
-  sheetHeader: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md },
-  sheetHeaderText: { flex: 1, minWidth: 0 },
-  closeButton: { alignItems: 'center', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
-  title: {
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: COLORS.muted,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 12,
-    marginTop: 3,
-  },
-  actions: {
-    marginTop: SPACING.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
-    paddingTop: SPACING.xs,
-  },
-  actionRow: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: 10,
-  },
-  actionPressed: { backgroundColor: 'rgba(255,255,255,0.06)' },
-  actionText: {
-    flex: 1,
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  arabic: {
-    fontFamily: TYPOGRAPHY.arabic,
-    textAlign: 'left',
-    writingDirection: 'rtl',
-  },
 });

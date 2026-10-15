@@ -243,9 +243,14 @@ export function paginateItems(
     // many of its lines as fit and carries on over the page, rather than
     // moving on whole and leaving the foot of the slide empty -- never in a
     // piece of fewer than two lines, either side of the turn.
-    const languageMetric = hasMeasuredVerseLines(languageHeights[verseItem.id])
-      ? languageHeights[verseItem.id]
-      : createEstimatedVerseMetric(verseItem, fontSize, visibleLanguages, tableWidth);
+    //
+    // Only lines the platform's own text engine laid out can be turned over
+    // like this: a split is rendered line for line exactly as decided here.
+    // A verse whose lines are not measured yet moves on whole instead -- a
+    // guessed line break on the page reads as words flung across the column
+    // -- and its real lines settle the page before it is shown (see
+    // isSlideSettled).
+    const languageMetric = languageHeights[verseItem.id];
 
     if (!hasMeasuredVerseLines(languageMetric)) {
       if (currentSlide.length) flushSlide();
@@ -262,7 +267,6 @@ export function paginateItems(
       currentHeight,
       availableHeight: safeAvailableHeight,
       fontSize,
-      tableWidth,
       visibleLanguages,
     });
     currentSlide = result.currentSlide;
@@ -306,13 +310,13 @@ function appendTallVerseSegments({
       ? createContinuationCapacityItem(item)
       : item;
     const remainingHeight = availableHeight - currentHeight;
-    let lineCapacities = withoutWidowLines(state, getIndependentLineCapacities(
+    let lineCapacities = withoutWidowLines(state, coordinateLineCapacities(state, getIndependentLineCapacities(
       state,
       remainingHeight,
       fontSize,
       capacityItem,
       visibleLanguages,
-    ));
+    )));
 
     if (currentSlide.length && shouldAvoidTinyFragment(
       state,
@@ -376,6 +380,47 @@ function appendTallVerseSegments({
   }
 
   return { currentSlide, currentHeight };
+}
+
+/**
+ * Keeps the columns of a split verse in step. Each language's capacity says
+ * how many of its own remaining lines would fit; taken independently, the
+ * English could finish on this slide while the Coptic carried on alone over
+ * the page. Instead every column takes the same share of its remaining lines
+ * as the most constrained one (the smallest capacity over remaining lines),
+ * so the slide shows the same stretch of the verse in every language, give
+ * or take a line, and the remainders turn the page together. Never a single
+ * line either side of the turn; and a short column (three lines or fewer) is
+ * not chopped: it goes whole on this slide when the limiting column keeps at
+ * least half of its lines here, otherwise whole on the next.
+ */
+export function coordinateLineCapacities(state, capacities) {
+  const entries = state.languages
+    .filter((entry) => entry.offset < entry.lines.length)
+    .map((entry) => ({
+      language: entry.language,
+      remaining: entry.lines.length - entry.offset,
+      capacity: Math.max(0, capacities[entry.language] ?? 0),
+    }));
+  if (!entries.length) return {};
+  if (entries.every((entry) => entry.capacity >= entry.remaining)) return capacities;
+
+  const limiting = entries.reduce((best, entry) =>
+    (entry.capacity * best.remaining < best.capacity * entry.remaining ? entry : best));
+  const coordinated = {};
+  entries.forEach((entry) => {
+    let take;
+    if (entry.remaining <= 3) {
+      const limitingKeepsHalf = limiting.capacity * 2 >= limiting.remaining;
+      take = limitingKeepsHalf && entry.capacity >= entry.remaining ? entry.remaining : 0;
+    } else {
+      take = Math.floor((entry.remaining * limiting.capacity) / limiting.remaining);
+      if (entry.remaining - take === 1) take = entry.remaining - 2;
+      if (take === 1) take = entry.capacity >= 2 ? 2 : 0;
+    }
+    coordinated[entry.language] = Math.max(0, Math.min(take, entry.capacity, entry.remaining));
+  });
+  return coordinated;
 }
 
 /**
@@ -660,26 +705,6 @@ export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth)
     (languageHeights.length ? Math.max(...languageHeights) : 0);
 }
 
-export function createEstimatedVerseMetric(item, fontSize, visibleLanguages, tableWidth) {
-  const layout = getVerseLanguageLayout(item, visibleLanguages, tableWidth);
-  return layout.languages.reduce((metric, language) => {
-    const text = item.verse?.[language];
-    if (!String(text || "").trim()) return metric;
-    const lines = createEstimatedTextLines(
-      text,
-      getEstimatedLineLength(language, fontSize, layout.rowColumnWidth, item),
-    );
-    return {
-      ...metric,
-      [language]: {
-        height: lines.length * getSlideshowLanguageLineHeight(language, item, fontSize),
-        lines,
-        lineSignature: lines.map((line) => line.text).join("\n"),
-      },
-    };
-  }, {});
-}
-
 function getVerseLanguageLayout(item, visibleLanguages = {}, tableWidth = 0) {
   const languages = getVisibleVerseLanguages(item, visibleLanguages);
   return {
@@ -688,14 +713,57 @@ function getVerseLanguageLayout(item, visibleLanguages = {}, tableWidth = 0) {
   };
 }
 
-export function getVisibleVerseLanguages(item, visibleLanguages = {}) {
-  const verse = item.verse || {};
+/**
+ * A Coptic line with no translation of its own is not a column but the
+ * whole line, centered across the row (see spanningLanguage in VerseBlock).
+ */
+export function copticStandsAlone(verse = {}) {
   const hasTranslationText = Boolean(
     (verse.english && verse.english.trim()) ||
       (verse.french && verse.french.trim()) ||
       (verse.arabic && verse.arabic.trim()),
   );
-  if (verse.invincibleCoptic && !hasTranslationText) {
+  return Boolean(verse.invincibleCoptic) && !hasTranslationText;
+}
+
+/**
+ * Whether a language's text is set justified (rendered line by line, so a
+ * page break can fall between its measured lines) rather than centered. The
+ * one definition both the renderer and the measurement bookkeeping follow.
+ */
+export function isSlideshowLanguageJustified(verse = {}, language) {
+  if (verse.type === "refrainLabel" || verse.type === "readingReference") return false;
+  return !(language === "coptic" && copticStandsAlone(verse));
+}
+
+/**
+ * The languages whose measured lines pagination needs before it can trust an
+ * item: the justified columns that have text. Those are the only ones a slide
+ * can split, and a split is rendered from exactly these lines.
+ */
+export function getLanguagesNeedingLineMetrics(item, visibleLanguages = {}) {
+  if (item?.type !== "verse") return [];
+  const verse = item.verse || {};
+  return getVisibleVerseLanguages(item, visibleLanguages).filter((language) =>
+    isSlideshowLanguageJustified(verse, language) && Boolean(String(verse[language] || "").trim()));
+}
+
+/**
+ * An item is measured once its height AND the lines of every column that
+ * could be split are known. A height alone is not enough: a verse would then
+ * leave the measurement layer before its lines were reported, and a later
+ * page break in it could only be guessed.
+ */
+export function isSlideshowItemMeasured(item, heights = {}, languageHeights = {}, visibleLanguages = {}) {
+  if (!item || typeof heights[item.id] !== "number") return false;
+  const metric = languageHeights[item.id] || {};
+  return getLanguagesNeedingLineMetrics(item, visibleLanguages).every((language) =>
+    Array.isArray(metric[language]?.lines));
+}
+
+export function getVisibleVerseLanguages(item, visibleLanguages = {}) {
+  const verse = item.verse || {};
+  if (copticStandsAlone(verse)) {
     return String(verse.coptic || "").trim() ? ["coptic"] : [];
   }
 
@@ -841,8 +909,11 @@ function anchorDistance(item, anchor) {
   // line ranges. Treating the range-less decoration as a zero-distance match
   // for a text anchor made findSlideIndexForAnchor choose the earlier page,
   // so pressing Next appeared to do nothing and the reader became trapped.
+  // A row that is not split at all (no ranges, not even empty ones) holds
+  // every line the anchor could name: turned to a width where the row fits
+  // whole, or measured again from scratch, the reader is still on it.
   if (languages.length && !rangeLanguages.length) {
-    return Number.POSITIVE_INFINITY;
+    return item.slideshowLineRanges ? Number.POSITIVE_INFINITY : 0;
   }
 
   if (!languages.length) {
@@ -921,32 +992,93 @@ export function getSlideRenderLayers(currentIndex, slideCount) {
   ];
 }
 
-export function getMeasurementBatch(
-  items,
-  measuredHeights,
-  limit,
-  anchor,
-  preferredSectionId,
-  maxDistance = Number.POSITIVE_INFINITY,
-) {
-  const missing = items.filter((item) => typeof measuredHeights[item.id] !== "number");
-  if (!Number.isFinite(maxDistance) && missing.length <= limit) return missing;
+/**
+ * The index of the item the reader is at: the anchor's own row, else the
+ * first row of the section asked for, else the top.
+ */
+export function getReadingItemIndex(items, anchor, preferredSectionId) {
   const matchedIndex = items.findIndex((item) =>
     (anchor?.sourceItemId && getSourceItemId(item) === anchor.sourceItemId) ||
     (preferredSectionId && item.sectionId === preferredSectionId),
   );
-  const preferredIndex = matchedIndex >= 0 ? matchedIndex : 0;
+  return matchedIndex >= 0 ? matchedIndex : 0;
+}
+
+/**
+ * Where the pagination run holding an item begins: the nearest item at or
+ * before it that must open a slide (see buildPaginationUnits). The slides
+ * from there on are filled in order, so an item's slide depends on nothing
+ * before this one.
+ */
+export function getPaginationRunStart(items, index) {
+  if (!items.length) return 0;
+  const units = buildPaginationUnits(items);
+  let start = Math.min(Math.max(index, 0), items.length - 1);
+  while (start > 0 && !units[start].breakBefore) start -= 1;
+  return start;
+}
+
+/**
+ * Whether a slide can still change as measurements land. It cannot once
+ * every item from the start of its run through its own items, and the first
+ * item of the next slide (the one that didn't fit), is measured: the greedy
+ * fill that produced it then has no estimate left in it. An empty slide has
+ * nothing to settle.
+ */
+export function isSlideSettled(items, slides, slideIndex, isMeasured, itemIndexById) {
+  const slide = slides[slideIndex];
+  if (!slide) return false;
+  if (!items.length || !slide.length) return true;
+  const indexById = itemIndexById || new Map(items.map((item, index) => [item.id, index]));
+  const firstIndex = indexById.get(getSourceItemId(slide[0]));
+  const lastIndex = indexById.get(getSourceItemId(slide[slide.length - 1]));
+  if (firstIndex == null || lastIndex == null) return false;
+  const next = slides[slideIndex + 1]?.[0];
+  const nextIndex = next ? indexById.get(getSourceItemId(next)) : null;
+  const end = Math.max(lastIndex, nextIndex ?? lastIndex);
+  for (let index = getPaginationRunStart(items, firstIndex); index <= end; index += 1) {
+    if (!isMeasured(items[index])) return false;
+  }
+  return true;
+}
+
+/**
+ * The next items to measure off-screen, nearest the reader first. `measured`
+ * is the predicate for an item that needs no measuring (an object of heights
+ * by id still works). With `runStart`, whatever the reader's slide needs
+ * before it can settle -- its run, from the start, up to the reader's row --
+ * comes before anything else; then outward from the row in both directions.
+ */
+export function getMeasurementBatch(
+  items,
+  measured,
+  limit,
+  anchor,
+  preferredSectionId,
+  maxDistance = Number.POSITIVE_INFINITY,
+  runStart = null,
+) {
+  const isMeasured = typeof measured === "function"
+    ? measured
+    : (item) => typeof measured[item.id] === "number";
+  const missing = items.filter((item) => !isMeasured(item));
+  if (!Number.isFinite(maxDistance) && missing.length <= limit) return missing;
+  const preferredIndex = getReadingItemIndex(items, anchor, preferredSectionId);
 
   const prioritized = [];
   const seen = new Set();
+  const consider = (index) => {
+    const item = items[index];
+    if (!item || seen.has(item.id) || isMeasured(item)) return;
+    seen.add(item.id);
+    prioritized.push(item);
+  };
+  const start = runStart == null ? preferredIndex : Math.min(Math.max(runStart, 0), preferredIndex);
+  for (let index = start; index <= preferredIndex && prioritized.length < limit; index += 1) consider(index);
   const radiusLimit = Math.min(items.length - 1, Math.max(0, maxDistance));
-  for (let radius = 0; radius <= radiusLimit && prioritized.length < limit; radius += 1) {
-    [preferredIndex + radius, preferredIndex - radius].forEach((index) => {
-      const item = items[index];
-      if (!item || seen.has(item.id) || typeof measuredHeights[item.id] === "number") return;
-      seen.add(item.id);
-      prioritized.push(item);
-    });
+  for (let radius = 1; radius <= radiusLimit && prioritized.length < limit; radius += 1) {
+    consider(preferredIndex + radius);
+    consider(preferredIndex - radius);
   }
   return prioritized.slice(0, limit);
 }

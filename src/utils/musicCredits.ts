@@ -37,3 +37,24 @@ export function formatMusicTrackPerformers(
     .map((artist) => artist.displayName.trim())
     .find(Boolean) ?? fallback;
 }
+
+/**
+ * The artists a track's "Go to artists" leads to, each once, in credit order:
+ * its performers, or whoever is credited when no one is. Only those with a
+ * page to open.
+ */
+export function musicTrackArtists(
+  track: Pick<MusicConsumerTrack, 'artists'>,
+): MusicConsumerTrackArtist[] {
+  const performers = performerCredits(track.artists).filter((artist) => artist.id);
+  if (performers.length) return performers;
+
+  const seen = new Set<string>();
+  return [...track.artists]
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .filter((artist) => {
+      if (!artist.id || seen.has(artist.id)) return false;
+      seen.add(artist.id);
+      return true;
+    });
+}

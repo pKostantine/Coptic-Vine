@@ -68,6 +68,13 @@ export interface PlaybackContextValue {
   hydrated: boolean;
   cycleRepeatMode: () => void;
   toggleShuffle: () => void;
+  /**
+   * How fast Learn & Study plays (the lesson player's speed chip). Music
+   * always plays at its own pace, so a song queued after a slowed lesson
+   * is not slowed with it.
+   */
+  learningRate: number;
+  setLearningRate: (rate: number) => void;
 }
 
 const PlaybackContext = createContext<PlaybackContextValue | null>(null);
@@ -99,6 +106,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const [loadingSource, setLoadingSource] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [learningRate, setLearningRate] = useState(1);
   const sourceRequestId = useRef(0);
   const restorePositionMs = useRef<number | null>(null);
 
@@ -361,6 +369,15 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     }
   }, [currentItem, player]);
 
+  // Set again on every new source as well as on a change of speed: a
+  // replaced source starts at the player's default rate.
+  const playbackRate = currentItem?.playable.kind === 'learning_audio' ? learningRate : 1;
+  const currentKey = currentItem?.key ?? null;
+  useEffect(() => {
+    if (!status.isLoaded || !currentKey) return;
+    player.setPlaybackRate(playbackRate);
+  }, [currentKey, playbackRate, player, status.isLoaded]);
+
   useEffect(() => {
     const requestedPosition = restorePositionMs.current;
     if (requestedPosition == null || !status.isLoaded) return;
@@ -458,6 +475,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     hydrated,
     cycleRepeatMode,
     toggleShuffle,
+    learningRate,
+    setLearningRate,
   }), [
     clearUpcoming,
     hydrated,
@@ -469,6 +488,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     currentTimeMs,
     cycleRepeatMode,
     durationMs,
+    learningRate,
     loadingSource,
     next,
     playItem,

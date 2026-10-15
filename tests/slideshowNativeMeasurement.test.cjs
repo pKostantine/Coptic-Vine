@@ -76,3 +76,36 @@ test('web slideshow keeps user-selected font size independent of orientation', (
   assert.match(fontDeclaration, /fontScaleToPx\(preferences\.fontScale\)/);
   assert.doesNotMatch(fontDeclaration, /screenWidth|screenHeight/);
 });
+
+// A line break the page shows is one the platform's text engine made. The
+// character-count estimate exists only to size unmeasured rows for a
+// provisional page: it must never be turned into forced lines, and no
+// provisional page is shown -- the deck waits for the reader's slide to
+// settle, keeping the last settled one meanwhile.
+test('no guessed line breaks reach the page, and the deck shows only settled slides', () => {
+  const layout = fs.readFileSync('src/components/vine/slideshowLayout.js', 'utf8');
+  const container = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
+  assert.doesNotMatch(layout, /createEstimatedVerseMetric/);
+  assert.doesNotMatch(container, /createEstimatedVerseMetric|createEstimatedTextLines/);
+  const placeVerse = layout.match(/const placeVerse = \(verseItem\) => \{([\s\S]*?)\n  \};/)?.[1] || '';
+  assert.match(placeVerse, /if \(!hasMeasuredVerseLines\(languageMetric\)\)/);
+  assert.match(container, /isSlideSettled\(items, slides, resolvedSlideIndex, isItemMeasured, itemIndexById\)/);
+  assert.match(container, /getMeasurementBatch\(\s*items,\s*isItemMeasured,/);
+  assert.match(container, /\{deckHidden \? null : \(\s*<SlideDeck\s+slides=\{shownDeck\.slides\}/);
+  assert.match(container, /const shownDeck = settled \|\| settleTimedOut \|\| !settledDeck \? liveDeck : settledDeck;/);
+});
+
+// A paragraph turned over the page is rendered from exactly the lines that
+// were measured, on web as on the phone, and justified down to its last
+// line unless that line ends the paragraph.
+test('forced lines render line for line on every platform', () => {
+  const verseBlock = fs.readFileSync('src/components/vine/VerseBlock.js', 'utf8');
+  const justified = fs.readFileSync('src/components/vine/JustifiedText.js', 'utf8');
+  assert.match(verseBlock, /Platform\.OS === "web" && !language\.forceLines \? \(\s*<CssJustifiedVerseBody/);
+  assert.match(verseBlock, /textAlign: alignmentFor\("coptic"\)/);
+  assert.match(verseBlock, /annotateNativeLines\(event\.nativeEvent\.lines \|\| \[\], getPlainRenderedText\(language\)\)/);
+  assert.match(justified, /const isLastLine = forceLines \? Boolean\(line\.isParagraphEnd\) : index === lastIndex \|\| line\.isParagraphEnd;/);
+  assert.match(justified, /import \{ annotateNativeLines, splitParagraphs, splitWords \} from "\.\/textLines";/);
+  // Text with no words never waits on a layout event that cannot come.
+  assert.match(justified, /splitWords\(text\)\.length \? nativeLineCache\.get\(cacheKey\) : NO_LINES/);
+});

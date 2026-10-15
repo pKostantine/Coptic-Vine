@@ -614,3 +614,220 @@ test("viewport tap direction remains correct across inset surface sizes", () => 
     }
   }
 });
+
+// ---- Text on a slide is never laid out from a guess ----
+
+import {
+  coordinateLineCapacities,
+  getLanguagesNeedingLineMetrics,
+  getPaginationRunStart,
+  isSlideSettled,
+  isSlideshowItemMeasured,
+  isSlideshowLanguageJustified,
+} from "../src/components/vine/slideshowLayout.js";
+
+test("a verse whose lines are not measured is never split: it moves on whole, with no forced lines", () => {
+  const first = verseItem({ id: "first", sectionId: "first" });
+  const tall = verseItem({ id: "tall", sectionId: "tall" });
+  // The first verse leaves room for half of the second; the second has only an estimated height, no lines.
+  const slides = paginateItems([first, tall], { first: 600, tall: 800 }, {}, 1000, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides.map((slide) => slide.map((entry) => entry.id)), [["first"], ["tall"]]);
+  slides.flat().forEach((entry) => {
+    assert.equal(entry.verse.slideshowForcedLines, undefined);
+    assert.equal(entry.slideshowLineRanges, undefined);
+  });
+  // Even a verse taller than a whole slide waits whole for its lines.
+  const giant = paginateItems([tall], { tall: 5000 }, {}, 1000, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(giant.map((slide) => slide.map((entry) => entry.id)), [["tall"]]);
+  assert.equal(giant[0][0].verse.slideshowForcedLines, undefined);
+});
+
+test("whatever is measured, forced lines only ever come from measured lines", () => {
+  const items = Array.from({ length: 12 }, (_, index) => verseItem({ id: `v${index}`, sectionId: "one" }));
+  const measuredLines = { english: { lines: metricLines("English", 9) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 11) }, arabic: { lines: metricLines("عربي", 7) } };
+  for (let mask = 0; mask < 1 << items.length; mask += 97) {
+    const languageHeights = {};
+    const heights = {};
+    items.forEach((item, index) => {
+      heights[item.id] = 180 + (index * 37) % 400;
+      if (mask & (1 << index)) languageHeights[item.id] = measuredLines;
+    });
+    const slides = paginateItems(items, heights, languageHeights, 500, 18, ALL_LANGUAGES, 1024);
+    slides.flat().forEach((entry) => {
+      const source = entry.sourceItemId || entry.id;
+      if (!languageHeights[source]) {
+        assert.equal(entry.verse.slideshowForcedLines, undefined, `${source} was split without measured lines (mask ${mask})`);
+        assert.equal(entry.id, source);
+      }
+    });
+    // Every measured verse that was split still renders all of its lines, once, in order.
+    items.filter((item) => languageHeights[item.id]).forEach((item) => {
+      const segments = slides.flat().filter((entry) => (entry.sourceItemId || entry.id) === item.id);
+      if (segments.length < 2) return;
+      ["english", "coptic", "arabic"].forEach((language) => {
+        const rendered = segments.flatMap((segment) => segment.verse.slideshowForcedLines?.[language] || []);
+        assert.deepEqual(rendered, measuredLines[language].lines, `${item.id} ${language} lost lines (mask ${mask})`);
+      });
+    });
+  }
+});
+
+// ---- The columns of a split verse stay in step ----
+
+function lineState(counts, offsets = {}) {
+  return {
+    languages: Object.entries(counts).map(([language, count]) => ({
+      language,
+      lineHeight: 24,
+      lines: metricLines(language, count),
+      offset: offsets[language] || 0,
+    })),
+  };
+}
+
+test("a split verse takes the same share of every column as its most constrained one", () => {
+  // Coptic (7 of 10 fit) sets the share: English and Arabic take about seven tenths too.
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 6, coptic: 10, arabic: 5 }), { english: 8, coptic: 7, arabic: 6 }),
+    { english: 4, coptic: 7, arabic: 3 },
+  );
+  // When everything fits, nothing is held back.
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 4, coptic: 6 }), { english: 9, coptic: 9 }),
+    { english: 9, coptic: 9 },
+  );
+  // Columns already finished (offset at the end) are left out.
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 6, coptic: 6 }, { english: 6 }), { english: 9, coptic: 4 }),
+    { coptic: 4 },
+  );
+});
+
+test("a split never leaves a single line on either side of the turn, and a short column is never chopped", () => {
+  // Arabic would take 3 of 4 and leave one: it takes 2 instead.
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 10, arabic: 4 }), { english: 8, arabic: 8 }),
+    { english: 8, arabic: 2 },
+  );
+  // A share of a single line becomes two.
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 10, arabic: 5 }), { english: 3, arabic: 6 }),
+    { english: 3, arabic: 2 },
+  );
+  // Three lines or fewer go whole: here, since the limiting column keeps over half...
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 10, arabic: 3 }), { english: 7, arabic: 6 }),
+    { english: 7, arabic: 3 },
+  );
+  // ...and whole on the next slide when it does not.
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 10, arabic: 3 }), { english: 4, arabic: 6 }),
+    { english: 4, arabic: 0 },
+  );
+  // Never more than fits, never more than remains.
+  for (const counts of [{ english: 7, coptic: 13, arabic: 9 }, { english: 20, coptic: 4, arabic: 11 }]) {
+    for (let capacity = 0; capacity <= 20; capacity += 1) {
+      const capacities = { english: capacity, coptic: Math.max(0, capacity - 2), arabic: Math.min(capacity, 9) };
+      // When everything fits the capacities come back as they are; the segment takes what remains.
+      const takes = coordinateLineCapacities(lineState(counts), capacities);
+      Object.entries(takes).forEach(([language, capacityTaken]) => {
+        const take = Math.min(capacityTaken, counts[language]);
+        assert.ok(take <= capacities[language] && take >= 0, `${language} took ${take} at capacity ${capacity}`);
+        const remaining = counts[language] - take;
+        assert.notEqual(remaining, 1, `${language} left a single line at capacity ${capacity}`);
+        if (take === 1) assert.equal(counts[language], 1);
+      });
+    }
+  }
+});
+
+test("a verse split across slides shows every language on every slide of it, in step", () => {
+  const item = verseItem({ id: "psalm", sectionId: "psalm" });
+  const metric = {
+    english: { lines: metricLines("English", 12) },
+    coptic: { lines: metricLines("ⲕⲟⲡⲧ", 20) },
+    arabic: { lines: metricLines("عربي", 10) },
+  };
+  const fontSize = 18;
+  const lineHeight = getSlideshowLanguageLineHeight("coptic", item, fontSize);
+  const slides = paginateItems([item], { psalm: 9999 }, { psalm: metric }, lineHeight * 8 + 40, fontSize, ALL_LANGUAGES, 1024);
+  assert.ok(slides.length >= 3);
+  slides.forEach((slide, index) => {
+    const counts = slide[0].slideshowLineCounts;
+    assert.ok(counts.english > 0 && counts.coptic > 0 && counts.arabic > 0, `slide ${index} lost a column: ${JSON.stringify(counts)}`);
+    const shareOf = (language) => (slide[0].slideshowLineRanges[language].end) / metric[language].lines.length;
+    assert.ok(Math.abs(shareOf("english") - shareOf("coptic")) < 0.2, `slide ${index}: English and Coptic drift apart`);
+    assert.ok(Math.abs(shareOf("arabic") - shareOf("coptic")) < 0.2, `slide ${index}: Arabic and Coptic drift apart`);
+  });
+});
+
+// ---- What counts as measured, and when a slide is settled ----
+
+test("an item is measured only once its height and the lines of every column that could be split are known", () => {
+  const item = verseItem();
+  assert.deepEqual(getLanguagesNeedingLineMetrics(item, ALL_LANGUAGES), ["english", "coptic", "arabic"]);
+  assert.equal(isSlideshowItemMeasured(item, {}, {}, ALL_LANGUAGES), false);
+  assert.equal(isSlideshowItemMeasured(item, { [item.id]: 120 }, {}, ALL_LANGUAGES), false);
+  const partial = { [item.id]: { english: { lines: metricLines("E", 2) }, coptic: { lines: metricLines("C", 2) } } };
+  assert.equal(isSlideshowItemMeasured(item, { [item.id]: 120 }, partial, ALL_LANGUAGES), false);
+  const full = { [item.id]: { ...partial[item.id], arabic: { lines: [] } } };
+  assert.equal(isSlideshowItemMeasured(item, { [item.id]: 120 }, full, ALL_LANGUAGES), true);
+  // A language with no text, one hidden, a centered row, or a Coptic line standing alone needs no lines.
+  const englishOnly = { english: true, french: false, coptic: false, arabic: false };
+  assert.deepEqual(getLanguagesNeedingLineMetrics(item, englishOnly), ["english"]);
+  assert.deepEqual(getLanguagesNeedingLineMetrics(verseItem({ verse: { ...item.verse, arabic: "  " } }), ALL_LANGUAGES), ["english", "coptic"]);
+  assert.deepEqual(getLanguagesNeedingLineMetrics(verseItem({ verse: { ...item.verse, type: "refrainLabel" } }), ALL_LANGUAGES), []);
+  const alone = verseItem({ verse: { coptic: "Ⲁⲗⲗⲏⲗⲟⲩⲓⲁ", invincibleCoptic: true } });
+  assert.deepEqual(getLanguagesNeedingLineMetrics(alone, ALL_LANGUAGES), []);
+  assert.equal(isSlideshowLanguageJustified(alone.verse, "coptic"), false);
+  assert.equal(isSlideshowLanguageJustified(item.verse, "coptic"), true);
+  assert.equal(isSlideshowLanguageJustified({ type: "readingReference" }, "english"), false);
+  // Anything that is not a verse is measured by its height alone.
+  assert.equal(isSlideshowItemMeasured({ id: "t", type: "title", title: { english: "T" } }, { t: 30 }, {}, ALL_LANGUAGES), true);
+});
+
+test("a slide is settled once its run, its items and the item that did not fit are all measured", () => {
+  const title = (id) => ({ id: `${id}-title`, sectionId: id, type: "title", title: { english: id } });
+  const verse = (id, index) => verseItem({ id: `${id}-${index}`, sectionId: id });
+  const items = [title("a"), verse("a", 0), verse("a", 1), verse("a", 2), title("b"), verse("b", 0), verse("b", 1)];
+  assert.equal(getPaginationRunStart(items, 3), 0);
+  assert.equal(getPaginationRunStart(items, 4), 4);
+  assert.equal(getPaginationRunStart(items, 6), 4);
+  const measuredSet = new Set();
+  const isMeasured = (item) => measuredSet.has(item.id);
+  const heights = Object.fromEntries(items.map((item) => [item.id, 100]));
+  const slides = paginateItems(items, heights, {}, 250, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides.map((slide) => slide.map((entry) => entry.id)), [
+    ["a-title", "a-0"], ["a-1", "a-2"], ["b-title", "b-0"], ["b-1"],
+  ]);
+  // The second slide of "a" needs the whole run before it, itself, and the next item.
+  assert.equal(isSlideSettled(items, slides, 1, isMeasured), false);
+  ["a-title", "a-0", "a-1", "a-2"].forEach((id) => measuredSet.add(id));
+  assert.equal(isSlideSettled(items, slides, 1, isMeasured), false);
+  measuredSet.add("b-title");
+  assert.equal(isSlideSettled(items, slides, 1, isMeasured), true);
+  // "b" opens its own run: nothing of "a" is needed for it.
+  measuredSet.clear();
+  ["b-title", "b-0", "b-1"].forEach((id) => measuredSet.add(id));
+  assert.equal(isSlideSettled(items, slides, 2, isMeasured), true);
+  assert.equal(isSlideSettled(items, slides, 3, isMeasured), true);
+  assert.equal(isSlideSettled(items, slides, 0, isMeasured), false);
+  // Segments of a split verse count by their source row.
+  const split = paginateItems([title("c"), verseItem({ id: "c-0", sectionId: "c" })], { "c-title": 30, "c-0": 9999 }, { "c-0": { english: { lines: metricLines("E", 12) } } }, 200, 18, ALL_LANGUAGES, 1024);
+  assert.ok(split.length > 1);
+  const cItems = [title("c"), verseItem({ id: "c-0", sectionId: "c" })];
+  assert.equal(isSlideSettled(cItems, split, 1, (item) => ["c-title", "c-0"].includes(item.id)), true);
+  // Nothing to settle on an empty deck or an empty slide; an unknown slide is not settled.
+  assert.equal(isSlideSettled([], [[]], 0, isMeasured), true);
+  assert.equal(isSlideSettled(items, slides, 9, isMeasured), false);
+});
+
+test("measurement takes the reader's run first, then spreads out from the reader's row", () => {
+  const items = Array.from({ length: 60 }, (_, index) => ({ id: `row-${index}`, sectionId: index < 30 ? "first" : "second", type: "verse", verse: { english: "x" } }));
+  const measured = new Set(["row-22", "row-23"]);
+  const batch = getMeasurementBatch(items, (item) => measured.has(item.id), 10, { sourceItemId: "row-25" }, null, 8, 20);
+  // The run's start (20) up to the reader's row (25) first, less what is measured; then outward from 25.
+  assert.deepEqual(batch.map((item) => item.id), ["row-20", "row-21", "row-24", "row-25", "row-26", "row-27", "row-28", "row-29", "row-30", "row-31"]);
+  // A predicate that says everything is measured leaves nothing to do.
+  assert.deepEqual(getMeasurementBatch(items, () => true, 10, { sourceItemId: "row-25" }, null, 8, 20), []);
+});

@@ -1,200 +1,346 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import LearningArtwork from '@/components/learning/LearningArtwork';
+import ActionSheetFrame, {
+  SheetButton,
+  SheetError,
+  SheetHeader,
+  SheetLoading,
+  SheetNote,
+  SheetRow,
+  SheetRowGroup,
+  SheetSectionLabel,
+  SheetTextField,
+  isArabicText,
+  useActionSheetMode,
+} from '@/components/playback/ActionSheetFrame';
 import Icon, { type IconName } from '@/components/vine/ui/Icon';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { learningService } from '@/services/learningService';
 import type {
+  LearningMediaAsset,
+  LearningPlaylistDetail,
   LearningPlaylistItemKind,
   LearningPlaylistSummary,
   LearningProgressState,
 } from '@/types/learningPlatform';
 
 import { tr } from '../../utils/appText';
-import { useModalOrientations } from '@/hooks/useModalOrientations';
-const BUILT_IN_LISTS: { state: LearningProgressState; label: string; labelAr: string; labelFr: string; icon: IconName }[] = [
-  { state: 'will_learn', label: 'Will Learn', labelAr: 'سأتعلم', labelFr: 'À apprendre', icon: 'bookmark-outline' },
-  { state: 'learning', label: 'Learning', labelAr: 'أتعلّم الآن', labelFr: 'En cours', icon: 'school-outline' },
-  { state: 'finished', label: 'Finished Learning', labelAr: 'أكملت التعلّم', labelFr: 'Apprentissage terminé', icon: 'checkmark' },
+
+const BUILT_IN_LISTS: { state: LearningProgressState; label: () => string; icon: IconName; iconOn: IconName }[] = [
+  { state: 'will_learn', label: () => tr('Will Learn', 'À apprendre', 'سأتعلم'), icon: 'bookmark-outline', iconOn: 'bookmark' },
+  { state: 'learning', label: () => tr('Learning', 'En cours', 'أتعلّم الآن'), icon: 'school-outline', iconOn: 'school-outline' },
+  { state: 'finished', label: () => tr('Finished', 'Terminé', 'أكملت'), icon: 'checkmark-done', iconOn: 'checkmark-done' },
 ];
 
-export default function LearningPlaylistPicker({
-  itemKind,
-  itemId,
-  locale,
-  isArabic = false,
-}: {
+/** "3 items", in the App Language — a playlist holds recordings and lessons alike. */
+function itemCount(count: number): string {
+  return count === 1
+    ? tr('1 item', '1 élément', 'عنصر واحد')
+    : tr(`${count} items`, `${count} éléments`, `${count} عناصر`);
+}
+
+/** The entry of a playlist that is this item, if it holds it. */
+function entryFor(playlist: LearningPlaylistDetail, itemKind: LearningPlaylistItemKind, itemId: string): string | null {
+  const entry = playlist.items.find((item) => (
+    item.kind === 'lesson'
+      ? itemKind === 'lesson' && item.lesson.id === itemId
+      : itemKind === 'album_recording' && item.recording.id === itemId
+  ));
+  return entry?.id ?? null;
+}
+
+interface LearningPlaylistPanelProps {
   itemKind: LearningPlaylistItemKind;
   itemId: string;
   locale: string;
-  isArabic?: boolean;
-}) {
-  const modalOrientations = useModalOrientations();
-  const [open, setOpen] = useState(false);
+  /** Leaves for the account page, when no one is signed in to keep a list. */
+  onSignIn: () => void;
+}
+
+/**
+ * Add to playlist, Learn & Study (Coptic Vine Player design, "Add to playlist
+ * · Learn"): where the lesson stands — Will Learn, Learning, Finished — as
+ * three tiles, the chosen one gold; then the reader's own playlists, each
+ * ticked when it holds the lesson, and a new one made on the spot. Drawn
+ * inside a sheet that already shows the lesson.
+ */
+export function LearningPlaylistPanel({ itemKind, itemId, locale, onSignIn }: LearningPlaylistPanelProps) {
+  const mode = useActionSheetMode();
+  const [loaded, setLoaded] = useState(false);
+  const [signedIn, setSignedIn] = useState(true);
   const [playlists, setPlaylists] = useState<LearningPlaylistSummary[]>([]);
+  // Playlist → its entry for this item, so a tick can be taken back out.
+  const [entries, setEntries] = useState<Map<string, string>>(new Map());
   const [currentState, setCurrentState] = useState<LearningProgressState | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [addingId, setAddingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
 
-  const show = async () => {
-    setOpen(true);
-    setLoading(true);
-    setError(null);
-    try {
-      const [playlistPayload, itemLibrary] = await Promise.all([
-        learningService.getPlaylists(locale),
-        learningService.getItemLibrary(locale),
-      ]);
-      if (!playlistPayload.authenticated || !itemLibrary.authenticated) {
-        setOpen(false);
-        Alert.alert(
-          tr('Sign in required', 'Connexion requise', 'تسجيل الدخول مطلوب'),
-          tr('Sign in to save learning progress and playlists.', 'Connectez-vous pour enregistrer votre progression et vos playlists.', 'سجّل الدخول لحفظ تقدّمك وقوائم التعلّم.'),
-        );
-        return;
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const [playlistPayload, itemLibrary] = await Promise.all([
+          learningService.getPlaylists(locale),
+          learningService.getItemLibrary(locale),
+        ]);
+        if (!playlistPayload.authenticated || !itemLibrary.authenticated) {
+          if (active) {
+            setSignedIn(false);
+            setLoaded(true);
+          }
+          return;
+        }
+        const contents = await Promise.allSettled(playlistPayload.playlists.map((playlist) => learningService.getPlaylist(playlist.id, locale)));
+        if (!active) return;
+        const found = new Map<string, string>();
+        contents.forEach((result) => {
+          const entry = result.status === 'fulfilled' ? entryFor(result.value, itemKind, itemId) : null;
+          if (result.status === 'fulfilled' && entry) found.set(result.value.id, entry);
+        });
+        setEntries(found);
+        setPlaylists(playlistPayload.playlists);
+        setCurrentState(itemLibrary.items.find((item) => item.itemKind === itemKind && item.itemId === itemId)?.state ?? null);
+        setLoaded(true);
+      } catch (cause) {
+        if (!active) return;
+        setError(cause instanceof Error ? cause.message : tr('Unable to load My Learning.', 'Impossible de charger Mon apprentissage.', 'تعذر تحميل «تعلّمي».'));
+        setLoaded(true);
       }
-      setPlaylists(playlistPayload.playlists);
-      setCurrentState(itemLibrary.items.find((item) => item.itemKind === itemKind && item.itemId === itemId)?.state ?? null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load My Learning.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+    return () => { active = false; };
+  }, [itemId, itemKind, locale]);
 
-  const selectBuiltIn = async (state: LearningProgressState) => {
-    if (addingId || currentState === state) return;
-    setAddingId(state);
+  if (!loaded) return <SheetLoading />;
+
+  if (!signedIn) {
+    return (
+      <>
+        <SheetSectionLabel>{tr('Learning', 'Apprentissage', 'التعلّم')}</SheetSectionLabel>
+        <SheetRowGroup>
+          <SheetRow icon="person-circle-outline" label={tr('Sign in', 'Se connecter', 'تسجيل الدخول')} trailing="chevron" onPress={onSignIn} />
+        </SheetRowGroup>
+        <SheetNote>{tr('Sign in to save learning progress and playlists.', 'Connectez-vous pour enregistrer votre progression et vos playlists.', 'سجّل الدخول لحفظ تقدّمك وقوائم التعلّم.')}</SheetNote>
+      </>
+    );
+  }
+
+  const selectState = async (state: LearningProgressState) => {
+    if (busyId || currentState === state) return;
+    setBusyId(state);
     setError(null);
     try {
       await learningService.setItemProgress(itemKind, itemId, state);
       setCurrentState(state);
-      setOpen(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to update My Learning.');
+      setError(cause instanceof Error ? cause.message : tr('Unable to update My Learning.', 'Impossible de modifier Mon apprentissage.', 'تعذر تحديث «تعلّمي».'));
     } finally {
-      setAddingId(null);
+      setBusyId(null);
     }
   };
 
-  const addToCustom = async (playlist: LearningPlaylistSummary) => {
-    if (addingId) return;
-    setAddingId(playlist.id);
+  const toggle = async (playlist: LearningPlaylistSummary) => {
+    if (busyId) return;
+    const entry = entries.get(playlist.id);
+    setBusyId(playlist.id);
     setError(null);
     try {
-      await learningService.addPlaylistItem(playlist.id, itemKind, itemId);
-      setOpen(false);
-      Alert.alert(
-        tr('Added', 'Ajouté', 'تمت الإضافة'),
-        tr(`Added to ${playlist.name}.`, `Ajouté à ${playlist.name}.`, 'تمت إضافة المحتوى إلى قائمتك.'),
-      );
+      const updated = entry
+        ? await learningService.removePlaylistItem(playlist.id, entry)
+        : await learningService.addPlaylistItem(playlist.id, itemKind, itemId);
+      const nextEntry = entry ? null : entryFor(updated, itemKind, itemId);
+      setEntries((current) => {
+        const next = new Map(current);
+        if (nextEntry) next.set(playlist.id, nextEntry);
+        else next.delete(playlist.id);
+        return next;
+      });
+      setPlaylists((current) => current.map((item) => (item.id === playlist.id ? { ...item, itemCount: updated.items.length } : item)));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to add this item.');
+      setError(cause instanceof Error ? cause.message : tr('Unable to update this playlist.', 'Impossible de modifier cette playlist.', 'تعذر تحديث القائمة.'));
     } finally {
-      setAddingId(null);
+      setBusyId(null);
+    }
+  };
+
+  const createAndAdd = async () => {
+    const name = newName.trim();
+    if (!name || creating) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const created = await learningService.createPlaylist(name, null, 'private');
+      const updated = await learningService.addPlaylistItem(created.id, itemKind, itemId);
+      const entry = entryFor(updated, itemKind, itemId);
+      setPlaylists((current) => [{ ...created, itemCount: updated.items.length }, ...current]);
+      if (entry) setEntries((current) => new Map(current).set(created.id, entry));
+      setNewName('');
+      setFormOpen(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : tr('Unable to create the playlist.', 'Impossible de créer la playlist.', 'تعذر إنشاء القائمة.'));
+    } finally {
+      setCreating(false);
     }
   };
 
   return (
     <>
-      <Pressable accessibilityLabel="Add to My Learning" style={styles.trigger} onPress={() => void show()}>
+      <SheetSectionLabel>{tr('Learning', 'Apprentissage', 'التعلّم')}</SheetSectionLabel>
+      <View style={styles.tiles} accessibilityRole="radiogroup">
+        {BUILT_IN_LISTS.map((entry) => {
+          const on = currentState === entry.state;
+          const busy = busyId === entry.state;
+          return (
+            <Pressable
+              key={entry.state}
+              accessibilityRole="radio"
+              accessibilityLabel={entry.label()}
+              accessibilityState={{ checked: on, busy }}
+              disabled={Boolean(busyId)}
+              onPress={() => void selectState(entry.state)}
+              style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+                styles.tile,
+                mode === 'side' && styles.tileSide,
+                hovered && !on && styles.tileHovered,
+                pressed && !on && styles.tilePressed,
+                on && styles.tileOn,
+              ]}
+            >
+              {busy
+                ? <ActivityIndicator size="small" color={on ? COLORS.greenDeep : COLORS.gold} style={styles.tileSpinner} />
+                : <Icon name={on ? entry.iconOn : entry.icon} size={22} color={on ? COLORS.greenDeep : COLORS.gold} />}
+              <Text numberOfLines={1} style={[styles.tileText, on && styles.tileTextOn, isArabicText(entry.label()) && styles.arabic]}>{entry.label()}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <SheetSectionLabel>{tr('Custom playlists', 'Playlists personnelles', 'قوائم مخصّصة')}</SheetSectionLabel>
+      <SheetRowGroup>
+        <SheetRow
+          icon="add"
+          label={tr('New playlist', 'Nouvelle playlist', 'قائمة جديدة')}
+          tone="accent"
+          accessibilityHint={tr('Make a playlist and add this to it', 'Créer une playlist et y ajouter ceci', 'أنشئ قائمة وأضف إليها هذا')}
+          onPress={() => setFormOpen((open) => !open)}
+        />
+        {formOpen ? (
+          <View style={styles.form}>
+            <SheetTextField
+              autoFocus
+              value={newName}
+              onChangeText={setNewName}
+              placeholder={tr('Playlist name', 'Nom de la playlist', 'اسم القائمة')}
+              accessibilityLabel={tr('Playlist name', 'Nom de la playlist', 'اسم القائمة')}
+              returnKeyType="done"
+              onSubmitEditing={() => void createAndAdd()}
+            />
+            <SheetButton
+              label={tr('Create and add', 'Créer et ajouter', 'إنشاء وإضافة')}
+              disabled={!newName.trim()}
+              busy={creating}
+              onPress={() => void createAndAdd()}
+            />
+          </View>
+        ) : null}
+        {playlists.map((playlist) => (
+          <SheetRow
+            key={playlist.id}
+            icon="list-outline"
+            chip="grey"
+            label={playlist.name}
+            detail={itemCount(playlist.itemCount)}
+            trailing="check"
+            checked={entries.has(playlist.id)}
+            busy={busyId === playlist.id}
+            onPress={() => void toggle(playlist)}
+          />
+        ))}
+      </SheetRowGroup>
+      {!playlists.length && !formOpen ? (
+        <SheetNote>{tr('No custom playlists yet. Make one to group lessons your way.', 'Aucune playlist personnelle pour l’instant. Créez-en une pour regrouper vos leçons à votre façon.', 'لا توجد قوائم مخصّصة بعد. أنشئ قائمة لتجمع الدروس على طريقتك.')}</SheetNote>
+      ) : null}
+      {error ? <SheetError>{error}</SheetError> : null}
+    </>
+  );
+}
+
+/**
+ * A button that opens Add to playlist on its own sheet, for a lesson or a
+ * recording shown outside a More menu.
+ */
+export default function LearningPlaylistPicker({
+  itemKind,
+  itemId,
+  locale,
+  title,
+  coverAsset,
+}: {
+  itemKind: LearningPlaylistItemKind;
+  itemId: string;
+  locale: string;
+  /** Kept for the pages that pass it: the sheet sets Arabic by the text itself. */
+  isArabic?: boolean;
+  /** The item's name and artwork, for the top of the sheet. */
+  title?: string;
+  coverAsset?: LearningMediaAsset | null;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const addLabel = tr('Add to playlist', 'Ajouter à une playlist', 'إضافة إلى قائمة');
+
+  return (
+    <>
+      <Pressable accessibilityRole="button" accessibilityLabel={tr('Add to My Learning', 'Ajouter à Mon apprentissage', 'أضف إلى تعلّمي')} style={styles.trigger} onPress={() => setOpen(true)}>
         <Icon name="playlist-add" size={20} color={COLORS.learningBright} />
       </Pressable>
-      <Modal supportedOrientations={modalOrientations} animationType="fade" transparent visible={open} onRequestClose={() => setOpen(false)}>
-        <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable accessible={false} style={styles.sheet} onPress={() => undefined}>
-            <View style={styles.header}>
-              <View style={styles.headerCopy}>
-                <Text style={[styles.title, isArabic && styles.arabic]}>{tr('Add to My Learning', 'Ajouter à Mon apprentissage', 'أضف إلى تعلّمي')}</Text>
-                <Text style={[styles.subtitle, isArabic && styles.arabic]}>{tr('Choose a built-in or custom playlist', 'Choisissez une playlist intégrée ou personnelle', 'اختر قائمة أساسية أو مخصّصة')}</Text>
-              </View>
-              <Pressable accessibilityLabel="Close" style={styles.close} onPress={() => setOpen(false)}>
-                <Icon name="close" size={20} color={COLORS.muted} />
-              </Pressable>
-            </View>
-            {loading ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
-            {!loading ? (
-              <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-                <Text style={[styles.groupLabel, isArabic && styles.arabic]}>{tr('MY LEARNING', 'MON APPRENTISSAGE', 'قوائم التعلّم')}</Text>
-                {BUILT_IN_LISTS.map((entry) => {
-                  const selected = currentState === entry.state;
-                  return (
-                    <Pressable accessibilityRole="button"
-                      key={entry.state}
-                      disabled={selected || Boolean(addingId)}
-                      onPress={() => void selectBuiltIn(entry.state)}
-                      style={[styles.playlist, selected && styles.playlistSelected]}
-                    >
-                      <View style={styles.playlistIcon}><Icon name={entry.icon} size={21} color={selected ? COLORS.learningBright : COLORS.muted} /></View>
-                      <View style={styles.playlistInfo}>
-                        <Text style={[styles.playlistName, isArabic && styles.arabic]}>{tr(entry.label, entry.labelFr, entry.labelAr)}</Text>
-                        {selected ? <Text style={[styles.selectedText, isArabic && styles.arabic]}>{tr('Currently in this list', 'Déjà dans cette liste', 'في هذه القائمة')}</Text> : null}
-                      </View>
-                      {addingId === entry.state
-                        ? <ActivityIndicator color={COLORS.learning} />
-                        : <Icon name={selected ? 'checkmark' : 'chevron-forward'} size={18} color={selected ? COLORS.learningBright : COLORS.learning} />}
-                    </Pressable>
-                  );
-                })}
-
-                <Text style={[styles.groupLabel, styles.customLabel, isArabic && styles.arabic]}>{tr('CUSTOM PLAYLISTS', 'PLAYLISTS PERSONNELLES', 'قوائم مخصّصة')}</Text>
-                {playlists.map((playlist) => (
-                  <Pressable accessibilityRole="button" key={playlist.id} disabled={Boolean(addingId)} style={styles.playlist} onPress={() => void addToCustom(playlist)}>
-                    <View style={styles.playlistIcon}><Icon name="list-outline" size={21} color={COLORS.learningBright} /></View>
-                    <View style={styles.playlistInfo}>
-                      <Text numberOfLines={1} style={[styles.playlistName, isArabic && styles.arabic]}>{playlist.name}</Text>
-                      <Text style={[styles.playlistMeta, isArabic && styles.arabic]}>{playlist.itemCount} {playlist.itemCount === 1 ? 'item' : 'items'}</Text>
-                    </View>
-                    {addingId === playlist.id ? <ActivityIndicator color={COLORS.learning} /> : <Icon name="chevron-forward" size={18} color={COLORS.learning} />}
-                  </Pressable>
-                ))}
-                {!playlists.length ? (
-                  <Text style={[styles.empty, isArabic && styles.arabicCentered]}>{tr('Create custom playlists from My Learning.', 'Créez des playlists personnelles depuis Mon apprentissage.', 'أنشئ قائمة مخصّصة من صفحة «تعلّمي».')}</Text>
-                ) : null}
-              </ScrollView>
-            ) : null}
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ActionSheetFrame visible={open} onClose={() => setOpen(false)} closeLabel={tr('Close Add to playlist', 'Fermer Ajouter à une playlist', 'إغلاق الإضافة إلى قائمة')}>
+        <SheetHeader
+          artwork={title ? <LearningArtwork asset={coverAsset} size={52} radius={10} label={title} /> : null}
+          kicker={title ? addLabel : null}
+          title={title ?? addLabel}
+        />
+        {open ? (
+          <LearningPlaylistPanel
+            itemKind={itemKind}
+            itemId={itemId}
+            locale={locale}
+            onSignIn={() => { setOpen(false); router.push('/account'); }}
+          />
+        ) : null}
+      </ActionSheetFrame>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   trigger: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: COLORS.learningSoft, borderWidth: 1, borderColor: COLORS.learningLine },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.72)' },
-  sheet: { maxHeight: '78%', padding: SPACING.md, paddingBottom: SPACING.xl, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: COLORS.greenDeep, borderWidth: 1, borderColor: COLORS.learningLine },
-  header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  headerCopy: { flex: 1 },
-  title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
-  subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
-  close: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  loader: { marginVertical: SPACING.xl },
-  list: { marginTop: SPACING.md },
-  listContent: { gap: SPACING.sm },
-  groupLabel: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
-  customLabel: { marginTop: SPACING.md },
-  playlist: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: SPACING.md, padding: SPACING.sm, borderRadius: RADII.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  playlistSelected: { borderColor: COLORS.learning, backgroundColor: COLORS.learningDeep },
-  playlistIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.sm, backgroundColor: COLORS.learningSoft },
-  playlistInfo: { flex: 1, minWidth: 0 },
-  playlistName: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  playlistMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3 },
-  selectedText: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '700', marginTop: 3 },
-  empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, textAlign: 'center', padding: SPACING.md },
-  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.sm },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
-  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  tiles: { flexDirection: 'row', gap: 8 },
+  tile: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 16,
+    flex: 1,
+    flexBasis: 0,
+    gap: 8,
+    minWidth: 0,
+    paddingHorizontal: 6,
+    paddingVertical: 14,
+  },
+  tileSide: { gap: 5, paddingVertical: 10 },
+  tileHovered: { backgroundColor: 'rgba(255, 255, 255, 0.1)' },
+  tilePressed: { backgroundColor: 'rgba(255, 255, 255, 0.13)' },
+  tileOn: { backgroundColor: COLORS.gold },
+  tileSpinner: { height: 22 },
+  tileText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '700', textAlign: 'center' },
+  tileTextOn: { color: COLORS.greenDeep },
+  form: { gap: 8 },
+  // Centred like the English, only the script's direction changes.
+  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

@@ -7,11 +7,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  View,
   type ViewStyle,
 } from 'react-native';
 
-import Icon, { type IconName } from '@/components/vine/ui/Icon';
+import { SheetRow } from '@/components/playback/ActionSheetFrame';
+import type { IconName } from '@/components/vine/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { downloadManager } from '@/services/downloadManager';
 import type { OfflineDownloadProgress, OfflineDownloadRequest } from '@/types/offlineDownloads';
@@ -191,6 +191,8 @@ function NativeOfflineDownloadButton({
     const menuText = removing
       ? (tr('Remove download', 'Supprimer le téléchargement', 'إزالة التنزيل'))
       : text;
+    // A fresh download is just "Download", as the More menu draws it; the
+    // line under the label only explains a download already under way.
     const menuDetail = updateAvailable
       ? (tr('A newer version is available', 'Une version plus récente est disponible', 'يتوفر إصدار أحدث'))
       : removing
@@ -201,7 +203,7 @@ function NativeOfflineDownloadButton({
             ? (tr('Continue this download', 'Poursuivre ce téléchargement', 'متابعة التنزيل'))
             : failed
               ? (tr('Try downloading again', 'Réessayer le téléchargement', 'حاول التنزيل مرة أخرى'))
-              : (tr('Save for offline listening', 'Enregistrer pour l’écoute hors ligne', 'الحفظ للاستماع بلا اتصال'));
+              : null;
     const menuIcon: IconName = updateAvailable
       ? 'repeat'
       : removing
@@ -212,26 +214,22 @@ function NativeOfflineDownloadButton({
             ? 'play'
             : failed
               ? 'repeat'
-              : 'download-outline';
-    const menuColor = removing ? '#FF8A8A' : accent;
+              : 'arrow-down-circle-outline';
 
     return (
-      <Pressable
-        accessibilityRole="button"
+      <SheetRow
+        icon={menuIcon}
+        label={menuText}
+        detail={menuDetail}
         accessibilityLabel={menuText}
         accessibilityHint={active ? (tr('Tap to pause', 'Touchez pour mettre en pause', 'اضغط للإيقاف المؤقت')) : undefined}
-        disabled={busy}
-        onPress={action}
-        style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed, busy && styles.disabled]}
-      >
-        <View style={[styles.menuIcon, { backgroundColor: soft }]}>
-          {busy ? <ActivityIndicator size="small" color={menuColor} /> : <Icon name={menuIcon} size={20} color={menuColor} />}
-        </View>
-        <View style={styles.menuTextGroup}>
-          <Text style={[styles.menuLabel, removing && styles.menuLabelDanger, isArabic && styles.arabic]}>{menuText}</Text>
-          <Text style={[styles.menuDetail, isArabic && styles.arabic]}>{menuDetail}</Text>
-        </View>
-      </Pressable>
+        chip={removing ? 'grey' : 'gold'}
+        iconColor={removing ? '#FF8A8A' : theme === 'learning' ? COLORS.learningBright : COLORS.gold}
+        tone={removing ? 'danger' : 'plain'}
+        trailing="chevron"
+        busy={busy}
+        onPress={() => void action()}
+      />
     );
   }
 
@@ -281,12 +279,5 @@ const styles = StyleSheet.create({
   compact: { minHeight: 36, paddingHorizontal: SPACING.md },
   disabled: { opacity: 0.65 },
   text: { fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
-  menuRow: { alignItems: 'center', borderRadius: 8, flexDirection: 'row', gap: SPACING.md, minHeight: 62, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs },
-  menuRowPressed: { backgroundColor: 'rgba(255,255,255,0.06)' },
-  menuIcon: { alignItems: 'center', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
-  menuTextGroup: { flex: 1, minWidth: 0 },
-  menuLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
-  menuLabelDanger: { color: '#FF8A8A' },
-  menuDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, lineHeight: 16, marginTop: 2 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

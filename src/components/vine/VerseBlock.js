@@ -6,11 +6,14 @@ import { resolveRubricKey } from "../../utils/verseRubric";
 import JustifiedText, { measureJustifiedLinesWeb } from "./JustifiedText";
 import { getLanguageColumnGap } from "./documentPresentationMetrics";
 import {
+  copticStandsAlone as isCopticStandingAlone,
   getSlideshowLanguageFontSize,
   getSlideshowLanguageLineHeight,
   hasRenderableSlideshowLanguageBody,
   hasSeasonalPrefixLine as hasVisibleSeasonalPrefixLine,
+  isSlideshowLanguageJustified,
 } from "./slideshowLayout";
+import { annotateNativeLines, toReportedLines } from "./textLines";
 
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   ? {
@@ -90,12 +93,11 @@ export default function VerseBlock({
   // per-language spot like any other verse. Only when the Coptic really is
   // the whole line does it stop being a column and span the row (see
   // spanningLanguage).
-  const hasTranslationText = Boolean(
-    (verse.english && verse.english.trim()) ||
-      (verse.french && verse.french.trim()) ||
-      (verse.arabic && verse.arabic.trim()),
-  );
-  const copticStandsAlone = verse.invincibleCoptic && !hasTranslationText;
+  const copticStandsAlone = isCopticStandingAlone(verse);
+  // Justified or centered: the one decision pagination also reads (see
+  // isSlideshowLanguageJustified), since only a justified column is rendered
+  // line by line and so can be turned over the page between its lines.
+  const alignmentFor = (language) => (isSlideshowLanguageJustified(verse, language) ? "justify" : "center");
   const bibleNumberFor = (language) =>
     !Array.isArray(verse.slideshowBibleNumberLanguages) ||
     verse.slideshowBibleNumberLanguages.includes(language)
@@ -112,7 +114,7 @@ export default function VerseBlock({
       fontFamily: "Georgia",
       lineHeight: getSlideshowLanguageLineHeight("english", { verse }, fontSize),
       styles: [styles.english],
-      textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
+      textAlign: alignmentFor("english"),
       minWordsToJustify: 1,
       forceLines: verse.slideshowForcedLines?.english,
     },
@@ -128,7 +130,7 @@ export default function VerseBlock({
       fontFamily: "Georgia",
       lineHeight: getSlideshowLanguageLineHeight("french", { verse }, fontSize),
       styles: [styles.english],
-      textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
+      textAlign: alignmentFor("french"),
       minWordsToJustify: 1,
       forceLines: verse.slideshowForcedLines?.french,
     },
@@ -143,7 +145,7 @@ export default function VerseBlock({
       fontFamily: TYPOGRAPHY.coptic,
       lineHeight: getSlideshowLanguageLineHeight("coptic", { verse }, fontSize),
       styles: [styles.coptic],
-      textAlign: isRefrainLabel || isReadingReference || copticStandsAlone ? "center" : "justify",
+      textAlign: alignmentFor("coptic"),
       minWordsToJustify: 1,
       forceLines: verse.slideshowForcedLines?.coptic,
     },
@@ -159,7 +161,7 @@ export default function VerseBlock({
       fontFamily: "Arial",
       lineHeight: getSlideshowLanguageLineHeight("arabic", { verse }, fontSize),
       styles: [styles.arabic],
-      textAlign: isRefrainLabel || isReadingReference ? "center" : "justify",
+      textAlign: alignmentFor("arabic"),
       minWordsToJustify: 1,
       forceLines: verse.slideshowForcedLines?.arabic,
     },
@@ -253,7 +255,12 @@ export default function VerseBlock({
         ]}
       >
         {!hasVisibleBody ? null : isJustified ? (
-          Platform.OS === "web" ? (
+          // The browser justifies a whole paragraph itself. A paragraph
+          // turned over the page is rendered line by line from the lines
+          // pagination measured, on web as on the phone: given the joined
+          // text back, the browser could wrap it a line longer or shorter
+          // than the page was budgeted for.
+          Platform.OS === "web" && !language.forceLines ? (
             <CssJustifiedVerseBody
               theme={theme}
               language={language}
@@ -289,7 +296,7 @@ export default function VerseBlock({
             }
             onTextLayout={(event) =>
               reportLanguageMetric(language.key, {
-                lines: event.nativeEvent.lines || [],
+                lines: toReportedLines(annotateNativeLines(event.nativeEvent.lines || [], getPlainRenderedText(language))),
               })
             }
           >
@@ -474,6 +481,17 @@ function getJustifiedBodyText(language) {
   const bodyText = parts ? parts.body : language.text;
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
   return bibleVerseNumber ? `${bibleVerseNumber} ${bodyText}` : bodyText;
+}
+
+// The string renderLanguageText actually puts on the page, paragraph breaks
+// and all, so the native lines of a centered cell can be read back against it
+// (see annotateNativeLines) and a page break between them keeps its breaks.
+function getPlainRenderedText(language) {
+  const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
+  if (parts) return `${parts.prefix}\n${parts.body}`;
+  if (language.seasonalHoosVersePrefixSpacer) return `${language.seasonalHoosVersePrefixSpacer}\n${language.text}`;
+  const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
+  return bibleVerseNumber ? `${bibleVerseNumber} ${language.text}` : language.text;
 }
 
 function renderLanguageText(language, theme) {

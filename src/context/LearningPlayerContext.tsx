@@ -53,6 +53,9 @@ interface LearningPlayerContextValue {
   clearUpcoming: () => void;
   cycleRepeatMode: () => void;
   toggleShuffle: () => void;
+  /** The listening speed, 1 for as recorded. */
+  playbackRate: number;
+  setPlaybackRate: (rate: number) => void;
 }
 
 export function learningAlbumQueue(album: LearningAlbumDetail): LearningQueueItem[] {
@@ -173,5 +176,7 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     clearUpcoming: playback.clearUpcoming,
     cycleRepeatMode: playback.cycleRepeatMode,
     toggleShuffle: playback.toggleShuffle,
+    playbackRate: playback.learningRate ?? 1,
+    setPlaybackRate: playback.setLearningRate,
   };
 }

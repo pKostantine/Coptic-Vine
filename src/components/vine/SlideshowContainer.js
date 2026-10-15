@@ -15,6 +15,8 @@ import {
   getItemSignature,
   getMeasurementBatch,
   getPageTurnForKey,
+  getPaginationRunStart,
+  getReadingItemIndex,
   isKeyKeptByFocusedControl,
   getPageTurnForSwipe,
   getPageTurnForTap,
@@ -24,6 +26,8 @@ import {
   getSlidePadding,
   getSlideRenderLayers,
   getSlideshowChromeMetrics,
+  isSlideSettled,
+  isSlideshowItemMeasured,
   normalizeLanguageMetric,
   paginateItems,
 } from "./slideshowLayout";
@@ -411,17 +415,35 @@ export default function SlideshowContainer({
   // Pagination keeps falling back to estimateItemHeight for anything not yet
   // measured. The current anchor is measured first after a jump or width change;
   // the remaining document then settles in bounded batches.
+  //
+  // Measured means its height AND its lines (see isSlideshowItemMeasured):
+  // an item stays in the measurement layer until both have been reported.
+  // Measured by height alone, a verse could leave before its lines came in,
+  // and a page break in it could then only be guessed.
+  const isItemMeasured = useCallback(
+    (item) => isSlideshowItemMeasured(item, measuredHeights, measuredLanguageHeights, visibleLanguages),
+    [measuredHeights, measuredLanguageHeights, visibleLanguages],
+  );
+  const itemIndexById = useMemo(() => new Map(items.map((item, index) => [item.id, index])), [items]);
+  const preferredSectionId = restoreRequest?.target.sectionId || selectedSectionId || currentAnchor?.sectionId;
+  // Whatever the reader's slide needs before it can settle comes first: its
+  // run, from the start, up to the reader's own row.
+  const readingRunStart = useMemo(
+    () => getPaginationRunStart(items, getReadingItemIndex(items, currentAnchor, preferredSectionId)),
+    [currentAnchor, items, preferredSectionId],
+  );
   const measurementBatch = useMemo(() => {
     if (!(viewportHeight || viewportHeightOverride)) return [];
     return getMeasurementBatch(
       items,
-      measuredHeights,
+      isItemMeasured,
       MEASUREMENT_BATCH_SIZE,
       currentAnchor,
-      restoreRequest?.target.sectionId || selectedSectionId || currentAnchor?.sectionId,
+      preferredSectionId,
       MEASUREMENT_WINDOW_RADIUS,
+      readingRunStart,
     );
-  }, [currentAnchor, items, measuredHeights, restoreRequest?.token, selectedSectionId, viewportHeight, viewportHeightOverride]);
+  }, [currentAnchor, isItemMeasured, items, preferredSectionId, readingRunStart, viewportHeight, viewportHeightOverride]);
   // An empty batch means the active reading window is fully measured. Faraway
   // items intentionally remain estimated until the reader approaches them.
   const isActiveMeasurementComplete = useMemo(
@@ -429,11 +451,14 @@ export default function SlideshowContainer({
     [measurementBatch, viewportHeight, viewportHeightOverride],
   );
 
+  const anchoredSlideIndex = useMemo(
+    () => findSlideIndexForAnchor(slides, currentAnchor),
+    [currentAnchor, slides],
+  );
   const resolvedSlideIndex = useMemo(() => {
-    const anchoredIndex = findSlideIndexForAnchor(slides, currentAnchor);
-    if (anchoredIndex >= 0) return anchoredIndex;
+    if (anchoredSlideIndex >= 0) return anchoredSlideIndex;
     return Math.min(currentSlideIndex, Math.max(slides.length - 1, 0));
-  }, [currentAnchor, currentSlideIndex, slides]);
+  }, [anchoredSlideIndex, currentSlideIndex, slides]);
 
   // Update synchronously after every committed page so rapid taps/clicker
   // presses can advance repeatedly without waiting for the next render's
@@ -441,6 +466,48 @@ export default function SlideshowContainer({
   useLayoutEffect(() => {
     navigationIndexRef.current = resolvedSlideIndex;
   }, [resolvedSlideIndex]);
+
+  // The slide on screen is never provisional. Pagination runs on estimates
+  // until the measurements land, and a slide built on estimates can change
+  // as they do: so the deck shows the last slide that was settled (see
+  // isSlideSettled) -- with the size, font and languages it was measured for
+  // -- until the live one is, and then that. Opened fresh, with nothing
+  // settled yet, it shows nothing for the frame or two it takes. Should a
+  // measurement never come, the live deck is shown anyway after a moment
+  // rather than leaving the reader with a blank page: at worst it lays its
+  // verses out whole, never with a guessed line break.
+  // Until the anchor finds its slide again, the slide index is only the old
+  // number, and the slide at it is not the reader's: not settled either.
+  const settled = Boolean(measuredViewportHeight) &&
+    (!currentAnchor || anchoredSlideIndex >= 0) &&
+    isSlideSettled(items, slides, resolvedSlideIndex, isItemMeasured, itemIndexById);
+  const liveDeck = useMemo(() => ({
+    slides,
+    currentIndex: resolvedSlideIndex,
+    visibleLanguages,
+    fontSize,
+    columnWidth: slideColumnWidth,
+    tableWidth: slideTableWidth,
+    slidePadding,
+  }), [fontSize, resolvedSlideIndex, slideColumnWidth, slidePadding, slideTableWidth, slides, visibleLanguages]);
+  const [settledDeck, setSettledDeck] = useState(null);
+  const [settleTimedOut, setSettleTimedOut] = useState(false);
+  useLayoutEffect(() => {
+    if (!settled) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the deck just settled is what the next unsettled frame keeps showing
+    setSettledDeck(liveDeck);
+  }, [liveDeck, settled]);
+  useEffect(() => {
+    if (settled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the wait is over the moment the live deck is exact
+      setSettleTimedOut(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setSettleTimedOut(true), SETTLE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [settled]);
+  const shownDeck = settled || settleTimedOut || !settledDeck ? liveDeck : settledDeck;
+  const deckHidden = !settled && !settleTimedOut && !settledDeck;
 
   // The settings/calendar transaction is independent of the content-selector
   // selection. Its token must jump even when the hymn id has not changed (a
@@ -707,20 +774,22 @@ export default function SlideshowContainer({
         onNext={goToNextSlide}
         onOpenSelector={onOpenSelector}
       >
-        <SlideDeck
-          slides={slides}
-          currentIndex={resolvedSlideIndex}
-          visibleLanguages={visibleLanguages}
-          fontSize={fontSize}
-          theme={theme}
-          columnWidth={slideColumnWidth}
-          tableWidth={slideTableWidth}
-          titleHelpers={titleHelpers}
-          slidePadding={slidePadding}
-          onToggleCollapse={onToggleCollapse}
-          onAction={onAction}
-          copticGospelRite={copticGospelRite}
-        />
+        {deckHidden ? null : (
+          <SlideDeck
+            slides={shownDeck.slides}
+            currentIndex={shownDeck.currentIndex}
+            visibleLanguages={shownDeck.visibleLanguages}
+            fontSize={shownDeck.fontSize}
+            theme={theme}
+            columnWidth={shownDeck.columnWidth}
+            tableWidth={shownDeck.tableWidth}
+            titleHelpers={titleHelpers}
+            slidePadding={shownDeck.slidePadding}
+            onToggleCollapse={onToggleCollapse}
+            onAction={onAction}
+            copticGospelRite={copticGospelRite}
+          />
+        )}
       </NavigationSurface>
 
       <Text
@@ -957,8 +1026,12 @@ export function NavigationSurface({
 // How many unmeasured items may mount in the off-screen measurement layer in
 // a single commit. Large enough that a typical hymn measures in one or two
 // frames, small enough that no commit ever mounts a whole liturgy at once.
-const MEASUREMENT_BATCH_SIZE = Platform.OS === "web" ? 48 : 16;
+const MEASUREMENT_BATCH_SIZE = Platform.OS === "web" ? 48 : 24;
 const MEASUREMENT_WINDOW_RADIUS = Platform.OS === "web" ? 96 : 48;
+// How long the deck waits for the reader's slide to settle before showing it
+// as it is. A slide's own items measure in a few frames; this only ever
+// matters if a measurement never comes.
+const SETTLE_TIMEOUT_MS = 700;
 const COLLAPSE_BUTTON_SIZE = DOCUMENT_CONTROL_METRICS.collapseButtonSize;
 const COLLAPSE_BUTTON_CIRCLE = DOCUMENT_CONTROL_METRICS.collapseCircleSize;
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"

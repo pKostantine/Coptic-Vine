@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import {
   GestureResponderEvent,
   LayoutChangeEvent,
@@ -30,11 +30,18 @@ interface SeekBarProps {
   accentColor?: string;
   /** Slightly denser treatment for short landscape/full-screen control rows. */
   dense?: boolean;
+  /** Set between the two times, e.g. the lesson player's speed chip. */
+  center?: ReactNode;
 }
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const SEEK_ACK_TOLERANCE_MS = 1100;
 const SEEK_ACK_TIMEOUT_MS = 2500;
+// The design's 4pt bar and 13pt white thumb, in a taller band that takes the
+// touch; the times sit 9pt under the bar (6pt in the dense rows).
+const HIT_HEIGHT = 24;
+const TRACK_HEIGHT = 4;
+const THUMB_SIZE = 13;
 
 /**
  * A scrubber designed to stay visually locked to the finger.
@@ -55,6 +62,7 @@ export default function SeekBar({
   onSeek,
   accentColor = COLORS.gold,
   dense = false,
+  center,
 }: SeekBarProps) {
   const [scrubRatio, setScrubRatio] = useState<number | null>(null);
   const [optimisticSeekMs, setOptimisticSeekMs] = useState<number | null>(null);
@@ -68,12 +76,11 @@ export default function SeekBar({
   const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frameRef = useRef<number | null>(null);
   const pendingRatioRef = useRef<number | null>(null);
-  const thumbSize = dense ? 12 : 16;
-  const latest = useRef({ durationMs, onSeek, thumbSize });
+  const latest = useRef({ durationMs, onSeek });
 
   useEffect(() => {
-    latest.current = { durationMs, onSeek, thumbSize };
-  }, [durationMs, onSeek, thumbSize]);
+    latest.current = { durationMs, onSeek };
+  }, [durationMs, onSeek]);
 
   useEffect(() => {
     optimisticSeekRef.current = optimisticSeekMs;
@@ -110,18 +117,17 @@ export default function SeekBar({
     });
   };
 
+  // The thumb is centred on the end of the fill, as drawn, so the bar's
+  // whole width is its travel.
   const ratioFromGrant = (event: GestureResponderEvent) => {
     const width = widthRef.current;
-    const halfThumb = latest.current.thumbSize / 2;
-    const travel = Math.max(1, width - latest.current.thumbSize);
     if (width <= 0) return 0;
-    return clamp01((event.nativeEvent.locationX - halfThumb) / travel);
+    return clamp01(event.nativeEvent.locationX / width);
   };
 
   const ratioFromDrag = (gesture: PanResponderGestureState) => {
-    const travel = Math.max(1, widthRef.current - latest.current.thumbSize);
     if (widthRef.current <= 0) return startRatioRef.current;
-    return clamp01(startRatioRef.current + gesture.dx / travel);
+    return clamp01(startRatioRef.current + gesture.dx / Math.max(1, widthRef.current));
   };
 
   const commitSeek = (ratio: number) => {
@@ -215,10 +221,7 @@ export default function SeekBar({
     ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) }
     : {};
 
-  // Keep the thumb centre inside the actual bar at both ends rather than
-  // rendering half of it outside the track.
-  const thumbTravel = Math.max(0, layoutWidth - thumbSize);
-  const thumbLeft = thumbSize / 2 + thumbTravel * ratio;
+  const thumbLeft = layoutWidth * ratio;
 
   return (
     <View style={styles.wrapper}>
@@ -245,46 +248,28 @@ export default function SeekBar({
           widthRef.current = nextWidth;
           setLayoutWidth(nextWidth);
         }}
-        style={[
-          styles.hitArea,
-          dense && styles.hitAreaDense,
-          Platform.OS === 'web' && styles.webCursor,
-        ]}
+        style={[styles.hitArea, Platform.OS === 'web' && styles.webCursor]}
         {...hoverProps}
         {...panResponder.panHandlers}
       >
-        <View
-          pointerEvents="none"
-          style={[
-            styles.track,
-            { marginHorizontal: thumbSize / 2 },
-            active && styles.trackActive,
-          ]}
-        >
+        <View pointerEvents="none" style={[styles.track, active && styles.trackActive]}>
           <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: accentColor }]} />
         </View>
         <View
           pointerEvents="none"
           style={[
             styles.thumb,
-            dense && styles.thumbDense,
-            {
-              width: thumbSize,
-              height: thumbSize,
-              borderRadius: thumbSize / 2,
-              left: thumbLeft,
-              marginLeft: -thumbSize / 2,
-              backgroundColor: accentColor,
-            },
-            active ? styles.thumbActive : styles.thumbIdle,
+            { left: thumbLeft },
+            active ? styles.thumbActive : null,
           ]}
         />
       </View>
-      <View pointerEvents="none" style={[styles.timeRow, dense && styles.timeRowDense]}>
-        <Text style={[styles.time, dense && styles.timeDense, scrubbing && { color: accentColor }]}>
+      <View pointerEvents="box-none" style={[styles.timeRow, dense && styles.timeRowDense]}>
+        <Text style={[styles.time, scrubbing && { color: accentColor }]}>
           {formatPlaybackTime(displayMs)}
         </Text>
-        <Text style={[styles.time, dense && styles.timeDense]}>
+        {center ?? null}
+        <Text style={styles.time}>
           {durationMs > 0 ? `-${formatPlaybackTime(Math.max(0, durationMs - displayMs))}` : '--:--'}
         </Text>
       </View>
@@ -295,36 +280,42 @@ export default function SeekBar({
 const styles = StyleSheet.create({
   wrapper: { width: '100%' },
   // A forgiving touch target around the thin visible bar is critical on phones.
-  hitArea: { height: 38, justifyContent: 'center' },
-  hitAreaDense: { height: 30 },
+  hitArea: { height: HIT_HEIGHT, justifyContent: 'center' },
   webCursor: { cursor: 'pointer', touchAction: 'none' } as object,
   track: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    height: TRACK_HEIGHT,
+    borderRadius: TRACK_HEIGHT,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
   },
-  trackActive: { height: 6, borderRadius: 3 },
-  fill: { height: '100%', borderRadius: 3 },
+  trackActive: { height: 6, borderRadius: 6 },
+  fill: { height: '100%', borderRadius: TRACK_HEIGHT },
   thumb: {
     position: 'absolute',
-    top: 11,
-    shadowColor: COLORS.shadow,
-    shadowOpacity: 0.42,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 4,
+    top: (HIT_HEIGHT - THUMB_SIZE) / 2,
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    marginLeft: -THUMB_SIZE / 2,
+    borderRadius: THUMB_SIZE / 2,
+    backgroundColor: COLORS.white,
+    ...Platform.select({
+      web: { boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)' } as object,
+      default: { shadowColor: COLORS.shadow, shadowOpacity: 0.4, shadowRadius: 3, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+    }),
   },
-  thumbDense: { top: 9 },
-  thumbIdle: { transform: [{ scale: 0.82 }] },
-  thumbActive: { transform: [{ scale: 1.12 }] },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -1 },
-  timeRowDense: { marginTop: -2 },
+  thumbActive: { transform: [{ scale: 1.2 }] },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 9 - (HIT_HEIGHT - TRACK_HEIGHT) / 2,
+  },
+  timeRowDense: { marginTop: 6 - (HIT_HEIGHT - TRACK_HEIGHT) / 2 },
   time: {
-    color: COLORS.muted,
+    color: 'rgba(255, 255, 255, 0.62)',
     fontFamily: TYPOGRAPHY.body,
     fontSize: 12,
+    fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
-  timeDense: { fontSize: 10 },
 });

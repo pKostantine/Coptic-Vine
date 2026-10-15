@@ -7,6 +7,8 @@ export type IconName =
   | 'disc-outline'
   | 'people-outline'
   | 'arrow-down-circle-outline'
+  | 'add-circle-outline'
+  | 'checkmark-done'
   | 'chevron-back'
   | 'chevron-forward'
   | 'chevron-down'
@@ -620,6 +622,19 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="M176 262.62 256 342l80-79.38M256 330.97V170" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
           <Path d="M256 64C150 64 64 150 64 256s86 192 192 192 192-86 192-192S362 64 256 64Z" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
+        </Svg>
+      );
+    case 'add-circle-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192 192-86 192-192Z" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
+          <Path d="M256 176v160M336 256H176" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'checkmark-done':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M464 128 240 384l-96-96M144 384l-96-96M368 128 232 284" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case 'book-outline':
