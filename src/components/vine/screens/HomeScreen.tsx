@@ -5,7 +5,8 @@ import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import FillSvg from '../ui/FillSvg';
 
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
@@ -417,7 +418,7 @@ function HeroGlow() {
   return (
     <View style={styles.glow} pointerEvents="none">
       <LinearGradient colors={[COLORS.greenMid, COLORS.greenDeep, '#000000']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
-      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+      <FillSvg>
         <Defs>
           <RadialGradient id="homeGlow" cx="50%" cy="18%" rx="120%" ry="75%" fx="50%" fy="18%">
             <Stop offset="0" stopColor="#346E3A" stopOpacity="0.85" />
@@ -427,7 +428,7 @@ function HeroGlow() {
           </RadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#homeGlow)" />
-      </Svg>
+      </FillSvg>
     </View>
   );
 }

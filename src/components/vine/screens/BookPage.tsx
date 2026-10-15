@@ -4,7 +4,8 @@ import Head from 'expo-router/head';
 import { createContext, forwardRef, useContext, useEffect, useId, useState, type ReactNode } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View, type ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient as SvgLinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { Defs, LinearGradient as SvgLinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import FillSvg from '../ui/FillSvg';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import Icon, { type IconName } from '../ui/Icon';
@@ -247,7 +248,7 @@ function GlowArt({ palette }: { palette: PageGlowPalette }) {
   const id = `glow${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const { cx, cy, rx, ry } = palette.light;
   return (
-    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+    <FillSvg>
       <Defs>
         <SvgLinearGradient id={`${id}l`} x1="0" y1="0" x2="0" y2="1">
           {palette.fall.map(([offset, color]) => <Stop key={offset} offset={offset} stopColor={color} />)}
@@ -258,7 +259,7 @@ function GlowArt({ palette }: { palette: PageGlowPalette }) {
       </Defs>
       <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}l)`} />
       <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}r)`} />
-    </Svg>
+    </FillSvg>
   );
 }
 

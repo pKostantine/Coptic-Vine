@@ -3,7 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useId, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import FillSvg from '../ui/FillSvg';
 
 import BookPage, { PageGutter } from './BookPage';
 import Icon from '../ui/Icon';
@@ -171,7 +172,7 @@ function CrimsonGlow() {
   const id = `crimson${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <View style={[StyleSheet.absoluteFill, styles.crimsonBase]} pointerEvents="none">
-      <Svg width="100%" height="100%">
+      <FillSvg>
         <Defs>
           <RadialGradient id={id} cx="0%" cy="0%" rx="140%" ry="110%" fx="0%" fy="0%">
             <Stop offset="0" stopColor="#760618" stopOpacity="0.9" />
@@ -180,7 +181,7 @@ function CrimsonGlow() {
           </RadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
-      </Svg>
+      </FillSvg>
     </View>
   );
 }
