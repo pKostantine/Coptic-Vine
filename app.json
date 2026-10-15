@@ -13,7 +13,11 @@
     "ios": {
       "icon": "./assets/images/coptic-vine-icon.png",
       "supportsTablet": true,
-      "requireFullScreen": true
+      "requireFullScreen": true,
+      "bundleIdentifier": "com.pkostantine.CopticVine",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -34,7 +38,12 @@
       "favicon": "./assets/images/coptic-vine-favicon.png"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "origin": "https://copticvine.ca"
+        }
+      ],
       [
         "expo-splash-screen",
         {
