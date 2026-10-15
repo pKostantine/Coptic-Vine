@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Href, Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { PanResponder, type PanResponderGestureState, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import DocumentPillBar from '../ui/DocumentPillBar';
@@ -46,6 +46,7 @@ import {
 import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
 import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
+import { swipeEdge, swipeStartX } from '../../../utils/edgeSwipe';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
 import {
   createSermonHighlight,
@@ -893,8 +894,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     ? getActiveAntiphonaryGroup(readySections, currentSectionId, currentTune)
     : null;
 
-  const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
-  const selectorSwipeStartX = Math.max(screenWidth - selectorEdgeWidth, 0);
 
   // A subdocument/Antiphonary modal (or the content selector) stacks visually
   // on top of this screen but never unmounts it -- so without this guard, a
@@ -908,14 +907,20 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // BEHIND it never competes for the same gesture while anything covers it.
   const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen || settingsOpen;
 
+  // Where the swipe this screen took began: decided while it is being taken,
+  // kept for its release (see swipeStartX).
+  const swipeTakenFromXRef = useRef(0);
   const gesturePanResponder = useMemo(
     () => {
-      const shouldHandleEdgeSwipe = (event: unknown, gestureState: { x0: number; dx: number; dy: number }) => {
+      // Only a swipe from the very edge goes back or opens the contents
+      // (utils/edgeSwipe.ts); one across the page turns it, or does nothing.
+      const shouldHandleEdgeSwipe = (event: unknown, gestureState: PanResponderGestureState) => {
         if (isCoveredByModal || isStylusGestureEvent(event) || pencilGestureActiveRef.current) return false;
-        const startsInRightEdge = gestureState.x0 >= selectorSwipeStartX;
-        const startsInLeftEdge = gestureState.x0 < 56;
+        const startX = swipeStartX(gestureState);
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        return (startsInRightEdge || startsInLeftEdge) && isHorizontal && Math.abs(gestureState.dx) > 18;
+        const handles = swipeEdge(startX, screenWidth) !== null && isHorizontal && Math.abs(gestureState.dx) > 18;
+        if (handles) swipeTakenFromXRef.current = startX;
+        return handles;
       };
 
       return PanResponder.create({
@@ -923,17 +928,20 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         onMoveShouldSetPanResponder: (event, gestureState) => shouldHandleEdgeSwipe(event, gestureState),
         onPanResponderRelease: (event, gestureState) => {
           if (isCoveredByModal || isStylusGestureEvent(event) || pencilGestureActiveRef.current) return;
-          if (gestureState.x0 >= selectorSwipeStartX && gestureState.dx <= -36) {
+          const takenFromX = swipeTakenFromXRef.current;
+          const travelled = gestureState.moveX - takenFromX;
+          const edge = swipeEdge(takenFromX, screenWidth);
+          if (edge === 'right' && travelled <= -36) {
             setSelectorOpen(true);
             return;
           }
-          if (gestureState.x0 < 56 && gestureState.dx > 60) {
+          if (edge === 'left' && travelled > 60) {
             leaveDocument();
           }
         },
       });
     },
-    [selectorSwipeStartX, isCoveredByModal, leaveDocument],
+    [screenWidth, isCoveredByModal, leaveDocument],
   );
 
   return (

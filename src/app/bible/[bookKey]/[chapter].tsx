@@ -32,6 +32,7 @@ import {
 } from '@/utils/bibleService';
 import { goBack } from '@/utils/navigation';
 import { writeRichClipboard } from '@/utils/richClipboard';
+import { swipeEdge, swipeStartX } from '@/utils/edgeSwipe';
 import { appText, type AppText } from '@/utils/appText';
 import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
@@ -457,23 +458,31 @@ export default function BibleChapterDocument() {
     goBack(router, fallbackHref);
   }, [router, bookKey, book, chapterListLoaded, chapterCount]);
 
+  // Only a swipe from the very edge goes back or opens the verses
+  // (utils/edgeSwipe.ts), measured from where it began.
+  const swipeTakenFromXRef = useRef(0);
   const gesturePanResponder = useMemo(() => {
-    const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
+    // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
     return PanResponder.create({
       onMoveShouldSetPanResponder: (event, gestureState) => {
         if (isStylusGestureEvent(event) || pencilGestureActive || bookSettingsOpen) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
         if (!isHorizontal) return false;
-        const isBackSwipe = gestureState.x0 < 56 && gestureState.dx > 24;
-        const isSelectorSwipe = !isSelectorOpen && gestureState.x0 > screenWidth - selectorEdgeWidth && gestureState.dx < -24;
+        const startX = swipeStartX(gestureState);
+        const edge = swipeEdge(startX, screenWidth);
+        const isBackSwipe = edge === 'left' && gestureState.dx > 24;
+        const isSelectorSwipe = !isSelectorOpen && edge === 'right' && gestureState.dx < -24;
+        if (isBackSwipe || isSelectorSwipe) swipeTakenFromXRef.current = startX;
         return isBackSwipe || isSelectorSwipe;
       },
       onPanResponderRelease: (event, gestureState) => {
         if (isStylusGestureEvent(event) || pencilGestureActive) return;
-        const selectorEdge = Math.min(240, Math.max(128, screenWidth * 0.18));
-        if (gestureState.x0 < 56 && gestureState.dx > 60) {
+        const takenFromX = swipeTakenFromXRef.current;
+        const travelled = gestureState.moveX - takenFromX;
+        const edge = swipeEdge(takenFromX, screenWidth);
+        if (edge === 'left' && travelled > 60) {
           goBackALevel();
-        } else if (!isSelectorOpen && gestureState.x0 > screenWidth - selectorEdge && gestureState.dx < -36) {
+        } else if (!isSelectorOpen && edge === 'right' && travelled < -36) {
           setIsSelectorOpen(true);
         }
       },

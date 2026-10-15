@@ -1,12 +1,13 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type GestureResponderEvent, Modal, PanResponder, type PanResponderGestureState, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { type GestureResponderEvent, Modal, PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
+import { swipeEdge, swipeStartX } from '../../../utils/edgeSwipe';
 import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
 import DocumentSurface, { type SlideJumpRequest } from '../DocumentSurface';
 import {
@@ -72,10 +73,6 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
 }
 
 /** Where a swipe began, in page coordinates -- see swipeGesturePanResponder. */
-function swipeStartX(gestureState: PanResponderGestureState) {
-  return gestureState.moveX - gestureState.dx;
-}
-
 /**
  * The edge swipes, for a swipe that starts in the side safe-area inset.
  *
@@ -353,7 +350,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const { startsInInset } = insetEdgeSwipe;
   const swipeTakenFromXRef = useRef(0);
   const swipeGesturePanResponder = useMemo(() => {
-    const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
     // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
@@ -361,10 +357,10 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         if (isCovered || isStylusGestureEvent(_) || startsInInset(startX)) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal) return false;
-        const isCloseSwipe = startX < 56 && gestureState.dx > 12;
-        const isSelectorSwipe =
-          startX > screenWidth - selectorEdgeWidth &&
-          gestureState.dx < -12;
+        // Only from the very edge: a swipe across the page turns it, or does nothing.
+        const edge = swipeEdge(startX, screenWidth);
+        const isCloseSwipe = edge === 'left' && gestureState.dx > 12;
+        const isSelectorSwipe = edge === 'right' && gestureState.dx < -12;
         if (isCloseSwipe || isSelectorSwipe) swipeTakenFromXRef.current = startX;
         return isCloseSwipe || isSelectorSwipe;
       },
@@ -372,11 +368,12 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         if (isCovered || isStylusGestureEvent(event)) return;
         const takenFromX = swipeTakenFromXRef.current;
         const travelled = gestureState.moveX - takenFromX;
-        if (takenFromX < 56 && travelled > 60) {
+        const edge = swipeEdge(takenFromX, screenWidth);
+        if (edge === 'left' && travelled > 60) {
           onClose();
           return;
         }
-        if (takenFromX > screenWidth - selectorEdgeWidth && travelled < -36) {
+        if (edge === 'right' && travelled < -36) {
           setSelectorOpen(true);
         }
       },
@@ -400,17 +397,17 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       onMoveShouldSetPanResponderCapture: (event, gestureState) => {
         const startX = swipeStartX(gestureState);
         if (isStylusGestureEvent(event) || overlayStartsInInset(startX)) return false;
-        const isCloseSwipe = startX < 56 && gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        const isCloseSwipe = swipeEdge(startX, screenWidth) === 'left' && gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (isCloseSwipe) overlaySwipeTakenFromXRef.current = startX;
         return isCloseSwipe;
       },
       onPanResponderRelease: (event, gestureState) => {
         if (isStylusGestureEvent(event)) return;
         const takenFromX = overlaySwipeTakenFromXRef.current;
-        if (takenFromX < 56 && gestureState.moveX - takenFromX > 60) closeOverlay();
+        if (swipeEdge(takenFromX, screenWidth) === 'left' && gestureState.moveX - takenFromX > 60) closeOverlay();
       },
     });
-  }, [overlayStartsInInset]);
+  }, [overlayStartsInInset, screenWidth]);
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={modalOrientations}>

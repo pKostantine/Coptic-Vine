@@ -307,15 +307,31 @@ test('a subdocument (and its Settings/Calendar) can be swiped out from a landsca
   assert.match(modal, /isStylusGestureEvent\(_\) \|\| startsInInset\(startX\)\) return false;/);
 });
 
-test('a subdocument\'s edge swipes know where they started, in slideshow mode too', () => {
+test('a swipe goes back or opens the contents only from the very edge, measured from where it began', () => {
   // gestureState.x0 is 0 until a responder is granted, and granting resets
-  // dx; reading either made every swipe look like it began at the left edge,
-  // so the content list could never be swiped open over a slideshow.
+  // dx; reading either made every swipe look like it began at the left edge.
+  // And a swipe across a page -- one to the left starts on the right of the
+  // screen -- must turn it, not open the contents or close the document.
+  const ts = require('typescript');
+  const source = fs.readFileSync('src/utils/edgeSwipe.ts', 'utf8');
+  assert.match(source, /return gestureState\.moveX - gestureState\.dx;/);
+  const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const module = { exports: {} };
+  new Function('exports', 'require', 'module', js)(module.exports, require, module);
+  const { swipeEdge, EDGE_SWIPE_ZONE } = module.exports;
+  assert.equal(EDGE_SWIPE_ZONE, 28);
+  assert.equal(swipeEdge(10, 430), 'left');
+  assert.equal(swipeEdge(420, 430), 'right');
+  for (const start of [40, 56, 120, 215, 310, 380]) assert.equal(swipeEdge(start, 430), null, `a swipe from ${start} is on the page`);
+
+  for (const file of ['src/components/vine/screens/DocumentModal.tsx', 'src/components/vine/screens/ServiceDocument.tsx', 'src/app/bible/[bookKey]/[chapter].tsx']) {
+    const screen = fs.readFileSync(file, 'utf8');
+    assert.match(screen, /import \{ swipeEdge, swipeStartX \} from/, file);
+    assert.doesNotMatch(screen, /gestureState\.x0\s*[<>]|selectorEdgeWidth|< 56/, file);
+    assert.match(screen, /swipeTakenFromXRef\.current = startX;/, file);
+  }
   const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
-  assert.match(modal, /return gestureState\.moveX - gestureState\.dx;/);
-  assert.doesNotMatch(modal, /gestureState\.x0\s*[<>]|\(gestureState\.x0\)/);
-  assert.match(modal, /if \(isCloseSwipe \|\| isSelectorSwipe\) swipeTakenFromXRef\.current = startX;/);
-  assert.match(modal, /takenFromX > screenWidth - selectorEdgeWidth && travelled < -36\) \{\s*setSelectorOpen\(true\);/);
+  assert.match(modal, /if \(edge === 'right' && travelled < -36\) \{\s*setSelectorOpen\(true\);/);
   assert.match(modal, /if \(isCloseSwipe\) overlaySwipeTakenFromXRef\.current = startX;/);
 });
 
