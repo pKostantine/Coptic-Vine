@@ -257,6 +257,50 @@ test("a run of buttons shares a slide while they fit, and still opens a fresh on
   ]);
 });
 
+test("a headpiece always opens a slide and keeps what follows; the Medallion stays with the last words and ends its slide", () => {
+  const verse = (id) => verseItem({ id, sectionId: id });
+  const headpiece = { id: "hoos-title", sectionId: "hoos", type: "title", isCollapsed: true, collapsible: true, ornament: "lintel", title: { english: "The First Hoos" } };
+  const button = { id: "midnight-hour-button", sectionId: "midnight-hour", type: "button", title: { english: "Midnight Hour" } };
+  const medallion = { id: "document-end-medallion", sectionId: "document-end", type: "ornament", ornament: "medallion" };
+  const next = { id: "next-button", sectionId: "next", type: "button", isHyperlink: true, title: { english: "Morning Doxology" } };
+  const items = [verse("before"), headpiece, button, verse("after"), verse("last"), medallion, next];
+  const heights = Object.fromEntries(items.map((item) => [item.id, 60]));
+  const slides = paginateItems(items, heights, {}, 1000, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides.map((slide) => slide.map((entry) => entry.id)), [
+    ["before"],
+    // Even a collapsible headpiece opens a slide, and the button after it stays on it.
+    ["hoos-title", "midnight-hour-button", "after", "last", "document-end-medallion"],
+    ["next-button"],
+  ]);
+});
+
+test("a band or divider sits with what comes either side of it", () => {
+  const title = { id: "next-title", sectionId: "next", type: "title", title: { english: "Next" } };
+  const divider = { id: "divider", sectionId: "divider", type: "ornament", ornament: "divider" };
+  const items = [verseItem({ id: "before", sectionId: "before" }), divider, title];
+  const heights = Object.fromEntries(items.map((item) => [item.id, 60]));
+  const slides = paginateItems(items, heights, {}, 1000, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides.map((slide) => slide.map((entry) => entry.id)), [["before", "divider", "next-title"]]);
+});
+
+test("a verse that doesn't fit fills the rest of the slide and carries on, never leaving a single line", () => {
+  const first = verseItem({ id: "first", sectionId: "first", verse: { english: "", type: "priest" } });
+  const second = verseItem({ id: "second", sectionId: "second" });
+  const lines = (count) => ({ english: { lines: metricLines("English", count) } });
+  const english = { english: true, french: false, coptic: false, arabic: false };
+  const lineHeight = getSlideshowLanguageLineHeight("english", second, 18);
+  const budget = 1000;
+  // The first verse leaves room for about five of the second's six lines.
+  const firstHeight = budget - lineHeight * 5 - 40;
+  const slides = paginateItems([first, second], { first: firstHeight, second: lineHeight * 6 + 40 }, { second: lines(6) }, budget, 18, english, 1024);
+  const lineCount = (entry) => (entry.verse.english.match(/English\d+/g) || []).length;
+  // Four of its lines fill this slide; the last two turn the page together.
+  assert.deepEqual(slides.map((slide) => slide.map(lineCount)), [[0, 4], [2]]);
+  // With room for a single line it moves on whole.
+  const tight = paginateItems([first, second], { first: budget - lineHeight - 40, second: lineHeight * 6 + 40 }, { second: lines(6) }, budget, 18, english, 1024);
+  assert.deepEqual(tight.map((slide) => slide.map(lineCount)), [[0], [6]]);
+});
+
 test("line anchors follow the same content when page capacity changes", () => {
   const item = verseItem();
   const before = splitVerse(item, { availableHeight: 320, lineCount: 15 }).slides;

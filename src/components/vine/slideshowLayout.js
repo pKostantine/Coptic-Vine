@@ -169,18 +169,44 @@ function hasVisibleTitleText(title) {
   return Boolean(title?.english || title?.french || title?.arabic);
 }
 
+/** A title set in a headpiece (constants/documentOrnaments.ts). */
+function isHeadpieceItem(item) {
+  return item?.type === "title" && Boolean(HEADPIECE_ASPECT[item.ornament]);
+}
+
+/** A band or divider: an ornament that sits between whatever is either side of it. */
+function isFlowOrnament(item) {
+  return item?.type === "ornament" && (item.ornament === "band" || item.ornament === "divider");
+}
+
+function ownBreakBefore(item, previous) {
+  return (item.type === "title" && !item.isCollapsed && hasVisibleTitleText(item.title)) ||
+    // A button opens a slide of its own, but a run of them (the Liturgy of
+    // the Word's three at its end) shares one as far as they fit.
+    (item.type === "button" && previous?.type !== "button") ||
+    // The Antiphonary's Vatos half opens its own slide, so the Vatos pill
+    // lands on its first verse rather than partway down Adam's last slide.
+    (item.verse?.tune === "vatos" && previous?.verse?.tune === "adam");
+}
+
+/**
+ * Where a slide must begin. The ornaments set their own rules: a headpiece
+ * always opens a slide, with nothing before it, and whatever follows it
+ * shares that slide as far as it fits; the Medallion stays with the last
+ * words before it, and nothing follows it on its slide; a band or divider
+ * sits with what comes either side of it.
+ */
 function buildPaginationUnits(items) {
-  return items.map((item, index) => ({
-    items: [item],
-    breakBefore:
-      (item.type === "title" && !item.isCollapsed && hasVisibleTitleText(item.title)) ||
-      // A button opens a slide of its own, but a run of them (the Liturgy of
-      // the Word's three at its end) shares one as far as they fit.
-      (item.type === "button" && items[index - 1]?.type !== "button") ||
-      // The Antiphonary's Vatos half opens its own slide, so the Vatos pill
-      // lands on its first verse rather than partway down Adam's last slide.
-      (item.verse?.tune === "vatos" && items[index - 1]?.verse?.tune === "adam"),
-  }));
+  return items.map((item, index) => {
+    const previous = items[index - 1];
+    let breakBefore;
+    if (isHeadpieceItem(item)) breakBefore = true;
+    else if (item.type === "ornament" && item.ornament === "medallion") breakBefore = false;
+    else if (previous?.type === "ornament" && previous.ornament === "medallion") breakBefore = true;
+    else if (isFlowOrnament(item) || isHeadpieceItem(previous) || isFlowOrnament(previous)) breakBefore = false;
+    else breakBefore = ownBreakBefore(item, previous);
+    return { items: [item], breakBefore };
+  });
 }
 
 export function paginateItems(
@@ -213,13 +239,10 @@ export function paginateItems(
       return;
     }
 
-    if (currentSlide.length && verseHeight <= safeAvailableHeight) {
-      flushSlide();
-      currentSlide.push(verseItem);
-      currentHeight += verseHeight;
-      return;
-    }
-
+    // A verse that doesn't fit what is left of the slide fills it with as
+    // many of its lines as fit and carries on over the page, rather than
+    // moving on whole and leaving the foot of the slide empty -- never in a
+    // piece of fewer than two lines, either side of the turn.
     const languageMetric = hasMeasuredVerseLines(languageHeights[verseItem.id])
       ? languageHeights[verseItem.id]
       : createEstimatedVerseMetric(verseItem, fontSize, visibleLanguages, tableWidth);
@@ -283,13 +306,13 @@ function appendTallVerseSegments({
       ? createContinuationCapacityItem(item)
       : item;
     const remainingHeight = availableHeight - currentHeight;
-    let lineCapacities = getIndependentLineCapacities(
+    let lineCapacities = withoutWidowLines(state, getIndependentLineCapacities(
       state,
       remainingHeight,
       fontSize,
       capacityItem,
       visibleLanguages,
-    );
+    ));
 
     if (currentSlide.length && shouldAvoidTinyFragment(
       state,
@@ -353,6 +376,22 @@ function appendTallVerseSegments({
   }
 
   return { currentSlide, currentHeight };
+}
+
+/**
+ * Holds back enough of a column's lines that the turn of the page never
+ * leaves it a single line on the next slide.
+ */
+function withoutWidowLines(state, capacities) {
+  const adjusted = { ...capacities };
+  for (const entry of state.languages) {
+    const remaining = entry.lines.length - entry.offset;
+    const capacity = adjusted[entry.language] ?? 0;
+    if (capacity > 0 && capacity < remaining && remaining - capacity < MIN_USEFUL_FRAGMENT_LINES) {
+      adjusted[entry.language] = Math.max(0, remaining - MIN_USEFUL_FRAGMENT_LINES);
+    }
+  }
+  return adjusted;
 }
 
 function createContinuationCapacityItem(item) {
@@ -583,7 +622,7 @@ export function getVerseLineSegmentHeight(segment, fontSize, visibleLanguages) {
  * height over its width, drawn the full width of the page, and the
  * Medallion's size.
  */
-const HEADPIECE_ASPECT = { lintel: 230 / 1200, stepped: 400 / 1200, interlace: 460 / 1200 };
+const HEADPIECE_ASPECT = { lintel: 230 / 1200, stepped: 400 / 1200, interlace: 460 / 1200, roundels: 400 / 1200 };
 
 export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
   const chrome = getSlideshowChromeMetrics(fontSize);

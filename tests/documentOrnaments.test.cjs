@@ -44,6 +44,22 @@ test('each Hoos is set in a Lintel, on its titled first part only', () => {
   assert.equal(byId['theFirstHoosLobsh-30'], undefined);
 });
 
+test('the Psalm and Gospel are set in the Three Roundels, in every service that reads them', () => {
+  const titleOnly = (id, english) => ({ id, title: { english, arabic: '' }, verses: [] });
+  const dressed = withDocumentOrnaments([
+    titleOnly('GOSPEL_RITE-34', 'Psalm and Gospel'),
+    section('psalmResponse-1', 'psalmResponse', 'Psalm Response'),
+    titleOnly('PALM_SUNDAY_LITURGY_GOSPEL_RITE-34.5', 'Psalms and Gospels'),
+    titleOnly('MOURNFUL_GOSPEL_RITE-12', 'Psalm and Gospel'),
+    titleOnly('MOURNFUL_4_GOSPELS_RITE-20', 'Psalm and Gospels'),
+  ], TITLE);
+  const byId = Object.fromEntries(dressed.map((entry) => [entry.id, entry.ornament]));
+  for (const id of ['GOSPEL_RITE-34', 'PALM_SUNDAY_LITURGY_GOSPEL_RITE-34.5', 'MOURNFUL_GOSPEL_RITE-12', 'MOURNFUL_4_GOSPELS_RITE-20']) {
+    assert.equal(byId[id], 'roundels', id);
+  }
+  assert.equal(byId['psalmResponse-1'], undefined);
+});
+
 test('the Theotokia of the day is announced in the Interlace just before the Psali\'s conclusion, named from the Theotokia that follows', () => {
   const dressed = withDocumentOrnaments([
     // A Sunday Theotokia part prayed earlier in the service must not name the day.
@@ -96,7 +112,7 @@ test('the reader draws each ornament once and points to it; the slideshow knows 
   assert.match(slideshow, /section\.ornament === "medallion"/);
   assert.match(slideshow, /item\.type === "title" && item\.ornament/);
   const layout = fs.readFileSync('src/components/vine/slideshowLayout.js', 'utf8');
-  assert.match(layout, /HEADPIECE_ASPECT = \{ lintel: 230 \/ 1200, stepped: 400 \/ 1200, interlace: 460 \/ 1200 \}/);
+  assert.match(layout, /HEADPIECE_ASPECT = \{ lintel: 230 \/ 1200, stepped: 400 \/ 1200, interlace: 460 \/ 1200, roundels: 400 \/ 1200 \}/);
   // The service is dressed as it arrives, with the season it is prayed in.
   const service = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
   assert.match(service, /withDocumentOrnaments\(hydrated, \{ english: title, arabic, french \}\)/);

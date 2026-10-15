@@ -8,6 +8,18 @@ export const DOCUMENT_END_SECTION_ID = 'document-end';
 /** The Psalmody's four Hooses: each one's title is set in a Lintel instead of the plain title. */
 const HOOS_KEYS = new Set(['theFirstHoos', 'theSecondHoos', 'theThirdHoos', 'theFourthHoos']);
 
+/**
+ * The Psalm and Gospel, wherever a service reads them: the Gospel rites
+ * spliced in whole, whose title ("Psalm and Gospel") heads a section of its
+ * own named `<key>-<order>`. Each is set in the Three Roundels.
+ */
+const GOSPEL_RITE_KEYS = new Set(['GOSPEL_RITE', 'PALM_SUNDAY_LITURGY_GOSPEL_RITE', 'MOURNFUL_GOSPEL_RITE', 'MOURNFUL_4_GOSPELS_RITE']);
+
+/** A section's hymn key: its own, or for a title spliced in ahead of its import, the key its id is named after. */
+function sectionKey(section: DocumentSection): string {
+  return section.hymnKey ?? section.id.replace(/-[^-]*$/, '');
+}
+
 /** The Psali's conclusion, Adam or Vatos, after which the Theotokia of the day begins. */
 const PSALI_CONCLUSION_KEYS = new Set(['conclusionOfTheAdamPsali', 'conclusionOfTheVatosPsali']);
 
@@ -44,8 +56,9 @@ function followingTheotokiaDay(sections: DocumentSection[], from: number): Weekd
  * Dresses a hydrated service with its ornaments: its own name in the Stepped
  * headpiece at the start, each Hoos's title in a Lintel, the Theotokia of
  * the day announced in the Interlace just before the Psali's conclusion that
- * leads into it, and the Medallion closing the service -- before the
- * buttons that leave for the next one, which are no longer part of it.
+ * leads into it, the Psalm and Gospel in the Three Roundels, and the
+ * Medallion closing the service -- before the buttons that leave for the
+ * next one, which are no longer part of it.
  */
 export function withDocumentOrnaments(sections: DocumentSection[], title: DocumentTitle): DocumentSection[] {
   const dressed: DocumentSection[] = [{
@@ -76,9 +89,11 @@ export function withDocumentOrnaments(sections: DocumentSection[], title: Docume
         });
       }
     }
-    dressed.push(section.hymnKey && HOOS_KEYS.has(section.hymnKey) && hasTitle(section)
-      ? { ...section, ornament: 'lintel' }
-      : section);
+    const key = sectionKey(section);
+    dressed.push(!hasTitle(section) ? section
+      : HOOS_KEYS.has(key) ? { ...section, ornament: 'lintel' }
+        : GOSPEL_RITE_KEYS.has(key) ? { ...section, ornament: 'roundels' }
+          : section);
   });
 
   let end = dressed.length;

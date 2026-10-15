@@ -1,15 +1,15 @@
 import type { DocumentTheme } from './documentThemes';
-import { INTERLACE_ART, LINTEL_ART, MEDALLION_ART, STEPPED_ART, type OrnamentArt } from './ornamentArt';
+import { INTERLACE_ART, LINTEL_ART, MEDALLION_ART, ROUNDELS_ART, STEPPED_ART, type OrnamentArt } from './ornamentArt';
 import type { SeasonThemeKey } from './seasonAppearance';
 
 /**
  * The ornaments a document is dressed with (Coptic Vine Ornaments 1): a
  * headpiece a title is set inside -- the Lintel over each of the Psalmody's
  * Hooses, the Stepped frame over a service's own name at its start, the
- * Interlace over the Theotokia of the day -- and the Medallion that closes a
- * service.
+ * Interlace over the Theotokia of the day, the Three Roundels over the Psalm
+ * and Gospel -- and the Medallion that closes a service.
  */
-export type DocumentOrnament = 'lintel' | 'stepped' | 'interlace' | 'medallion';
+export type DocumentOrnament = 'lintel' | 'stepped' | 'interlace' | 'roundels' | 'medallion';
 export type HeadpieceOrnament = Exclude<DocumentOrnament, 'medallion'>;
 
 export interface HeadpieceFrame {
@@ -26,12 +26,13 @@ export const HEADPIECES: Record<HeadpieceOrnament, HeadpieceFrame> = {
   lintel: { art: LINTEL_ART, text: { left: 14, right: 14, top: 66, bottom: 3 }, fontSize: 2.6, minFontSize: 15 },
   stepped: { art: STEPPED_ART, text: { left: 25, right: 25, top: 46, bottom: 4 }, fontSize: 3.9, minFontSize: 16 },
   interlace: { art: INTERLACE_ART, text: { left: 17, right: 17, top: 41, bottom: 6 }, fontSize: 4.6, minFontSize: 17 },
+  roundels: { art: ROUNDELS_ART, text: { left: 22, right: 22, top: 50, bottom: 5 }, fontSize: 3.6, minFontSize: 16 },
 };
 
 export const MEDALLION = MEDALLION_ART;
 
 export function isHeadpiece(ornament: DocumentOrnament | undefined): ornament is HeadpieceOrnament {
-  return ornament === 'lintel' || ornament === 'stepped' || ornament === 'interlace';
+  return ornament === 'lintel' || ornament === 'stepped' || ornament === 'interlace' || ornament === 'roundels';
 }
 
 /**
