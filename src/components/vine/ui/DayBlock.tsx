@@ -1,5 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, PanResponder, type PanResponderGestureState } from 'react-native';
 
 import { useCalendar } from '../../../context/CalendarContext';
 import { appText, tr } from '../../../utils/appText';
@@ -31,12 +32,43 @@ interface DayBlockProps {
  * (Coptic Vine design, "Books"). Live, the season and the eve toggle; the Coptic day
  * large over the Gregorian; the week around it, each day selectable; and the
  * next great season with a day count. It wears the day's season colours
- * (seasonAppearance.ts), cross-fading when the day changes.
+ * (seasonAppearance.ts), cross-fading when the day changes. Swiped sideways it
+ * moves a week: to the next one leftwards (rightwards in Arabic, whose week
+ * runs the other way), to the one before the other way.
  */
 export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, action }: DayBlockProps) {
   const { selectDate } = useCalendar();
   const { theme } = day;
   const [week, setWeek] = useState<{ key: string; days: WeekStripDay[] } | null>(null);
+
+  // The swipe, read once and kept: the responder outlives renders, so it
+  // reaches the day it moves from, and the direction, through refs.
+  const swipeRef = useRef({ isoDate: day.isoDate, arabic, selectDate });
+  useEffect(() => {
+    swipeRef.current = { isoDate: day.isoDate, arabic, selectDate };
+  });
+  const [drag] = useState(() => new Animated.Value(0));
+  // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
+  const [weekSwipe] = useState(() => {
+    const sideways = (gesture: PanResponderGestureState) => Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5;
+    const settle = () => Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => sideways(gesture),
+      onPanResponderTerminationRequest: () => false,
+      // The card leans after the finger, a quarter of the way, so the swipe is felt.
+      onPanResponderMove: (_, gesture) => drag.setValue(gesture.dx / 4),
+      onPanResponderRelease: (_, gesture) => {
+        settle();
+        if (Math.abs(gesture.dx) < 50 && Math.abs(gesture.vx) < 0.5) return;
+        const { isoDate, arabic: rtl, selectDate: select } = swipeRef.current;
+        const towardsLater = rtl ? gesture.dx > 0 : gesture.dx < 0;
+        const date = new Date(`${isoDate}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + (towardsLater ? 7 : -7));
+        select(date);
+      },
+      onPanResponderTerminate: settle,
+    });
+  });
 
   useEffect(() => {
     let active = true;
@@ -65,6 +97,7 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
   });
 
   return (
+    <Animated.View style={{ transform: [{ translateX: drag }] }} {...weekSwipe.panHandlers}>
     <TodayCard
       theme={theme}
       arabic={arabic}
@@ -81,6 +114,7 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
         action: action ? { label: action.label, onPress: action.onPress, trailingIcon: arabic ? 'chevron-back' : 'chevron-forward' } : undefined,
       }}
     />
+    </Animated.View>
   );
 }
 
