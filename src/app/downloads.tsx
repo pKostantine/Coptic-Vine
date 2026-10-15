@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import { PageGlow, PageGutterProvider, SectionHeading, usePageGutter } from '@/components/vine/screens/BookPage';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import { BuddedCross } from '@/components/vine/ui/Ornaments';
@@ -329,12 +329,14 @@ function NativeDownloadsScreen() {
 
 /** A section heading over its rows, 6pt apart. In the iPad's columns the first one sits at the top. */
 function Section({ title, arabic, first = false, children }: { title: string; arabic: boolean; first?: boolean; children: ReactNode }) {
+  // In the iPad's columns the rows run to the column's edges, level with the storage card.
+  const gutter = usePageGutter();
   return (
     <>
       <View style={first ? styles.firstSection : null}>
         <SectionHeading title={title} arabic={arabic} size="page" />
       </View>
-      <View style={styles.rows}>{children}</View>
+      <View style={[styles.rows, { marginHorizontal: gutter }]}>{children}</View>
     </>
   );
 }
@@ -378,10 +380,12 @@ function BookRow({ book, arabic, run, onRemove }: {
   const size = book.totalBytes ? bytes(book.totalBytes, arabic) : null;
   const withSize = (status: string) => [status, size].filter(Boolean).join(' · ');
   let detail: ReactNode;
+  let detailIcon: ReactNode = null;
   let trailing: ReactNode;
   switch (book.status) {
     case 'installed':
-      detail = <><Icon name="checkmark-circle" size={14} color={COLORS.gold} />{withSize(tr('Downloaded', 'Téléchargé', 'منزّل'))}</>;
+      detailIcon = <Icon name="checkmark-circle" size={14} color={COLORS.gold} />;
+      detail = withSize(tr('Downloaded', 'Téléchargé', 'منزّل'));
       trailing = <MenuButton label={tr(`More for ${book.title}`, `Plus pour ${book.title}`, `المزيد لـ ${book.title}`)} onPress={onRemove} />;
       break;
     case 'downloading':
@@ -413,6 +417,7 @@ function BookRow({ book, arabic, run, onRemove }: {
       icon={<BuddedCross size={22} />}
       title={book.title}
       detail={detail}
+      detailIcon={detailIcon}
       trailing={trailing}
       // A partial download (paused, failed, waiting for an update) can still be removed, by a long press.
       onLongPress={book.status === 'not_downloaded' || book.status === 'installed' ? undefined : onRemove}
@@ -454,10 +459,12 @@ function MediaRow({ item, details, glyph, arabic, onRemove }: {
 }
 
 /** One row card: a gold glyph or cover, the name over its state, then whatever the row offers. */
-function Row({ icon, title, detail, trailing, chevron = false, quiet = false, arabic, onPress, onLongPress }: {
+function Row({ icon, title, detail, detailIcon, trailing, chevron = false, quiet = false, arabic, onPress, onLongPress }: {
   icon: ReactNode;
   title: string;
   detail?: ReactNode;
+  /** A glyph before the state, 5pt from it: the gold check of a downloaded book. */
+  detailIcon?: ReactNode;
   trailing?: ReactNode;
   chevron?: boolean;
   /** The quieter "Check for updates" row, without the cards' fade. */
@@ -473,11 +480,15 @@ function Row({ icon, title, detail, trailing, chevron = false, quiet = false, ar
       <View style={styles.rowText}>
         <Text style={[styles.rowTitle, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
         {detail ? (
-          <Text style={[styles.rowDetail, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text>
+          <View style={[styles.detailRow, arabic && styles.rowReverse]}>
+            {detailIcon}
+            <Text style={[styles.rowDetail, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text>
+          </View>
         ) : null}
       </View>
       {trailing}
-      {chevron ? <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} style={styles.chevron} /> : null}
+      {/* Wrapped, so it stacks above the gradient on the web, where a bare SVG paints beneath it. */}
+      {chevron ? <View style={styles.chevron}><Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /></View> : null}
     </>
   );
   const style = [styles.row, quiet && styles.rowQuiet, arabic && styles.rowReverse];
@@ -585,13 +596,14 @@ const styles = StyleSheet.create({
   legendText: { color: 'rgba(255, 255, 255, 0.85)', fontFamily: TYPOGRAPHY.body, fontSize: 13 },
 
   // Rows 6pt apart, each a card fading down to the surface (the design's "dl-r").
-  rows: { gap: 6, marginHorizontal: 16 },
+  rows: { gap: 6 },
   row: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, minHeight: 58, overflow: 'hidden', paddingLeft: 14, paddingRight: 10, paddingVertical: 9 },
   rowQuiet: { backgroundColor: 'rgba(255, 255, 255, 0.04)' },
   rowIcon: { alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600', lineHeight: 20 },
-  rowDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
+  detailRow: { alignItems: 'center', flexDirection: 'row', gap: 5, marginTop: 2 },
+  rowDetail: { color: COLORS.muted, flexShrink: 1, fontFamily: TYPOGRAPHY.body, fontSize: 12.5 },
   detailGold: { color: COLORS.goldBright, fontWeight: '600' },
   chevron: { marginRight: 4 },
   thumb: { borderRadius: 10, height: 44, marginLeft: -5, width: 44 },
