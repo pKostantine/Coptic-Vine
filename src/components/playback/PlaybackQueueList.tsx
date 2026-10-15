@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { MutableRefObject, useEffect, useRef, useState } from 'react';
+import { MutableRefObject, type ReactNode, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   GestureResponderEvent,
@@ -15,14 +15,17 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import Icon from '@/components/vine/ui/Icon';
+import LearningArtwork from '@/components/learning/LearningArtwork';
+import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
+import MusicArtwork from '@/components/music/MusicArtwork';
+import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import RoundIconButton from '@/components/playback/RoundIconButton';
+import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import type { MusicQueueItem } from '@/context/MusicPlayerContext';
+import type { LearningQueueItem } from '@/context/LearningPlayerContext';
+import type { QueueEntryView } from '@/context/queueEntries';
 import type { PlaybackRepeatMode } from '@/types/playback';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
-import MusicArtwork from './MusicArtwork';
-import MusicTrackActionsMenu from './MusicTrackActionsMenu';
 
 import { tr } from '../../utils/appText';
 // Rows are a fixed height so a drag distance maps directly onto a slot index.
@@ -30,9 +33,18 @@ const ROW_HEIGHT = 64;
 const COMPACT_ROW_HEIGHT = 52;
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
-interface MusicQueueListProps {
-  queue: MusicQueueItem[];
-  queueKeys: string[];
+/** Which player the list is open in, or which kind a row is: each has its colour. */
+export type QueueTone = 'music' | 'learning';
+
+const TONES: Record<QueueTone, { accent: string; bright: string; soft: string; line: string; icon: IconName }> = {
+  music: { accent: COLORS.gold, bright: COLORS.goldBright, soft: COLORS.goldSoft, line: COLORS.goldLine, icon: 'musical-notes-outline' },
+  learning: { accent: COLORS.learning, bright: COLORS.learningBright, soft: COLORS.learningSoft, line: COLORS.learningLine, icon: 'school-outline' },
+};
+
+interface PlaybackQueueListProps {
+  /** The whole queue, in the engine's order — see queueEntries.ts. */
+  entries: QueueEntryView[];
+  /** The engine's index of what is playing. */
   currentIndex: number;
   playing: boolean;
   isArabic: boolean;
@@ -43,13 +55,17 @@ interface MusicQueueListProps {
   repeatMode: PlaybackRepeatMode;
   onToggleShuffle: () => void;
   onCycleRepeat: () => void;
+  /** The player this list is open in; its header takes that colour, each row its own kind's. */
+  tone?: QueueTone;
   likedTrackIds?: ReadonlySet<string>;
-  onToggleLike?: (trackId: string) => void;
+  onToggleLikeTrack?: (trackId: string) => void;
+  likedLearningIds?: ReadonlySet<string>;
+  onToggleLikeLearning?: (item: LearningQueueItem) => void;
   compact?: boolean;
   /**
-   * `true` gives the list its own scroll area (desktop side panel). Otherwise
-   * the rows sit inline and the page scrolls; use onDragActiveChange to lock
-   * the page while a row is being dragged.
+   * `true` gives the list its own scroll area (a side panel, a sheet).
+   * Otherwise the rows sit inline and the page scrolls; use
+   * onDragActiveChange to lock the page while a row is being dragged.
    */
   scrollable?: boolean;
   onDragActiveChange?: (active: boolean) => void;
@@ -71,9 +87,14 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export default function MusicQueueList({
-  queue,
-  queueKeys,
+/**
+ * The queue as the engine holds it: Music tracks and Learn & Study items in
+ * one list, each row in its own kind's colour with its own artwork and
+ * actions, dragged into any order. Shared by both players, so what a lesson
+ * queued after a song looks like is the same whichever one is open.
+ */
+export default function PlaybackQueueList({
+  entries,
   currentIndex,
   playing,
   isArabic,
@@ -84,17 +105,21 @@ export default function MusicQueueList({
   repeatMode,
   onToggleShuffle,
   onCycleRepeat,
+  tone = 'music',
   likedTrackIds,
-  onToggleLike,
+  onToggleLikeTrack,
+  likedLearningIds,
+  onToggleLikeLearning,
   compact = false,
   scrollable = false,
   onDragActiveChange,
   style,
-}: MusicQueueListProps) {
+}: PlaybackQueueListProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
-  const count = queue.length;
+  const count = entries.length;
   const rowHeight = compact ? COMPACT_ROW_HEIGHT : ROW_HEIGHT;
   const target = drag ? clamp(drag.from + Math.round(drag.dy / rowHeight), 0, count - 1) : -1;
+  const colors = TONES[tone];
 
   const offsetFor = (index: number): number => {
     if (!drag) return 0;
@@ -130,11 +155,11 @@ export default function MusicQueueList({
 
   const rows = (
     <View style={[styles.list, { height: count * rowHeight }, Platform.OS === 'web' && styles.noSelect]}>
-      {queue.map((item, index) => (
+      {entries.map((entry, index) => (
         <QueueRow
-          key={queueKeys[index] ?? `${item.track.id}-${index}`}
+          key={entry.key}
           index={index}
-          item={item}
+          entry={entry}
           active={index === currentIndex}
           playing={playing}
           offset={offsetFor(index)}
@@ -142,8 +167,10 @@ export default function MusicQueueList({
           dragging={drag != null}
           handlers={handlers}
           onSelect={onSelect}
-          liked={likedTrackIds?.has(item.track.id) ?? false}
-          onToggleLike={onToggleLike}
+          likedTrackIds={likedTrackIds}
+          onToggleLikeTrack={onToggleLikeTrack}
+          likedLearningIds={likedLearningIds}
+          onToggleLikeLearning={onToggleLikeLearning}
           isArabic={isArabic}
           compact={compact}
           rowHeight={rowHeight}
@@ -162,6 +189,7 @@ export default function MusicQueueList({
               icon="shuffle"
               accessibilityLabel={shuffleEnabled ? 'Shuffle on' : 'Shuffle off'}
               active={shuffleEnabled}
+              accentColor={colors.accent}
               onPress={onToggleShuffle}
               size={compact ? 38 : 46}
             />
@@ -169,6 +197,7 @@ export default function MusicQueueList({
               icon="repeat"
               accessibilityLabel={repeatLabel}
               active={repeatMode !== 'off'}
+              accentColor={colors.accent}
               badge={repeatMode === 'one' ? '1' : undefined}
               onPress={onCycleRepeat}
               size={compact ? 38 : 46}
@@ -177,17 +206,26 @@ export default function MusicQueueList({
         </View>
         <View style={[styles.headerBottom, compact && styles.headerBottomCompact]}>
           <Text style={[styles.headerMeta, compact && styles.headerMetaCompact, isArabic && styles.arabic]}>
-            {tr(`${upNext} up next · ${count} ${count === 1 ? 'track' : 'tracks'}`, `${upNext} à suivre · ${count} ${count === 1 ? 'titre' : 'titres'}`, `${upNext} التالي`)}
+            {tr(
+              `${upNext} up next · ${count} ${count === 1 ? 'item' : 'items'}`,
+              `${upNext} à suivre · ${count} ${count === 1 ? 'élément' : 'éléments'}`,
+              `${upNext} التالي · ${count}`,
+            )}
           </Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr('Clear queue', 'Vider la file', 'مسح قائمة الانتظار')}
             disabled={count <= 1}
             onPress={onClear}
-            style={({ pressed }) => [styles.clearButton, count <= 1 && styles.clearButtonDisabled, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.clearButton,
+              { borderColor: colors.line, backgroundColor: colors.soft },
+              count <= 1 && styles.clearButtonDisabled,
+              pressed && styles.pressed,
+            ]}
           >
-            <Icon name="close" size={12} color={count <= 1 ? COLORS.muted : COLORS.goldBright} />
-            <Text style={[styles.clearText, count <= 1 && styles.clearTextDisabled]}>{tr('Clear queue', 'Vider la file', 'مسح')}</Text>
+            <Icon name="close" size={12} color={count <= 1 ? COLORS.muted : colors.bright} />
+            <Text style={[styles.clearText, { color: colors.bright }, count <= 1 && styles.clearTextDisabled]}>{tr('Clear queue', 'Vider la file', 'مسح')}</Text>
           </Pressable>
         </View>
       </View>
@@ -208,7 +246,7 @@ export default function MusicQueueList({
 
 interface QueueRowProps {
   index: number;
-  item: MusicQueueItem;
+  entry: QueueEntryView;
   active: boolean;
   playing: boolean;
   offset: number;
@@ -216,14 +254,61 @@ interface QueueRowProps {
   dragging: boolean;
   handlers: MutableRefObject<DragHandlers>;
   onSelect: (index: number) => void;
-  liked: boolean;
-  onToggleLike?: (trackId: string) => void;
+  likedTrackIds?: ReadonlySet<string>;
+  onToggleLikeTrack?: (trackId: string) => void;
+  likedLearningIds?: ReadonlySet<string>;
+  onToggleLikeLearning?: (item: LearningQueueItem) => void;
   isArabic: boolean;
   compact: boolean;
   rowHeight: number;
 }
 
-function QueueRow({ index, item, active, playing, offset, lifted, dragging, handlers, onSelect, liked, onToggleLike, isArabic, compact, rowHeight }: QueueRowProps) {
+/** What a row shows for its kind of entry: its colour, picture, words, like and actions. */
+function describeRow(
+  entry: QueueEntryView,
+  compact: boolean,
+  isArabic: boolean,
+  likes: Pick<QueueRowProps, 'likedTrackIds' | 'onToggleLikeTrack' | 'likedLearningIds' | 'onToggleLikeLearning'>,
+): { tone: QueueTone; title: string; subtitle: string; artwork: ReactNode; liked: boolean; onToggleLike?: () => void; actions: ReactNode } {
+  const artSize = compact ? 36 : 44;
+  switch (entry.kind) {
+    case 'music': {
+      const { item } = entry;
+      return {
+        tone: 'music',
+        title: item.track.title,
+        subtitle: formatMusicTrackPerformers(item.track, item.releaseTitle ?? ''),
+        artwork: <MusicArtwork asset={item.coverAsset} size={artSize} radius={6} label={item.releaseTitle ?? item.track.title} />,
+        liked: likes.likedTrackIds?.has(item.track.id) ?? false,
+        onToggleLike: likes.onToggleLikeTrack ? () => likes.onToggleLikeTrack?.(item.track.id) : undefined,
+        actions: <MusicTrackActionsMenu item={item} isArabic={isArabic} size={compact ? 32 : 36} />,
+      };
+    }
+    case 'learning': {
+      const { item } = entry;
+      return {
+        tone: 'learning',
+        title: item.title,
+        subtitle: `${item.cantorName} · ${item.containerTitle}`,
+        artwork: <LearningArtwork asset={item.coverAsset} size={artSize} radius={6} label={item.containerTitle} />,
+        liked: likes.likedLearningIds?.has(item.id) ?? false,
+        onToggleLike: likes.onToggleLikeLearning ? () => likes.onToggleLikeLearning?.(item) : undefined,
+        actions: <LearningItemActionsMenu item={item} isArabic={isArabic} size={compact ? 32 : 36} />,
+      };
+    }
+    default:
+      return {
+        tone: 'music',
+        title: entry.title,
+        subtitle: entry.subtitle ?? '',
+        artwork: <View style={[styles.unknownArt, { width: artSize, height: artSize }]} />,
+        liked: false,
+        actions: null,
+      };
+  }
+}
+
+function QueueRow({ index, entry, active, playing, offset, lifted, dragging, handlers, onSelect, likedTrackIds, onToggleLikeTrack, likedLearningIds, onToggleLikeLearning, isArabic, compact, rowHeight }: QueueRowProps) {
   const [translateY] = useState(() => new Animated.Value(0));
   const indexRef = useRef(index);
   useEffect(() => {
@@ -254,7 +339,9 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
     onPanResponderTerminate: () => handlers.current.end(),
   }));
 
-  const performers = formatMusicTrackPerformers(item.track, item.releaseTitle ?? '');
+  const row = describeRow(entry, compact, isArabic, { likedTrackIds, onToggleLikeTrack, likedLearningIds, onToggleLikeLearning });
+  const colors = TONES[row.tone];
+  const state = active ? `${playing ? tr('Now playing', 'En lecture', 'قيد التشغيل') : tr('Paused', 'En pause', 'متوقف')} · ` : '';
 
   return (
     <Animated.View
@@ -264,42 +351,46 @@ function QueueRow({ index, item, active, playing, offset, lifted, dragging, hand
         lifted && styles.rowLifted,
       ]}
     >
-      <View style={[styles.row, active && styles.rowActive, lifted && styles.rowLiftedInner]}>
+      <View style={[styles.row, active && { backgroundColor: colors.soft }, lifted && styles.rowLiftedInner, lifted && { borderColor: colors.line }]}>
         <View
           accessibilityRole="adjustable"
-          accessibilityLabel={`Reorder ${item.track.title}`}
+          accessibilityLabel={`Reorder ${row.title}`}
           style={[styles.handle, compact && styles.handleCompact, Platform.OS === 'web' && styles.handleWeb]}
           {...panResponder.panHandlers}
         >
-          <Icon name="reorder" size={compact ? 18 : 22} color={lifted ? COLORS.goldBright : COLORS.muted} />
+          <Icon name="reorder" size={compact ? 18 : 22} color={lifted ? colors.bright : COLORS.muted} />
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Play ${item.track.title}`}
+          accessibilityLabel={`Play ${row.title}`}
           disabled={dragging}
           onPress={() => onSelect(index)}
           style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}
         >
-          <MusicArtwork asset={item.coverAsset} size={compact ? 36 : 44} radius={6} label={item.releaseTitle ?? item.track.title} />
+          {row.artwork}
           <View style={styles.rowText}>
-            <Text numberOfLines={1} style={[styles.rowTitle, compact && styles.rowTitleCompact, active && styles.rowTitleActive]}>{item.track.title}</Text>
-            <Text numberOfLines={1} style={[styles.rowArtist, compact && styles.rowArtistCompact]}>
-              {active ? (playing ? 'Now playing · ' : 'Paused · ') : ''}{performers}
-            </Text>
+            <Text numberOfLines={1} style={[styles.rowTitle, compact && styles.rowTitleCompact, active && { color: colors.bright }]}>{row.title}</Text>
+            <View style={styles.rowMeta}>
+              {/* A queue of both kinds tells them apart at a glance. */}
+              <Icon name={colors.icon} size={compact ? 10 : 12} color={colors.accent} />
+              <Text numberOfLines={1} style={[styles.rowSubtitle, compact && styles.rowSubtitleCompact]}>
+                {state}{row.subtitle}
+              </Text>
+            </View>
           </View>
         </Pressable>
-        {onToggleLike ? (
+        {row.onToggleLike ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={liked ? `Unlike ${item.track.title}` : `Like ${item.track.title}`}
+            accessibilityLabel={row.liked ? `Unlike ${row.title}` : `Like ${row.title}`}
             disabled={dragging}
-            onPress={() => onToggleLike(item.track.id)}
+            onPress={row.onToggleLike}
             style={({ pressed }) => [styles.likeButton, compact && styles.likeButtonCompact, pressed && styles.pressed]}
           >
-            <Icon name={liked ? 'heart' : 'heart-outline'} size={compact ? 16 : 17} color={liked ? COLORS.goldBright : COLORS.muted} />
+            <Icon name={row.liked ? 'heart' : 'heart-outline'} size={compact ? 16 : 17} color={row.liked ? colors.bright : COLORS.muted} />
           </Pressable>
         ) : null}
-        {!dragging ? <MusicTrackActionsMenu item={item} isArabic={isArabic} size={compact ? 32 : 36} /> : null}
+        {!dragging ? row.actions : null}
       </View>
     </Animated.View>
   );
@@ -343,11 +434,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: RADII.pill,
     borderWidth: 1,
-    borderColor: COLORS.goldLine,
-    backgroundColor: COLORS.goldSoft,
   },
   clearButtonDisabled: { borderColor: COLORS.border, backgroundColor: 'transparent' },
-  clearText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
+  clearText: { fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
   clearTextDisabled: { color: COLORS.muted },
   list: { position: 'relative' },
   noSelect: { userSelect: 'none' } as object,
@@ -360,11 +449,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: SPACING.xs,
   },
-  rowActive: { backgroundColor: COLORS.goldSoft },
   rowLiftedInner: {
     backgroundColor: COLORS.surfaceSoft,
     borderWidth: 1,
-    borderColor: COLORS.goldLine,
     ...Platform.select({
       web: { boxShadow: '0 10px 28px rgba(0, 0, 0, 0.55)' } as object,
       default: { shadowColor: COLORS.shadow, shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
@@ -374,9 +461,10 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   rowTitleCompact: { fontSize: 13 },
-  rowTitleActive: { color: COLORS.goldBright },
-  rowArtist: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
-  rowArtistCompact: { fontSize: 10, marginTop: 1 },
+  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  rowSubtitle: { color: COLORS.muted, flexShrink: 1, fontFamily: TYPOGRAPHY.body, fontSize: 12 },
+  rowSubtitleCompact: { fontSize: 10 },
+  unknownArt: { borderRadius: 6, backgroundColor: COLORS.surfaceSoft },
   likeButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   likeButtonCompact: { width: 32, height: 32, borderRadius: 16 },
   handle: { width: 48, height: '100%', alignItems: 'center', justifyContent: 'center' },

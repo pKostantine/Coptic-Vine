@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
+import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -163,6 +164,7 @@ export default function LearningPlaylistScreen() {
                 ? item.recording.albumTitle
                 : item.lesson.lessonSetTitle;
               const mediaType = item.kind === 'lesson' ? item.lesson.mediaType : 'audio';
+              const audioItem = audioQueue.find((entry) => entry.id === content.id);
               return (
                 <LearningMediaRow
                   key={item.id}
@@ -174,16 +176,21 @@ export default function LearningPlaylistScreen() {
                   active={mediaType === 'audio' && currentItem?.id === content.id}
                   isArabic={isArabic}
                   onPress={() => openItem(item)}
-                  trailing={owned ? (
-                    <Pressable
-                      accessibilityLabel="Remove from learning playlist"
-                      disabled={Boolean(removingId)}
-                      onPress={() => void removeItem(item)}
-                      style={styles.remove}
-                    >
-                      <Text style={styles.removeText}>{removingId === item.id ? '…' : '×'}</Text>
-                    </Pressable>
-                  ) : null}
+                  trailing={(
+                    <View style={styles.rowActions}>
+                      {audioItem ? <LearningItemActionsMenu item={audioItem} isArabic={isArabic} size={32} /> : null}
+                      {owned ? (
+                        <Pressable
+                          accessibilityLabel="Remove from learning playlist"
+                          disabled={Boolean(removingId)}
+                          onPress={() => void removeItem(item)}
+                          style={styles.remove}
+                        >
+                          <Text style={styles.removeText}>{removingId === item.id ? '…' : '×'}</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  )}
                 />
               );
             })}
@@ -241,6 +248,7 @@ const styles = StyleSheet.create({
   sectionTitle: { flex: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   ownerBadge: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 9, fontWeight: '900', letterSpacing: 1, paddingVertical: 5, paddingHorizontal: 9, borderRadius: RADII.pill, backgroundColor: COLORS.learningSoft },
   mediaList: { overflow: 'hidden', borderRadius: RADII.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   remove: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: 'rgba(214, 69, 69, 0.13)', borderWidth: 1, borderColor: 'rgba(214, 69, 69, 0.4)' },
   removeText: { color: COLORS.priest, fontSize: 22, lineHeight: 24, fontWeight: '700' },
   empty: { alignItems: 'center', padding: SPACING.xl },

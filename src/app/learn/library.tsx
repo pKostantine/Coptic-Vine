@@ -15,6 +15,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LearningArtwork from '@/components/learning/LearningArtwork';
+import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -240,6 +241,7 @@ export default function LearningLibraryScreen() {
           const stateIndex = STATE_ORDER.indexOf(item.state);
           const busy = movingId === item.itemId;
           const isPlaying = currentItem?.id === item.itemId;
+          const audioItem = audioQueue.find((entry) => entry.id === item.itemId);
           const forward = stateIndex < STATE_ORDER.length - 1
             ? { state: STATE_ORDER[stateIndex + 1], label: stateIndex === 0 ? tr('Start', 'Commencer', 'ابدأ') : tr('Finish', 'Terminer', 'أكملت'), icon: stateIndex === 0 ? (arabic ? 'chevron-back' as const : 'chevron-forward' as const) : 'checkmark' as const }
             : null;
@@ -248,7 +250,8 @@ export default function LearningLibraryScreen() {
             : null;
           return (
             <View key={item.itemKind + ':' + item.itemId} style={styles.itemCard}>
-              <Pressable accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.cantorName}`} style={({ pressed }) => [styles.itemTop, rowDirection, pressed && styles.pressed]} onPress={() => openItem(item)}>
+              <View style={[styles.itemTop, rowDirection]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.cantorName}`} style={({ pressed }) => [styles.itemMain, rowDirection, pressed && styles.pressed]} onPress={() => openItem(item)}>
                 <View style={styles.thumb}>
                   <LearningArtwork asset={item.coverAsset} size={68} radius={14} label={item.containerTitle} />
                   <View style={[styles.thumbBadge, arabic ? styles.thumbBadgeLeft : styles.thumbBadgeRight]}>
@@ -260,6 +263,9 @@ export default function LearningLibraryScreen() {
                   <Text numberOfLines={1} style={[styles.itemMeta, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{item.cantorName}</Text>
                 </View>
               </Pressable>
+              {/* Beside the card's own tap target, never inside it: a button in a button is invalid on web. */}
+              {audioItem ? <LearningItemActionsMenu item={audioItem} isArabic={arabic} size={34} /> : null}
+              </View>
               <View style={[styles.itemFoot, rowDirection]}>
                 <View style={[styles.tag, rowDirection]}>
                   <View style={styles.tagDot} />
@@ -432,7 +438,8 @@ const styles = StyleSheet.create({
 
   items: { gap: 10, marginTop: 14 },
   itemCard: { backgroundColor: COLORS.surface, borderRadius: 20, padding: 12 },
-  itemTop: { alignItems: 'center', flexDirection: 'row', gap: 14 },
+  itemTop: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  itemMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 14, minWidth: 0 },
   thumb: { position: 'relative' },
   thumbBadge: {
     alignItems: 'center',
