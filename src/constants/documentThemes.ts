@@ -11,9 +11,9 @@ import { COLORS } from './theme';
  * contrast against its page.
  */
 
-export type DocumentThemeId = 'night' | 'slate' | 'vine' | 'sepia' | 'paper';
+export type DocumentThemeId = 'night' | 'walnut' | 'vine' | 'sepia' | 'paper';
 
-export const DOCUMENT_THEME_IDS: DocumentThemeId[] = ['night', 'slate', 'vine', 'sepia', 'paper'];
+export const DOCUMENT_THEME_IDS: DocumentThemeId[] = ['night', 'walnut', 'vine', 'sepia', 'paper'];
 
 export const DEFAULT_DOCUMENT_THEME_ID: DocumentThemeId = 'night';
 
@@ -136,35 +136,36 @@ export const NIGHT_DOCUMENT_THEME: DocumentTheme = {
   },
 };
 
-const SLATE_DOCUMENT_THEME: DocumentTheme = {
-  id: 'slate',
-  name: { english: 'Slate', french: 'Ardoise', arabic: 'رمادي' },
+const WALNUT_DOCUMENT_THEME: DocumentTheme = {
+  id: 'walnut',
+  name: { english: 'Walnut', french: 'Noyer', arabic: 'جوزي' },
   dark: true,
   colors: {
-    // A charcoal page: softer than black on an OLED screen, and the text
-    // off-white so it does not glare against it.
-    page: '#1A1D22',
-    surface: '#272B33',
-    border: '#343A44',
-    strip: '#22262D',
-    stripActive: '#2C313A',
-    text: '#F2F2EE',
-    alternate: '#9CCBFF',
+    // A warm dark brown, like a lamp-lit page: gentler than black at night,
+    // with a soft off-white ink, and still dark enough for the blue alternation and
+    // the rubric colours to carry.
+    page: '#1F1914',
+    surface: '#2B231C',
+    border: '#3A2F25',
+    strip: '#251E18',
+    stripActive: '#30271F',
+    text: '#F0ECE4',
+    alternate: '#A9CFFF',
     accent: COLORS.gold,
-    onAccent: '#1A1D22',
+    onAccent: '#1F1914',
     accentSoft: COLORS.goldSoft,
     accentLine: COLORS.goldLine,
     ...darkRubric,
-    priest: '#EA6363',
-    comment: '#7F95AE',
-    silent: '#A4AAB1',
-    refrain: '#9ED8AC',
-    subdoc: '#9CCBFF',
-    subdocSoft: rgba('#9CCBFF', 0.13),
-    subdocLine: rgba('#9CCBFF', 0.45),
-    link: '#66CC97',
-    linkSoft: rgba('#66CC97', 0.13),
-    linkLine: rgba('#66CC97', 0.45),
+    priest: '#EE6B60',
+    comment: '#93A3B6',
+    silent: '#B3A898',
+    refrain: '#A8DDB4',
+    subdoc: '#A9CFFF',
+    subdocSoft: rgba('#A9CFFF', 0.13),
+    subdocLine: rgba('#A9CFFF', 0.45),
+    link: '#6FD3A0',
+    linkSoft: rgba('#6FD3A0', 0.13),
+    linkLine: rgba('#6FD3A0', 0.45),
   },
 };
 
@@ -173,12 +174,13 @@ const VINE_DOCUMENT_THEME: DocumentTheme = {
   name: { english: 'Vine', french: 'Vigne', arabic: 'الكرمة' },
   dark: true,
   colors: {
-    // The app's own deep green, with a warm white on it.
-    page: '#0F2416',
-    surface: '#1A3623',
-    border: '#24452F',
-    strip: '#15301E',
-    stripActive: '#1E3F2A',
+    // A dark vine green, deeper than the app's chrome so a long service is
+    // easy on the eye, with a warm white on it.
+    page: '#0A1A0F',
+    surface: '#13281A',
+    border: '#1D3826',
+    strip: '#0F2115',
+    stripActive: '#173020',
     text: '#F3F0E5',
     alternate: '#A3CFFF',
     accent: COLORS.gold,
@@ -207,20 +209,35 @@ const SEPIA_DOCUMENT_THEME: DocumentTheme = {
   name: { english: 'Sepia', french: 'Sépia', arabic: 'سيبيا' },
   dark: false,
   colors: {
-    // Old paper: a warm cream, with ink and an antique gold on it.
-    page: '#F4ECD8',
-    surface: '#EADFC6',
-    border: '#DACDB1',
-    strip: '#EBE2CC',
-    stripActive: '#E2D6B8',
+    // Old paper: a soft beige that doesn't glare, with ink and an antique gold on it.
+    page: '#E6D9BC',
+    surface: '#DCCDAC',
+    border: '#CBBA96',
+    strip: '#DED1B3',
+    stripActive: '#D3C3A0',
     text: '#2A2117',
     alternate: '#1F4E8C',
-    accent: '#8A5A12',
+    // A shade deeper than Paper's gold, to hold its contrast on the beige.
+    accent: '#7A4E0E',
     onAccent: '#FFF8E7',
-    accentSoft: rgba('#8A5A12', 0.12),
-    accentLine: rgba('#8A5A12', 0.45),
+    accentSoft: rgba('#7A4E0E', 0.12),
+    accentLine: rgba('#7A4E0E', 0.45),
     ...lightRubric,
-    silent: '#75736C',
+    // The beige is a little darker than paper, so each rubric is deepened a
+    // shade more to keep its contrast, with the same hue.
+    priest: '#A12326',
+    deacon: '#645700',
+    people: '#8C3E0F',
+    comment: '#617082',
+    refrain: '#225C37',
+    metropolitan: '#085B65',
+    subdoc: '#24519A',
+    subdocSoft: rgba('#24519A', 0.1),
+    subdocLine: rgba('#24519A', 0.4),
+    link: '#1C5E49',
+    linkSoft: rgba('#1C5E49', 0.1),
+    linkLine: rgba('#1C5E49', 0.4),
+    silent: '#6B6962',
   },
 };
 
@@ -247,7 +264,7 @@ const PAPER_DOCUMENT_THEME: DocumentTheme = {
 
 export const DOCUMENT_THEMES: Record<DocumentThemeId, DocumentTheme> = {
   night: NIGHT_DOCUMENT_THEME,
-  slate: SLATE_DOCUMENT_THEME,
+  walnut: WALNUT_DOCUMENT_THEME,
   vine: VINE_DOCUMENT_THEME,
   sepia: SEPIA_DOCUMENT_THEME,
   paper: PAPER_DOCUMENT_THEME,

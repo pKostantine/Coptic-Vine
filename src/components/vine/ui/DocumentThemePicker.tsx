@@ -46,8 +46,8 @@ export default function DocumentThemePicker({ selected, onSelect, isArabic = fal
                 styles.swatch,
                 wide && styles.swatchWide,
                 { backgroundColor: theme.colors.page },
-                // The black page alone would sink into the sheet without a hairline.
-                id === 'night' && styles.swatchEdge,
+                // The black and the dark green pages would sink into the green sheet without a hairline.
+                (id === 'night' || id === 'vine') && styles.swatchEdge,
                 active && styles.swatchActive,
               ]}
             >

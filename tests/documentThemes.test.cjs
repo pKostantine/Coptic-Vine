@@ -46,7 +46,7 @@ const SOLID_COLORS = ['page', 'surface', 'border', 'strip', 'stripActive', 'onAc
 const WASHES = ['accentSoft', 'accentLine', 'subdocSoft', 'subdocLine', 'linkSoft', 'linkLine'];
 
 test('there are five pages, Night first and the default, each with a name in every App Language', () => {
-  assert.deepEqual(DOCUMENT_THEME_IDS, ['night', 'slate', 'vine', 'sepia', 'paper']);
+  assert.deepEqual(DOCUMENT_THEME_IDS, ['night', 'walnut', 'vine', 'sepia', 'paper']);
   assert.equal(getDocumentTheme(undefined), NIGHT_DOCUMENT_THEME);
   assert.equal(getDocumentTheme('sepia').id, 'sepia');
   // A page this version doesn't know (a newer app synced it, a hand-edited file) reads as Night rather than breaking.
@@ -120,7 +120,8 @@ test('the light pages keep every rubric its hue, deepened to carry on paper', ()
     assert.ok(near(colors.people, COLORS.people, 12), `${id}'s people stay orange`);
     assert.ok(near(colors.alternate, COLORS.rowBlue, 15), `${id}'s blue verse stays blue`);
     assert.ok(near(colors.refrain, COLORS.refrain, 15), `${id}'s refrain stays green`);
-    assert.ok(luminance(colors.text) < 0.05 && luminance(colors.page) > 0.8, `${id} is ink on paper`);
+    // Sepia is a beige rather than near-white, so it doesn't glare; still a light page under dark ink.
+    assert.ok(luminance(colors.text) < 0.05 && luminance(colors.page) > 0.6, `${id} is ink on paper`);
   }
 });
 
