@@ -26,16 +26,70 @@ function applyFilter(row: Record<string, unknown>, filter: Filter): boolean {
   return left <= right;
 }
 
+/**
+ * A caller's own copy of what a query found, nested values and all. The rows
+ * readLocalTable returns are kept and shared by every later query, so one
+ * caller changing a result must not change it for the rest.
+ */
+function copyValue<T>(value: T): T {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(copyValue) as T;
+  const copy: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) copy[key] = copyValue(child);
+  return copy as T;
+}
+
 function projectRow(row: Record<string, unknown>, selection: string): Record<string, unknown> {
-  if (!selection || selection.trim() === '*') return { ...row };
+  if (!selection || selection.trim() === '*') return copyValue(row);
   const projected: Record<string, unknown> = {};
   for (const token of selection.split(',').map((part) => part.trim()).filter(Boolean)) {
     const separator = token.indexOf(':');
     const output = separator > 0 ? token.slice(0, separator).trim() : token;
     const source = separator > 0 ? token.slice(separator + 1).trim() : token;
-    projected[output] = row[source];
+    projected[output] = copyValue(row[source]);
   }
   return projected;
+}
+
+/**
+ * Hash indexes over kept tables, one per column, built the first time a
+ * query matches on that column: `.eq('gregorian_date', day).maybeSingle()`
+ * then looks up one bucket instead of testing all 29,585 date conversions.
+ * They are keyed by the rows array readLocalTable keeps, so an index goes
+ * when its table does. Buckets hold row positions, in table order.
+ */
+const columnIndexes = new WeakMap<Record<string, unknown>[], Map<string, Map<string, number[]>>>();
+
+function columnIndex(rows: Record<string, unknown>[], column: string): Map<string, number[]> {
+  let byColumn = columnIndexes.get(rows);
+  if (!byColumn) {
+    byColumn = new Map();
+    columnIndexes.set(rows, byColumn);
+  }
+  let index = byColumn.get(column);
+  if (!index) {
+    index = new Map();
+    for (let position = 0; position < rows.length; position += 1) {
+      // Keyed as applyFilter compares, by String(value), so a lookup finds
+      // exactly the rows the filter would have let through.
+      const key = String(rows[position][column]);
+      const bucket = index.get(key);
+      if (bucket) bucket.push(position);
+      else index.set(key, [position]);
+    }
+    byColumn.set(column, index);
+  }
+  return index;
+}
+
+/** The only rows an eq or in filter can let through, in table order. */
+function indexedRows(rows: Record<string, unknown>[], filter: Filter): Record<string, unknown>[] {
+  const index = columnIndex(rows, filter.column);
+  if (filter.kind === 'eq') return (index.get(String(filter.value)) ?? []).map((position) => rows[position]);
+  const keys = new Set((filter.value as unknown[]).map((candidate) => String(candidate)));
+  const positions = [...keys].flatMap((key) => index.get(key) ?? []);
+  if (keys.size > 1) positions.sort((a, b) => a - b);
+  return positions.map((position) => rows[position]);
 }
 
 class HybridQuery implements PromiseLike<QueryResult> {
@@ -76,9 +130,13 @@ class HybridQuery implements PromiseLike<QueryResult> {
   private async execute(): Promise<QueryResult> {
     const rows = await readLocalTable(this.schemaName, this.tableName);
     if (rows === null) return this.online();
-    let filtered = rows.filter((row) => this.filters.every((filter) => applyFilter(row, filter)));
+    // The first column matched exactly narrows the rows through its index;
+    // every filter, that one included, is then tested on what's left.
+    const indexed = this.filters.find((filter) => filter.kind === 'eq' || filter.kind === 'in');
+    const candidates = indexed ? indexedRows(rows, indexed) : rows;
+    let filtered = candidates.filter((row) => this.filters.every((filter) => applyFilter(row, filter)));
     if (this.orderings.length) {
-      filtered = [...filtered].sort((a, b) => {
+      const compare = (a: Record<string, unknown>, b: Record<string, unknown>) => {
         for (const ordering of this.orderings) {
           const left = comparable(a[ordering.column]);
           const right = comparable(b[ordering.column]);
@@ -87,7 +145,11 @@ class HybridQuery implements PromiseLike<QueryResult> {
           return ordering.ascending ? direction : -direction;
         }
         return 0;
-      });
+      };
+      // With one row wanted, a single pass finds it: the earliest of the
+      // first-ordered rows, just as the stable sort would put first.
+      if (this.rowLimit === 1) filtered = filtered.length ? [filtered.reduce((first, row) => (compare(row, first) < 0 ? row : first))] : [];
+      else filtered.sort(compare);
     }
     if (this.rowLimit != null) filtered = filtered.slice(0, this.rowLimit);
     const projected = filtered.map((row) => projectRow(row, this.selection));
@@ -189,6 +251,12 @@ class HybridRpc implements PromiseLike<QueryResult> {
   constructor(private schemaName: string, private functionName: string, private args: Record<string, unknown>) {}
   abortSignal(signal: AbortSignal) { this.signal = signal; return this; }
 
+  private online(): PromiseLike<QueryResult> {
+    let query: any = supabase.schema(this.schemaName).rpc(this.functionName, this.args);
+    if (this.signal) query = query.abortSignal(this.signal);
+    return query;
+  }
+
   private async execute(): Promise<QueryResult> {
     const published = await readLocalRpc(this.schemaName, this.functionName, this.args);
     if (published.found) return { data: published.data, error: null };
@@ -198,15 +266,22 @@ class HybridRpc implements PromiseLike<QueryResult> {
     }
     if (this.schemaName === 'bible' || ['get_bible_books', 'get_bible_chapter_list'].includes(this.functionName)) {
       const derived = await localBibleRpc(this.functionName, this.args);
-      if (derived.found) return { data: derived.data, error: null };
+      // Derived from the kept Bible rows, so handed over as a copy.
+      if (derived.found) return { data: copyValue(derived.data), error: null };
     }
     const localResourceSchema = this.functionName === 'get_readings_for_date' ? 'calendar' : this.schemaName;
-    if (await hasLocalSchema(localResourceSchema)) {
-      return { data: null, error: { message: `Offline package does not contain ${this.schemaName}.${this.functionName}.`, code: 'OFFLINE_RPC_MISSING' } };
+    if (!(await hasLocalSchema(localResourceSchema))) return this.online();
+    // The package holds each day's answers only for its window (from the
+    // start of last month to about a year ahead) and only the functions it
+    // was built with. Past that, ask the server; the gap in the package is
+    // the answer only when that fails too, as it does offline.
+    try {
+      const online = await this.online();
+      if (!online.error || this.signal?.aborted) return online;
+    } catch (cause) {
+      if (this.signal?.aborted) throw cause;
     }
-    let query: any = supabase.schema(this.schemaName).rpc(this.functionName, this.args);
-    if (this.signal) query = query.abortSignal(this.signal);
-    return query;
+    return { data: null, error: { message: `Offline package does not contain ${this.schemaName}.${this.functionName}.`, code: 'OFFLINE_RPC_MISSING' } };
   }
 
   then<TResult1 = QueryResult, TResult2 = never>(

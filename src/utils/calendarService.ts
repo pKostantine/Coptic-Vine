@@ -1,8 +1,49 @@
-import { contentDataClient as supabase } from '../services/contentDataClient';
+import { contentDataClient as supabase, isContentSchemaInstalled } from '../services/contentDataClient';
 import { computeMovableFeastDates, FIXED_FEASTS } from './fixedFeasts';
-import { toIsoDate } from './dateUtils';
+import { localDateAtUtcMidnight, toIsoDate } from './dateUtils';
 import { getSeasonIndicatorKey } from '../constants/seasonNames';
 import { pickNextSeason } from './nextSeason';
+
+/**
+ * A session-long cache of loads. What the calendar says about a date or a
+ * year doesn't change while the app runs, and the same questions come again
+ * and again: every screen wants today's Coptic date, and the season
+ * selector, the Books day block and the month grid all want this year's
+ * seasons. Each is answered once.
+ *
+ * A load that fails is forgotten, so the next ask tries again, and once the
+ * cache is full its oldest entry goes. What has arrived can also be read at
+ * once (peek), which lets the season selector draw a year on its first frame.
+ */
+class SessionCache<K, V> {
+  private loads = new Map<K, Promise<V>>();
+  private settled = new Map<K, V>();
+
+  constructor(private limit: number) {}
+
+  get(key: K, load: () => Promise<V>): Promise<V> {
+    const kept = this.loads.get(key);
+    if (kept) return kept;
+    if (this.loads.size >= this.limit) {
+      const oldest = this.loads.keys().next().value as K;
+      this.loads.delete(oldest);
+      this.settled.delete(oldest);
+    }
+    const value = load();
+    this.loads.set(key, value);
+    // Only while it is still the entry for its key, so an earlier failure
+    // settling late never evicts a retry.
+    value.then(
+      (result) => { if (this.loads.get(key) === value) this.settled.set(key, result); },
+      () => { if (this.loads.get(key) === value) this.loads.delete(key); },
+    );
+    return value;
+  }
+
+  peek(key: K): V | undefined {
+    return this.settled.get(key);
+  }
+}
 
 export interface CalendarDay {
   gregorianDate: string;
@@ -87,31 +128,41 @@ export interface CopticDate {
  */
 export async function getCopticDate(date: Date): Promise<CopticDate | null> {
   try {
-    const { data, error } = await supabase
-      .schema('calendar')
-      .from('coptic_date_conversions')
-      .select('coptic_month_name, coptic_day, coptic_year')
-      .eq('gregorian_date', toIsoDate(date))
-      .maybeSingle();
-
-    if (error || !data) return null;
-    return { monthName: data.coptic_month_name, day: data.coptic_day, year: data.coptic_year };
+    const data = await getDateConversion(toIsoDate(date));
+    return data ? { monthName: data.coptic_month_name, day: data.coptic_day, year: data.coptic_year } : null;
   } catch {
     return null;
   }
 }
 
+interface DateConversion {
+  coptic_year: number;
+  coptic_month: number;
+  coptic_month_name: string;
+  coptic_day: number;
+}
+
+/** Room for a few hundred days, far more than a session visits. */
+const dateConversions = new SessionCache<string, DateConversion | null>(400);
+
+/** The Coptic date of a Gregorian ISO date, read once a session. Rejects when it can't be read; null when the calendar has no such day. */
+function getDateConversion(isoDate: string): Promise<DateConversion | null> {
+  return dateConversions.get(isoDate, async () => {
+    const { data, error } = await supabase
+      .schema('calendar')
+      .from('coptic_date_conversions')
+      .select('coptic_year, coptic_month, coptic_month_name, coptic_day')
+      .eq('gregorian_date', isoDate)
+      .maybeSingle();
+    if (error) throw new Error(`Unable to resolve Coptic date: ${error.message}`);
+    return data ?? null;
+  });
+}
+
 /** Looks up the Coptic (year, month, monthName) for a given Gregorian date — used to seed the Coptic month view. */
 export async function getCopticMonthForDate(date: Date) {
-  const { data, error } = await supabase
-    .schema('calendar')
-    .from('coptic_date_conversions')
-    .select('coptic_year, coptic_month, coptic_month_name')
-    .eq('gregorian_date', toIsoDate(date))
-    .maybeSingle();
-
-  if (error) throw new Error(`Unable to resolve Coptic month: ${error.message}`);
-  return data;
+  const data = await getDateConversion(toIsoDate(date));
+  return data ? { coptic_year: data.coptic_year, coptic_month: data.coptic_month, coptic_month_name: data.coptic_month_name } : null;
 }
 
 /** Finds the (coptic_year, coptic_month) adjacent to the given month, by walking to the nearest day-1 row across the boundary. */
@@ -129,9 +180,8 @@ export async function getAdjacentCopticMonth(copticYear: number, copticMonth: nu
   return data;
 }
 
-/** The Gregorian [start, end) span of a given Coptic year, via that year's Thoout 1 and the next year's Thoout 1. */
-export async function getGregorianRangeForCopticYear(copticYear: number): Promise<{ startDate: string; endDate: string }> {
-  const { data: start, error: startError } = await supabase
+async function getThoout1(copticYear: number, edge: 'start' | 'end'): Promise<string> {
+  const { data, error } = await supabase
     .schema('calendar')
     .from('coptic_date_conversions')
     .select('gregorian_date')
@@ -139,25 +189,29 @@ export async function getGregorianRangeForCopticYear(copticYear: number): Promis
     .eq('coptic_month', 1)
     .eq('coptic_day', 1)
     .maybeSingle();
-  if (startError) throw new Error(`Unable to resolve Coptic year start: ${startError.message}`);
+  if (error) throw new Error(`Unable to resolve Coptic year ${edge}: ${error.message}`);
+  return data?.gregorian_date;
+}
 
-  const { data: end, error: endError } = await supabase
-    .schema('calendar')
-    .from('coptic_date_conversions')
-    .select('gregorian_date')
-    .eq('coptic_year', copticYear + 1)
-    .eq('coptic_month', 1)
-    .eq('coptic_day', 1)
-    .maybeSingle();
-  if (endError) throw new Error(`Unable to resolve Coptic year end: ${endError.message}`);
+const copticYearRanges = new SessionCache<number, { startDate: string; endDate: string }>(16);
 
-  return { startDate: start?.gregorian_date, endDate: end?.gregorian_date };
+/** The Gregorian [start, end) span of a given Coptic year, via that year's Thoout 1 and the next year's Thoout 1. */
+export function getGregorianRangeForCopticYear(copticYear: number): Promise<{ startDate: string; endDate: string }> {
+  return copticYearRanges.get(copticYear, async () => {
+    const [startDate, endDate] = await Promise.all([getThoout1(copticYear, 'start'), getThoout1(copticYear + 1, 'end')]);
+    return { startDate, endDate };
+  });
 }
 
 /** Resolves the Coptic year for a given Gregorian date. */
 export async function getCopticYearForDate(date: Date): Promise<number | null> {
   const result = await getCopticMonthForDate(date);
   return result?.coptic_year ?? null;
+}
+
+/** The Coptic year of a date if it has already been read this session, else null; for drawing a first frame without waiting. */
+export function peekCopticYearForDate(date: Date): number | null {
+  return dateConversions.peek(toIsoDate(date))?.coptic_year ?? null;
 }
 
 // `calendar.season_ranges` currently carries exactly seven range_keys:
@@ -290,38 +344,85 @@ export async function getSingleDayEventsForCopticYear(copticYear: number, period
     rangesByKey[period.rangeKey] = { startDate: period.startDate, endDate: period.endDate };
   }
 
-  const fixed = await Promise.all(
-    FIXED_FEASTS.map(async (feast) => {
-      const date = await resolveCopticDate(copticYear, feast.monthName, feast.day);
-      return date ? { key: feast.key, title: feast.title, date } : null;
-    }),
-  );
+  const [fixed, kiahkSundays] = await Promise.all([
+    Promise.all(
+      FIXED_FEASTS.map(async (feast) => {
+        const date = await resolveCopticDate(copticYear, feast.monthName, feast.day);
+        return date ? { key: feast.key, title: feast.title, date } : null;
+      }),
+    ),
+    getKiahkSundays(copticYear),
+  ]);
 
   const movable = computeMovableFeastDates(rangesByKey);
-
-  const kiahkSundays = await getKiahkSundays(copticYear);
 
   return [...fixed, ...movable, ...kiahkSundays]
     .filter((event): event is SingleDayEvent => Boolean(event))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-const yearIndicatorSources = new Map<number, Promise<{ seasons: SeasonRange[]; events: SingleDayEvent[] }>>();
+/** A Coptic year's span, its season ranges and its single-day feasts. Shared by everyone who asks, so never changed. */
+export interface SeasonYear {
+  startDate: string;
+  endDate: string;
+  seasons: SeasonRange[];
+  events: SingleDayEvent[];
+}
+
+const yearIndicatorSources = new SessionCache<number, SeasonYear>(16);
 
 /** A Coptic year's season ranges and single-day feasts, loaded once per year per session. */
-function getYearIndicatorSources(copticYear: number) {
-  let cached = yearIndicatorSources.get(copticYear);
-  if (!cached) {
-    cached = (async () => {
-      const { startDate, endDate } = await getGregorianRangeForCopticYear(copticYear);
-      const seasons = await getSeasonRanges(startDate, endDate);
-      const events = await getSingleDayEventsForCopticYear(copticYear, seasons);
-      return { seasons, events };
-    })();
-    cached.catch(() => yearIndicatorSources.delete(copticYear));
-    yearIndicatorSources.set(copticYear, cached);
-  }
-  return cached;
+function getYearIndicatorSources(copticYear: number): Promise<SeasonYear> {
+  return yearIndicatorSources.get(copticYear, async () => {
+    const { startDate, endDate } = await getGregorianRangeForCopticYear(copticYear);
+    const seasons = await getSeasonRanges(startDate, endDate);
+    const events = await getSingleDayEventsForCopticYear(copticYear, seasons);
+    return { startDate, endDate, seasons, events };
+  });
+}
+
+/**
+ * A Coptic year for the season selector, or null when the calendar has no
+ * such year. The same entry the Books day block reads its seasons from, so
+ * this year's is usually there before the selector is opened.
+ */
+export async function getSeasonYear(copticYear: number): Promise<SeasonYear | null> {
+  const year = await getYearIndicatorSources(copticYear);
+  return year.startDate && year.endDate ? year : null;
+}
+
+/** getSeasonYear's answer if it has already arrived this session (null if not yet, or if there is no such year). */
+export function peekSeasonYear(copticYear: number): SeasonYear | null {
+  const year = yearIndicatorSources.peek(copticYear);
+  return year?.startDate && year.endDate ? year : null;
+}
+
+const yearCopticDates = new SessionCache<number, Map<string, CopticDate>>(16);
+
+/** The Coptic date of every day of a Coptic year, keyed by Gregorian ISO date: the season selector's second date under each feast. */
+export function getCopticDatesOfYear(copticYear: number): Promise<Map<string, CopticDate>> {
+  return yearCopticDates.get(copticYear, async () => {
+    const { startDate, endDate } = await getGregorianRangeForCopticYear(copticYear);
+    return getCopticDatesBetween(startDate, endDate);
+  });
+}
+
+/** getCopticDatesOfYear's answer if it has already arrived this session. */
+export function peekCopticDatesOfYear(copticYear: number): Map<string, CopticDate> | undefined {
+  return yearCopticDates.peek(copticYear);
+}
+
+/**
+ * Reads the installed calendar into memory, and this Coptic year's seasons
+ * with it, so that the first visit to the season selector or the calendar
+ * doesn't wait for them. Does nothing while the calendar isn't installed:
+ * it would only be fetching from the server what no one has asked for.
+ */
+export async function warmCalendar(): Promise<void> {
+  if (!(await isContentSchemaInstalled('calendar'))) return;
+  const copticYear = await getCopticYearForDate(localDateAtUtcMidnight(new Date()));
+  if (copticYear === null) return;
+  await Promise.all([getSeasonYear(copticYear), getCopticDatesOfYear(copticYear)]);
 }
 
 function addDaysIso(isoDate: string, days: number): string {

@@ -3,12 +3,26 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { bookDownloadManager, getAutomaticBookUpdatesEnabled } from '@/services/bookDownloadManager';
+import { warmCalendar } from '@/utils/calendarService';
+
+/** Long enough for the first screen to have drawn and loaded what it needs itself. */
+const CALENDAR_WARM_DELAY_MS = 2000;
 
 function isWifi(type: Network.NetworkStateType | undefined): boolean {
   return type === Network.NetworkStateType.WIFI || type === Network.NetworkStateType.ETHERNET;
 }
 
 export default function BookSyncBootstrap() {
+  useEffect(() => {
+    // With the calendar installed, read it into memory once launch has
+    // settled, so the season selector and the calendar open without waiting
+    // for it. Off the launch path, and nothing at all without the calendar.
+    const warm = setTimeout(() => {
+      warmCalendar().catch(() => {});
+    }, CALENDAR_WARM_DELAY_MS);
+    return () => clearTimeout(warm);
+  }, []);
+
   useEffect(() => {
     let active = true;
     let syncing = false;

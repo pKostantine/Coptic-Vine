@@ -16,12 +16,14 @@ import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useCalendar } from '@/context/CalendarContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
-  getCopticDatesBetween,
+  getCopticDatesOfYear,
   getCopticYearForDate,
-  getGregorianRangeForCopticYear,
-  getSeasonRanges,
-  getSingleDayEventsForCopticYear,
+  getSeasonYear,
+  peekCopticDatesOfYear,
+  peekCopticYearForDate,
+  peekSeasonYear,
   type CopticDate,
+  type SeasonYear,
 } from '@/utils/calendarService';
 import { localDateAtUtcMidnight, todayIsoDate } from '@/utils/dateUtils';
 import {
@@ -31,6 +33,7 @@ import {
   formatGregorianDateRange,
 } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
+import type { AppLanguage } from '@/utils/preferencesStorage';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 
@@ -70,6 +73,51 @@ function rowEnd(row: TopRow) {
   return row.type === 'season' ? row.endDate : row.date;
 }
 
+/** A year's seasons in order, each holding the feasts that fall in it, and the feasts that fall in none between them. */
+function buildRows({ startDate, endDate, seasons, events }: SeasonYear, language: AppLanguage): TopRow[] {
+  const seasonRows: SeasonRow[] = seasons
+    .filter((row) => row.startDate >= startDate && row.startDate < endDate)
+    .map((row) => {
+      const formal = getSeasonFormalName(row.rangeKey, row.activeSeason);
+      return {
+        type: 'season',
+        key: row.rangeKey,
+        // Shown whenever the Arabic isn't: French in French.
+        title: tr(formal.english, formal.french || formal.english, formal.english, language),
+        arabic: formal.arabic,
+        startDate: row.startDate,
+        endDate: row.endDate,
+        children: [],
+      };
+    });
+
+  const looseDays: DayRow[] = [];
+  for (const event of events.filter((e) => e.date >= startDate && e.date < endDate)) {
+    // A day that exactly completes a season (its endDate) belongs to that
+    // season, even if it also happens to be the next season's startDate
+    // (e.g. Resurrection ends Holy Week and begins Holy 50 Days).
+    const assigned =
+      seasonRows.find((s) => event.date === s.endDate) ||
+      seasonRows.find((s) => event.date > s.startDate && event.date < s.endDate) ||
+      seasonRows.find((s) => event.date === s.startDate);
+
+    const formal = getEventFormalName(event.key, event.title);
+    const title = tr(formal.english, formal.french || formal.english, formal.english, language);
+    if (assigned) {
+      assigned.children.push({ key: event.key, title, arabic: formal.arabic, date: event.date });
+    } else {
+      looseDays.push({ type: 'day', key: event.key, title, arabic: formal.arabic, date: event.date });
+    }
+  }
+  seasonRows.forEach((s) => s.children.sort((a, b) => a.date.localeCompare(b.date)));
+
+  return [...seasonRows, ...looseDays].sort(
+    (a, b) => rowStart(a).localeCompare(rowStart(b)) || rowEnd(a).localeCompare(rowEnd(b)),
+  );
+}
+
+const NO_COPTIC_DATES = new Map<string, CopticDate>();
+
 interface SeasonSelectorScreenProps {
   /** Set when this screen is rendered inside a modal rather than as its own route (see DocumentModal) — returns to whatever the host was showing instead of popping the navigation stack. */
   onClose?: () => void;
@@ -98,88 +146,57 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   const wide = useLayoutMode() !== 'phone';
   const isArabic = preferences.appLanguage === 'ar';
   const appLanguage = preferences.appLanguage;
-  const [year, setYear] = useState<number | null>(null);
-  const [currentCopticYear, setCurrentCopticYear] = useState<number | null>(null);
-  const [rows, setRows] = useState<TopRow[] | null>(null);
-  const [copticDates, setCopticDates] = useState<Map<string, CopticDate>>(new Map());
-  const [yearRange, setYearRange] = useState<{ startDate: string; endDate: string } | null>(null);
+  // Real "today" in the device's own calendar day, not whatever date is
+  // selected elsewhere in the app — this seeds which Coptic year to show.
+  // Usually already read (the Home page and the Books day block ask for it,
+  // and the calendar is warmed at launch), so known on the first frame.
+  const [currentCopticYear, setCurrentCopticYear] = useState<number | null>(() => peekCopticYearForDate(localDateAtUtcMidnight(new Date())));
+  const [year, setYear] = useState<number | null>(currentCopticYear);
+  // A year is drawn from the calendar's session cache: one read before (by
+  // the day block, an earlier visit, or the warm-up) is drawn the moment the
+  // screen or the year changes, without a spinner in between. `landed` only
+  // counts the loads that arrive, to draw what they brought.
+  const [, setLanded] = useState(0);
+  // The Coptic dates are only each feast's second line: a year whose dates
+  // can't be read is shown without them.
+  const [undatedYear, setUndatedYear] = useState<number | null>(null);
+  const seasonYear = year === null ? null : peekSeasonYear(year);
+  const yearDates = year === null ? undefined : peekCopticDatesOfYear(year);
+  const copticDates = yearDates ?? NO_COPTIC_DATES;
+  const datesSettled = yearDates !== undefined || (year !== null && undatedYear === year);
 
   useEffect(() => {
-    // Real "today" in the device's own calendar day, not whatever date is
-    // selected elsewhere in the app — this seeds which Coptic year to show.
     getCopticYearForDate(localDateAtUtcMidnight(new Date())).then((y) => {
       setCurrentCopticYear(y);
-      setYear(y);
+      // Never over a year the arrows have already chosen.
+      setYear((current) => current ?? y);
     });
   }, []);
 
   useEffect(() => {
     if (year === null) return;
     let cancelled = false;
-    setRows(null);
-    setYearRange(null);
-
-    getGregorianRangeForCopticYear(year).then(async ({ startDate, endDate }) => {
-      if (cancelled || !startDate || !endDate) return;
-      const [periods, dates] = await Promise.all([
-        getSeasonRanges(startDate, endDate),
-        getCopticDatesBetween(startDate, endDate).catch(() => new Map<string, CopticDate>()),
-      ]);
-      const singleDayEvents = await getSingleDayEventsForCopticYear(year, periods);
-      if (cancelled) return;
-
-      const seasonRows: SeasonRow[] = periods
-        .filter((row) => row.startDate >= startDate && row.startDate < endDate)
-        .map((row) => {
-          const formal = getSeasonFormalName(row.rangeKey, row.activeSeason);
-          return {
-            type: 'season',
-            key: row.rangeKey,
-            // Shown whenever the Arabic isn't: French in French.
-            title: tr(formal.english, formal.french || formal.english, formal.english),
-            arabic: formal.arabic,
-            startDate: row.startDate,
-            endDate: row.endDate,
-            children: [],
-          };
-        });
-
-      const looseDays: DayRow[] = [];
-      for (const event of singleDayEvents.filter((e) => e.date >= startDate && e.date < endDate)) {
-        // A day that exactly completes a season (its endDate) belongs to that
-        // season, even if it also happens to be the next season's startDate
-        // (e.g. Resurrection ends Holy Week and begins Holy 50 Days).
-        const assigned =
-          seasonRows.find((s) => event.date === s.endDate) ||
-          seasonRows.find((s) => event.date > s.startDate && event.date < s.endDate) ||
-          seasonRows.find((s) => event.date === s.startDate);
-
-        const formal = getEventFormalName(event.key, event.title);
-        const title = tr(formal.english, formal.french || formal.english, formal.english);
-        if (assigned) {
-          assigned.children.push({ key: event.key, title, arabic: formal.arabic, date: event.date });
-        } else {
-          looseDays.push({ type: 'day', key: event.key, title, arabic: formal.arabic, date: event.date });
-        }
-      }
-      seasonRows.forEach((s) => s.children.sort((a, b) => a.date.localeCompare(b.date)));
-
-      const merged: TopRow[] = [...seasonRows, ...looseDays].sort(
-        (a, b) => rowStart(a).localeCompare(rowStart(b)) || rowEnd(a).localeCompare(rowEnd(b)),
-      );
-
-      setRows(merged);
-      setCopticDates(dates);
-      setYearRange({ startDate, endDate });
-    });
-
+    const landed = () => {
+      if (!cancelled) setLanded((count) => count + 1);
+    };
+    if (!peekSeasonYear(year)) getSeasonYear(year).then(landed, () => {});
+    if (!peekCopticDatesOfYear(year)) {
+      getCopticDatesOfYear(year).then(landed, () => {
+        if (!cancelled) setUndatedYear(year);
+      });
+    }
     return () => {
       cancelled = true;
     };
-  }, [year, isArabic, appLanguage]);
+  }, [year]);
+
+  const rows = useMemo(
+    () => (seasonYear && datesSettled ? buildRows(seasonYear, appLanguage) : null),
+    [seasonYear, datesSettled, appLanguage],
+  );
 
   const todayIso = todayIsoDate();
-  const todayInViewedYear = Boolean(yearRange && todayIso >= yearRange.startDate && todayIso < yearRange.endDate);
+  const todayInViewedYear = Boolean(seasonYear && todayIso >= seasonYear.startDate && todayIso < seasonYear.endDate);
 
   // Where the "Live · Today" rule goes: before the row (or nested feast) that
   // is today, before the season today falls in, or after the last row already
