@@ -318,3 +318,16 @@ test('a subdocument\'s edge swipes know where they started, in slideshow mode to
   assert.match(modal, /takenFromX > screenWidth - selectorEdgeWidth && travelled < -36\) \{\s*setSelectorOpen\(true\);/);
   assert.match(modal, /if \(isCloseSwipe\) overlaySwipeTakenFromXRef\.current = startX;/);
 });
+
+test('a document left opens again at the top; its place is kept only while it is open', () => {
+  const store = fs.readFileSync('src/utils/lastDocumentPosition.ts', 'utf8');
+  assert.match(store, /export function forgetDocumentPosition\(key: string\): void \{\n  closedDocuments\.add\(key\);\n  lastPositionByDocument\.delete\(key\);\n  pendingRestores\.delete\(key\);/);
+  assert.match(store, /export function setLastDocumentPosition\(key: string, sectionId: string\): void \{\n  if \(closedDocuments\.has\(key\)\) return;/);
+  assert.match(store, /if \(closedDocuments\.has\(key\) \|\| pendingRestores\.has\(key\)/);
+  const screen = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+  assert.match(screen, /useState\(\(\) => openDocumentPosition\(documentPositionKey\)\);/);
+  assert.match(screen, /if \(!coveredRef\.current\) forgetDocumentPosition\(documentPositionKey\);/);
+  assert.match(screen, /navigation\.addListener\('beforeRemove', \(\) => forgetDocumentPosition\(documentPositionKey\)\)/);
+  // Opening the Seasons over it covers it rather than leaving it.
+  assert.match(screen, /navigatingAwayRef\.current = true;\n    coveredRef\.current = true;/);
+});

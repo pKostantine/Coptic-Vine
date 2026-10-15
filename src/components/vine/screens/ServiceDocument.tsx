@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Href, Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Href, Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,8 +37,8 @@ import { getDayOverview } from '../../../utils/calendarService';
 import { withDocumentOrnaments } from '../../../utils/documentOrnaments';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import {
-  captureDocumentRestore, clearPendingDocumentRestore, getLastDocumentPosition,
-  getPendingDocumentRestore, markPendingDocumentRestoresDirty, setLastDocumentPosition,
+  captureDocumentRestore, clearPendingDocumentRestore, forgetDocumentPosition, getLastDocumentPosition,
+  getPendingDocumentRestore, markPendingDocumentRestoresDirty, openDocumentPosition, setLastDocumentPosition,
 } from '../../../utils/lastDocumentPosition';
 import {
   resolveDocumentRestore, visibleDocumentSectionIds, type DocumentRestoreRequest,
@@ -233,6 +233,27 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // hymn the reader is on (see the settings-signature layout effect below).
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeSermonHighlightId, setActiveSermonHighlightId] = useState<string | null>(null);
+  // Open: its position is remembered while it stays open -- through Settings,
+  // the Calendar, the Seasons, a date or a setting changed -- and forgotten
+  // the moment it is left (below), so it next opens at the top.
+  useState(() => openDocumentPosition(documentPositionKey));
+  // Set while a page this document opened covers it (the Seasons), which may
+  // unmount it on the web; cleared when it is in front again. Unmounted any
+  // other way, it was left.
+  const coveredRef = useRef(false);
+  useFocusEffect(useCallback(() => {
+    coveredRef.current = false;
+  }, []));
+  useEffect(() => () => {
+    if (!coveredRef.current) forgetDocumentPosition(documentPositionKey);
+  }, [documentPositionKey]);
+  // Taken off the stack -- even from under the Seasons, left for elsewhere --
+  // it was left too.
+  const navigation = useNavigation();
+  useEffect(
+    () => navigation.addListener('beforeRemove', () => forgetDocumentPosition(documentPositionKey)),
+    [navigation, documentPositionKey],
+  );
   // Seeded from the same module-level store selectedSlideSectionId is (see
   // below): changing a setting can unmount this screen and mount it again,
   // and starting back at null would leave the content selector with nothing
@@ -646,6 +667,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       restoreSettingsSignature,
     );
     navigatingAwayRef.current = true;
+    coveredRef.current = true;
     setSelectorOpen(false);
     router.push(href);
   };
