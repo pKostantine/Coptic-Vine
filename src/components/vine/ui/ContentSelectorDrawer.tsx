@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
+import { DOCUMENT_TITLE_SECTION_ID } from '../../../utils/documentOrnaments';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection, pickDocumentTitle } from '../documentHtml';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
@@ -106,6 +107,8 @@ export default function ContentSelectorDrawer({
   const listable = sections.filter((section) => {
     // "Our Father" always has a title but should never clutter the jump-to list.
     if (section.hymnKey === 'ourFather') return false;
+    // Nor the service's own name, which heads the document in its headpiece.
+    if (section.id === DOCUMENT_TITLE_SECTION_ID) return false;
     // A section hidden from the document because Silent Prayers are disabled
     // shouldn't still be jumpable from the content list.
     if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;

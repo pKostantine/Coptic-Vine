@@ -128,7 +128,12 @@ export function getItemSignature(item, displayedTitle = "") {
       hashSlideshowText(displayedTitle),
       item.isCollapsed ? "collapsed" : "open",
       item.collapsible ? "collapsible" : "fixed",
+      item.ornament || "plain",
     ].join(":");
+  }
+
+  if (item.type === "ornament") {
+    return `${item.id}:ornament:${item.ornament}`;
   }
 
   if (item.type === "gospelRiteToggle") {
@@ -572,8 +577,20 @@ export function getVerseLineSegmentHeight(segment, fontSize, visibleLanguages) {
     (languageHeights.length ? Math.max(...languageHeights) : 0);
 }
 
+/**
+ * The ornaments' proportions (constants/documentOrnaments.ts, kept here as
+ * plain numbers so this file stays importable on its own): each headpiece's
+ * height over its width, drawn no wider than 720pt, and the Medallion's size.
+ */
+const HEADPIECE_ASPECT = { lintel: 230 / 1200, stepped: 400 / 1200, interlace: 460 / 1200 };
+const HEADPIECE_MAX_WIDTH = 720;
+
 export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
   const chrome = getSlideshowChromeMetrics(fontSize);
+  if (item.type === "title" && HEADPIECE_ASPECT[item.ornament]) {
+    return Math.min(Math.max(tableWidth, 1), HEADPIECE_MAX_WIDTH) * HEADPIECE_ASPECT[item.ornament] + SPACING_SM * 2;
+  }
+  if (item.type === "ornament") return Math.min(Math.max(tableWidth * 0.28, 96), 150) + SPACING_SM * 6;
   if (item.type === "title") return chrome.titleLineHeight + SPACING_SM * 2;
   if (item.type === "button") {
     const minimumHeight = item.isHyperlink

@@ -4,6 +4,7 @@ import { SPACING } from "../../constants/theme";
 import { getAlternatingVerseColorIndex } from "../../utils/versePresentation";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
+import { Headpiece, headpieceSize, Medallion, medallionSize } from "./ui/DocumentOrnaments";
 import { DOCUMENT_CONTROL_METRICS, getLanguageColumnGap } from "./documentPresentationMetrics";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
@@ -1122,6 +1123,46 @@ const SlideItem = memo(function SlideItem({
     );
   }
 
+  if (item.type === "ornament") {
+    return (
+      <View
+        style={styles.medallionRow}
+        onLayout={(event) => onMeasured?.(event.nativeEvent.layout.height, measurementSignature)}
+      >
+        <Medallion size={medallionSize(tableWidth)} color={theme.colors.ornament || theme.colors.gold} />
+      </View>
+    );
+  }
+
+  if (item.type === "title" && item.ornament) {
+    const arabic = titleHelpers.shouldShowArabicTitle(item.title);
+    const text = titleHelpers.getTitleText(item.title);
+    const { height } = headpieceSize(item.ornament, tableWidth);
+    return (
+      <View
+        style={styles.headpieceRow}
+        onLayout={(event) => onMeasured?.(event.nativeEvent.layout.height, measurementSignature)}
+      >
+        <Headpiece
+          kind={item.ornament}
+          availableWidth={tableWidth}
+          color={theme.colors.ornament || theme.colors.gold}
+          text={text}
+          arabic={arabic}
+        />
+        {item.collapsible && onToggleCollapse ? (
+          <View style={[styles.headpieceCollapse, { top: height / 2 - COLLAPSE_BUTTON_SIZE / 2 }]}>
+            <CollapseButton
+              collapsed={Boolean(item.currentlyCollapsed)}
+              onPress={() => onToggleCollapse(item.sectionId)}
+              color={theme.colors.gold}
+            />
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
   if (item.type === "title") {
     const hasButton = Boolean(item.collapsible && onToggleCollapse);
     const titleInset = hasButton ? COLLAPSE_BUTTON_SIZE : 0;
@@ -1271,6 +1312,11 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
   const suppressMap = computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent, suppressAllSpeakerLabels);
 
   return sections.flatMap((section, sectionIndex) => {
+    // The Medallion closing a service: a slide item of its own, with no title.
+    if (section.ornament === "medallion") {
+      return [{ id: `${section.id}-medallion`, sectionId: section.id, type: "ornament", ornament: "medallion" }];
+    }
+
     if (section.isSubdocumentButton || section.isAntiphonaryButton || section.isHyperlinkButton) {
       return [
         {
@@ -1321,6 +1367,8 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         titlePrayerType: section.titlePrayerType || null,
         collapsible: Boolean(section.collapsible),
         currentlyCollapsed: Boolean(section.currentlyCollapsed),
+        // Set inside a headpiece instead (constants/documentOrnaments.ts).
+        ornament: section.ornament || null,
       },
       ...verses.map((verse, verseIndex) => ({
         id: `${section.id}-${verseIndex}`,
@@ -1442,7 +1490,7 @@ const EASTERN_ARABIC_DIGITS = {
 // slides are dropped entirely.
 function slideHasVisibleContent(slide = []) {
   return slide.some((item) => {
-    if (item.type === "button" || item.type === "gospelRiteToggle") {
+    if (item.type === "button" || item.type === "gospelRiteToggle" || item.type === "ornament") {
       return true;
     }
 
@@ -1544,6 +1592,21 @@ const styles = StyleSheet.create({
       },
       default: {},
     }),
+  },
+  headpieceRow: {
+    alignItems: "center",
+    flexShrink: 0,
+    paddingVertical: SPACING.sm,
+    position: "relative",
+  },
+  headpieceCollapse: {
+    left: 0,
+    position: "absolute",
+  },
+  medallionRow: {
+    alignItems: "center",
+    flexShrink: 0,
+    paddingVertical: SPACING.lg,
   },
   titleRow: {
     alignItems: "center",

@@ -47,6 +47,8 @@ interface DocumentWebViewProps {
   sermonHighlights?: SermonHighlight[];
   /** The page the document is read on — see constants/documentThemes.ts. */
   theme?: DocumentTheme;
+  /** The colour its ornaments are drawn in (documentOrnamentColor). */
+  ornamentColor?: string;
 }
 
 /**
@@ -86,6 +88,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       sermonPlannerMode = false,
       sermonHighlights = [],
       theme = NIGHT_DOCUMENT_THEME,
+      ornamentColor,
     },
     ref,
   ) => {
@@ -284,6 +287,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               bottomContentInset: 0,
               sermonPlannerMode,
               theme,
+              ornamentColor,
               nativeSwipeNavigation: true,
             })
           : null,
@@ -302,6 +306,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         suppressAllSpeakerLabels,
         sermonPlannerMode,
         theme,
+        ornamentColor,
       ],
     );
 

@@ -19,8 +19,10 @@ import {
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { BookSettingsSheet } from './SettingsScreen';
+import { documentOrnamentColor } from '../../../constants/documentOrnaments';
 import { getDocumentTheme } from '../../../constants/documentThemes';
 import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
+import { getDayThemeKey, type SeasonThemeKey } from '../../../constants/seasonAppearance';
 import { COLORS } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useCalendar } from '../../../context/CalendarContext';
@@ -31,6 +33,8 @@ import { useReadingKeepAwake } from '../../../utils/useReadingKeepAwake';
 import { findReadingSectionId, parseReadingParam } from '../../../utils/documentReadings';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { getEpistleConditionFlags } from '../../../utils/readingsService';
+import { getDayOverview } from '../../../utils/calendarService';
+import { withDocumentOrnaments } from '../../../utils/documentOrnaments';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import {
   captureDocumentRestore, clearPendingDocumentRestore, getLastDocumentPosition,
@@ -196,6 +200,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   );
 
   const [sections, setSections] = useState<DocumentSection[] | null>(null);
+  // The season of the day being prayed, which the ornaments on Night and Paper
+  // are drawn in; read with the document so it arrives with it.
+  const [ornamentSeason, setOrnamentSeason] = useState<SeasonThemeKey | null>(null);
   // An old hydration must not briefly render as though it belongs to a new
   // date/condition set while the replacement document is being fetched.
   const conditionsKey = JSON.stringify([schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags]);
@@ -374,9 +381,12 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       (schema === 'liturgy' && table === 'lectionary_liturgy') ||
       (schema === 'liturgy' && table === 'sermon_planner');
     const epistleFlagsPromise = needsEpistleFlags ? getEpistleConditionFlags(effectiveDate) : Promise.resolve({});
+    const seasonPromise = getDayOverview(effectiveDate.toISOString().slice(0, 10))
+      .then((overview) => getDayThemeKey(overview?.indicatorKey, overview?.activeKeys))
+      .catch(() => null);
 
-    epistleFlagsPromise
-      .then((epistleFlags) =>
+    Promise.all([
+      epistleFlagsPromise.then((epistleFlags) =>
         hydrateSupabaseServiceHymn(
           schema,
           table,
@@ -386,10 +396,16 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext, ...userConditionFlags },
           weekdayConditionDate,
         ),
-      )
-      .then((result) => {
+      ),
+      seasonPromise,
+    ])
+      .then(([result, season]) => {
         if (!cancelled) {
-          const newSections = withAppendedHyperlink(result as DocumentSection[], appendHyperlinkKey);
+          const hydrated = withAppendedHyperlink(result as DocumentSection[], appendHyperlinkKey);
+          // A service opens on its own name and closes on the Medallion; the
+          // Sermon Planner is a working page, not a service, and stays bare.
+          const newSections = isSermonPlanner ? hydrated : withDocumentOrnaments(hydrated, { english: title, arabic, french });
+          setOrnamentSeason(season);
           setSections(newSections);
           setLoadedConditionsKey(conditionsKey);
           // Opened at one of its readings (?reading=Psalm, see lectionaryHref):
@@ -446,7 +462,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     return () => {
       cancelled = true;
     };
-  }, [schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, documentPositionKey]);
+  }, [schema, table, title, arabic, french, isSermonPlanner, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, documentPositionKey]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle
@@ -976,6 +992,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             keyboardNavigationEnabled={!isCoveredByModal}
             sermonPlannerMode={isSermonPlanner}
             sermonHighlights={sermonPlanner.plan.highlights}
+            ornamentColor={documentOrnamentColor(documentTheme, ornamentSeason)}
           />
           </View>
           {isSermonPlanner ? (

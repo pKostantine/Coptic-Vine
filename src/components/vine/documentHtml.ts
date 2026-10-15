@@ -1,3 +1,4 @@
+import { HEADPIECES, isHeadpiece, MEDALLION, type DocumentOrnament, type HeadpieceOrnament } from '../../constants/documentOrnaments';
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 import { SPACING } from '../../constants/theme';
 import type {
@@ -80,6 +81,8 @@ export interface DocumentSection {
   /** Same dual-evaluation, but for the in-document "Coptic Gospel Rite" toggle — only set on sections spliced in from GOSPEL_RITE. */
   copticGospelRiteOnly?: boolean;
   nonCopticGospelRiteOnly?: boolean;
+  /** Dressed with an ornament (constants/documentOrnaments.ts): its title set inside a headpiece, or, with no title, the Medallion that closes a service. */
+  ornament?: DocumentOrnament;
 }
 
 export interface DocumentTitle {
@@ -192,6 +195,7 @@ export function buildDocumentHtml(
     sermonPlannerMode = false,
     nativeSwipeNavigation = false,
     theme = NIGHT_DOCUMENT_THEME,
+    ornamentColor = theme.colors.accent,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -214,6 +218,8 @@ export function buildDocumentHtml(
     nativeSwipeNavigation?: boolean;
     /** The page the document is read on — see constants/documentThemes.ts. Night, the page the services were always read on, unless told otherwise. */
     theme?: DocumentTheme;
+    /** The colour the document's ornaments are drawn in (documentOrnamentColor): the season's on Night and Paper, the page's own ink on the others. */
+    ornamentColor?: string;
   },
 ) {
   const colors = theme.colors;
@@ -267,6 +273,15 @@ export function buildDocumentHtml(
       }),
     )
     .join('');
+  // Each ornament the document wears is drawn once, as a symbol, and every
+  // place it appears points to it.
+  const ornamentKinds = [...new Set(visibleSections.map((section) => section.ornament).filter(Boolean))] as DocumentOrnament[];
+  const ornamentDefs = ornamentKinds.length
+    ? `<svg class="ornament-defs" aria-hidden="true"><defs>${ornamentKinds.map((kind) => {
+      const art = kind === 'medallion' ? MEDALLION : HEADPIECES[kind].art;
+      return `<symbol id="cv-ornament-${kind}" viewBox="0 0 ${art.width} ${art.height}">${art.body}</symbol>`;
+    }).join('')}</defs></svg>`
+    : '';
 
   return `<!doctype html>
 <html>
@@ -445,6 +460,56 @@ export function buildDocumentHtml(
         color: ${colors.silent};
         font-style: italic;
       }
+      .ornament-defs {
+        height: 0;
+        overflow: hidden;
+        position: absolute;
+        width: 0;
+      }
+      .headpiece {
+        color: ${ornamentColor};
+        container-type: inline-size;
+        margin: 0 auto;
+        max-width: 720px;
+        position: relative;
+        width: 100%;
+      }
+      .headpiece-art, .medallion-art {
+        display: block;
+        height: auto;
+        width: 100%;
+      }
+      .headpiece-text {
+        align-items: center;
+        box-sizing: border-box;
+        display: flex;
+        justify-content: center;
+        position: absolute;
+        text-align: center;
+      }
+      .headpiece-title {
+        color: ${ornamentColor};
+        font-family: Georgia, serif;
+        font-weight: 400;
+        letter-spacing: 0.05em;
+        line-height: 1.12;
+        margin: 0;
+        text-transform: uppercase;
+        text-wrap: balance;
+      }
+      .headpiece-title.arabic {
+        direction: rtl;
+        font-family: "Arial", sans-serif;
+        letter-spacing: 0;
+      }
+      .headpiece .collapse-button {
+        left: 0;
+      }
+      .medallion {
+        color: ${ornamentColor};
+        margin: ${SPACING.lg}px auto 0;
+        width: clamp(96px, 28%, 150px);
+      }
       .open-button {
         align-items: center;
         background: ${colors.subdocSoft};
@@ -552,7 +617,7 @@ export function buildDocumentHtml(
     </style>
   </head>
   <body>
-    <div class="page-scroller"><main class="document">${htmlSections}</main></div>
+    ${ornamentDefs}<div class="page-scroller"><main class="document">${htmlSections}</main></div>
     <script>
       function postAction(type, payload) {
         var message = JSON.stringify(Object.assign({ type: type }, payload || {}));
@@ -1060,8 +1125,20 @@ function renderSection(
     return toggleHtml + renderDocumentButtonSection(section, appLanguage);
   }
 
+  if (section.ornament === 'medallion') {
+    return `
+    <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
+      <div class="medallion" aria-hidden="true">
+        <svg class="medallion-art" viewBox="0 0 ${MEDALLION.width} ${MEDALLION.height}"><use href="#cv-ornament-medallion"></use></svg>
+      </div>
+    </section>
+  `;
+  }
+
   const isCollapsed = Boolean(section.collapsible && section.defaultCollapsed);
-  const titleHtml = renderSectionTitle(section, appLanguage, isCollapsed, theme);
+  const titleHtml = isHeadpiece(section.ornament)
+    ? renderHeadpieceTitle(section, section.ornament, appLanguage, isCollapsed, theme)
+    : renderSectionTitle(section, appLanguage, isCollapsed, theme);
 
   const versesHtml = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent, copticGospelRite })
     .map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts))
@@ -1157,6 +1234,44 @@ function renderHyperlinkButtonSection(section: DocumentSection, appLanguage: App
   `;
 }
 
+/**
+ * A title set inside its headpiece, in place of the plain title row: the
+ * frame drawn across the page and the title in its open space, sized with
+ * the frame as the ornament sheet places it, though never smaller than a
+ * phone can read.
+ */
+function renderHeadpieceTitle(
+  section: DocumentSection,
+  kind: HeadpieceOrnament,
+  appLanguage: AppTitleLanguage,
+  isCollapsed: boolean,
+  theme: DocumentTheme,
+) {
+  const frame = HEADPIECES[kind];
+  const title = pickDocumentTitle(section.title, appLanguage);
+  const text = title.language === 'arabic' ? formatArabicDigits(title.text) : title.text;
+  const { left, right, top, bottom } = frame.text;
+  return `
+    <div class="headpiece headpiece-${kind}" role="heading" aria-level="2">
+      <svg class="headpiece-art" viewBox="0 0 ${frame.art.width} ${frame.art.height}" aria-hidden="true"><use href="#cv-ornament-${kind}"></use></svg>
+      <div class="headpiece-text" style="left: ${left}%; right: ${right}%; top: ${top}%; bottom: ${bottom}%;">
+        <p class="headpiece-title ${title.language}" style="font-size: ${frame.minFontSize}px; font-size: max(${frame.minFontSize}px, ${frame.fontSize}cqw);">${escapeHtml(text)}</p>
+        ${section.collapsible ? renderCollapseButton(section.id, isCollapsed, theme) : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderCollapseButton(sectionId: string, isCollapsed: boolean, theme: DocumentTheme) {
+  return `<button class="collapse-button${isCollapsed ? ' is-collapsed' : ''}" data-collapse-button="${escapeAttribute(sectionId)}" aria-label="${isCollapsed ? 'Expand section' : 'Collapse section'}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="${theme.colors.accent}" stroke-width="1.5" />
+          <line x1="7" y1="12" x2="17" y2="12" stroke="${theme.colors.accent}" stroke-width="1.5" stroke-linecap="round" />
+          <line class="collapse-plus-bar" x1="12" y1="7" x2="12" y2="17" stroke="${theme.colors.accent}" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      </button>`;
+}
+
 function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLanguage, isCollapsed: boolean, theme: DocumentTheme) {
   // A title always shows exactly one language, driven by the App Language
   // setting — falling back to whichever language actually has text for this
@@ -1186,15 +1301,7 @@ function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLangu
     )
     .join('');
 
-  const collapseButtonHtml = section.collapsible
-    ? `<button class="collapse-button${isCollapsed ? ' is-collapsed' : ''}" data-collapse-button="${escapeAttribute(section.id)}" aria-label="${isCollapsed ? 'Expand section' : 'Collapse section'}">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="${theme.colors.accent}" stroke-width="1.5" />
-          <line x1="7" y1="12" x2="17" y2="12" stroke="${theme.colors.accent}" stroke-width="1.5" stroke-linecap="round" />
-          <line class="collapse-plus-bar" x1="12" y1="7" x2="12" y2="17" stroke="${theme.colors.accent}" stroke-width="1.5" stroke-linecap="round" />
-        </svg>
-      </button>`
-    : '';
+  const collapseButtonHtml = section.collapsible ? renderCollapseButton(section.id, isCollapsed, theme) : '';
   const titleRowClass = section.collapsible ? 'title-row has-collapse-button' : 'title-row';
 
   return `

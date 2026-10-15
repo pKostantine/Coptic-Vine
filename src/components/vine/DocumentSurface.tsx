@@ -4,6 +4,7 @@ import { ActivityIndicator, Platform, useWindowDimensions, View } from 'react-na
 import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
 import { pickDocumentTitle, withRememberedCollapse, type DocumentTitle } from './documentHtml';
+import { documentOrnamentColor } from '../../constants/documentOrnaments';
 import { getDocumentTheme, slideshowThemeFor } from '../../constants/documentThemes';
 import { useBottomChrome } from '../../context/BottomChromeContext';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
@@ -45,6 +46,8 @@ interface DocumentSurfaceProps {
   keyboardNavigationEnabled?: boolean;
   sermonPlannerMode?: boolean;
   sermonHighlights?: SermonHighlight[];
+  /** The colour the document's ornaments are drawn in; by default the page's own (documentOrnamentColor, Night and Paper in the Annual green). */
+  ornamentColor?: string;
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -139,6 +142,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       keyboardNavigationEnabled = true,
       sermonPlannerMode = false,
       sermonHighlights = [],
+      ornamentColor: ornamentColorProp,
     },
     ref,
   ) => {
@@ -147,7 +151,11 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     const fontSize = fontScaleToPx(preferences.fontScale);
     // The page both renderers draw on (constants/documentThemes.ts).
     const theme = getDocumentTheme(preferences.documentTheme);
-    const slideshowTheme = useMemo(() => slideshowThemeFor(theme), [theme]);
+    const ornamentColor = ornamentColorProp ?? documentOrnamentColor(theme);
+    const slideshowTheme = useMemo(() => {
+      const base = slideshowThemeFor(theme);
+      return { ...base, colors: { ...base.colors, ornament: ornamentColor } };
+    }, [theme, ornamentColor]);
     const effectiveSlideshowMode = preferences.slideshowMode && !sermonPlannerMode;
     const effectiveSelectText = sermonPlannerMode || (preferences.selectText && !effectiveSlideshowMode);
     // section.id already includes hymn_key + item_order. Combining it with
@@ -371,6 +379,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         sermonPlannerMode={sermonPlannerMode}
         sermonHighlights={sermonHighlights}
         theme={theme}
+        ornamentColor={ornamentColor}
       />
     );
   },
