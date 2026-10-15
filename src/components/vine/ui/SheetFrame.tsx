@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, BackHandler, Modal, PanResponder, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, BackHandler, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '../../../constants/theme';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
+import { useSheetDragToClose } from './useSheetDragToClose';
 
 interface SheetFrameProps {
   visible: boolean;
@@ -26,8 +27,6 @@ interface SheetFrameProps {
   scroll?: boolean;
   children: ReactNode;
 }
-
-const DRAG_TO_CLOSE = 80;
 
 /**
  * The frame every sheet of the app shares (Coptic Vine design, "Calendar
@@ -66,18 +65,9 @@ export default function SheetFrame({
     }
   }, [visible, mounted, progress, drag, reduced]);
 
-  // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
-  const [panResponder] = useState(() =>
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-      onPanResponderMove: (_, gesture) => drag.setValue(Math.max(0, gesture.dy)),
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > DRAG_TO_CLOSE || gesture.vy > 1.2) onCloseRef.current();
-        else Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
-      },
-      onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
-    }),
-  );
+  // Pulled down from anywhere on the sheet while its content is scrolled to
+  // the top. Content that scrolls itself is dragged by the grab handle alone.
+  const sheetDrag = useSheetDragToClose(visible, drag, onClose);
 
   // Inline there is no modal to catch Android's back button, so the sheet does.
   useEffect(() => {
@@ -96,7 +86,7 @@ export default function SheetFrame({
     : <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>{content}</Modal>);
 
   const body = scroll ? (
-    <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
+    <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
       {children}
     </ScrollView>
   ) : (
@@ -131,8 +121,11 @@ export default function SheetFrame({
   return layer(
     <>
       {backdrop}
-      <Animated.View style={[styles.sheet, { maxHeight: height - insets.top - 60, maxWidth: sheetMaxWidth, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]}>
-        <View style={styles.grabArea} {...panResponder.panHandlers}>
+      <Animated.View
+        style={[styles.sheet, { maxHeight: height - insets.top - 60, maxWidth: sheetMaxWidth, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]}
+        {...(scroll ? sheetDrag.sheetHandlers : {})}
+      >
+        <View style={styles.grabArea} {...sheetDrag.grabHandlers}>
           <View style={styles.grab} />
         </View>
         {body}

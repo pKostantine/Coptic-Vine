@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, BackHandler, Modal, PanResponder, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, BackHandler, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import { tr } from '../../../utils/appText';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import CalendarPanel from './CalendarPanel';
+import { useSheetDragToClose } from './useSheetDragToClose';
 
 interface CalendarSheetProps {
   visible: boolean;
@@ -21,8 +22,6 @@ interface CalendarSheetProps {
    */
   inline?: boolean;
 }
-
-const DRAG_TO_CLOSE = 80;
 
 /**
  * The calendar over whatever page it was opened from — Books, or a document
@@ -59,18 +58,8 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
     }
   }, [visible, mounted, progress, drag, reduced]);
 
-  // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
-  const [panResponder] = useState(() =>
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-      onPanResponderMove: (_, gesture) => drag.setValue(Math.max(0, gesture.dy)),
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > DRAG_TO_CLOSE || gesture.vy > 1.2) onCloseRef.current();
-        else Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
-      },
-      onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
-    }),
-  );
+  // Pulled down from anywhere on the sheet while the calendar is scrolled to its top.
+  const sheetDrag = useSheetDragToClose(visible, drag, onClose);
 
   // Inline there is no modal to catch Android's back button, so the sheet does.
   useEffect(() => {
@@ -90,14 +79,14 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
     : <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>{children}</Modal>);
 
   const panel = (
-    <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+    <ScrollView bounces={false} showsVerticalScrollIndicator={false} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
       <CalendarPanel
         onOpenSeasons={() => {
           onClose();
           onOpenSeasons();
         }}
         header={dialog ? undefined : (
-          <View style={styles.grabArea} {...panResponder.panHandlers}>
+          <View style={styles.grabArea} {...sheetDrag.grabHandlers}>
             <View style={styles.grab} />
           </View>
         )}
@@ -138,7 +127,7 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
   return layer(
     <>
       {backdrop}
-      <Animated.View style={[styles.sheet, { maxHeight: height - insets.top - 60, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]}>
+      <Animated.View style={[styles.sheet, { maxHeight: height - insets.top - 60, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]} {...sheetDrag.sheetHandlers}>
         {panel}
       </Animated.View>
     </>,
