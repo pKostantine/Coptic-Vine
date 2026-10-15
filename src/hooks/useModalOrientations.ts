@@ -1,15 +1,6 @@
-import { createContext, useContext } from 'react';
-
 import { useReadingPreferences } from '../context/ReadingPreferencesContext';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '../utils/modalOrientations';
-import { READING_DEVICE_CLASS, type OrientationMode } from '../utils/preferencesStorage';
-
-/**
- * Set by a reading screen (a service, a Bible chapter), which turns with
- * Book Settings' Orientation even on a phone -- where every other screen
- * stays upright (utils/screenOrientation.ts).
- */
-export const ReaderScreenContext = createContext(false);
+import type { OrientationMode } from '../utils/preferencesStorage';
 
 type ModalOrientations = typeof MODAL_SUPPORTED_ORIENTATIONS;
 
@@ -34,12 +25,7 @@ export function modalOrientationsFor(mode: OrientationMode): ModalOrientations {
  * device even when the app is locked to one way. This keeps each one to the
  * orientation lock the screens beneath it follow (see AppStack in _layout).
  */
-export function useModalOrientations(onReaderScreen = false): ModalOrientations {
+export function useModalOrientations(): ModalOrientations {
   const { preferences } = useReadingPreferences();
-  // A reading screen says so itself where it asks above its own provider.
-  const reader = useContext(ReaderScreenContext) || onReaderScreen;
-  // Over a phone's upright pages a sheet stays upright too, rather than
-  // turning on its own over a page that doesn't.
-  if (READING_DEVICE_CLASS === 'phone' && !reader) return PORTRAIT;
   return modalOrientationsFor(preferences.orientationMode);
 }

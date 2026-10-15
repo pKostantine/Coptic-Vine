@@ -1,7 +1,5 @@
 import { Platform, useWindowDimensions } from 'react-native';
 
-import { READING_DEVICE_CLASS } from './preferencesStorage';
-
 /**
  * How much room the app has (Coptic Vine design system, "Layout and spacing"):
  * - `phone`: one column with the bottom tab bar.
@@ -31,9 +29,6 @@ export function layoutModeFor(width: number, isWeb: boolean, coarsePointer: bool
 
 export function useLayoutMode(): LayoutMode {
   const { width } = useWindowDimensions();
-  // A phone on its side (a reader turned with Auto Rotate) is as wide as a
-  // tablet but a fraction of its height: it keeps the phone's layout.
-  if (Platform.OS !== 'web' && READING_DEVICE_CLASS === 'phone') return 'phone';
   return layoutModeFor(width, Platform.OS === 'web', Platform.OS === 'web' && hasCoarsePointer());
 }
 

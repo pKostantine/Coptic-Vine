@@ -16,8 +16,7 @@ import { BottomChromeProvider, useBottomChrome } from '@/context/BottomChromeCon
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { READING_DEVICE_CLASS } from '@/utils/preferencesStorage';
-import { screenOrientationFor } from '@/utils/screenOrientation';
+import type { OrientationMode } from '@/utils/preferencesStorage';
 import { keepsWholeWindow } from '@/utils/desktopChrome';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
@@ -31,11 +30,18 @@ SplashScreen.preventAutoHideAsync();
  */
 export { default as ErrorBoundary } from '@/components/vine/screens/AppErrorScreen';
 
+type StackOrientation = 'default' | 'landscape_right' | 'landscape_left' | 'portrait_up';
+
+const STACK_ORIENTATIONS: Record<OrientationMode, StackOrientation> = {
+  auto: 'default',
+  landscape: 'landscape_right',
+  reverseLandscape: 'landscape_left',
+  portrait: 'portrait_up',
+};
+
 function AppStack() {
   const { preferences } = useReadingPreferences();
-  // Every screen but the readers, which set their own (ServiceDocument, the
-  // Bible chapter): upright on a phone, Book Settings' choice on a tablet.
-  const orientation = screenOrientationFor(preferences.orientationMode, { phone: READING_DEVICE_CLASS === 'phone', reader: false });
+  const orientation = STACK_ORIENTATIONS[preferences.orientationMode];
 
   // Expo Router delegates this option to the native screen controller. That
   // keeps its bounds and orientation in one lifecycle, including when an iPad

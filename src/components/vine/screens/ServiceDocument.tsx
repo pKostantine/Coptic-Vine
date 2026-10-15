@@ -21,9 +21,6 @@ import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { BookSettingsSheet } from './SettingsScreen';
 import { documentOrnamentColor } from '../../../constants/documentOrnaments';
 import { getDocumentTheme } from '../../../constants/documentThemes';
-import { ReaderScreenContext } from '../../../hooks/useModalOrientations';
-import { READING_DEVICE_CLASS } from '../../../utils/preferencesStorage';
-import { screenOrientationFor } from '../../../utils/screenOrientation';
 import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
 import { getDayThemeKey, type SeasonThemeKey } from '../../../constants/seasonAppearance';
 import { COLORS } from '../../../constants/theme';
@@ -914,7 +911,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   );
 
   return (
-    <ReaderScreenContext.Provider value>
     <SafeAreaView
       edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
       style={[styles.safeArea, { backgroundColor: documentTheme.colors.page }]}
@@ -927,9 +923,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           This screen already implements its own equivalent gesture above
           (gesturePanResponder), so the native one is both redundant and the
           source of that bug — disabled here in favor of it. */}
-      {/* A reader turns with Book Settings' Orientation, even on a phone,
-          whose other screens stay upright (utils/screenOrientation.ts). */}
-      <Stack.Screen options={{ gestureEnabled: false, orientation: screenOrientationFor(preferences.orientationMode, { phone: READING_DEVICE_CLASS === 'phone', reader: true }) }} />
+      <Stack.Screen options={{ gestureEnabled: false }} />
       <Head>
         <title>{`Coptic Vine ${title}`}</title>
       </Head>
@@ -1084,7 +1078,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       <CalendarSheet inline visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={() => navigateAway('/season-selector')} />
       <BookSettingsSheet inDocument visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </SafeAreaView>
-    </ReaderScreenContext.Provider>
   );
 }
 
