@@ -39,7 +39,7 @@ jobs:
           src/components/vine/ui/Icon.tsx
           src/components/offline/OfflineDownloadButton.tsx
           src/components/music/MusicPlaylistPicker.tsx
-          src/components/music/MusicQueueList.tsx
+          src/components/playback/PlaybackQueueList.tsx
           src/components/music/MusicTrackActionsMenu.tsx
           src/context/AuthContext.tsx
           src/services/offlineDownloadRequests.ts
