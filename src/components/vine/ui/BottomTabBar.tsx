@@ -1,7 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useId, useRef } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -79,7 +79,10 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
       style={styles.shell}
       onLayout={(event) => reportHeight(event.nativeEvent.layout.height)}
     >
-      <View accessibilityRole="tablist" style={[styles.bar, tablet && styles.barTablet, Platform.OS === 'web' && { paddingBottom: insets.bottom + (tablet ? 14 : 0) }]}>
+      {/* The bar's green runs on under the iPhone's home indicator, with the
+          tabs themselves above it. No screen with the tab bar insets its
+          own bottom edge, so this is the only place it is made room for. */}
+      <View accessibilityRole="tablist" style={[styles.bar, tablet && styles.barTablet, { paddingBottom: insets.bottom + (tablet ? 14 : 0) }]}>
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'home' }} accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
         <Icon name="home-outline" size={iconSize} color={active === 'home' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'home' && styles.tabLabelActive]}>{labels.home}</Text>

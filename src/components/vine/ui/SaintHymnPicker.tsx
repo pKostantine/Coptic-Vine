@@ -22,6 +22,7 @@ import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import DocumentWebView from '@/components/vine/DocumentWebView';
 import { PageGlow } from '@/components/vine/screens/BookPage';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { fontScaleToPx } from '@/utils/preferencesStorage';
 import {
@@ -214,6 +215,10 @@ export default function SaintHymnPicker({
     }
     closePicker();
   };
+
+  // Swiping in from the left edge goes back a step, as Back on Android does:
+  // out of an open preview or saint's menu first, then out of Saint Hymns.
+  const edgeSwipeHandlers = useEdgeSwipeBack(closeTopLayer, visible);
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
@@ -452,7 +457,7 @@ export default function SaintHymnPicker({
       onRequestClose={closeTopLayer}
       supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
     >
-      <View style={[styles.page, DISABLED_TEXT_SELECTION_STYLE]}>
+      <View style={[styles.page, DISABLED_TEXT_SELECTION_STYLE]} {...edgeSwipeHandlers}>
         <PageGlow kind="green" tall={wide} />
         <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.flex}>
           <SubPageHeader title={label(LABELS.title)} arabic={isArabic} onBack={closePicker} backLabel={tr('Back', 'Retour', 'رجوع')} />
