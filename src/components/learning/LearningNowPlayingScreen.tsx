@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Pressable,
   StyleSheet,
   Text,
@@ -17,6 +18,7 @@ import Icon from '@/components/vine/ui/Icon';
 import MusicLyricsView from '@/components/music/MusicLyricsView';
 import SeekBar from '@/components/music/SeekBar';
 import PlaybackQueueList from '@/components/playback/PlaybackQueueList';
+import { usePullDownToClose } from '@/components/playback/usePullDownToClose';
 import PlayerSheet from '@/components/playback/PlayerSheet';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -80,6 +82,8 @@ export default function LearningNowPlayingScreen({
     if (embedded && onClose) onClose();
     else goBack(router, '/learn');
   };
+  // Pulled down, the player goes away, as the music player does.
+  const pullDown = usePullDownToClose(closePlayer);
 
   useEffect(() => {
     if (!currentItem) {
@@ -251,14 +255,19 @@ export default function LearningNowPlayingScreen({
 
   return (
     <SafeAreaView edges={['left', 'right']} style={[styles.safeArea, embedded && styles.embedded]}>
-      <PlayerHeader title={currentItem.containerTitle} onClose={closePlayer} />
+      <Animated.View style={[styles.dismissLayer, { transform: [{ translateY: pullDown.drag }] }]} {...(wide ? {} : pullDown.panHandlers)}>
+      {/* On the iPad the lyrics and the queue beside the player scroll
+          themselves, so the pull is taken on the header and the player only. */}
+      {wide ? (
+        <View {...pullDown.panHandlers}><PlayerHeader title={currentItem.containerTitle} onClose={closePlayer} /></View>
+      ) : <PlayerHeader title={currentItem.containerTitle} onClose={closePlayer} />}
       {wide ? (
         <View style={styles.wideBody}>
           <View style={styles.panel}>
             <PanelHeader title={tr('Lyrics', 'Paroles', 'الكلمات')} onFullscreen={() => setLyricsFullscreen(true)} />
             <MusicLyricsView {...lyricsProps} />
           </View>
-          <View style={styles.playerColumn}>{playerCard}</View>
+          <View style={styles.playerColumn} {...pullDown.panHandlers}>{playerCard}</View>
           <PlaybackQueueList {...queueProps} scrollable />
         </View>
       ) : landscapePhone ? (
@@ -296,6 +305,7 @@ export default function LearningNowPlayingScreen({
           <SheetButtons onLyrics={() => setOpenSheet('lyrics')} onQueue={() => setOpenSheet('queue')} count={entries.length} isArabic={isArabic} />
         </View>
       )}
+      </Animated.View>
 
       {!wide ? (
         <>
@@ -451,6 +461,7 @@ function TransportControls({ playing, buffering, onPrevious, onTogglePlayback, o
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   embedded: { position: 'absolute', inset: 0, zIndex: 90, elevation: 90 },
+  dismissLayer: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingHorizontal: SPACING.md, backgroundColor: COLORS.black },
   headerCopy: { flex: 1, minWidth: 0, alignItems: 'center' },
   headerEyebrow: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },

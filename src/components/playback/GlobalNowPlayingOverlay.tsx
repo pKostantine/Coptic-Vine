@@ -27,7 +27,6 @@ const FLOATING_GAP = 10;
 
 const EXCLUDED_PATHS = new Set([
   '/season-selector',
-  '/account',
   '/settings',
   '/book-settings',
   '/downloads',
@@ -35,8 +34,9 @@ const EXCLUDED_PATHS = new Set([
   '/learn/now-playing',
 ]);
 
+// The book pages, where Book Settings' "Display Now Playing Bar" decides. Home
+// and Account are not among them: the bar shows there whenever something plays.
 const BOOK_PATH_PREFIXES = [
-  '/',
   '/bible',
   '/psalmody',
   '/liturgy',
@@ -210,6 +210,7 @@ export default function GlobalNowPlayingOverlay() {
   const onOpen = () => setIsPopupOpen(true);
   const onTogglePlayback = isMusic ? music.togglePlayback : learning.togglePlayback;
   const onNext = isMusic ? music.next : learning.next;
+  const onPrevious = isMusic ? music.previous : learning.previous;
   const accentColor = isMusic ? COLORS.gold : COLORS.learning;
 
   let title = 'Now playing';
@@ -347,6 +348,7 @@ export default function GlobalNowPlayingOverlay() {
         onOpen={onOpen}
         onTogglePlayback={onTogglePlayback}
         onNext={onNext}
+        onPrevious={onPrevious}
         onHide={() => setIsCollapsed(true)}
         nextLabel={isMusic ? 'Next track' : 'Next lesson'}
       />

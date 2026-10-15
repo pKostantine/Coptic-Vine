@@ -166,12 +166,15 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
 
   // Pull the whole player down to put it away, the way a sheet behaves. The
   // gesture only starts on a clear downward drag, so the seek bar, the queue
-  // and horizontal swipes keep working.
+  // and horizontal swipes keep working. Taken in the capture phase: asked
+  // after them, the artwork, the buttons and the seek bar had already taken
+  // the touch, and a pull down did nothing.
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
   const [dismissResponder] = useState(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_event, gesture: PanResponderGestureState) => (
+    onMoveShouldSetPanResponderCapture: (_event, gesture: PanResponderGestureState) => (
       gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.5
     ),
+    onPanResponderTerminationRequest: () => false,
     onPanResponderMove: (_event, gesture: PanResponderGestureState) => {
       dismissDrag.setValue(Math.max(0, gesture.dy));
     },
@@ -520,7 +523,9 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         style={[styles.dismissLayer, { transform: [{ translateY: dismissDrag }] }]}
         {...(wide ? {} : dismissResponder.panHandlers)}
       >
-        {header}
+        {/* On the iPad the lyrics and the queue beside the player scroll
+            themselves, so the pull is taken on the header and the player only. */}
+        {wide ? <View {...dismissResponder.panHandlers}>{header}</View> : header}
 
         {wide ? (
           <View style={styles.wideBody}>
@@ -528,7 +533,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
               {lyricsPanelHeader}
               <MusicLyricsView {...lyricsProps} />
             </View>
-            <View style={[styles.panel, styles.playerPanel, { width: centerWidth }]}>
+            <View style={[styles.panel, styles.playerPanel, { width: centerWidth }]} {...dismissResponder.panHandlers}>
               {player}
             </View>
             <PlaybackQueueList {...queueProps} scrollable style={styles.sidePanel} />
