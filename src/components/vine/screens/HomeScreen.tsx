@@ -59,7 +59,7 @@ function splitSaintTitle(title: string): { main: string; detail: string | null }
 
 /**
  * Home (Coptic Vine design system, "HomeHero"): the seal on a green glow with
- * "Pray. Read. Learn." and the day beneath it, the Agpeya hour to pray now,
+ * the day beneath it, the Agpeya hour to pray now,
  * then two framed cards under a gold crown — the day's readings, one service
  * at a time, and the saints of today and tomorrow. Home always shows the
  * live day, whatever date the Books screen has been moved to.
@@ -188,9 +188,6 @@ export default function HomeScreen() {
             style={styles.logo}
           />
         </View>
-        <Text style={[styles.heroTag, arabic && styles.arabicCentered]} maxFontSizeMultiplier={1.3} accessibilityRole="header">
-          {tr('Pray. Read. Learn.', 'Prier. Lire. Apprendre.', 'صلِّ. اقرأ. تعلَّم.')}
-        </Text>
         <Text style={[styles.heroDate, arabic && styles.arabicCentered]} maxFontSizeMultiplier={1.3}>
           {dayLine(liveDate, styles.heroCoptic)}
         </Text>
@@ -419,8 +416,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 184,
   },
-  heroTag: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: 26, textAlign: 'center' },
-  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 8, textAlign: 'center' },
+  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 24, textAlign: 'center' },
   heroCoptic: { color: COLORS.goldBright, fontWeight: '600' },
   heroDivider: { alignItems: 'center', marginBottom: 22, marginTop: 20 },
   card: {
