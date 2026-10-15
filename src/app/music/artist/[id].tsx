@@ -188,7 +188,7 @@ export default function MusicArtistScreen() {
       {!artist ? (
         <View style={styles.pending}>
           <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} onPress={() => goBack(router, '/music')} style={({ pressed }) => [styles.pendingBack, pressed && styles.pressed]}>
-            <Icon name={arabic ? 'chevron-forward' : 'chevron-back'} size={20} color={COLORS.gold} />
+            <Icon name="chevron-back" size={20} color={COLORS.gold} />
           </Pressable>
           {error ? (
             <LoadFailure error={error} layout="inline" onRetry={() => setAttempt((count) => count + 1)} />
@@ -209,14 +209,14 @@ export default function MusicArtistScreen() {
               onBack={() => goBack(router, '/music')}
               backLabel={tr('Go back', 'Retour', 'رجوع')}
             >
-              <View style={[styles.actions, wide && styles.actionsWide, arabic && styles.rowReverse]}>
+              <View style={[styles.actions, wide && styles.actionsWide]}>
                 <Pressable
                   accessibilityRole="button"
                   aria-selected={followed}
                   accessibilityLabel={followed ? tr('Unfollow artist', 'Ne plus suivre l’artiste', 'إلغاء متابعة الفنان') : tr('Follow artist', 'Suivre l’artiste', 'متابعة الفنان')}
                   disabled={followBusy}
                   onPress={() => void toggleFollow()}
-                  style={({ pressed }) => [styles.follow, !followed && styles.followOff, arabic && styles.rowReverse, followBusy && styles.disabled, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.follow, !followed && styles.followOff, followBusy && styles.disabled, pressed && styles.pressed]}
                 >
                   {followBusy ? <ActivityIndicator size="small" color={followed ? COLORS.greenDeep : COLORS.gold} /> : followed ? <Icon name="checkmark" size={17} color={COLORS.greenDeep} /> : <Icon name="add" size={17} color={COLORS.gold} />}
                   <Text style={[styles.followText, !followed && styles.followTextOff, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
@@ -233,7 +233,7 @@ export default function MusicArtistScreen() {
                 </Pressable>
               </View>
               {artistLinks.length ? (
-                <View style={[styles.links, wide && styles.linksWide, wide && (arabic ? styles.linksEnd : styles.linksStart), arabic && styles.rowReverse]}>
+                <View style={[styles.links, wide && styles.linksWide, wide && styles.linksStart]}>
                   {artistLinks.map((link) => (
                     <Pressable
                       key={link.id ?? `${link.platform}:${link.url}`}
@@ -251,7 +251,7 @@ export default function MusicArtistScreen() {
 
             <SectionHeading size="page" title={tr('Releases', 'Parutions', 'الإصدارات')} arabic={arabic} />
             {artist.releases.length ? (
-              <View style={[styles.grid, { gap, paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+              <View style={[styles.grid, { gap, paddingHorizontal: gutter }]}>
                 {artist.releases.map((release) => {
                   const liked = likes.isLiked(release.id);
                   return (
@@ -299,7 +299,6 @@ const styles = StyleSheet.create({
   loader: { marginTop: 48 },
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.6 },
-  rowReverse: { flexDirection: 'row-reverse' },
   actions: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 16 },
   actionsWide: { marginTop: 20 },
   follow: { alignItems: 'center', backgroundColor: COLORS.gold, borderColor: COLORS.gold, borderRadius: 99, borderWidth: 1, flexDirection: 'row', gap: 6, height: 40, paddingLeft: 14, paddingRight: 18 },
@@ -311,12 +310,11 @@ const styles = StyleSheet.create({
   links: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 16 },
   linksWide: { gap: 10 },
   linksStart: { justifyContent: 'flex-start' },
-  linksEnd: { justifyContent: 'flex-end' },
   link: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   linkWide: { borderRadius: 22, height: 44, width: 44 },
   linkPressed: { backgroundColor: 'rgba(227, 181, 59, 0.2)' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   empty: { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14 },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

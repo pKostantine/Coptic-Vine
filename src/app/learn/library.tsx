@@ -183,12 +183,11 @@ export default function LearningLibraryScreen() {
   const authenticated = library.authenticated || playlistLibrary.authenticated;
   const gutter = wide ? 0 : 16;
   const inGutter = { paddingHorizontal: gutter };
-  const rowDirection = arabic && styles.rowReverse;
 
   // Across the page, over both columns on the iPad and desktop.
   const intro = (
     <>
-      <View style={[styles.introRow, inGutter, rowDirection]}>
+      <View style={[styles.introRow, inGutter]}>
         <Text style={[styles.intro, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
           {tr('Move each recording or lesson forward as you learn it.', 'Faites avancer chaque enregistrement ou leçon à mesure que vous l’apprenez.', 'نظّم ما ستتعلّمه، وما تدرسه الآن، وما أكملته.')}
         </Text>
@@ -203,7 +202,7 @@ export default function LearningLibraryScreen() {
       {error ? <Text style={[styles.error, inGutter]}>{error}</Text> : null}
 
       {!loading && !authenticated ? (
-        <View style={[styles.authCard, { marginHorizontal: gutter }, rowDirection]}>
+        <View style={[styles.authCard, { marginHorizontal: gutter }]}>
           <Icon name="person-circle-outline" size={30} color={COLORS.gold} />
           <View style={styles.authCopy}>
             <Text style={[styles.authTitle, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Keep your learning across devices', 'Gardez votre apprentissage sur tous vos appareils', 'احفظ تعلّمك على كل أجهزتك')}</Text>
@@ -212,7 +211,7 @@ export default function LearningLibraryScreen() {
             </Text>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel={tr('Open account', 'Ouvrir le compte', 'افتح الحساب')} style={({ pressed }) => [styles.authButton, pressed && styles.pressed]} onPress={() => router.push('/account')}>
-            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.greenDeep} />
+            <Icon name="chevron-forward" size={18} color={COLORS.greenDeep} />
           </Pressable>
         </View>
       ) : null}
@@ -221,7 +220,7 @@ export default function LearningLibraryScreen() {
 
   const lists = (
     <>
-      <View accessibilityRole="tablist" style={[styles.tabs, wide && styles.tabsFlush, { marginHorizontal: gutter }, rowDirection]}>
+      <View accessibilityRole="tablist" style={[styles.tabs, wide && styles.tabsFlush, { marginHorizontal: gutter }]}>
         {STATE_ORDER.map((state) => {
           const count = library.items.filter((item) => item.state === state).length;
           const active = state === activeState;
@@ -231,7 +230,7 @@ export default function LearningLibraryScreen() {
               accessibilityRole="tab"
               aria-selected={active}
               onPress={() => setActiveState(state)}
-              style={[styles.tab, active && styles.tabActive, rowDirection]}
+              style={[styles.tab, active && styles.tabActive]}
             >
               <Text style={[styles.tabLabel, active && styles.tabLabelActive, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{labels[state].title}</Text>
               <View style={[styles.tabCount, active && styles.tabCountActive]}>
@@ -249,7 +248,7 @@ export default function LearningLibraryScreen() {
           const isPlaying = currentItem?.id === item.itemId;
           const audioItem = audioQueue.find((entry) => entry.id === item.itemId);
           const forward = stateIndex < STATE_ORDER.length - 1
-            ? { state: STATE_ORDER[stateIndex + 1], label: stateIndex === 0 ? tr('Start', 'Commencer', 'ابدأ') : tr('Finish', 'Terminer', 'أكملت'), icon: stateIndex === 0 ? (arabic ? 'chevron-back' as const : 'chevron-forward' as const) : 'checkmark' as const }
+            ? { state: STATE_ORDER[stateIndex + 1], label: stateIndex === 0 ? tr('Start', 'Commencer', 'ابدأ') : tr('Finish', 'Terminer', 'أكملت'), icon: stateIndex === 0 ? 'chevron-forward' as const : 'checkmark' as const }
             : null;
           const back = stateIndex > 0
             ? { state: STATE_ORDER[stateIndex - 1], label: stateIndex === 2 ? tr('Revisit', 'Revoir', 'أعد التعلّم') : tr('Later', 'Plus tard', 'لاحقاً') }
@@ -257,11 +256,11 @@ export default function LearningLibraryScreen() {
           return (
             <View key={item.itemKind + ':' + item.itemId} style={styles.itemCard}>
               <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-              <View style={[styles.itemTop, rowDirection]}>
-              <Pressable accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.cantorName}`} style={({ pressed }) => [styles.itemMain, rowDirection, pressed && styles.pressed]} onPress={() => openItem(item)}>
+              <View style={styles.itemTop}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.cantorName}`} style={({ pressed }) => [styles.itemMain, pressed && styles.pressed]} onPress={() => openItem(item)}>
                 <View style={styles.thumb}>
                   <LearningArtwork asset={item.coverAsset} size={68} radius={14} label={item.containerTitle} />
-                  <View style={[styles.thumbBadge, arabic ? styles.thumbBadgeLeft : styles.thumbBadgeRight]}>
+                  <View style={styles.thumbBadge}>
                     <Icon name={item.mediaType === 'video' ? 'eye-outline' : isPlaying ? 'pause' : 'play'} size={13} color={COLORS.greenDeep} />
                   </View>
                 </View>
@@ -273,12 +272,12 @@ export default function LearningLibraryScreen() {
               {/* Beside the card's own tap target, never inside it: a button in a button is invalid on web. */}
               {audioItem ? <LearningItemActionsMenu item={audioItem} isArabic={arabic} size={34} /> : null}
               </View>
-              <View style={[styles.itemFoot, rowDirection]}>
-                <View style={[styles.tag, rowDirection]}>
+              <View style={styles.itemFoot}>
+                <View style={styles.tag}>
                   <View style={styles.tagDot} />
                   <Text numberOfLines={1} style={[styles.tagText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{item.containerTitle}</Text>
                 </View>
-                <View style={[styles.moves, rowDirection]}>
+                <View style={styles.moves}>
                   {back ? (
                     <Pressable
                       accessibilityRole="button"
@@ -296,7 +295,7 @@ export default function LearningLibraryScreen() {
                       accessibilityLabel={`${forward.label}: ${item.title}`}
                       disabled={busy}
                       onPress={() => void moveItem(item, forward.state)}
-                      style={({ pressed }) => [styles.move, rowDirection, busy && styles.disabled, pressed && styles.pressed]}
+                      style={({ pressed }) => [styles.move, busy && styles.disabled, pressed && styles.pressed]}
                     >
                       <Text style={[styles.moveText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{forward.label}</Text>
                       <Icon name={forward.icon} size={15} color={COLORS.greenDeep} />
@@ -310,7 +309,7 @@ export default function LearningLibraryScreen() {
         {!loading && !stateItems.length ? (
           <View style={styles.emptyState}>
             <Icon name="school-outline" size={30} color={COLORS.gold} />
-            <Text style={[styles.emptyTitle, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{labels[activeState].empty}</Text>
+            <Text style={[styles.emptyTitle, arabic && styles.arabicCentered]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{labels[activeState].empty}</Text>
             {!authenticated ? (
               <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={({ pressed }) => pressed && styles.pressed}>
                 <Text style={styles.emptyAction}>{tr('Sign in', 'Se connecter', 'تسجيل الدخول')}</Text>
@@ -336,7 +335,7 @@ export default function LearningLibraryScreen() {
       <Text style={[styles.sectionBody, inGutter, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {tr('Group any lessons and recordings your way.', 'Regroupez leçons et enregistrements à votre façon.', 'اجمع الدروس والتسجيلات في قوائمك الخاصة.')}
       </Text>
-      <View style={[styles.createRow, inGutter, rowDirection]}>
+      <View style={[styles.createRow, inGutter]}>
         <TextInput
           accessibilityLabel={tr('New playlist name', 'Nom de la nouvelle playlist', 'اسم قائمة جديدة')}
           editable={!creating}
@@ -363,7 +362,7 @@ export default function LearningLibraryScreen() {
           <Pressable
             accessibilityRole="button"
             key={playlist.id}
-            style={({ pressed }) => [styles.playlistRow, rowDirection, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.playlistRow, pressed && styles.pressed]}
             onPress={() => router.push({ pathname: '/learn/playlist/[id]', params: { id: playlist.id } })}
           >
             <View style={styles.playlistIcon}><Icon name="list-outline" size={22} color={COLORS.gold} /></View>
@@ -373,7 +372,7 @@ export default function LearningLibraryScreen() {
                 {playlist.itemCount === 1 ? tr('1 item', '1 élément', 'عنصر واحد') : tr(`${playlist.itemCount} items`, `${playlist.itemCount} éléments`, `${playlist.itemCount} عناصر`)}
               </Text>
             </View>
-            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+            <Icon name="chevron-forward" size={17} color={COLORS.gold} />
           </Pressable>
         ))}
       </View>
@@ -393,7 +392,7 @@ export default function LearningLibraryScreen() {
           <TabHeader title={tr('Learn & Study', 'Apprendre', 'تعلّم وادرس')} arabic={arabic} wide={wide} nav={<LearningSectionNav active="library" flush={wide} />} />
           {intro}
           {wide ? (
-            <View style={[styles.columns, rowDirection]}>
+            <View style={styles.columns}>
               <View style={styles.listsColumn}>{lists}</View>
               {/* The playlists' heading level with the tabs: no section margin over it at the top of its column. */}
               <View style={[styles.column, styles.columnHeadFlush]}>{playlists}</View>
@@ -422,7 +421,6 @@ const styles = StyleSheet.create({
   column: { flex: 1, minWidth: 0 },
   // Cancels SectionHeading's own top margin.
   columnHeadFlush: { marginTop: -28 },
-  rowReverse: { flexDirection: 'row-reverse' },
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.42 },
   loader: { marginVertical: 24 },
@@ -454,6 +452,7 @@ const styles = StyleSheet.create({
   itemTop: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   itemMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 14, minWidth: 0 },
   thumb: { position: 'relative' },
+  // The 28pt gold disc overhangs the cover by 6pt, its ring by 3 more.
   thumbBadge: {
     alignItems: 'center',
     backgroundColor: COLORS.gold,
@@ -464,11 +463,9 @@ const styles = StyleSheet.create({
     height: 34,
     justifyContent: 'center',
     position: 'absolute',
+    right: -9,
     width: 34,
   },
-  // The 28pt gold disc overhangs the cover by 6pt, its ring by 3 more.
-  thumbBadgeRight: { right: -9 },
-  thumbBadgeLeft: { left: -9 },
   itemCopy: { flex: 1, minWidth: 0 },
   itemTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '700', lineHeight: 21 },
   itemMeta: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 3 },
@@ -497,6 +494,7 @@ const styles = StyleSheet.create({
   playlistCopy: { flex: 1, minWidth: 0 },
   playlistName: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
   playlistMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicTight: { fontFamily: TYPOGRAPHY.arabic },
 });

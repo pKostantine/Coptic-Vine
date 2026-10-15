@@ -85,5 +85,5 @@ const styles = StyleSheet.create({
   name: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700' },
   bio: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 17, marginTop: SPACING.xs },
   chevron: { color: COLORS.learning, fontSize: 30, paddingRight: SPACING.xs },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

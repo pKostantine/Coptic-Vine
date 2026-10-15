@@ -55,7 +55,7 @@ export default function FontScaleControl({
 }: FontScaleControlProps) {
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
-      <View style={[styles.header, isArabic && styles.rowReverse]}>
+      <View style={styles.header}>
         <Text style={[styles.label, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{label}</Text>
         <Text style={[styles.value, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>
           {isArabic ? toEasternArabicDigits(fontScale) : fontScale}
@@ -100,8 +100,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, gap: 10, paddingBottom: 13, paddingHorizontal: 16, paddingTop: 11 },
   cardCompact: { paddingBottom: 11, paddingTop: 9 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  rowReverse: { flexDirection: 'row-reverse' },
-  label: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
+  // Left set even in Arabic, whose right-to-left text would otherwise take the row's far side.
+  label: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600', textAlign: 'left' },
   value: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', minWidth: 24, textAlign: 'right' },
   track: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   sliderHost: { flex: 1, minWidth: 0 },
@@ -111,7 +111,6 @@ const styles = StyleSheet.create({
   endMarkerLarge: { fontSize: 21, lineHeight: 21 },
   arabicText: {
     fontFamily: TYPOGRAPHY.arabic,
-    textAlign: 'right',
     writingDirection: 'rtl',
   },
 });

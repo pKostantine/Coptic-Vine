@@ -97,9 +97,9 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
   const wideLayout = layout !== 'phone';
 
   const nav = (
-    <View style={[styles.nav, wideLayout ? styles.navWide : { paddingTop: insets.top + 4 }, arabic && styles.rowReverse]}>
+    <View style={[styles.nav, wideLayout ? styles.navWide : { paddingTop: insets.top + 4 }]}>
       <RoundButton
-        icon={arabic ? 'chevron-forward' : 'chevron-back'}
+        icon="chevron-back"
         label={tr('Back', 'Retour', 'رجوع')}
         onPress={() => goBack(router, backHref)}
       />
@@ -108,20 +108,20 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
   );
 
   const hero = (
-    <View style={[styles.hero, wideLayout && styles.heroWide, wideLayout && arabic && styles.heroWideArabic]}>
+    <View style={[styles.hero, wideLayout && styles.heroWide]}>
       <View style={styles.medallion}>
         <BuddedCross size={30} />
       </View>
       {kicker ? (
-        <Text style={[styles.kicker, wideLayout && styles.textStart, arabic && styles.kickerArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        <Text style={[styles.kicker, wideLayout && styles.textLeft, arabic && styles.kickerArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
           {arabic ? kicker : kicker.toUpperCase()}
         </Text>
       ) : null}
-      <Text style={[styles.title, wideLayout && styles.textStart, arabic && styles.titleArabic]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>
+      <Text style={[styles.title, wideLayout && styles.textLeft, arabic && styles.titleArabic]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {appText(title)}
       </Text>
       {subtitle ? (
-        <Text style={[styles.subtitle, wideLayout && styles.textStart, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        <Text style={[styles.subtitle, wideLayout && styles.textLeft, arabic && styles.subtitleArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
           {subtitle}
         </Text>
       ) : null}
@@ -157,7 +157,7 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
                 {content}
               </View>
             ) : (
-              <View style={[styles.columns, arabic && styles.rowReverse]}>
+              <View style={styles.columns}>
                 <View style={layout === 'desktop' ? styles.asideDesktop : styles.column2}>
                   {hero}
                   {aside}
@@ -280,11 +280,11 @@ export function SectionHeading({ title, arabic, trailing, size = 'book' }: {
   size?: 'book' | 'page' | 'results';
 }) {
   return (
-    <View style={[styles.section, size === 'page' && styles.sectionPage, size === 'results' && styles.sectionResults, { paddingHorizontal: usePageGutter() }, arabic && styles.rowReverse]}>
+    <View style={[styles.section, size === 'page' && styles.sectionPage, size === 'results' && styles.sectionResults, { paddingHorizontal: usePageGutter() }]}>
       <Text style={[styles.sectionTitle, size !== 'book' && styles.sectionTitlePage, arabic && styles.arabic]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>
         {title}
       </Text>
-      <VineRule arabic={arabic} />
+      <VineRule />
       {trailing}
     </View>
   );
@@ -319,10 +319,10 @@ export function BookRow({ title, arabic, onPress, icon, detail, count, bookmarke
       onPress={onPress}
       onPressIn={onPrefetch}
       onHoverIn={onPrefetch}
-      style={({ pressed }) => [styles.row, arabic && styles.rowReverse, pressed && styles.rowPressed]}
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
       {icon ? (
-        <View style={[styles.rowIcon, arabic && styles.rowIconArabic]}>
+        <View style={styles.rowIcon}>
           <Icon name={icon} size={24} color={COLORS.gold} />
         </View>
       ) : null}
@@ -342,7 +342,7 @@ export function BookRow({ title, arabic, onPress, icon, detail, count, bookmarke
           {count}
         </Text>
       ) : null}
-      <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+      <Icon name="chevron-forward" size={17} color={COLORS.gold} />
     </Pressable>
   );
 }
@@ -365,7 +365,7 @@ export function ReadingRow({ kind, value, arabic, onPress, kindWidth = 74 }: Rea
       accessibilityRole="button"
       accessibilityLabel={value ? `${kind}, ${value}` : kind}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, styles.readingRow, arabic && styles.rowReverse, pressed && styles.rowPressed]}
+      style={({ pressed }) => [styles.row, styles.readingRow, pressed && styles.rowPressed]}
     >
       <Text style={[styles.kind, { width: kindWidth }, arabic && styles.kindArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>
         {arabic ? kind : kind.toUpperCase()}
@@ -373,7 +373,7 @@ export function ReadingRow({ kind, value, arabic, onPress, kindWidth = 74 }: Rea
       <Text style={[styles.reading, !value && styles.readingMissing, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {value ?? '—'}
       </Text>
-      <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+      <Icon name="chevron-forward" size={17} color={COLORS.gold} />
     </Pressable>
   );
 }
@@ -384,9 +384,8 @@ const styles = StyleSheet.create({
   column: { alignSelf: 'center', maxWidth: BOOK_PAGE_MAX_WIDTH, width: '100%' },
   padded: { gap: 12, paddingHorizontal: 16 },
   paddedWide: { paddingHorizontal: 0 },
-  rowReverse: { flexDirection: 'row-reverse' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  arabicTitle: { fontFamily: TYPOGRAPHY.arabic, fontSize: 18, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicTitle: { fontFamily: TYPOGRAPHY.arabic, fontSize: 18, textAlign: 'left', writingDirection: 'rtl' },
   pressed: { opacity: 0.7 },
 
   glow: { height: 520, left: 0, position: 'absolute', right: 0, top: 0 },
@@ -399,8 +398,7 @@ const styles = StyleSheet.create({
   asideDesktop: { width: DESKTOP_ASIDE_WIDTH },
   single: { alignSelf: 'center', maxWidth: SINGLE_COLUMN_WIDTH, width: '100%' },
   heroWide: { alignItems: 'flex-start', paddingHorizontal: 0 },
-  heroWideArabic: { alignItems: 'flex-end' },
-  textStart: { textAlign: 'auto' },
+  textLeft: { textAlign: 'left' },
   nav: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
   roundButton: {
     alignItems: 'center',
@@ -430,6 +428,7 @@ const styles = StyleSheet.create({
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 36, fontWeight: '700', lineHeight: 38, marginTop: 6, textAlign: 'center' },
   titleArabic: { fontFamily: TYPOGRAPHY.arabic, lineHeight: 52, writingDirection: 'rtl' },
   subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, marginTop: 8, textAlign: 'center' },
+  subtitleArabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 
   section: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 10, marginTop: 26 },
   sectionTitle: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700' },
@@ -454,7 +453,6 @@ const styles = StyleSheet.create({
   },
   rowPressed: { backgroundColor: COLORS.surfaceSoft },
   rowIcon: { alignItems: 'flex-start', height: 40, justifyContent: 'center', width: 32 },
-  rowIconArabic: { alignItems: 'flex-end' },
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700' },
   rowDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
@@ -462,7 +460,7 @@ const styles = StyleSheet.create({
 
   readingRow: { gap: 12 },
   kind: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.4 },
-  kindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  kindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', writingDirection: 'rtl' },
   reading: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 16.5, fontWeight: '600' },
   readingMissing: { color: 'rgba(255, 255, 255, 0.35)' },
 });

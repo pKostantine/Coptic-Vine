@@ -24,7 +24,7 @@ export default function ToggleRow({ label, isArabic = false, active, onPress, di
       accessibilityLabel={label}
       accessibilityState={{ checked: on, disabled }}
       onPress={disabled ? undefined : onPress}
-      style={({ pressed }) => [styles.row, minHeight !== undefined && [styles.rowSized, { minHeight }], isArabic && styles.rowReverse, disabled && styles.rowDisabled, pressed && !disabled && styles.pressed]}
+      style={({ pressed }) => [styles.row, minHeight !== undefined && [styles.rowSized, { minHeight }], disabled && styles.rowDisabled, pressed && !disabled && styles.pressed]}
     >
       <Text style={[styles.label, isArabic && styles.labelArabic, disabled && styles.labelDisabled]} maxFontSizeMultiplier={1.3}>{label}</Text>
       <Switch on={on} />
@@ -55,12 +55,11 @@ const styles = StyleSheet.create({
   },
   // A row of a set height centres the 28pt switch in it, so a 40pt row has 6pt either side.
   rowSized: { paddingVertical: 6 },
-  rowReverse: { flexDirection: 'row-reverse' },
   rowDisabled: { opacity: 0.5 },
   pressed: { backgroundColor: 'rgba(255, 255, 255, 0.09)' },
   label: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600', minWidth: 0 },
   labelDisabled: { color: COLORS.muted },
-  labelArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  labelArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   track: { backgroundColor: 'rgba(255, 255, 255, 0.14)', borderRadius: 99, height: 28, padding: 3, width: 46 },
   trackOn: { backgroundColor: COLORS.gold },
   thumb: { backgroundColor: COLORS.muted, borderRadius: 11, boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.3)', height: 22, width: 22 },

@@ -2,7 +2,7 @@
 import { type ErrorBoundaryProps, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { LinearGradient } from 'expo-linear-gradient';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -172,7 +172,7 @@ export default function MusicLibraryScreen() {
   const recentReleases = library?.recentReleases.slice(0, wide ? GRID_COLUMNS : 10) ?? [];
   const seeAll = (section: 'recent-tracks' | 'recent-releases') => (
     <Pressable accessibilityRole="button" hitSlop={8} onPress={() => openFolder(section)} style={({ pressed }) => pressed && styles.pressed}>
-      <Text style={[styles.seeAll, isArabic && styles.arabicFont]}>{tr('See all', 'Tout voir', 'الكل')}</Text>
+      <Text style={[styles.seeAll, isArabic && styles.arabic]}>{tr('See all', 'Tout voir', 'الكل')}</Text>
     </Pressable>
   );
 
@@ -187,15 +187,14 @@ export default function MusicLibraryScreen() {
         onPress={() => openFolder('likes')}
         style={({ pressed }) => [
           styles.heroOpen,
-          wide ? styles.heroOpenWide : isArabic ? styles.heroOpenArabic : styles.heroOpenStart,
-          wide && isArabic && styles.heroOpenWideArabic,
+          wide ? styles.heroOpenWide : styles.heroOpenStart,
           pressed && styles.pressed,
         ]}
       >
         <View style={[styles.heroIcon, wide && styles.heroIconWide]}>
           <Icon name="heart" size={wide ? 28 : 25} color={COLORS.gold} />
         </View>
-        <View style={[styles.heroText, wide ? (isArabic ? styles.heroTextWideArabic : styles.heroTextWide) : styles.heroTextPhone]}>
+        <View style={[styles.heroText, wide ? styles.heroTextWide : styles.heroTextPhone]}>
           <Text style={[styles.heroTitle, wide && styles.heroTitleWide, isArabic && styles.arabic]} numberOfLines={1}>{likes.title}</Text>
           <Text style={[styles.heroDetail, wide && styles.heroDetailWide, isArabic && styles.arabic]} numberOfLines={1}>{likes.detail}</Text>
         </View>
@@ -210,7 +209,6 @@ export default function MusicLibraryScreen() {
         style={({ pressed }) => [
           styles.heroPlay,
           wide ? styles.heroPlayWide : styles.heroPlayPhone,
-          isArabic ? { left: wide ? 22 : 16 } : { right: wide ? 22 : 16 },
           !likedCount && styles.disabled,
           pressed && styles.pressed,
         ]}
@@ -223,14 +221,14 @@ export default function MusicLibraryScreen() {
   const tiles = (
     <View style={[styles.tiles, wide && styles.tilesWide]}>
       {tileRows.map((row) => (
-        <View key={row.map((folder) => folder.id).join(':')} style={[styles.tileRow, wide && styles.tileRowWide, isArabic && styles.rowReverse]}>
+        <View key={row.map((folder) => folder.id).join(':')} style={[styles.tileRow, wide && styles.tileRowWide]}>
           {row.map((folder) => (
             <Pressable
               key={folder.id}
               accessibilityRole="button"
               accessibilityLabel={`${folder.title}, ${folder.detail}`}
               onPress={() => openFolder(folder.id)}
-              style={({ pressed }) => [styles.tile, isArabic && styles.tileArabic, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
             >
               <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
               {/* In a View of its own so it draws over the gradient on the web, as the text does. */}
@@ -248,8 +246,8 @@ export default function MusicLibraryScreen() {
 
   /** A shelf of covers: a rail on a phone, one row of five on the iPad and desktop. */
   const shelf = (children: ReactNode) => (wide ? (
-    <View style={[styles.grid, isArabic && styles.rowReverse]}>{children}</View>
-  ) : <Rail arabic={isArabic}>{children}</Rail>);
+    <View style={styles.grid}>{children}</View>
+  ) : <Rail>{children}</Rail>);
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -272,14 +270,14 @@ export default function MusicLibraryScreen() {
               <Text style={[styles.authBody, isArabic && styles.arabic]}>
                 {tr('Likes, playlists, follows, and listening history are tied to your account.', 'Vos favoris, playlists, abonnements et historique d’écoute sont liés à votre compte.', 'الإعجابات وقوائم التشغيل وسجل الاستماع مرتبطة بحسابك.')}
               </Text>
-              <Pressable accessibilityRole="button" style={[styles.primaryButton, isArabic && styles.primaryButtonArabic]} onPress={() => router.push('/account')}>
-                <Text style={[styles.primaryButtonText, isArabic && styles.arabicFont]}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text>
+              <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => router.push('/account')}>
+                <Text style={[styles.primaryButtonText, isArabic && styles.arabic]}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text>
               </Pressable>
             </View>
           ) : null}
 
           {loading && !library ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : (
-            <View style={[styles.top, wide ? styles.topWide : styles.gutter, wide && isArabic && styles.rowReverse]}>
+            <View style={[styles.top, wide ? styles.topWide : styles.gutter]}>
               {hero}
               {tiles}
             </View>
@@ -328,17 +326,10 @@ export default function MusicLibraryScreen() {
   );
 }
 
-/** A phone's rail of covers. In Arabic it runs from the right, and opens there, at its first cover. */
-function Rail({ arabic, children }: { arabic: boolean; children: ReactNode }) {
-  const ref = useRef<ScrollView>(null);
+/** A phone's rail of covers. */
+function Rail({ children }: { children: ReactNode }) {
   return (
-    <ScrollView
-      ref={ref}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={[styles.rail, arabic && styles.rowReverse]}
-      onContentSizeChange={arabic ? () => ref.current?.scrollToEnd({ animated: false }) : undefined}
-    >
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
       {children}
     </ScrollView>
   );
@@ -353,9 +344,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 28 },
   contentWide: { paddingHorizontal: WIDE_MARGIN },
   gutter: { marginHorizontal: 16 },
-  rowReverse: { flexDirection: 'row-reverse' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  arabicFont: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   pressed: { opacity: 0.8 },
   disabled: { opacity: 0.45 },
   loader: { marginVertical: SPACING.xl },
@@ -369,16 +358,13 @@ const styles = StyleSheet.create({
   heroOpen: { alignItems: 'center', flexDirection: 'row', gap: 14, padding: 16 },
   // On a phone the play button sits at the row's end: the text stops short of it.
   heroOpenStart: { paddingRight: 76 },
-  heroOpenArabic: { flexDirection: 'row-reverse', paddingLeft: 76 },
   heroOpenWide: { alignItems: 'flex-start', flex: 1, flexDirection: 'column', gap: 0, padding: 22 },
-  heroOpenWideArabic: { alignItems: 'flex-end' },
   heroIcon: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.28)', borderRadius: 16, height: 52, justifyContent: 'center', width: 52 },
   heroIconWide: { height: 60, width: 60 },
   heroText: { minWidth: 0 },
   heroTextPhone: { flex: 1 },
   // On the iPad and desktop the name sits 14 under the icon, clear of the play button in the corner below.
   heroTextWide: { alignSelf: 'stretch', paddingRight: 72, paddingTop: 14 },
-  heroTextWideArabic: { alignSelf: 'stretch', paddingLeft: 72, paddingTop: 14 },
   heroTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   heroTitleWide: { fontSize: 30 },
   heroDetail: { color: 'rgba(255, 255, 255, 0.78)', fontFamily: TYPOGRAPHY.body, fontSize: 13.5, marginTop: 2 },
@@ -390,15 +376,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'absolute',
   },
-  heroPlayPhone: { borderRadius: 23, height: 46, marginTop: -23, top: '50%', width: 46 },
-  heroPlayWide: { borderRadius: 28, bottom: 22, height: 56, width: 56 },
+  heroPlayPhone: { borderRadius: 23, height: 46, marginTop: -23, right: 16, top: '50%', width: 46 },
+  heroPlayWide: { borderRadius: 28, bottom: 22, height: 56, right: 22, width: 56 },
 
   tiles: { gap: 10 },
   tilesWide: { flex: 1 },
   tileRow: { flexDirection: 'row', gap: 10 },
   tileRowWide: { flex: 1 },
   tile: { borderRadius: 18, flex: 1, minHeight: 96, minWidth: 0, overflow: 'hidden', padding: 14 },
-  tileArabic: { alignItems: 'flex-end' },
   tileText: { alignSelf: 'stretch', marginTop: 'auto', paddingTop: 12 },
   tileTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },
   tileDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
@@ -418,7 +403,6 @@ const styles = StyleSheet.create({
   crashBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
   crashActions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   primaryButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.gold, borderRadius: RADII.pill, justifyContent: 'center', marginTop: 4, minHeight: 40, paddingHorizontal: SPACING.lg },
-  primaryButtonArabic: { alignSelf: 'flex-end' },
   primaryButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   secondaryButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: RADII.pill, borderWidth: 1, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.lg },
   secondaryButtonText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },

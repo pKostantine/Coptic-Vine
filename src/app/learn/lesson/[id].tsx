@@ -215,5 +215,5 @@ const styles = StyleSheet.create({
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: SPACING.md },
   downloadWrap: { marginTop: SPACING.lg },
   libraryAction: { marginTop: SPACING.md },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

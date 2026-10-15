@@ -95,12 +95,12 @@ export default function ReleaseTile({
             </>
           )}
           {badge ? (
-            <View style={[styles.badge, arabic ? styles.badgeRight : styles.badgeLeft]}>
+            <View style={styles.badge}>
               <Text style={[styles.badgeText, arabic && styles.arabicBadge]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{arabic ? badge : badge.toUpperCase()}</Text>
             </View>
           ) : null}
         </View>
-        <View style={[styles.text, arabic && styles.rowReverse]}>
+        <View style={styles.text}>
           <View style={styles.titles}>
             <Text style={[styles.title, { fontSize: size.title, lineHeight: size.titleLine }, arabic && styles.arabic]} numberOfLines={titleLines} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
             {subtitle ? <Text style={[styles.subtitle, { fontSize: size.subtitle }, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{subtitle}</Text> : null}
@@ -118,8 +118,7 @@ export default function ReleaseTile({
           onPress={onPlay}
           style={({ pressed }) => [
             styles.play,
-            { borderRadius: size.play / 2, height: size.play, top: width - size.playInset - size.play, width: size.play },
-            arabic ? { left: size.playInset } : { right: size.playInset },
+            { borderRadius: size.play / 2, height: size.play, right: size.playInset, top: width - size.playInset - size.play, width: size.play },
             pressed && styles.pressed,
           ]}
         >
@@ -133,7 +132,7 @@ export default function ReleaseTile({
           accessibilityLabel={likeLabel ?? title}
           hitSlop={8}
           onPress={onToggleLike}
-          style={({ pressed }) => [styles.heart, { top: width + TEXT_GAP + 1 }, arabic ? styles.heartLeft : styles.heartRight, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.heart, { top: width + TEXT_GAP + 1 }, pressed && styles.pressed]}
         >
           <Icon name={liked ? 'heart' : 'heart-outline'} size={size.heart} color={liked ? COLORS.gold : COLORS.muted} />
         </Pressable>
@@ -155,9 +154,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   coverCross: { alignItems: 'center', bottom: 0, justifyContent: 'center', left: 0, opacity: 0.55, position: 'absolute', right: 0, top: 0 },
-  badge: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, height: 22, justifyContent: 'center', paddingHorizontal: 9, position: 'absolute', top: 10 },
-  badgeLeft: { left: 10 },
-  badgeRight: { right: 10 },
+  badge: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, height: 22, justifyContent: 'center', left: 10, paddingHorizontal: 9, position: 'absolute', top: 10 },
   badgeText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 0.9 },
   arabicBadge: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
   // The play button sits on the cover's lower corner, beside the tile's own tap target.
@@ -168,14 +165,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'absolute',
   },
-  heart: { position: 'absolute' },
-  heartRight: { right: 0 },
-  heartLeft: { left: 0 },
+  heart: { position: 'absolute', right: 0 },
   text: { alignItems: 'flex-start', flexDirection: 'row', gap: 6, marginTop: TEXT_GAP },
-  rowReverse: { flexDirection: 'row-reverse' },
   titles: { flex: 1, minWidth: 0 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontWeight: '600' },
   subtitle: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, marginTop: 2 },
-  // Right-aligned, but in the direction of its own words: a Latin title reads from its start and is cut at its end.
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right' },
+  // Left-aligned as in every language, but in the direction of its own words: a Latin title reads from its start and is cut at its end.
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left' },
 });

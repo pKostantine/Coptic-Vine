@@ -40,7 +40,7 @@ export default function FeaturedRelease({ release, arabic = false, onOpen, onPla
         <LinearGradient colors={['#2B5A30', '#0B1C10']} style={StyleSheet.absoluteFill} />
       )}
       <LinearGradient colors={['rgba(11, 28, 16, 0.15)', 'rgba(11, 28, 16, 0.86)']} style={StyleSheet.absoluteFill} pointerEvents="none" />
-      <View style={[styles.inner, arabic && styles.rowReverse]}>
+      <View style={styles.inner}>
         <Pressable accessibilityRole="button" accessibilityLabel={`${release.title}, ${artist}`} onPress={onOpen} style={({ pressed }) => [styles.art, pressed && styles.pressed]}>
           <MusicArtwork asset={release.coverAsset} size={128} label={release.title} />
         </Pressable>
@@ -49,12 +49,12 @@ export default function FeaturedRelease({ release, arabic = false, onOpen, onPla
             <Text style={[styles.title, arabic && styles.arabicText]} numberOfLines={3} maxFontSizeMultiplier={MAX_FONT_SCALE}>{release.title}</Text>
             <Text style={[styles.artist, arabic && styles.arabicText]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{artist}</Text>
           </Pressable>
-          <View style={[styles.actions, arabic && styles.rowReverse]}>
+          <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`${playing ? tr('Pause', 'Pause', 'إيقاف مؤقت') : tr('Play', 'Lire', 'تشغيل')}: ${release.title}`}
               onPress={onPlay}
-              style={({ pressed }) => [styles.play, arabic && styles.rowReverse, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.play, pressed && styles.pressed]}
             >
               <Icon name={playing ? 'pause' : 'play'} size={16} color={COLORS.greenDeep} />
               <Text style={[styles.playText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{playing ? tr('Pause', 'Pause', 'إيقاف') : tr('Play', 'Lire', 'تشغيل')}</Text>
@@ -83,7 +83,6 @@ const styles = StyleSheet.create({
   // The cover, blurred, bleeding past the card's edges so the blur has no hard rim.
   wash: { bottom: -40, left: -40, opacity: 0.75, position: 'absolute', right: -40, top: -40 },
   inner: { alignItems: 'center', flexDirection: 'row', gap: 16, padding: 16 },
-  rowReverse: { flexDirection: 'row-reverse' },
   art: { borderRadius: 16, boxShadow: '0px 14px 30px rgba(0, 0, 0, 0.55)' },
   pressed: { opacity: 0.8 },
   text: { flex: 1, minWidth: 0 },
@@ -93,7 +92,7 @@ const styles = StyleSheet.create({
   play: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, flexDirection: 'row', gap: 6, height: 38, paddingLeft: 13, paddingRight: 16 },
   playText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
   like: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.13)', borderRadius: 19, height: 38, justifyContent: 'center', width: 38 },
-  // Right-aligned, but in the direction of its own words: a Latin title reads from its start and is cut at its end.
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  // Left-aligned as in every language, but in the direction of its own words: a Latin title reads from its start and is cut at its end.
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

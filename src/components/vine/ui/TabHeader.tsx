@@ -30,7 +30,7 @@ export default function TabHeader({ title, arabic, wide, nav }: TabHeaderProps) 
     );
   }
   return (
-    <View style={[styles.row, arabic && styles.rowReverse]}>
+    <View style={styles.row}>
       <Text style={[styles.title, arabic && styles.arabic]} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {title}
       </Text>
@@ -41,9 +41,8 @@ export default function TabHeader({ title, arabic, wide, nav }: TabHeaderProps) 
 
 const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', gap: 24, justifyContent: 'space-between' },
-  rowReverse: { flexDirection: 'row-reverse' },
   title: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 38, fontWeight: '700', lineHeight: 42 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   // The pill keeps the design's 450pt (440 inside its padding and border) where there is room, and gives way on a narrow iPad.
   nav: { flexShrink: 1, minWidth: 300, width: 450 },
 });

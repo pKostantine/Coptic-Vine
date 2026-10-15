@@ -70,7 +70,7 @@ export function BookSettingsPanel({ wide = false, onOpenSaintHymns }: BookSettin
     </Text>
   );
   const chips = <Key extends string>(options: { key: Key; label: string; arabic: string; french: string }[], isOn: (key: Key) => boolean, onPress: (key: Key) => void, role: 'checkbox' | 'radio') => (
-    <View style={[styles.chips, arabic && styles.rowReverse]}>
+    <View style={styles.chips}>
       {options.map((item) => {
         const on = isOn(item.key);
         return (
@@ -125,11 +125,11 @@ export function BookSettingsPanel({ wide = false, onOpenSaintHymns }: BookSettin
           accessibilityRole="button"
           accessibilityLabel={`${labelText(SETTINGS_LABELS.saintHymns)}, ${selectedCount}`}
           onPress={onOpenSaintHymns}
-          style={({ pressed }) => [styles.linkRow, { minHeight: rowHeight }, arabic && styles.rowReverse, pressed && styles.linkRowPressed]}
+          style={({ pressed }) => [styles.linkRow, { minHeight: rowHeight }, pressed && styles.linkRowPressed]}
         >
           <Text style={[styles.linkLabel, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{labelText(SETTINGS_LABELS.saintHymns)}</Text>
           <Text style={[styles.linkValue, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{selectedCount}</Text>
-          <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+          <Icon name="chevron-forward" size={17} color={COLORS.gold} />
         </Pressable>
         <ToggleRow label={labelText(SETTINGS_LABELS.comments)} isArabic={arabic} active={preferences.displayComments} onPress={toggleDisplayComments} minHeight={rowHeight} />
         <ToggleRow label={labelText(SETTINGS_LABELS.silentPrayers)} isArabic={arabic} active={preferences.displaySilentPrayers} onPress={toggleDisplaySilentPrayers} minHeight={rowHeight} />
@@ -140,7 +140,7 @@ export function BookSettingsPanel({ wide = false, onOpenSaintHymns }: BookSettin
 
   if (wide) {
     return (
-      <View style={[styles.columns, arabic && styles.rowReverse]}>
+      <View style={styles.columns}>
         <View style={styles.column}>
           {languages}
           {content}
@@ -209,7 +209,6 @@ const styles = StyleSheet.create({
   dialogBody: { paddingBottom: 4, paddingHorizontal: 10, paddingTop: 14 },
   columns: { flexDirection: 'row', gap: 28 },
   column: { flex: 1, minWidth: 0 },
-  rowReverse: { flexDirection: 'row-reverse' },
   pressed: { opacity: 0.75 },
   kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8, marginHorizontal: 2 },
   kickerPhone: { marginBottom: 7, marginTop: 12 },
@@ -217,7 +216,7 @@ const styles = StyleSheet.create({
   kickerFirstPhone: { marginTop: 2 },
   kickerWide: { marginBottom: 9, marginTop: 22 },
   kickerFirstWide: { marginTop: 0 },
-  kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', writingDirection: 'rtl' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 99, height: 38, justifyContent: 'center', paddingHorizontal: 15 },
   chipPhone: { height: 34 },
@@ -230,5 +229,5 @@ const styles = StyleSheet.create({
   linkRowPressed: { backgroundColor: 'rgba(255, 255, 255, 0.09)' },
   linkLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600', minWidth: 0 },
   linkValue: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

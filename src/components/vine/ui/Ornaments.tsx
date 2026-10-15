@@ -42,15 +42,15 @@ export function BuddedCross({ size }: { size: number }) {
 /**
  * The vine drawn out from a section heading to the edge of the page, fading
  * away after the first 40% of its run (Coptic Vine design, "Book Pages"). It fills
- * the width it is given; in Arabic it runs from the right.
+ * the width it is given.
  */
-export function VineRule({ height = 18, arabic = false }: { height?: number; arabic?: boolean }) {
+export function VineRule({ height = 18 }: { height?: number }) {
   const [width, setWidth] = useState(0);
   // Unique per rule: on web every rule's mask sits in the same document.
   const id = `vine${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <View
-      style={[styles.rule, { height }, arabic && styles.mirrored]}
+      style={[styles.rule, { height }]}
       pointerEvents="none"
       onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))}
     >
@@ -71,5 +71,4 @@ function vineRuleXml(width: number, height: number, id: string): string {
 
 const styles = StyleSheet.create({
   rule: { flex: 1, minWidth: 0, opacity: 0.6, overflow: 'hidden' },
-  mirrored: { transform: [{ scaleX: -1 }] },
 });

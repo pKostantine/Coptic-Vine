@@ -147,5 +147,5 @@ const styles = StyleSheet.create({
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.sm },
   accountButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.learning, borderRadius: 8, justifyContent: 'center', marginTop: SPACING.md, minHeight: 40, paddingHorizontal: SPACING.md },
   accountButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '900' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

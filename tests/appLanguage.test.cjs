@@ -59,3 +59,43 @@ test('every component file rendering App Language text opts out of the React Com
   walk('src');
   assert.deepEqual(missing, []);
 });
+
+// The App Language changes the words and nothing else: in Arabic the app keeps
+// the English layout, its rows in the same order, its arrows pointing the same
+// way and its swipes going the same way. A hymn's, a verse's or a lyric's own
+// Arabic is content, set by its own language, so the readers are left out.
+test('Arabic keeps the English layout: no row, arrow or swipe turns round for it', () => {
+  const content = new Set([
+    'src/components/vine/documentHtml.ts',
+    'src/components/vine/bibleDocumentHtml.ts',
+    'src/components/vine/VerseBlock.js',
+    'src/components/vine/SlideshowContainer.js',
+    'src/components/vine/JustifiedText.js',
+  ]);
+  const mirrors = [
+    /row-reverse/,
+    /\?\s*'(chevron|arrow)-(back|forward)'\s*:\s*'(chevron|arrow)-(back|forward)'/,
+    /scaleX:\s*-1/,
+    /\b(arabic|isArabic|showArabic|rtl)\s*&&\s*styles\.\w*(Reverse|Mirror|mirrored|Right|End)\b/,
+  ];
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(tsx?|js)$/.test(full) && !content.has(full)) {
+        const source = fs.readFileSync(full, 'utf8');
+        for (const pattern of mirrors) if (pattern.test(source)) found.push(`${full}: ${pattern}`);
+      }
+    }
+  };
+  walk('src');
+  assert.deepEqual(found, []);
+
+  // A swipe to the left is the next week, whatever the language.
+  const dayBlock = fs.readFileSync('src/components/vine/ui/DayBlock.tsx', 'utf8');
+  assert.match(dayBlock, /const towardsLater = gesture\.dx < 0;/);
+  // The calendar's left arrow goes back a month, and says so in Arabic too.
+  const calendar = fs.readFileSync('src/components/vine/ui/CalendarPanel.tsx', 'utf8');
+  assert.match(calendar, /accessibilityLabel=\{tr\('Previous month', 'Mois précédent', 'الشهر السابق'\)\} style=\{styles\.arrow\} onPress=\{goPreviousMonth\}>\s*<Icon name="chevron-back"/);
+});

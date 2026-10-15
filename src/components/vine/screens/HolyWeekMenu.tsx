@@ -229,7 +229,7 @@ function HoursOf({ day, current, arabic, bookmarked, onOpen }: { day: HolyWeekDa
 
   return (
     <View style={styles.hours}>
-      <View style={[styles.hoursHead, arabic && styles.rowReverse]}>
+      <View style={styles.hoursHead}>
         <View style={styles.hoursIcon}>
           <Icon name={eve ? 'moon' : 'sunny'} size={17} color={accent} />
         </View>
@@ -241,12 +241,12 @@ function HoursOf({ day, current, arabic, bookmarked, onOpen }: { day: HolyWeekDa
             <Text style={[styles.nowTagText, arabic && styles.arabicSmall]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{now}</Text>
           </View>
         ) : null}
-        <Text style={[styles.dayTitle, arabic ? styles.dayTitleArabic : styles.dayTitleLatin]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        <Text style={[styles.dayTitle, arabic && styles.dayTitleArabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
           {entryLabel(day)}
         </Text>
       </View>
       {rows.map((hours) => (
-        <View key={hours[0].id} style={[styles.chipRow, arabic && styles.rowReverse]}>
+        <View key={hours[0].id} style={styles.chipRow}>
           {hours.map((hour) => {
             const label = hour.hourNumber ? hourLabel(hour, arabic) : tr(hour.shortTitle, hour.shortFrench, hour.shortArabic);
             return (
@@ -261,7 +261,7 @@ function HoursOf({ day, current, arabic, bookmarked, onOpen }: { day: HolyWeekDa
                   {label}
                 </Text>
                 {bookmarked(hour) ? (
-                  <View style={[styles.chipMark, arabic ? styles.chipMarkArabic : null]}>
+                  <View style={styles.chipMark}>
                     <Icon name="bookmark" size={9} color={COLORS.gold} />
                   </View>
                 ) : null}
@@ -277,7 +277,6 @@ function HoursOf({ day, current, arabic, bookmarked, onOpen }: { day: HolyWeekDa
 }
 
 const styles = StyleSheet.create({
-  rowReverse: { flexDirection: 'row-reverse' },
   arabicSmall: { fontFamily: TYPOGRAPHY.arabic },
   pressed: { opacity: 0.75 },
   crimsonBase: { backgroundColor: '#050101' },
@@ -293,15 +292,13 @@ const styles = StyleSheet.create({
   kindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0 },
   nowTag: { backgroundColor: COLORS.gold, borderRadius: 99, justifyContent: 'center', paddingHorizontal: 9, paddingVertical: 2 },
   nowTagText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700' },
-  dayTitle: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700' },
-  dayTitleLatin: { marginLeft: 'auto' },
-  dayTitleArabic: { fontFamily: TYPOGRAPHY.arabic, marginRight: 'auto', writingDirection: 'rtl' },
+  dayTitle: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', marginLeft: 'auto' },
+  dayTitleArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   chipRow: { flexDirection: 'row', gap: 6 },
   chip: { alignItems: 'center', borderRadius: 12, borderWidth: 1, flex: 1, height: 40, justifyContent: 'center', minWidth: 0, paddingHorizontal: 6 },
   chipDay: { backgroundColor: 'rgba(227, 181, 59, 0.12)', borderColor: 'rgba(227, 181, 59, 0.28)' },
   chipEve: { backgroundColor: 'rgba(142, 197, 255, 0.1)', borderColor: 'rgba(142, 197, 255, 0.28)' },
   chipText: { fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
   chipMark: { position: 'absolute', right: 4, top: 3 },
-  chipMarkArabic: { left: 4, right: undefined },
   chipGap: { flex: 1 },
 });

@@ -924,7 +924,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.black,
   },
   dismissLayer: { flex: 1, minHeight: 0 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 
   header: {
     height: HEADER_HEIGHT,

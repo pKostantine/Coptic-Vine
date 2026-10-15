@@ -231,7 +231,7 @@ export default function SynaxariumBrowserScreen() {
       {loading ? (
         <View style={styles.centerState}>
           <ActivityIndicator color={COLORS.gold} />
-          <Text style={[styles.stateText, isArabic && styles.arabic]}>
+          <Text style={[styles.stateText, isArabic && styles.arabicCentered]}>
             {tr('Loading Synaxarium…', 'Chargement du Synaxaire…', 'جارٍ تحميل السنكسار…')}
           </Text>
         </View>
@@ -240,10 +240,10 @@ export default function SynaxariumBrowserScreen() {
       ) : visibleDays.length === 0 ? (
         <View style={styles.centerState}>
           <Icon name="search-outline" size={30} color={COLORS.goldBright} />
-          <Text style={[styles.errorTitle, isArabic && styles.arabic]}>
+          <Text style={[styles.errorTitle, isArabic && styles.arabicCentered]}>
             {tr('No results', 'Aucun résultat', 'لا توجد نتائج')}
           </Text>
-          <Text style={[styles.stateText, isArabic && styles.arabic]}>
+          <Text style={[styles.stateText, isArabic && styles.arabicCentered]}>
             {tr('Try another name or spelling.', 'Essayez un autre nom ou une autre orthographe.', 'جرّب اسماً آخر أو صيغة مختلفة.')}
           </Text>
         </View>
@@ -462,5 +462,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   pressed: { opacity: 0.68, transform: [{ scale: 0.96 }] },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

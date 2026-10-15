@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
   arabic: {
     fontFamily: TYPOGRAPHY.arabic,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
 });

@@ -98,7 +98,7 @@ export default function TodayCard({
   const headingBlock = (
     <>
       <Text
-        style={[headingSize === 'small' ? styles.headingSmall : styles.heading, { color: theme.text }, arabic && styles.arabicHeading, fittedSize ? { fontSize: fittedSize } : null]}
+        style={[headingSize === 'small' ? styles.headingSmall : styles.heading, { color: theme.text }, arabic && styles.arabicText, fittedSize ? { fontSize: fittedSize } : null]}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         numberOfLines={headingSize === 'small' ? 2 : 1}
         adjustsFontSizeToFit={headingSize === 'large'}
@@ -141,7 +141,7 @@ export default function TodayCard({
           <View style={styles.divider} pointerEvents="none">
             <VineDivider width={200} height={26} />
           </View>
-          <View style={[styles.footer, arabic && styles.rowReverse]}>
+          <View style={styles.footer}>
             <View style={styles.footerText}>
               <Text style={[styles.footerLabel, { color: theme.muted }, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
                 {footer.label}
@@ -166,7 +166,7 @@ function GoButton({ action, arabic }: { action: TodayCardAction; arabic: boolean
       accessibilityRole="button"
       accessibilityLabel={action.accessibilityLabel ?? action.label}
       onPress={action.onPress}
-      style={({ pressed }) => [styles.go, arabic && styles.rowReverse, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.go, pressed && styles.pressed]}
     >
       {action.leadingIcon ? <Icon name={action.leadingIcon} size={14} color={COLORS.greenDeep} /> : null}
       <Text style={[styles.goText, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{action.label}</Text>
@@ -197,7 +197,7 @@ export interface DayStripItem {
  */
 export function DayStrip({ items, theme, arabic, variant = 'days' }: { items: DayStripItem[]; theme: DayBlockTheme; arabic: boolean; variant?: 'days' | 'hours' }) {
   return (
-    <View style={[styles.strip, arabic && styles.rowReverse]}>
+    <View style={styles.strip}>
       {items.map((item) => {
         const color = (normal: string) => (item.selected ? theme.selectedText : normal);
         return (
@@ -209,7 +209,7 @@ export function DayStrip({ items, theme, arabic, variant = 'days' }: { items: Da
             onPress={item.onPress}
             style={({ pressed }) => [styles.stripItem, item.selected && { backgroundColor: theme.selected }, pressed && !item.selected && styles.stripItemPressed]}
           >
-            {item.dot ? <View style={[styles.stripDot, arabic ? styles.stripDotArabic : null, { backgroundColor: item.selected ? theme.selectedText : COLORS.gold }]} /> : null}
+            {item.dot ? <View style={[styles.stripDot, { backgroundColor: item.selected ? theme.selectedText : COLORS.gold }]} /> : null}
             <Text
               style={[variant === 'hours' ? styles.stripLabelHours : styles.stripLabel, { color: color(theme.muted) }, arabic && styles.arabicSmall]}
               numberOfLines={1}
@@ -296,7 +296,6 @@ const styles = StyleSheet.create({
   block: { borderRadius: 24, overflow: 'hidden', padding: 1 },
   inner: { paddingHorizontal: 16, paddingTop: 16 },
   innerAlone: { paddingBottom: 18 },
-  rowReverse: { flexDirection: 'row-reverse' },
   date: { marginTop: 20 },
   // The design sets the date solid (line-height 1) with 8pt under it; two
   // points of that gap move into the line so a descender is never clipped.
@@ -315,7 +314,6 @@ const styles = StyleSheet.create({
   stripIcon: { height: 23, justifyContent: 'center' },
   stripSub: { fontFamily: TYPOGRAPHY.body, fontSize: 10 },
   stripDot: { borderRadius: 2, height: 4, position: 'absolute', right: 9, top: 6, width: 4 },
-  stripDotArabic: { left: 9, right: undefined },
   divider: { alignItems: 'center', marginTop: 14, opacity: 0.85 },
   footer: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingBottom: 14, paddingHorizontal: 16, paddingTop: 12 },
   footerText: { flex: 1, minWidth: 0 },
@@ -333,7 +331,6 @@ const styles = StyleSheet.create({
   },
   goText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   pressed: { opacity: 0.75 },
-  arabicHeading: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicSmall: { fontFamily: TYPOGRAPHY.arabic },
 });

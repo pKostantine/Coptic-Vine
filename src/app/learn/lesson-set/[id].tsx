@@ -74,20 +74,20 @@ export default function LearningLessonSetScreen() {
           <View style={styles.hero}>
             <LearningArtwork asset={lessonSet.coverAsset} size={190} label={lessonSet.title} />
             <View style={styles.heroInfo}>
-              <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{tr('HYMN COURSE', 'COURS D’HYMNE', 'منهج لحن')}</Text>
-              <Text style={[styles.title, isArabic && styles.arabic]}>{lessonSet.title}</Text>
+              <Text style={[styles.eyebrow, isArabic && styles.arabicCentered]}>{tr('HYMN COURSE', 'COURS D’HYMNE', 'منهج لحن')}</Text>
+              <Text style={[styles.title, isArabic && styles.arabicCentered]}>{lessonSet.title}</Text>
               <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/hymn/[id]', params: { id: lessonSet.hymn.id } })}>
-                <Text style={[styles.hymn, isArabic && styles.arabic]}>{lessonSet.hymn.title}</Text>
+                <Text style={[styles.hymn, isArabic && styles.arabicCentered]}>{lessonSet.hymn.title}</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: lessonSet.cantor.id } })}>
-                <Text style={[styles.cantor, isArabic && styles.arabic]}>{lessonSet.cantor.displayName}</Text>
+                <Text style={[styles.cantor, isArabic && styles.arabicCentered]}>{lessonSet.cantor.displayName}</Text>
               </Pressable>
               {lessonSet.season ? (
                 <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: lessonSet.season!.id } })}>
-                  <Text style={[styles.season, isArabic && styles.arabic]}>{lessonSet.season.title}</Text>
+                  <Text style={[styles.season, isArabic && styles.arabicCentered]}>{lessonSet.season.title}</Text>
                 </Pressable>
               ) : null}
-              {lessonSet.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{lessonSet.description}</Text> : null}
+              {lessonSet.description ? <Text style={[styles.description, isArabic && styles.arabicCentered]}>{lessonSet.description}</Text> : null}
               <View style={styles.actions}>
                 <Pressable accessibilityRole="button" disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
                   <Text style={styles.playAllText}>▶  {tr('Play Audio Lessons', 'Lire les leçons audio', 'تشغيل الدروس الصوتية')}</Text>
@@ -173,5 +173,6 @@ const styles = StyleSheet.create({
   mediaList: { overflow: 'hidden', borderRadius: RADII.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center', padding: SPACING.lg },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

@@ -91,5 +91,5 @@ const styles = StyleSheet.create({
   play: { width: 22, textAlign: 'center', color: COLORS.learningBright, fontSize: 12 },
   trailing: { paddingRight: SPACING.sm },
   activeText: { color: COLORS.learningBright },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

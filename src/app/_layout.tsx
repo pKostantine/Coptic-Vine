@@ -84,14 +84,13 @@ function AppFrame() {
   const layout = useLayoutMode();
   const pathname = usePathname();
   const segments = useSegments() as string[];
-  const { preferences } = useReadingPreferences();
   // A full now-playing screen is an overlay, not a route, so the segments alone
   // cannot tell us it is open — the overlay reports it instead.
   const { nowPlayingExpanded } = useBottomChrome();
   const showSideBar = layout === 'desktop' && !keepsWholeWindow(segments) && !nowPlayingExpanded;
 
   return (
-    <View style={{ flex: 1, flexDirection: preferences.appLanguage === 'ar' ? 'row-reverse' : 'row', backgroundColor: COLORS.black }}>
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: COLORS.black }}>
       {showSideBar ? <SideBar pathname={pathname} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <AppStack />

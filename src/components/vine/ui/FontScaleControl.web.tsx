@@ -40,7 +40,7 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
       );
     };
     return (
-      <View style={[styles.stepperRow, isArabic && styles.rowReverse]}>
+      <View style={styles.stepperRow}>
         <Text style={[styles.label, styles.stepperLabel, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{label}</Text>
         <View style={styles.stepper}>
           {stepButton(-1)}
@@ -59,7 +59,7 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
 
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
-      <View style={[styles.header, isArabic && styles.rowReverse]}>
+      <View style={styles.header}>
         <Text style={[styles.label, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{label}</Text>
         <Text style={[styles.value, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>
           {value}
@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
   stepButtonDisabled: { opacity: 0.4 },
   stepperValue: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '700', minWidth: 30, textAlign: 'center' },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  rowReverse: { flexDirection: 'row-reverse' },
-  label: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
+  // Left set even in Arabic, whose right-to-left text would otherwise take the row's far side.
+  label: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600', textAlign: 'left' },
   value: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', minWidth: 24, textAlign: 'right' },
   row: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   // Tall enough to click, the rail drawn through its middle; it reaches 3.5pt
@@ -121,7 +121,6 @@ const styles = StyleSheet.create({
   endMarkerLarge: { fontSize: 21, lineHeight: 21 },
   arabicText: {
     fontFamily: TYPOGRAPHY.arabic,
-    textAlign: 'right',
     writingDirection: 'rtl',
   },
 });

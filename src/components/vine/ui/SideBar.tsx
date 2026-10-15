@@ -77,7 +77,7 @@ export default function SideBar({ pathname }: { pathname: string }) {
 
   return (
     <View style={[styles.side, { paddingTop: insets.top + 24 }]}>
-      <View style={[styles.brand, arabic && styles.rowReverse]}>
+      <View style={styles.brand}>
         <Image source={require('../../../../assets/images/coptic-vine-seal-screen.png')} style={styles.seal} accessibilityIgnoresInvertColors />
         <Text style={styles.wordmark} numberOfLines={1}>Coptic Vine</Text>
       </View>
@@ -95,7 +95,6 @@ export default function SideBar({ pathname }: { pathname: string }) {
             onPress={() => router.replace(section.href as never)}
             style={(state) => [
               styles.item,
-              arabic && styles.rowReverse,
               on && { backgroundColor: COLORS.goldSoft },
               !on && (isHovered(state) || state.pressed) && styles.itemHover,
             ]}
@@ -122,7 +121,6 @@ export default function SideBar({ pathname }: { pathname: string }) {
 
 const styles = StyleSheet.create({
   side: { backgroundColor: COLORS.greenDeep, gap: 4, paddingBottom: 24, paddingHorizontal: 16, width: SIDEBAR_WIDTH },
-  rowReverse: { flexDirection: 'row-reverse' },
   brand: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingBottom: 22, paddingHorizontal: 8 },
   seal: { borderRadius: 22, height: 44, width: 44 },
   wordmark: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
@@ -132,5 +130,5 @@ const styles = StyleSheet.create({
   foot: { marginTop: 'auto', paddingHorizontal: 8 },
   footText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19.5 },
   footCoptic: { color: COLORS.goldBright, fontWeight: '600' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

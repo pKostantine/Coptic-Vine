@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
   headerTitleCompact: { fontSize: 18 },
   headerMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
   headerMetaCompact: { fontSize: 11 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',

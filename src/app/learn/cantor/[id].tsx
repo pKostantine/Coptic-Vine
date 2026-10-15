@@ -92,12 +92,12 @@ export default function LearningCantorScreen() {
   // A phone sets two 140pt covers side by side; the iPad and desktop three in each of two columns.
   const gap = wide ? GRID_GAP : 12;
   const tileWidth = wide ? Math.floor(((available - COLUMN_GAP) / 2 - GRID_GAP * 2) / 3) : 140;
-  const chevron = <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={wide ? 20 : 18} color={COLORS.gold} />;
+  const chevron = <Icon name="chevron-forward" size={wide ? 20 : 18} color={COLORS.gold} />;
 
   // In the iPad's and desktop's columns the sections sit flush; the row of columns takes the margins.
   const sectionGutter = wide ? 0 : gutter;
   const empty = (text: string) => (
-    <View style={[styles.empty, { marginHorizontal: sectionGutter }, arabic && styles.rowReverse]}>
+    <View style={[styles.empty, { marginHorizontal: sectionGutter }]}>
       <View style={styles.emptyCross}><BuddedCross size={22} /></View>
       <Text style={[styles.emptyText, arabic && styles.arabic]}>{text}</Text>
     </View>
@@ -112,7 +112,7 @@ export default function LearningCantorScreen() {
         {tr('Ordered recordings for listening and review', 'Enregistrements ordonnés pour l’écoute et la révision', 'تسجيلات مرتبة للاستماع والمراجعة')}
       </Text>
       {cantor.albums.length ? (
-        <View style={[styles.grid, { gap, paddingHorizontal: sectionGutter }, arabic && styles.rowReverse]}>
+        <View style={[styles.grid, { gap, paddingHorizontal: sectionGutter }]}>
           {cantor.albums.map((album) => {
             const albumPlaying = albumIsCurrent(album.id) && playing;
             return (
@@ -148,7 +148,7 @@ export default function LearningCantorScreen() {
         {tr('Step-by-step study for individual hymns', 'Étude pas à pas de chaque hymne', 'دروس خطوة بخطوة لكل لحن')}
       </Text>
       {cantor.lessonSets.length ? (
-        <View style={[styles.grid, { gap, paddingHorizontal: sectionGutter }, arabic && styles.rowReverse]}>
+        <View style={[styles.grid, { gap, paddingHorizontal: sectionGutter }]}>
           {cantor.lessonSets.map((lessonSet) => (
             <ReleaseTile
               key={lessonSet.id}
@@ -175,7 +175,7 @@ export default function LearningCantorScreen() {
       {!cantor ? (
         <View style={styles.pending}>
           <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} onPress={() => goBack(router, '/learn')} style={({ pressed }) => [styles.pendingBack, pressed && styles.pressed]}>
-            <Icon name={arabic ? 'chevron-forward' : 'chevron-back'} size={20} color={COLORS.gold} />
+            <Icon name="chevron-back" size={20} color={COLORS.gold} />
           </Pressable>
           {error ? (
             <LoadFailure error={error} layout="inline" onRetry={() => { setError(null); setAttempt((count) => count + 1); }} />
@@ -200,7 +200,7 @@ export default function LearningCantorScreen() {
 
             {wide ? (
               <PageGutterProvider gutter={0}>
-                <View style={[styles.columns, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+                <View style={[styles.columns, { paddingHorizontal: gutter }]}>
                   <View style={styles.column}>{albums}</View>
                   <View style={styles.column}>{lessonSets}</View>
                 </View>
@@ -227,7 +227,6 @@ const styles = StyleSheet.create({
   pendingBack: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   loader: { marginTop: 48 },
   pressed: { opacity: 0.7 },
-  rowReverse: { flexDirection: 'row-reverse' },
   // A phone sets the sections 22pt under what comes before them, not the page's 28.
   phoneSection: { marginTop: -6 },
   sub: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, lineHeight: 19, marginBottom: 12, marginTop: -4 },
@@ -237,5 +236,5 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   emptyCross: { opacity: 0.5 },
   emptyText: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

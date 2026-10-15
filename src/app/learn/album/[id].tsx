@@ -61,17 +61,17 @@ export default function LearningAlbumScreen() {
           <View style={styles.hero}>
             <LearningArtwork asset={album.coverAsset} size={210} label={album.title} />
             <View style={styles.heroInfo}>
-              <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{tr('LEARNING ALBUM', 'ALBUM D’APPRENTISSAGE', 'ألبوم تعلّم')}</Text>
-              <Text style={[styles.title, isArabic && styles.arabic]}>{album.title}</Text>
+              <Text style={[styles.eyebrow, isArabic && styles.arabicCentered]}>{tr('LEARNING ALBUM', 'ALBUM D’APPRENTISSAGE', 'ألبوم تعلّم')}</Text>
+              <Text style={[styles.title, isArabic && styles.arabicCentered]}>{album.title}</Text>
               <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: album.cantor.id } })}>
-                <Text style={[styles.cantor, isArabic && styles.arabic]}>{album.cantor.displayName}</Text>
+                <Text style={[styles.cantor, isArabic && styles.arabicCentered]}>{album.cantor.displayName}</Text>
               </Pressable>
               {album.season ? (
                 <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: album.season!.id } })}>
-                  <Text style={[styles.season, isArabic && styles.arabic]}>{album.season.title}</Text>
+                  <Text style={[styles.season, isArabic && styles.arabicCentered]}>{album.season.title}</Text>
                 </Pressable>
               ) : null}
-              {album.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{album.description}</Text> : null}
+              {album.description ? <Text style={[styles.description, isArabic && styles.arabicCentered]}>{album.description}</Text> : null}
               <View style={styles.actions}>
                 <Pressable accessibilityRole="button" disabled={!queue.length} style={[styles.playAll, !queue.length && styles.disabled]} onPress={() => queue.length && playQueue(queue, 0)}>
                   <Text style={styles.playAllText}>▶  {tr('Play All', 'Tout lire', 'تشغيل الكل')}</Text>
@@ -160,5 +160,6 @@ const styles = StyleSheet.create({
   mediaList: { overflow: 'hidden', borderRadius: RADII.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center', padding: SPACING.lg },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

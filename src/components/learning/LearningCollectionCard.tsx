@@ -70,5 +70,5 @@ const styles = StyleSheet.create({
   meta: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '800', marginTop: 4, textTransform: 'uppercase' },
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 17, marginTop: 4 },
   chevron: { color: COLORS.learning, fontSize: 28, paddingHorizontal: SPACING.xs },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

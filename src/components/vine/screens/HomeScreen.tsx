@@ -201,7 +201,7 @@ export default function HomeScreen() {
   );
   const prayCard = (
     <>
-      <View style={[card, styles.pray, arabic && styles.rowReverse]}>
+      <View style={[card, styles.pray]}>
         <View style={styles.flex}>
           <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Pray now · Agpeya', 'Prier maintenant · Agpia', 'صلِّ الآن · الأجبية')}</Text>
           <Text style={[styles.prayTitle, arabic && styles.arabic]} numberOfLines={2}>{tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}</Text>
@@ -210,7 +210,7 @@ export default function HomeScreen() {
           accessibilityRole="button"
           accessibilityLabel={`${tr('Pray', 'Prier', 'صلِّ')}: ${tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}`}
           onPress={() => router.push(`/agpeya/${hour.id}` as never)}
-          style={({ pressed }) => [styles.prayButton, arabic && styles.rowReverse, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.prayButton, pressed && styles.pressed]}
         >
           <Icon name="play" size={16} color={COLORS.greenDeep} />
           <Text style={[styles.prayButtonText, arabic && styles.arabicTight]}>{tr('Pray', 'Prier', 'صلِّ')}</Text>
@@ -228,7 +228,7 @@ export default function HomeScreen() {
   );
   /** A pill of options across a framed card: the services, today and tomorrow. */
   const segment = <T extends string>(options: { key: T; label: string }[], selected: T, onSelect: (key: T) => void) => (
-    <View style={[styles.segment, arabic && styles.rowReverse]}>
+    <View style={styles.segment}>
       {options.map((option) => {
         const active = selected === option.key;
         return (
@@ -263,7 +263,7 @@ export default function HomeScreen() {
         <Text style={[styles.framedTitle, arabic && styles.arabicCentered]}>{readingsTitle}</Text>
         <Text style={[styles.framedDate, arabic && styles.arabicCentered]}>{dayLine(readingsDate)}</Text>
       </Pressable>
-      <View style={[styles.segmentRow, arabic && styles.rowReverse]}>
+      <View style={styles.segmentRow}>
         {segment(serviceReadings.map(({ service, title }) => ({ key: service, label: title })), shownReadings.service, setReadingsService)}
       </View>
       <View style={styles.readingRows}>
@@ -273,7 +273,7 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityLabel={`${shownReadings.title}: ${line.label}${line.value ? `, ${line.value}` : ''}`}
             onPress={() => router.push(lectionaryHref(shownReadings.service, line) as never)}
-            style={({ pressed }) => [styles.readingRow, index === 0 && styles.readingRowFirst, arabic && styles.rowReverse, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.readingRow, index === 0 && styles.readingRowFirst, pressed && styles.pressed]}
           >
             <Text style={[styles.readingKind, { width: readingKindWidth }, arabic && styles.readingKindArabic]} numberOfLines={1}>{arabic ? line.label : line.label.toUpperCase()}</Text>
             <Text style={[styles.readingValue, !line.value && styles.readingMissing, arabic && styles.arabic]}>{line.value ?? '—'}</Text>
@@ -291,7 +291,7 @@ export default function HomeScreen() {
         <Text style={[styles.framedTitle, arabic && styles.arabicCentered]} accessibilityRole="header">{tr('Saints Commemorated', 'Saints commémorés', 'تذكارات القديسين')}</Text>
         <Text style={[styles.framedDate, arabic && styles.arabicCentered]}>{dayLine(synaxDate)}</Text>
       </View>
-      <View style={[styles.segmentRow, arabic && styles.rowReverse]}>
+      <View style={styles.segmentRow}>
         {segment(
           [
             { key: 'today' as const, label: tr('Today', 'Aujourd’hui', 'اليوم') },
@@ -318,7 +318,7 @@ export default function HomeScreen() {
             const title = arabic ? event.titleArabic || event.titleEnglish || '' : event.titleEnglish || event.titleArabic || '';
             const { main, detail } = arabic || preferences.appLanguage === 'fr' ? { main: title, detail: null } : splitSaintTitle(title);
             return (
-              <View key={event.entryKey} style={[styles.saint, index === events.length - 1 && styles.saintLast, arabic && styles.rowReverse]}>
+              <View key={event.entryKey} style={[styles.saint, index === events.length - 1 && styles.saintLast]}>
                 <View style={styles.saintDot} />
                 <View style={styles.flex}>
                   <Text style={[styles.saintName, arabic && styles.arabic]}>{main}</Text>
@@ -347,7 +347,7 @@ export default function HomeScreen() {
         <HeroGlow />
         {wideLayout ? (
           // iPad and desktop: the seal and the prayer, the readings, the Synaxarium.
-          <View style={[styles.columns, arabic && styles.rowReverse]}>
+          <View style={styles.columns}>
             <View style={styles.columnNarrow}>
               {heroBlock}
               {prayCard}
@@ -421,7 +421,6 @@ const styles = StyleSheet.create({
   columnWide: { flex: 1, minWidth: 0 },
   cardWide: { marginHorizontal: 0 },
   flex: { flex: 1, minWidth: 0 },
-  rowReverse: { flexDirection: 'row-reverse' },
   glow: { height: 560, left: 0, position: 'absolute', right: 0, top: 0 },
   hero: { alignItems: 'center', paddingHorizontal: 24 },
   halo: { alignItems: 'center', height: 212, justifyContent: 'center', width: 212 },
@@ -491,7 +490,7 @@ const styles = StyleSheet.create({
   readingRow: { alignItems: 'baseline', borderTopColor: 'rgba(255, 255, 255, 0.07)', borderTopWidth: 1, flexDirection: 'row', gap: 10, paddingVertical: 9 },
   readingRowFirst: { borderTopWidth: 0 },
   readingKind: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 10.5, fontWeight: '700', letterSpacing: 1.7 },
-  readingKindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  readingKindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', writingDirection: 'rtl' },
   readingValue: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
   readingMissing: { color: 'rgba(255, 255, 255, 0.35)' },
 
@@ -503,7 +502,7 @@ const styles = StyleSheet.create({
   saintDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, paddingVertical: 13 },
   pressed: { opacity: 0.7 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicTight: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
 });

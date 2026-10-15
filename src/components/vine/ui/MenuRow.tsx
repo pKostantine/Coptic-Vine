@@ -24,7 +24,7 @@ interface MenuRowProps {
   arabic?: string;
   subtitle?: string;
   subtitleArabic?: string;
-  /** The app shows one language at a time; with only Arabic the row mirrors to read right to left. */
+  /** The app shows one language at a time: the row's title in English (or French) or in Arabic. */
   showEnglish?: boolean;
   showArabic?: boolean;
   position?: MenuRowPosition;
@@ -82,20 +82,19 @@ export default function MenuRow({
     isTop && styles.top,
     isBottom && styles.bottom,
   ];
-  const paddingStyle = arabicOnly ? styles.rowArabic : styles.rowEnglish;
   const pressedStyle = night ? styles.pressedNight : styles.pressed;
 
   const content = (
     <>
-      {leading ? <View style={[styles.leading, arabicOnly ? styles.leadingArabic : styles.leadingEnglish]}>{leading}</View> : null}
-      <View style={[styles.body, arabicOnly ? styles.bodyArabic : styles.bodyEnglish, !isTop && styles.divided]}>
+      {leading ? <View style={styles.leading}>{leading}</View> : null}
+      <View style={[styles.body, !isTop && styles.divided]}>
         <View style={styles.text}>
-          <View style={[styles.titles, arabicOnly && styles.mirrored]}>
+          <View style={styles.titles}>
             {showEnglish ? (
               <Text style={styles.title} maxFontSizeMultiplier={MAX_FONT_SCALE}>{formatEnglishDisplayText(title)}</Text>
             ) : null}
             {showArabic ? (
-              <Text style={[styles.title, styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{toEasternArabicDigits(arabic!)}</Text>
+              <Text style={[styles.title, styles.arabic, showEnglish && styles.arabicBeside]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{toEasternArabicDigits(arabic!)}</Text>
             ) : null}
           </View>
           {secondLine ? (
@@ -105,20 +104,20 @@ export default function MenuRow({
           ) : null}
         </View>
         {isBookmarked ? <Icon name="bookmark" size={16} color={COLORS.gold} /> : null}
-        <Icon name={arabicOnly ? 'chevron-back' : 'chevron-forward'} size={16} color={accent ?? (night ? COLORS.nightLine : 'rgba(227, 181, 59, 0.7)')} />
+        <Icon name="chevron-forward" size={16} color={accent ?? (night ? COLORS.nightLine : 'rgba(227, 181, 59, 0.7)')} />
       </View>
     </>
   );
 
   if (trailingAction) {
     return (
-      <View style={[...frameStyle, styles.framed, arabicOnly && styles.mirrored]}>
+      <View style={[...frameStyle, styles.framed]}>
         <Pressable
           accessibilityRole="button"
           onPress={onPress}
           onPressIn={onPressIn}
           onHoverIn={onHoverIn}
-          style={({ pressed }) => [styles.inner, paddingStyle, pressed && pressedStyle]}
+          style={({ pressed }) => [styles.inner, styles.padded, pressed && pressedStyle]}
         >
           {content}
         </Pressable>
@@ -141,7 +140,7 @@ export default function MenuRow({
       onPress={onPress}
       onPressIn={onPressIn}
       onHoverIn={onHoverIn}
-      style={({ pressed }) => [...frameStyle, paddingStyle, pressed && pressedStyle]}
+      style={({ pressed }) => [...frameStyle, styles.padded, pressed && pressedStyle]}
     >
       {content}
     </Pressable>
@@ -157,8 +156,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
   },
   rowNight: { backgroundColor: COLORS.nightSurface, borderColor: COLORS.nightLine },
-  rowEnglish: { flexDirection: 'row', paddingLeft: 16 },
-  rowArabic: { flexDirection: 'row-reverse', paddingRight: 16 },
+  padded: { flexDirection: 'row', paddingLeft: 16 },
   // A framed row: the pressed wash stays inside the group's rounded outline.
   framed: { flexDirection: 'row', overflow: 'hidden' },
   inner: { alignItems: 'center', alignSelf: 'stretch', flex: 1, minWidth: 0 },
@@ -167,25 +165,24 @@ const styles = StyleSheet.create({
   bottom: { borderBottomLeftRadius: RADIUS, borderBottomRightRadius: RADIUS, borderBottomWidth: 1 },
   pressed: { backgroundColor: COLORS.surfaceSoft },
   pressedNight: { backgroundColor: '#0A1830' },
-  leading: { alignItems: 'center', justifyContent: 'center' },
-  leadingEnglish: { marginRight: 14 },
-  leadingArabic: { marginLeft: 14 },
+  leading: { alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   body: {
     alignItems: 'center',
     alignSelf: 'stretch',
     flex: 1,
+    flexDirection: 'row',
     gap: 10,
     minHeight: 56,
+    paddingRight: 14,
     paddingVertical: 13,
   },
-  bodyEnglish: { flexDirection: 'row', paddingRight: 14 },
-  bodyArabic: { flexDirection: 'row-reverse', paddingLeft: 14 },
   // The divider belongs to the text column, so it starts after any leading badge.
   divided: { borderTopColor: 'rgba(255, 255, 255, 0.08)', borderTopWidth: StyleSheet.hairlineWidth },
   text: { flex: 1, minWidth: 0 },
   titles: { flexDirection: 'row', gap: 12 },
-  mirrored: { flexDirection: 'row-reverse' },
   title: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  // Beside the English, the Arabic takes the far column and sets to its end.
+  arabicBeside: { textAlign: 'right' },
   subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 3 },
 });

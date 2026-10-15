@@ -102,6 +102,7 @@ export default function BibleSearchScreen() {
   const isArabic = preferences.appLanguage === 'ar';
   const label = (entry: { english: string; arabic: string; french?: string }) => (appText(entry));
   const localized = isArabic && styles.arabicText;
+  const localizedCentered = isArabic && styles.arabicCentered;
 
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<BibleSearchMode>('all');
@@ -285,7 +286,7 @@ export default function BibleSearchScreen() {
           <Text style={[styles.referenceText, localized]} numberOfLines={1}>
             {label(LABELS.goTo)} {formatBibleReference(reference, preferences.appLanguage)}
           </Text>
-          <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />
+          <Icon name="chevron-forward" size={18} color={COLORS.gold} />
         </Pressable>
       ) : null}
 
@@ -350,13 +351,13 @@ export default function BibleSearchScreen() {
       ) : null}
 
       {!languages.length ? (
-        <Text style={[styles.message, localized]}>{label(LABELS.noLanguages)}</Text>
+        <Text style={[styles.message, localizedCentered]}>{label(LABELS.noLanguages)}</Text>
       ) : !trimmed ? (
-        <Text style={[styles.message, localized]}>
+        <Text style={[styles.message, localizedCentered]}>
           {label(mode === 'websearch' ? LABELS.advancedHint : LABELS.hint)}
         </Text>
       ) : error ? (
-        <Text style={[styles.message, localized]}>{error}</Text>
+        <Text style={[styles.message, localizedCentered]}>{error}</Text>
       ) : loading ? (
         <ActivityIndicator color={COLORS.gold} style={styles.loading} />
       ) : (
@@ -369,7 +370,7 @@ export default function BibleSearchScreen() {
           initialNumToRender={12}
           windowSize={9}
           ListEmptyComponent={
-            <Text style={[styles.message, localized]}>
+            <Text style={[styles.message, localizedCentered]}>
               {label(mode === 'phrase' ? LABELS.noResultsPhrase : LABELS.noResults)}
             </Text>
           }
@@ -584,5 +585,6 @@ const styles = StyleSheet.create({
   snippetCoptic: { fontFamily: TYPOGRAPHY.coptic, fontSize: 17, lineHeight: 26 },
   snippetArabic: { fontFamily: TYPOGRAPHY.arabic, lineHeight: 26, textAlign: 'right', writingDirection: 'rtl' },
   snippetMatch: { color: COLORS.gold, fontWeight: '800' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

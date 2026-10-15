@@ -138,14 +138,14 @@ export default function BooksHome() {
       </Text>
       <View style={styles.shelf}>
         {chunk(tiles, columns).map((row) => (
-          <View key={row[0].id} style={[styles.shelfRow, arabic && styles.rowReverse]}>
+          <View key={row[0].id} style={styles.shelfRow}>
             {row.map(renderBook)}
             {/* A short last row keeps its tiles tile-sized. */}
             {Array.from({ length: columns - row.length }).map((_, index) => <View key={`gap-${index}`} style={styles.gap} />)}
           </View>
         ))}
         {chunk(rows, rowColumns).map((row) => (
-          <View key={row[0].id} style={[styles.shelfRow, arabic && styles.rowReverse]}>
+          <View key={row[0].id} style={styles.shelfRow}>
             {row.map(renderBook)}
           </View>
         ))}
@@ -173,7 +173,7 @@ export default function BooksHome() {
             </View>
           </View>
         ) : (
-          <View style={[styles.columns, arabic && styles.rowReverse]}>
+          <View style={styles.columns}>
             <View style={layout === 'desktop' ? styles.dayColumn : styles.half}>
               <View style={styles.titleBeside}>{title}</View>
               {dayBlock}
@@ -209,10 +209,9 @@ const styles = StyleSheet.create({
   // In the iPad's and desktop's columns the title keeps the 6pt it has under a
   // phone's status bar; the library's heading beside it then sits its 28pt down.
   titleBeside: { paddingTop: 6 },
-  rowReverse: { flexDirection: 'row-reverse' },
   section: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700', marginBottom: 12, marginTop: 28 },
   sectionOnLight: { color: '#10223A' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   shelf: { gap: 12 },
   shelfRow: { flexDirection: 'row', gap: 12 },
   gap: { flex: 1 },

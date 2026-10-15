@@ -189,16 +189,8 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   };
 
   const weekdayLetters = isArabic ? WEEKDAY_LETTERS.arabic : preferences.appLanguage === 'fr' ? WEEKDAY_LETTERS.french : WEEKDAY_LETTERS.english;
-  // Arrows keep their visual meaning in Arabic: the one pointing back in the
-  // reading direction goes back.
-  const goVisualLeftMonth = () => {
-    if (isArabic) void (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1));
-    else void (mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1));
-  };
-  const goVisualRightMonth = () => {
-    if (isArabic) void (mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1));
-    else void (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1));
-  };
+  const goPreviousMonth = () => void (mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1));
+  const goNextMonth = () => void (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1));
 
   return (
     <View style={DISABLED_TEXT_SELECTION_STYLE}>
@@ -211,12 +203,12 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
       </View>
 
       <View style={styles.body}>
-        <View style={[styles.monthRow, isArabic && styles.rowReverse]}>
+        <View style={styles.monthRow}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr('Choose month and year', 'Choisir le mois et l’année', 'اختر الشهر والسنة')}
             hitSlop={4}
-            style={[styles.monthTitleButton, isArabic && styles.rowReverse]}
+            style={styles.monthTitleButton}
             onPress={openDatePicker}
           >
             <Text style={[styles.monthTitle, isArabic && styles.arabicText]} numberOfLines={1}>
@@ -226,16 +218,16 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
             <Icon name="chevron-down" size={16} color={COLORS.gold} />
           </Pressable>
           <View style={styles.arrows}>
-            <Pressable accessibilityRole="button" accessibilityLabel={isArabic ? 'الشهر التالي' : tr('Previous month', 'Mois précédent', '')} style={styles.arrow} onPress={goVisualLeftMonth}>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('Previous month', 'Mois précédent', 'الشهر السابق')} style={styles.arrow} onPress={goPreviousMonth}>
               <Icon name="chevron-back" size={17} color={COLORS.gold} />
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={isArabic ? 'الشهر السابق' : tr('Next month', 'Mois suivant', '')} style={styles.arrow} onPress={goVisualRightMonth}>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('Next month', 'Mois suivant', 'الشهر التالي')} style={styles.arrow} onPress={goNextMonth}>
               <Icon name="chevron-forward" size={17} color={COLORS.gold} />
             </Pressable>
           </View>
         </View>
 
-        <View style={[styles.segment, isArabic && styles.rowReverse]}>
+        <View style={styles.segment}>
           {(['gregorian', 'coptic'] as Mode[]).map((option) => {
             const active = mode === option;
             return (
@@ -254,7 +246,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
           })}
         </View>
 
-        <View style={[styles.gridRow, isArabic && styles.rowReverse]}>
+        <View style={styles.gridRow}>
           {weekdayLetters.map((letter, index) => (
             <Text key={index} style={[styles.weekday, isArabic && styles.arabicLetter]}>{letter}</Text>
           ))}
@@ -267,7 +259,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
           {!days ? (
             <ActivityIndicator color={COLORS.gold} style={styles.loading} />
           ) : (
-            <View style={[styles.grid, isArabic && styles.rowReverse]}>
+            <View style={styles.grid}>
               {Array.from({ length: leadingBlanks }).map((_, i) => (
                 <View key={`blank-${i}`} style={styles.cell} />
               ))}
@@ -314,7 +306,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
       <Modal supportedOrientations={modalOrientations} visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
         <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} style={[styles.pickerBackdrop, DISABLED_TEXT_SELECTION_STYLE]} onPress={() => setPickerOpen(false)}>
           <Pressable accessible={false} style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
-            <View style={[styles.pickerColumns, isArabic && styles.rowReverse]}>
+            <View style={styles.pickerColumns}>
               <View style={styles.pickerColumn}>
                 <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>{tr('Month', 'Mois', 'الشهر')}</Text>
                 <ScrollView ref={monthListRef} style={styles.pickerList} showsVerticalScrollIndicator={false} snapToInterval={PICKER_ROW_HEIGHT} decelerationRate="fast">
@@ -378,7 +370,6 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
 }
 
 const styles = StyleSheet.create({
-  rowReverse: { flexDirection: 'row-reverse' },
   top: { paddingHorizontal: 16, paddingTop: 10 },
   body: { paddingHorizontal: 16 },
   monthRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 18 },

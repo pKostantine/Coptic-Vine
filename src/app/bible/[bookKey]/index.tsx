@@ -116,7 +116,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
       ) : (
         <>
           {isPsalms ? (
-            <View style={[styles.segmented, { borderColor: `${accent}33` }, showArabic && styles.rowReverse]}>
+            <View style={[styles.segmented, { borderColor: `${accent}33` }]}>
               {PSALM_NUMBERING_OPTIONS.map((option) => {
                 const isSelected = psalmNumbering === option.key;
                 const label = showArabic ? option.arabic : option.label;
@@ -150,7 +150,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
               )}
             </View>
           ) : null}
-          <View style={[styles.grid, showArabic && styles.rowReverse]}>
+          <View style={styles.grid}>
             {chapters!.map((chapterNumber) => {
               const isSpecialChapter = Boolean(getBibleSpecialChapterTitle(bookKey, chapterNumber));
               const isLxxAdditionChapter = isBibleLxxAdditionChapter(bookKey, chapterNumber);
@@ -203,7 +203,6 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
   loadingArea: { flex: 1, overflow: 'hidden' },
-  rowReverse: { flexDirection: 'row-reverse' },
   error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17, marginTop: SPACING.lg, textAlign: 'center' },
   segmented: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',

@@ -27,7 +27,7 @@ export default function DocumentThemePicker({ selected, onSelect, isArabic = fal
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={tr('Page', 'Page', 'الصفحة')}
-      style={[styles.row, isArabic && styles.rowReverse]}
+      style={styles.row}
     >
       {DOCUMENT_THEME_IDS.map((id) => {
         const theme = DOCUMENT_THEMES[id];
@@ -73,7 +73,6 @@ export default function DocumentThemePicker({ selected, onSelect, isArabic = fal
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8 },
-  rowReverse: { flexDirection: 'row-reverse' },
   option: { alignItems: 'center', flex: 1, gap: 5, minWidth: 0 },
   optionWide: { gap: 7 },
   pressed: { opacity: 0.75 },

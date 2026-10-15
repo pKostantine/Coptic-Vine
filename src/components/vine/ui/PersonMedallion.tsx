@@ -92,6 +92,6 @@ const styles = StyleSheet.create({
   initial: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontWeight: '700' },
   name: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600', lineHeight: 17.5, marginTop: 10, textAlign: 'center' },
   nameLarge: { fontSize: 15.5, lineHeight: 19.5 },
-  // A name or bio keeps the direction of its own words: a Latin one in an Arabic layout ends with its own full stop.
+  // A name or bio keeps the direction of its own words: a Latin one, read in Arabic, ends with its own full stop.
   arabic: { fontFamily: TYPOGRAPHY.arabic },
 });

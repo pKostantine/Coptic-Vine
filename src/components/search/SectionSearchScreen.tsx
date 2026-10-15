@@ -410,7 +410,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
       <View key={group.kind}>
         <SectionHeading title={tr(group.en, group.fr, group.ar)} arabic={isArabic} size="results" />
         {split ? (
-          <View style={[styles.columns, isArabic && styles.rowReverse]}>
+          <View style={styles.columns}>
             <View style={[styles.column, styles.rows]}>{group.results.slice(0, half).map(renderRow)}</View>
             <View style={[styles.column, styles.rows]}>{group.results.slice(half).map(renderRow)}</View>
           </View>
@@ -432,7 +432,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
         : null;
 
   const field = (
-    <View style={[styles.field, focused && styles.fieldFocused, isArabic && styles.rowReverse]}>
+    <View style={[styles.field, focused && styles.fieldFocused]}>
       <Icon name="search-outline" size={19} color={COLORS.gold} />
       <TextInput
         ref={inputRef}
@@ -490,14 +490,14 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   // On a phone the filters scroll sideways if a language's names run long;
   // beside the iPad's and desktop's field they always fit.
   const chips = wide ? (
-    <View accessibilityRole="radiogroup" style={[styles.chips, isArabic && styles.rowReverse]}>{chipButtons}</View>
+    <View accessibilityRole="radiogroup" style={styles.chips}>{chipButtons}</View>
   ) : (
     <ScrollView
       horizontal
       accessibilityRole="radiogroup"
       keyboardShouldPersistTaps="handled"
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={[styles.chips, styles.chipsPhone, isArabic && styles.rowReverse]}
+      contentContainerStyle={[styles.chips, styles.chipsPhone]}
     >
       {chipButtons}
     </ScrollView>
@@ -512,13 +512,13 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
       <PageGlow kind="green" tall={wide} />
 
       {wide ? (
-        <View style={[styles.topWide, { paddingTop: insets.top + 28 }, isArabic && styles.rowReverse]}>
+        <View style={[styles.topWide, { paddingTop: insets.top + 28 }]}>
           {field}
           {chips}
         </View>
       ) : (
         <View style={{ paddingTop: insets.top + 4 }}>
-          <View style={[styles.bar, isArabic && styles.rowReverse]}>
+          <View style={styles.bar}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={tr('Back', 'Retour', 'رجوع')}
@@ -526,7 +526,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
               onPress={() => goBack(router, fallback)}
               style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
             >
-              <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={20} color={COLORS.gold} />
+              <Icon name="chevron-back" size={20} color={COLORS.gold} />
             </Pressable>
             {field}
           </View>
@@ -577,7 +577,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
 
           {!loading && grouped.length ? (
             columns ? (
-              <View style={[styles.columns, styles.resultsWide, isArabic && styles.rowReverse]}>
+              <View style={[styles.columns, styles.resultsWide]}>
                 {columns.map((groups) => (
                   <View key={groups[0].kind} style={styles.column}>{groups.map((group) => renderGroup(group))}</View>
                 ))}
@@ -596,8 +596,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  rowReverse: { flexDirection: 'row-reverse' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicFont: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   pressed: { opacity: 0.65 },
 

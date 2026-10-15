@@ -248,7 +248,7 @@ export default function MusicPlaylistScreen() {
       ) : null}
       <View style={styles.header}>
         <Pressable accessibilityLabel="Back" onPress={() => goBack(router, '/music')} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
-        <Text numberOfLines={1} style={[styles.headerTitle, isArabic && styles.arabic]}>{tr('Playlist', 'Playlist', 'قائمة التشغيل')}</Text>
+        <Text numberOfLines={1} style={[styles.headerTitle, isArabic && styles.arabicCentered]}>{tr('Playlist', 'Playlist', 'قائمة التشغيل')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -260,10 +260,10 @@ export default function MusicPlaylistScreen() {
           <View style={styles.hero}>
             <MusicArtwork asset={playlist.coverAsset} size={184} label={playlist.name} />
             <View style={styles.heroText}>
-              <Text style={[styles.eyebrow, isArabic && styles.arabic]}>{playlist.visibility.toUpperCase()}</Text>
-              <Text style={[styles.title, isArabic && styles.arabic]}>{playlist.name}</Text>
-              {playlist.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{playlist.description}</Text> : null}
-              <Text style={[styles.meta, isArabic && styles.arabic]}>
+              <Text style={[styles.eyebrow, isArabic && styles.arabicCentered]}>{playlist.visibility.toUpperCase()}</Text>
+              <Text style={[styles.title, isArabic && styles.arabicCentered]}>{playlist.name}</Text>
+              {playlist.description ? <Text style={[styles.description, isArabic && styles.arabicCentered]}>{playlist.description}</Text> : null}
+              <Text style={[styles.meta, isArabic && styles.arabicCentered]}>
                 {tr(
                   `${playlist.tracks.length} ${playlist.tracks.length === 1 ? 'track' : 'tracks'}`,
                   `${playlist.tracks.length} ${playlist.tracks.length === 1 ? 'titre' : 'titres'}`,
@@ -378,7 +378,7 @@ export default function MusicPlaylistScreen() {
                   </View>
                 )
               )) : (
-              <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('This playlist is empty.', 'Cette playlist est vide.', 'هذه القائمة فارغة.')}</Text></View>
+              <View style={styles.empty}><Text style={[styles.emptyText, isArabic && styles.arabicCentered]}>{tr('This playlist is empty.', 'Cette playlist est vide.', 'هذه القائمة فارغة.')}</Text></View>
             )}
           </View>
         </NowPlayingAwareScrollView>
@@ -446,5 +446,6 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.35 },
   empty: { padding: SPACING.lg },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

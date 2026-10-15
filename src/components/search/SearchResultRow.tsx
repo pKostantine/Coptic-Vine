@@ -153,7 +153,7 @@ export default function SearchResultRow({
   const lesson = result.kind === 'learning_lesson';
   const titleStyle = [styles.title, active && styles.titleActive, arabic && styles.arabic];
   // The detail line often carries Latin names (performers, cantors), so it is
-  // only set to the right, not forced right-to-left, or they would clip from their start.
+  // only held to the left, not forced right-to-left, or they would clip from their start.
   const detailStyle = [styles.detail, arabic && styles.arabicAlign];
 
   let artwork: ReactNode;
@@ -185,13 +185,13 @@ export default function SearchResultRow({
   // The row's own tap (open or play) and its heart, bookmark or menu are
   // siblings, never one button inside another.
   return (
-    <View style={[styles.row, arabic && styles.rowArabic]}>
+    <View style={styles.row}>
       <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={[result.title, following ? followingLabel : null, detail].filter(Boolean).join(', ')}
         onPress={onPress}
-        style={({ pressed }) => [styles.main, arabic && styles.rowReverse, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.main, pressed && styles.pressed]}
       >
         {artwork}
 
@@ -222,7 +222,7 @@ export default function SearchResultRow({
         </View>
 
         {!track && !lesson ? (
-          <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} style={arabic ? styles.chevronArabic : styles.chevron} />
+          <Icon name="chevron-forward" size={17} color={COLORS.gold} style={styles.chevron} />
         ) : null}
       </Pressable>
 
@@ -264,8 +264,6 @@ const styles = StyleSheet.create({
     paddingRight: 10,
     paddingVertical: 8,
   },
-  rowArabic: { flexDirection: 'row-reverse', paddingLeft: 10, paddingRight: 8 },
-  rowReverse: { flexDirection: 'row-reverse' },
   main: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minWidth: 0 },
   pressed: { opacity: 0.8 },
   avatar: {
@@ -285,10 +283,9 @@ const styles = StyleSheet.create({
   detail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
   mark: { color: COLORS.goldBright },
   following: { color: COLORS.gold, fontWeight: '700' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  arabicAlign: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicAlign: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left' },
   iconButton: { alignItems: 'center', height: 34, justifyContent: 'center', width: 34 },
   iconPressed: { opacity: 0.65, transform: [{ scale: 0.94 }] },
   chevron: { marginRight: 4 },
-  chevronArabic: { marginLeft: 4 },
 });

@@ -264,7 +264,7 @@ export default function MusicLibraryFolderScreen() {
                 <Text numberOfLines={1} style={[styles.entityTitle, isArabic && styles.arabic]}>{playlist.name}</Text>
                 <Text numberOfLines={1} style={[styles.entityMeta, isArabic && styles.arabic]}>{playlist.trackCount} {playlist.trackCount === 1 ? 'track' : 'tracks'} · {playlist.visibility}</Text>
               </View>
-              <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.muted} />
+              <Icon name="chevron-forward" size={18} color={COLORS.muted} />
             </Pressable>
           ))}</View> : <Empty query={normalizedQuery} isArabic={isArabic} />}
         </>
@@ -287,7 +287,7 @@ export default function MusicLibraryFolderScreen() {
             <Pressable accessibilityLabel={`Unlike ${release.title}`} style={styles.circleAction} onPress={() => void unlikeRelease(release.id)}>
               <Icon name="heart" size={18} color={COLORS.goldBright} />
             </Pressable>
-          ) : <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.muted} />}
+          ) : <Icon name="chevron-forward" size={18} color={COLORS.muted} />}
         </View>
       ))}</View> : <Empty query={normalizedQuery} isArabic={isArabic} />;
     }
@@ -404,6 +404,6 @@ const styles = StyleSheet.create({
   createButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 8, justifyContent: 'center', minHeight: 44 },
   createButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   disabled: { opacity: 0.4 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  arabicInput: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicInput: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

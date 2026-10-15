@@ -36,27 +36,27 @@ export default function LibraryBook({ title, description, arabic, wide = false, 
         style={({ pressed }) => [StyleSheet.absoluteFill, pressed && styles.pressed]}
       />
 
-      <View style={[styles.content, wide && styles.contentWide, wide && arabic && styles.rowReverse]} pointerEvents="box-none">
+      <View style={[styles.content, wide && styles.contentWide]} pointerEvents="box-none">
         <View style={[styles.medallion, wide && styles.medallionWide]} pointerEvents="none">
           <BuddedCross size={wide ? 26 : 32} />
         </View>
         <View style={[wide && styles.wideText]} pointerEvents="none">
           <Text
-            style={[styles.title, wide && styles.titleWide, arabic && styles.arabicTitle, arabic && wide && styles.alignRight]}
+            style={[styles.title, wide && styles.titleWide, arabic && styles.arabic]}
             numberOfLines={2}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
           >
             {title}
           </Text>
           <Text
-            style={[styles.description, !wide && styles.centered, arabic && styles.arabicText, arabic && wide && styles.alignRight]}
+            style={[styles.description, !wide && styles.centered, arabic && styles.arabic]}
             numberOfLines={2}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
           >
             {description}
           </Text>
         </View>
-        {wide ? <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} /> : null}
+        {wide ? <Icon name="chevron-forward" size={18} color={COLORS.gold} /> : null}
       </View>
     </View>
   );
@@ -69,7 +69,6 @@ const styles = StyleSheet.create({
   bookTile: { flex: 1 },
   bookWide: { flex: 1 },
   pressed: { backgroundColor: 'rgba(255, 255, 255, 0.05)' },
-  rowReverse: { flexDirection: 'row-reverse' },
   content: { alignItems: 'center', paddingBottom: 18, paddingHorizontal: 14, paddingTop: 20 },
   contentWide: { flexDirection: 'row', gap: 16, paddingBottom: 14, paddingHorizontal: 16, paddingTop: 14 },
   wideText: { flex: 1, minWidth: 0 },
@@ -87,9 +86,8 @@ const styles = StyleSheet.create({
   medallionWide: { borderRadius: 21, height: 42, width: 42 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', marginTop: 14, textAlign: 'center' },
   titleWide: { marginTop: 0, textAlign: 'left' },
-  description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, lineHeight: 17, marginTop: 4 },
+  // Left set even in Arabic, whose right-to-left text would otherwise take the row's far side.
+  description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, lineHeight: 17, marginTop: 4, textAlign: 'left' },
   centered: { textAlign: 'center' },
-  alignRight: { textAlign: 'right' },
-  arabicTitle: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

@@ -127,7 +127,7 @@ export default function MusicHomeScreen() {
                 <EmptyState text={tr('No published releases yet.', 'Aucune parution publiée pour l’instant.', 'لا توجد إصدارات منشورة بعد.')} gutter={gutter} />
               ) : wide ? (
                 // The iPad and desktop: every latest release a cover in the row, the newest marked "New".
-                <View style={[styles.grid, arabic && styles.rowReverse]}>
+                <View style={styles.grid}>
                   {latest.map((release, index) => tile(release, gridTile, { large: true, badge: index === 0 ? tr('New', 'Nouveau', 'جديد') : undefined }))}
                 </View>
               ) : (
@@ -155,7 +155,7 @@ export default function MusicHomeScreen() {
               <SectionHeading size="page" title={tr('Artists', 'Artistes', 'الفنانون')} arabic={arabic} />
               {data.artists.length ? (
                 wide ? (
-                  <View style={[styles.peopleWide, arabic && styles.rowReverse]}>
+                  <View style={styles.peopleWide}>
                     {data.artists.map((artist) => (
                       <PersonMedallion
                         key={artist.id}
@@ -205,7 +205,6 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 28 },
   contentWide: { paddingHorizontal: 36 },
   loader: { marginVertical: 32 },
-  rowReverse: { flexDirection: 'row-reverse' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
   rail: { gap: 12, paddingTop: 14 },
   people: { gap: 16 },

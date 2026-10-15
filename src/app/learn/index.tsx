@@ -82,7 +82,7 @@ export default function LearningHomeScreen() {
 
   const browseAll = (label: string, onPress: () => void) => (
     <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={8} onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
-      <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />
+      <Icon name="chevron-forward" size={18} color={COLORS.gold} />
     </Pressable>
   );
 
@@ -121,7 +121,7 @@ export default function LearningHomeScreen() {
               />
               {home.cantors.length ? (
                 wide ? (
-                  <View style={[styles.peopleWide, arabic && styles.rowReverse]}>
+                  <View style={styles.peopleWide}>
                     {home.cantors.map((cantor) => (
                       <PersonMedallion
                         key={cantor.id}
@@ -156,7 +156,7 @@ export default function LearningHomeScreen() {
                 arabic={arabic}
                 trailing={browseAll(tr('All seasons', 'Tous les temps', 'كل المواسم'), () => router.push('/learn/seasons'))}
               />
-              <View style={[styles.tiles, { gap: tileGap, paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+              <View style={[styles.tiles, { gap: tileGap, paddingHorizontal: gutter }]}>
                 {seasons.map(({ season, look }) => (
                   <View key={season.id} style={{ width: tileWidth }}>
                     <LearningSeasonTile
@@ -184,7 +184,7 @@ export default function LearningHomeScreen() {
                       <Pressable
                         accessibilityRole="button"
                         key={item.itemKind + ':' + item.itemId}
-                        style={({ pressed }) => [styles.continueCard, arabic && styles.rowReverse, pressed && styles.pressed]}
+                        style={({ pressed }) => [styles.continueCard, pressed && styles.pressed]}
                         onPress={() => item.itemKind === 'lesson'
                           ? router.push({ pathname: '/learn/lesson/[id]', params: { id: item.itemId, setId: item.containerId } })
                           : router.push({ pathname: '/learn/album/[id]', params: { id: item.containerId } })}
@@ -218,7 +218,6 @@ const styles = StyleSheet.create({
   contentWide: { paddingHorizontal: 36 },
   loader: { marginVertical: 32 },
   pressed: { opacity: 0.7 },
-  rowReverse: { flexDirection: 'row-reverse' },
   people: { gap: 16 },
   // The iPad's and desktop's cantors: 140pt medallions, 28pt apart, wrapping when there are many.
   peopleWide: { flexDirection: 'row', flexWrap: 'wrap', gap: 28 },
@@ -242,5 +241,5 @@ const styles = StyleSheet.create({
   continueTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
   continueMeta: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
   resume: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

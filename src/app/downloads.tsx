@@ -271,7 +271,7 @@ function NativeDownloadsScreen() {
           onRemove={() => confirmRemoval(item.title, tr('It can be downloaded again at any time.', 'Vous pourrez le télécharger à nouveau.', 'يمكن تنزيله مرة أخرى في أي وقت.'), () => downloadManager.remove(item.packageKey))}
         />
       )) : (
-        <View style={[styles.empty, arabic && styles.rowReverse]}>
+        <View style={styles.empty}>
           <Icon name="cloud-download-outline" size={20} color={COLORS.gold} style={styles.emptyGlyph} />
           <Text style={[styles.emptyText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('No downloads yet.', 'Aucun téléchargement pour l’instant.', 'لا توجد تنزيلات بعد.')}</Text>
         </View>
@@ -295,7 +295,7 @@ function NativeDownloadsScreen() {
         chevron
         onPress={busy ? undefined : () => void maintenance('cleanup')}
       />
-      <Pressable accessibilityRole="button" onPress={removeAllMedia} style={({ pressed }) => [styles.destructive, arabic && styles.rowReverse, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="button" onPress={removeAllMedia} style={({ pressed }) => [styles.destructive, pressed && styles.pressed]}>
         <Icon name="trash-outline" size={19} color={DESTRUCTIVE} />
         <Text style={[styles.destructiveText, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
           {tr('Remove all media downloads', 'Supprimer tous les médias téléchargés', 'إزالة كل تنزيلات الوسائط')}
@@ -320,7 +320,7 @@ function NativeDownloadsScreen() {
             // The iPad's three columns: storage and the books; the calendar,
             // when to download and music; then lessons and maintenance.
             <PageGutterProvider gutter={0}>
-              <View style={[styles.columns, arabic && styles.rowReverse]}>
+              <View style={styles.columns}>
                 <View style={styles.column}>{storage}{booksSection}</View>
                 <View style={styles.column}>{calendarSection}{preferencesSection}{mediaSection(tr('Music', 'Musique', 'الترانيم'), music, 'musical-notes-outline')}</View>
                 <View style={styles.column}>{mediaSection(tr('Learning', 'Apprentissage', 'التعلّم'), learning, 'school-outline', true)}{maintenanceSection}</View>
@@ -369,14 +369,14 @@ function StorageCard({ arabic, segments }: { arabic: boolean; segments: { label:
       <Text style={[styles.total, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {value} <Text style={styles.totalUnit}>{unit}</Text>
       </Text>
-      <View style={[styles.bar, arabic && styles.rowReverse]}>
+      <View style={styles.bar}>
         {segments.filter((segment) => segment.bytes > 0).map((segment) => (
           <View key={segment.label} style={{ backgroundColor: segment.color, flex: segment.bytes }} />
         ))}
       </View>
-      <View style={[styles.legend, arabic && styles.rowReverse]}>
+      <View style={styles.legend}>
         {segments.map((segment) => (
-          <View key={segment.label} style={[styles.legendItem, arabic && styles.rowReverse]}>
+          <View key={segment.label} style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: segment.color }]} />
             <Text style={[styles.legendText, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{`${segment.label} ${bytes(segment.bytes, arabic)}`}</Text>
           </View>
@@ -421,7 +421,7 @@ function BookRow({ book, arabic, run, onRemove, onCancel }: {
     case 'paused':
       detail = `${tr('Paused', 'En pause', 'متوقف مؤقتًا')} · ${percent(book.progress, arabic)}`;
       trailing = (
-        <View style={[styles.trailingPair, arabic && styles.rowReverse]}>
+        <View style={styles.trailingPair}>
           <ActionButton icon="play" label={tr('Resume', 'Reprendre', 'استئناف')} arabic={arabic} onPress={install} />
           {cancel}
         </View>
@@ -430,7 +430,7 @@ function BookRow({ book, arabic, run, onRemove, onCancel }: {
     case 'failed':
       detail = tr('Couldn’t finish downloading', 'Téléchargement interrompu', 'تعذّر إكمال التنزيل');
       trailing = (
-        <View style={[styles.trailingPair, arabic && styles.rowReverse]}>
+        <View style={styles.trailingPair}>
           <ActionButton icon="refresh" label={tr('Retry', 'Réessayer', 'أعد المحاولة')} arabic={arabic} onPress={install} />
           {cancel}
         </View>
@@ -513,7 +513,7 @@ function Row({ icon, title, detail, detailIcon, trailing, chevron = false, quiet
       <View style={styles.rowText}>
         <Text style={[styles.rowTitle, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
         {detail ? (
-          <View style={[styles.detailRow, arabic && styles.rowReverse]}>
+          <View style={styles.detailRow}>
             {detailIcon}
             <Text style={[styles.rowDetail, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text>
           </View>
@@ -521,10 +521,10 @@ function Row({ icon, title, detail, detailIcon, trailing, chevron = false, quiet
       </View>
       {trailing}
       {/* Wrapped, so it stacks above the gradient on the web, where a bare SVG paints beneath it. */}
-      {chevron ? <View style={styles.chevron}><Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /></View> : null}
+      {chevron ? <View style={styles.chevron}><Icon name="chevron-forward" size={17} color={COLORS.gold} /></View> : null}
     </>
   );
-  const style = [styles.row, quiet && styles.rowQuiet, arabic && styles.rowReverse];
+  const style = [styles.row, quiet && styles.rowQuiet];
   if (!onPress && !onLongPress) return <View style={style}>{body}</View>;
   return (
     <Pressable
@@ -558,7 +558,7 @@ function SwitchRow({ label, detail, arabic, on, disabled = false, onPress }: {
       aria-disabled={disabled}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, styles.switchRow, arabic && styles.rowReverse, disabled && styles.switchRowDisabled, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.row, styles.switchRow, disabled && styles.switchRowDisabled, pressed && styles.pressed]}
     >
       <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <View style={styles.rowText}>
@@ -574,7 +574,7 @@ function SwitchRow({ label, detail, arabic, on, disabled = false, onPress }: {
 function ActionButton({ icon, label, arabic, filled = false, onPress }: { icon?: IconName; label: string; arabic: boolean; filled?: boolean; onPress: () => void }) {
   const color = filled ? COLORS.greenDeep : COLORS.gold;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.action, filled && styles.actionFilled, arabic && styles.rowReverse, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.action, filled && styles.actionFilled, pressed && styles.pressed]}>
       {icon ? <Icon name={icon} size={15} color={color} /> : null}
       <Text style={[styles.actionText, { color }, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
     </Pressable>
@@ -606,7 +606,7 @@ function DownloadAllButton({ arabic, onPress }: { arabic: boolean; onPress: () =
       accessibilityRole="button"
       accessibilityLabel={tr('Download all books', 'Télécharger tous les livres', 'تنزيل كل الكتب')}
       onPress={onPress}
-      style={({ pressed }) => [styles.downloadAll, arabic && styles.rowReverse, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.downloadAll, pressed && styles.pressed]}
     >
       <Icon name="cloud-download-outline" size={20} color={COLORS.gold} />
       <Text style={[styles.downloadAllText, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
@@ -654,14 +654,13 @@ const styles = StyleSheet.create({
   columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 24, marginTop: 2 },
   column: { flex: 1, minWidth: 0 },
   gutter: { marginHorizontal: 16 },
-  rowReverse: { flexDirection: 'row-reverse' },
   pressed: { opacity: 0.82 },
   firstSection: { marginTop: -24 },
 
   // The space used, on the day block's green (the design's "dl-st").
   storage: { borderRadius: 22, boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.35)', marginTop: 4, overflow: 'hidden', padding: 18 },
   eyebrow: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
-  eyebrowArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  eyebrowArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', writingDirection: 'rtl' },
   total: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 40, fontWeight: '700', lineHeight: 44, marginTop: 8 },
   totalUnit: { color: COLORS.goldBright, fontSize: 20 },
   bar: { backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: 99, flexDirection: 'row', gap: 3, height: 10, marginTop: 16, overflow: 'hidden' },
@@ -703,6 +702,6 @@ const styles = StyleSheet.create({
   destructive: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.12)', borderRadius: 16, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 58 },
   destructiveText: { color: DESTRUCTIVE, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
 
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicFont: { fontFamily: TYPOGRAPHY.arabic },
 });

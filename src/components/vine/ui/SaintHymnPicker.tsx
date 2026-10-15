@@ -105,7 +105,7 @@ export default function SaintHymnPicker({
 
   const label = (entry: { english: string; arabic: string; french?: string }) => (appText(entry));
   const localized = isArabic && styles.arabicText;
-  const rowDirection = isArabic && styles.rowReverse;
+  const localizedCentered = isArabic && styles.arabicCentered;
 
   useEffect(() => {
     if (!visible) return;
@@ -297,7 +297,7 @@ export default function SaintHymnPicker({
         accessibilityRole="button"
         accessibilityLabel={`${item.name}, ${item.options.map((option) => option.label).join(', ')}`}
         accessibilityState={single ? { selected: count > 0 } : { expanded: item.base === expandedBase }}
-        style={({ pressed }) => [styles.saintRow, highlighted && styles.saintRowOn, rowDirection, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.saintRow, highlighted && styles.saintRowOn, pressed && styles.pressed]}
         onPress={() => openSaint(item)}
       >
         {/* A saint fades straight down; the one whose hymns are open, or whose
@@ -329,7 +329,7 @@ export default function SaintHymnPicker({
         {single
           ? eyeButton({ token: item.options[0].token, category: item.options[0].category, label: item.options[0].label, saintName: item.name })
           // Wrapped so it stacks above the gradient on web, where a bare SVG paints beneath positioned siblings.
-          : <View><Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /></View>}
+          : <View><Icon name="chevron-forward" size={17} color={COLORS.gold} /></View>}
       </Pressable>
     );
   };
@@ -337,7 +337,7 @@ export default function SaintHymnPicker({
   /** A saint's hymns to choose from (Coptic Vine design, "Choose hymns"): on a phone straight on its sheet, wider on a pane of its own. */
   const chooser = expanded ? (
     <View style={wide ? styles.pane : styles.chooserSheet}>
-      <View style={[styles.chooserHead, rowDirection]}>
+      <View style={styles.chooserHead}>
         <View style={styles.flex}>
           <Text style={[styles.kicker, isArabic && styles.kickerArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{isArabic ? expanded.name : expanded.name.toUpperCase()}</Text>
           <Text style={[styles.chooserTitle, localized]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>{label(LABELS.choose)}</Text>
@@ -360,7 +360,7 @@ export default function SaintHymnPicker({
               accessibilityState={{ checked: active }}
               accessibilityLabel={option.label}
               key={option.token}
-              style={({ pressed }) => [styles.option, active && styles.optionOn, rowDirection, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.option, active && styles.optionOn, pressed && styles.pressed]}
               onPress={() => onToggle(option.token)}
             >
               <View style={[styles.check, active && styles.checkOn]}>
@@ -380,10 +380,10 @@ export default function SaintHymnPicker({
   /** A hymn's text, with the way to include it (Coptic Vine design, "Preview"). */
   const previewPanel = preview ? (
     <View style={wide ? styles.pane : styles.previewSheet}>
-      <View style={[styles.previewHead, rowDirection]}>
+      <View style={styles.previewHead}>
         {wide ? null : (
           <Pressable accessibilityRole="button" accessibilityLabel={tr('Close preview', 'Fermer l’aperçu', 'أغلق المعاينة')} style={({ pressed }) => [styles.previewBack, pressed && styles.pressed]} onPress={() => setPreview(null)}>
-            <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={19} color={COLORS.gold} />
+            <Icon name="chevron-back" size={19} color={COLORS.gold} />
           </Pressable>
         )}
         <Text style={[styles.previewTitle, localized]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>{previewTitle(preview)}</Text>
@@ -391,7 +391,7 @@ export default function SaintHymnPicker({
           accessibilityRole="switch"
           accessibilityState={{ checked: selectedSet.has(preview.token) }}
           accessibilityLabel={label(LABELS.include)}
-          style={({ pressed }) => [styles.includePill, rowDirection, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.includePill, pressed && styles.pressed]}
           onPress={() => onToggle(preview.token)}
         >
           <Icon name={selectedSet.has(preview.token) ? 'checkmark' : 'add'} size={15} color={COLORS.gold} />
@@ -399,11 +399,11 @@ export default function SaintHymnPicker({
         </Pressable>
       </View>
       {previewError ? (
-        <Text style={[styles.message, localized]}>{previewError}</Text>
+        <Text style={[styles.message, localizedCentered]}>{previewError}</Text>
       ) : !previewHymns ? (
         <ActivityIndicator color={COLORS.gold} style={styles.previewLoading} />
       ) : previewHymns.length === 0 ? (
-        <Text style={[styles.message, localized]}>{label(LABELS.noPreview)}</Text>
+        <Text style={[styles.message, localizedCentered]}>{label(LABELS.noPreview)}</Text>
       ) : (
         <View style={[styles.previewBody, { height: previewBodyHeight }]}>
           <DocumentWebView
@@ -426,7 +426,7 @@ export default function SaintHymnPicker({
   ) : null;
 
   const search = (
-    <View style={[styles.search, wide && styles.searchFlush, rowDirection]}>
+    <View style={[styles.search, wide && styles.searchFlush]}>
       <Icon name="search-outline" size={19} color={COLORS.gold} />
       <TextInput
         value={query}
@@ -443,7 +443,7 @@ export default function SaintHymnPicker({
   );
 
   const list = error ? (
-    <Text style={[styles.message, localized]}>{error}</Text>
+    <Text style={[styles.message, localizedCentered]}>{error}</Text>
   ) : !saints ? (
     <ActivityIndicator color={COLORS.gold} style={styles.loading} />
   ) : (
@@ -456,7 +456,7 @@ export default function SaintHymnPicker({
       initialNumToRender={16}
       windowSize={9}
       showsVerticalScrollIndicator={false}
-      ListEmptyComponent={<Text style={[styles.message, localized]}>{label(LABELS.empty)}</Text>}
+      ListEmptyComponent={<Text style={[styles.message, localizedCentered]}>{label(LABELS.empty)}</Text>}
       renderItem={({ item }) => saintRow(item)}
     />
   );
@@ -476,7 +476,7 @@ export default function SaintHymnPicker({
           </View>
 
           {wide ? (
-            <View style={[styles.columns, rowDirection]}>
+            <View style={styles.columns}>
               <View style={[styles.listColumn, layout === 'desktop' ? styles.listColumnDesktop : styles.listColumnTablet]}>
                 {search}
                 {list}
@@ -514,7 +514,6 @@ export default function SaintHymnPicker({
 const styles = StyleSheet.create({
   page: { backgroundColor: COLORS.black, flex: 1 },
   flex: { flex: 1, minWidth: 0 },
-  rowReverse: { flexDirection: 'row-reverse' },
   pressed: { opacity: 0.75 },
   search: {
     alignItems: 'center',
@@ -580,7 +579,7 @@ const styles = StyleSheet.create({
   chooserSheet: { paddingBottom: 4, paddingTop: 4 },
   chooserHead: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginBottom: 14 },
   kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
-  kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', writingDirection: 'rtl' },
   chooserTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', lineHeight: 28, marginTop: 5 },
   chooserCount: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, marginTop: 4 },
   clear: { paddingHorizontal: 2, paddingVertical: 6 },
@@ -604,5 +603,6 @@ const styles = StyleSheet.create({
   previewLoading: { paddingVertical: 32 },
   // The document renderer scrolls within this stable viewport.
   previewBody: { backgroundColor: COLORS.black, borderRadius: 18, overflow: 'hidden' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

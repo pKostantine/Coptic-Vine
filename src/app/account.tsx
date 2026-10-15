@@ -49,7 +49,7 @@ export default function AccountScreen() {
   const arabic = preferences.appLanguage === 'ar';
   const wide = layout !== 'phone';
   const gutter = wide ? 0 : 16;
-  const columns = [styles.columns, layout === 'tablet' && styles.columnsTablet, arabic && styles.rowReverse];
+  const columns = [styles.columns, layout === 'tablet' && styles.columnsTablet];
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -201,7 +201,7 @@ function SignedOutAccount({ gutter, wide = false }: { gutter: number; wide?: boo
       <View style={[styles.formCard, styles.formAfterCard, { marginHorizontal: gutter }]}>
         <SegmentNav items={modes} active={mode} arabic={arabic} role="radiogroup" onSelect={(key) => { setMode(key); setError(null); setNotice(null); }} />
 
-        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.googleButton, arabic && styles.rowReverse, pressed && styles.pressed]} onPress={() => void googleSignIn()}>
+        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.googleButton, pressed && styles.pressed]} onPress={() => void googleSignIn()}>
           <Text style={styles.googleMark}>G</Text>
           <Text style={[styles.googleButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Continue with Google', 'Continuer avec Google', 'المتابعة عبر Google')}</Text>
         </Pressable>
@@ -223,7 +223,7 @@ function SignedOutAccount({ gutter, wide = false }: { gutter: number; wide?: boo
         </Field>
 
         <Field label={tr('Password', 'Mot de passe', 'كلمة المرور')}>
-          <View style={[styles.passwordField, arabic && styles.rowReverse]}>
+          <View style={styles.passwordField}>
             <TextInput autoCapitalize="none" autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} secureTextEntry={!showPassword} value={password} onChangeText={setPassword} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={PLACEHOLDER} style={[styles.passwordInput, arabic && styles.arabic]} />
             <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? tr('Hide password', 'Masquer le mot de passe', 'إخفاء كلمة المرور') : tr('Show password', 'Afficher le mot de passe', 'إظهار كلمة المرور')} onPress={() => setShowPassword((current) => !current)} style={styles.showButton}>
               <Icon name="eye-outline" size={20} color={showPassword ? COLORS.gold : COLORS.muted} />
@@ -419,17 +419,17 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
           {currentName || tr('Coptic Vine listener', 'Auditeur Coptic Vine', 'مستمع كوبتك فاين')}
         </Text>
         <Text numberOfLines={1} style={styles.profileEmail} maxFontSizeMultiplier={MAX_FONT_SCALE}>{user.email}</Text>
-        <View style={[styles.verifiedPill, arabic && styles.rowReverse]}>
+        <View style={styles.verifiedPill}>
           {verified ? <Icon name="checkmark-circle" size={13} color={COLORS.gold} /> : null}
           <Text style={[styles.verifiedText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {tr(`${provider} account`, `Compte ${provider}`, `حساب ${provider}`)}{verified ? ` · ${verifiedLabel}` : ''}
           </Text>
         </View>
-        <View style={[styles.photoButtons, arabic && styles.rowReverse]}>
+        <View style={styles.photoButtons}>
           <Pressable
             accessibilityRole="button"
             disabled={avatarBusy}
-            style={({ pressed }) => [styles.photoButton, styles.photoButtonGold, arabic && styles.rowReverse, avatarBusy && styles.disabled, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.photoButton, styles.photoButtonGold, avatarBusy && styles.disabled, pressed && styles.pressed]}
             onPress={() => void changePhoto()}
           >
             {avatarBusy ? <ActivityIndicator size="small" color={COLORS.greenDeep} /> : <Icon name="camera-outline" size={14} color={COLORS.greenDeep} />}
@@ -496,9 +496,8 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
             <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
           </View>
         ) : null}
-        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.signOut, tablet && styles.signOutCompact, arabic && styles.rowReverse, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void signOut()}>
-          {/* The arrow leads out of the door: leftward too in Arabic. */}
-          <Icon name="log-out-outline" size={19} color={SIGN_OUT} style={arabic ? styles.mirrored : undefined} />
+        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.signOut, tablet && styles.signOutCompact, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void signOut()}>
+          <Icon name="log-out-outline" size={19} color={SIGN_OUT} />
           <Text style={[styles.signOutText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Sign out', 'Se déconnecter', 'تسجيل الخروج')}</Text>
         </Pressable>
       </View>
@@ -517,7 +516,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
 
   if (wide) {
     return (
-      <View style={[styles.columns, tablet && styles.columnsTablet, arabic && styles.rowReverse]}>
+      <View style={[styles.columns, tablet && styles.columnsTablet]}>
         <View style={styles.sideColumn}>
           {profileCard}
           {recovery}
@@ -593,7 +592,7 @@ function AppSettingsSection({ gutter, compact = false, wide = false }: { gutter:
           title={tr('App settings', 'Paramètres de l’application', 'إعدادات التطبيق')}
           arabic={arabic}
           trailing={(
-            <View style={[styles.sync, arabic && styles.rowReverse]} accessibilityLabel={sync.label}>
+            <View style={styles.sync} accessibilityLabel={sync.label}>
               <Icon name={sync.icon} size={16} color={sync.color} />
               <Text style={[styles.syncText, { color: sync.color }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{sync.label}</Text>
             </View>
@@ -603,7 +602,7 @@ function AppSettingsSection({ gutter, compact = false, wide = false }: { gutter:
       <Text style={[styles.kicker, { paddingHorizontal: gutter }, arabic && styles.arabicKicker]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {arabic ? tr('App language', 'Langue de l’application', 'لغة التطبيق') : tr('App language', 'Langue de l’application', 'لغة التطبيق').toUpperCase()}
       </Text>
-      <View accessibilityRole="radiogroup" style={[styles.languages, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+      <View accessibilityRole="radiogroup" style={[styles.languages, { paddingHorizontal: gutter }]}>
         {APP_LANGUAGE_OPTIONS.map((option) => {
           const active = preferences.appLanguage === option.key;
           return (
@@ -612,14 +611,14 @@ function AppSettingsSection({ gutter, compact = false, wide = false }: { gutter:
               accessibilityRole="radio"
               aria-checked={active}
               accessibilityLabel={`${option.label}, ${option.native}`}
-              style={({ pressed }) => [styles.language, arabic && styles.rowReverse, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.language, pressed && styles.pressed]}
               onPress={() => setAppLanguage(option.key)}
             >
               <LinearGradient colors={active ? [COLORS.green, COLORS.greenDeep] : [COLORS.surfaceDeep, COLORS.surface]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
               <View style={[styles.radio, active && styles.radioActive]} />
               <View style={styles.languageText}>
                 <Text style={styles.languageLabel} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{option.label}</Text>
-                <Text style={[styles.languageNative, active && styles.languageNativeActive, option.key === 'ar' && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{option.native}</Text>
+                <Text style={[styles.languageNative, active && styles.languageNativeActive, option.key === 'ar' && styles.languageNativeArabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{option.native}</Text>
               </View>
             </Pressable>
           );
@@ -672,17 +671,17 @@ function SettingsRow({ icon, label, description, value, arabic, onPress, expande
         {description ? <Text style={[styles.rowDescription, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{description}</Text> : null}
       </View>
       {value ? <Text style={[styles.rowValue, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{value}</Text> : null}
-      {onPress ? <View><Icon name={expanded ? 'chevron-down' : arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /></View> : null}
+      {onPress ? <View><Icon name={expanded ? 'chevron-down' : 'chevron-forward'} size={17} color={COLORS.gold} /></View> : null}
     </>
   );
-  if (!onPress) return <View style={[styles.row, compact && styles.rowCompact, arabic && styles.rowReverse]}>{body}</View>;
+  if (!onPress) return <View style={[styles.row, compact && styles.rowCompact]}>{body}</View>;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={description ? `${label}. ${description}` : label}
       aria-expanded={expanded}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, compact && styles.rowCompact, arabic && styles.rowReverse, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.row, compact && styles.rowCompact, pressed && styles.pressed]}
     >
       {body}
     </Pressable>
@@ -700,7 +699,7 @@ function Crown({ wide }: { wide: boolean }) {
   );
 }
 
-/** A labelled input. The label follows the App Language's direction, read from the module store so the many fields need no prop for it. */
+/** A labelled input. The App Language, which sets the label's script, is read from the module store so the many fields need no prop for it. */
 function Field({ label, children }: { label: string; children: ReactNode }) {
   const arabic = getCurrentAppLanguage() === 'ar';
   return (
@@ -730,8 +729,6 @@ const styles = StyleSheet.create({
   headingTablet: { marginBottom: -2, marginTop: -10 },
   headingDesktop: { marginBottom: -2, marginTop: -6 },
   headingColumnHead: { marginBottom: -2 },
-  mirrored: { transform: [{ scaleX: -1 }] },
-  rowReverse: { flexDirection: 'row-reverse' },
   loader: { marginVertical: 32 },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.5 },
@@ -787,7 +784,7 @@ const styles = StyleSheet.create({
   sync: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   syncText: { fontFamily: TYPOGRAPHY.body, fontSize: 12.5, fontWeight: '700' },
   kicker: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
-  arabicKicker: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  arabicKicker: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', writingDirection: 'rtl' },
   languages: { flexDirection: 'row', gap: 8 },
   language: { alignItems: 'center', borderRadius: 16, flex: 1, flexDirection: 'row', gap: 10, minWidth: 0, overflow: 'hidden', padding: 12 },
   radio: { borderColor: 'rgba(205, 216, 203, 0.45)', borderRadius: 9, borderWidth: 2, height: 18, width: 18 },
@@ -797,6 +794,7 @@ const styles = StyleSheet.create({
   languageLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, fontWeight: '700' },
   languageNative: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 1 },
   languageNativeActive: { color: COLORS.goldBright },
+  languageNativeArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   rows: { gap: 8 },
   rowsAfterLanguages: { marginTop: 10 },
   row: { alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 18, flexDirection: 'row', gap: 14, overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 14 },
@@ -809,6 +807,6 @@ const styles = StyleSheet.create({
   signOutCompact: { paddingVertical: 11 },
   signOutText: { color: SIGN_OUT, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },
 
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

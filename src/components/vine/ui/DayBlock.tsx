@@ -33,8 +33,8 @@ interface DayBlockProps {
  * large over the Gregorian; the week around it, each day selectable; and the
  * next great season with a day count. It wears the day's season colours
  * (seasonAppearance.ts), cross-fading when the day changes. Swiped sideways it
- * moves a week: to the next one leftwards (rightwards in Arabic, whose week
- * runs the other way), to the one before the other way.
+ * moves a week: to the next one leftwards, to the one before rightwards, in
+ * every App Language.
  */
 export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, action }: DayBlockProps) {
   const { selectDate } = useCalendar();
@@ -42,10 +42,10 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
   const [week, setWeek] = useState<{ key: string; days: WeekStripDay[] } | null>(null);
 
   // The swipe, read once and kept: the responder outlives renders, so it
-  // reaches the day it moves from, and the direction, through refs.
-  const swipeRef = useRef({ isoDate: day.isoDate, arabic, selectDate });
+  // reaches the day it moves from through a ref.
+  const swipeRef = useRef({ isoDate: day.isoDate, selectDate });
   useEffect(() => {
-    swipeRef.current = { isoDate: day.isoDate, arabic, selectDate };
+    swipeRef.current = { isoDate: day.isoDate, selectDate };
   });
   const [drag] = useState(() => new Animated.Value(0));
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
@@ -60,8 +60,8 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
       onPanResponderRelease: (_, gesture) => {
         settle();
         if (Math.abs(gesture.dx) < 50 && Math.abs(gesture.vx) < 0.5) return;
-        const { isoDate, arabic: rtl, selectDate: select } = swipeRef.current;
-        const towardsLater = rtl ? gesture.dx > 0 : gesture.dx < 0;
+        const { isoDate, selectDate: select } = swipeRef.current;
+        const towardsLater = gesture.dx < 0;
         const date = new Date(`${isoDate}T00:00:00Z`);
         date.setUTCDate(date.getUTCDate() + (towardsLater ? 7 : -7));
         select(date);
@@ -111,7 +111,7 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
         label: tr('Next season', 'Prochain temps', 'الفترة القادمة'),
         value: nextName ? appText(nextName) : ' ',
         detail: next && nextName ? dayCount(next.days, arabic) : undefined,
-        action: action ? { label: action.label, onPress: action.onPress, trailingIcon: arabic ? 'chevron-back' : 'chevron-forward' } : undefined,
+        action: action ? { label: action.label, onPress: action.onPress, trailingIcon: 'chevron-forward' } : undefined,
       }}
     />
     </Animated.View>

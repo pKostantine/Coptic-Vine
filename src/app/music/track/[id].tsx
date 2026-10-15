@@ -278,10 +278,10 @@ export default function MusicTrackDetailScreen() {
           </View>
 
           <View style={[styles.details, desktop && styles.detailsDesktop]}>
-            <Text style={[styles.eyebrow, isArabic && styles.arabic]}>
+            <Text style={[styles.eyebrow, isArabic && styles.arabicCentered]}>
               {tr('TRACK', 'TITRE', 'ترنيمة')}
             </Text>
-            <Text style={[styles.title, isArabic && styles.arabic]}>{track.title}</Text>
+            <Text style={[styles.title, isArabic && styles.arabicCentered]}>{track.title}</Text>
 
             {release ? (
               <Pressable
@@ -289,12 +289,12 @@ export default function MusicTrackDetailScreen() {
                 onPress={() => router.push(`/music/release/${release.id}`)}
                 style={({ pressed }) => pressed && styles.pressed}
               >
-                <Text numberOfLines={1} style={[styles.album, isArabic && styles.arabic]}>{release.title}</Text>
+                <Text numberOfLines={1} style={[styles.album, isArabic && styles.arabicCentered]}>{release.title}</Text>
               </Pressable>
             ) : null}
 
-            <Text numberOfLines={2} style={[styles.artists, isArabic && styles.arabic]}>{performers}</Text>
-            {meta ? <Text style={[styles.meta, isArabic && styles.arabic]}>{meta}</Text> : null}
+            <Text numberOfLines={2} style={[styles.artists, isArabic && styles.arabicCentered]}>{performers}</Text>
+            {meta ? <Text style={[styles.meta, isArabic && styles.arabicCentered]}>{meta}</Text> : null}
 
             <View style={styles.actions}>
               <Pressable
@@ -443,5 +443,6 @@ const styles = StyleSheet.create({
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 8, textAlign: 'center' },
   pressed: { opacity: 0.68, transform: [{ scale: 0.98 }] },
   rowPressed: { opacity: 0.72 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

@@ -24,7 +24,7 @@ interface SegmentNavProps<Key extends string> {
  */
 export default function SegmentNav<Key extends string>({ items, active, onSelect, arabic = false, role = 'tablist' }: SegmentNavProps<Key>) {
   return (
-    <View accessibilityRole={role} style={[styles.pill, arabic && styles.rowReverse]}>
+    <View accessibilityRole={role} style={styles.pill}>
       {items.map((item) => {
         const selected = item.key === active;
         return (
@@ -56,7 +56,6 @@ const styles = StyleSheet.create({
     gap: 4,
     padding: 4,
   },
-  rowReverse: { flexDirection: 'row-reverse' },
   // 8pt over and under a 14pt label: 33pt, in a 43pt pill.
   option: { alignItems: 'center', borderRadius: 99, flex: 1, justifyContent: 'center', minHeight: 33, paddingHorizontal: 8, paddingVertical: 8 },
   optionActive: { backgroundColor: COLORS.gold },

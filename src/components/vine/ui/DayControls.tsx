@@ -55,16 +55,16 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
   const statusOnly = Boolean(status) && !(seasonLabel && onOpenSeasons) && trailing === 'none';
 
   return (
-    <View style={[styles.row, statusOnly && styles.rowStatusOnly, arabic && styles.rowReverse]}>
+    <View style={[styles.row, statusOnly && styles.rowStatusOnly]}>
       {status ? (
-        <View style={[styles.live, arabic && styles.rowReverse]}>
+        <View style={styles.live}>
           <LiveDot ring={theme.liveRing} />
           <Text style={[styles.liveText, { color: theme.text }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {status}
           </Text>
         </View>
       ) : isLive ? (
-        <View style={[styles.live, arabic && styles.rowReverse]} accessibilityLabel={tr('Live', 'En direct', 'حاليًا')}>
+        <View style={styles.live} accessibilityLabel={tr('Live', 'En direct', 'حاليًا')}>
           <LiveDot ring={theme.liveRing} />
           <Text style={[styles.liveText, { color: theme.text }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {tr('Live', 'En direct', 'حاليًا')}
@@ -76,7 +76,7 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
           accessibilityLabel={tr('Back to today', 'Revenir à aujourd’hui', 'العودة إلى اليوم')}
           hitSlop={8}
           onPress={goLive}
-          style={({ pressed }) => [styles.live, styles.setLive, { borderColor: theme.accentBorder }, arabic && styles.rowReverse, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.live, styles.setLive, { borderColor: theme.accentBorder }, pressed && styles.pressed]}
         >
           <View style={[styles.idleDot, { borderColor: theme.muted }]} />
           <Text style={[styles.liveText, { color: theme.text }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
@@ -90,12 +90,12 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
           accessibilityRole="button"
           accessibilityLabel={`${seasonLabel}. ${tr('Open the seasons', 'Ouvrir les temps liturgiques', 'افتح الفترات')}`}
           onPress={onOpenSeasons}
-          style={({ pressed }) => [styles.season, { backgroundColor: theme.chip }, arabic ? styles.seasonArabic : styles.seasonLatin, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.season, { backgroundColor: theme.chip }, pressed && styles.pressed]}
         >
           <Text numberOfLines={1} style={[styles.seasonText, { color: theme.text }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {seasonLabel}
           </Text>
-          <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={15} color={theme.accent} />
+          <Icon name="chevron-forward" size={15} color={theme.accent} />
         </Pressable>
       ) : (
         <View style={styles.spacer} />
@@ -122,7 +122,7 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
             onPress={() => step(-1)}
             style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}
           >
-            <Icon name={arabic ? 'chevron-forward' : 'chevron-back'} size={17} color={theme.accent} />
+            <Icon name="chevron-back" size={17} color={theme.accent} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -131,7 +131,7 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
             onPress={() => step(1)}
             style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}
           >
-            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={theme.accent} />
+            <Icon name="chevron-forward" size={17} color={theme.accent} />
           </Pressable>
         </>
       ) : null}
@@ -163,7 +163,6 @@ function LiveDot({ ring }: { ring: DayBlockTheme['liveRing'] }) {
 const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', gap: 8, minHeight: 36 },
   rowStatusOnly: { minHeight: 0 },
-  rowReverse: { flexDirection: 'row-reverse' },
   live: { alignItems: 'center', flexDirection: 'row', gap: 7 },
   setLive: { borderRadius: 99, borderWidth: 1, height: 32, paddingHorizontal: 10 },
   liveText: { fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
@@ -181,9 +180,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     gap: 4,
     height: 36,
+    marginLeft: 'auto',
+    paddingLeft: 16,
+    paddingRight: 10,
   },
-  seasonLatin: { marginLeft: 'auto', paddingLeft: 16, paddingRight: 10 },
-  seasonArabic: { flexDirection: 'row-reverse', marginRight: 'auto', paddingLeft: 10, paddingRight: 16 },
   seasonText: { flexShrink: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
   spacer: { flex: 1 },
   arrow: {
@@ -204,5 +204,5 @@ const styles = StyleSheet.create({
     width: 38,
   },
   pressed: { opacity: 0.7 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
 });

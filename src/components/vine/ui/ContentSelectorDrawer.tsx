@@ -606,7 +606,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   selectorTitleArabic: {
-    textAlign: 'right',
     writingDirection: 'rtl',
   },
   centeredTitle: {

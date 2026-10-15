@@ -34,7 +34,7 @@ export default function LoadFailure({ error, onRetry, onBack, layout = 'fill' }:
       <Text style={[styles.title, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>{title}</Text>
       <Text style={[styles.hint, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>{hint}</Text>
       {detail ? <Text style={styles.detail} selectable maxFontSizeMultiplier={1.2}>{detail}</Text> : null}
-      <View style={[styles.actions, arabic && styles.rowReverse]}>
+      <View style={styles.actions}>
         {onRetry ? (
           <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.retry, pressed && styles.pressed]}>
             <Text style={[styles.retryText, arabic && styles.arabicTight]} maxFontSizeMultiplier={1.3}>{tr('Try again', 'Réessayer', 'حاول مرة أخرى')}</Text>
@@ -69,7 +69,6 @@ const styles = StyleSheet.create({
   hint: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, lineHeight: 21, marginTop: 6, maxWidth: 360, textAlign: 'center' },
   detail: { color: 'rgba(205, 216, 203, 0.55)', fontFamily: TYPOGRAPHY.body, fontSize: 12.5, lineHeight: 17, marginTop: 10, maxWidth: 360, textAlign: 'center' },
   actions: { alignItems: 'center', flexDirection: 'row', gap: 10, marginTop: 20 },
-  rowReverse: { flexDirection: 'row-reverse' },
   retry: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 10, justifyContent: 'center', minHeight: 42, paddingHorizontal: 20 },
   retryText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
   back: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 42, paddingHorizontal: 18 },

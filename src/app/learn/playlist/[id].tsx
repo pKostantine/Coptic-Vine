@@ -131,12 +131,12 @@ export default function LearningPlaylistScreen() {
         <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <View style={styles.heroIcon}><Text style={styles.heroGlyph}>≡</Text></View>
-            <Text style={[styles.eyebrow, isArabic && styles.arabic]}>
+            <Text style={[styles.eyebrow, isArabic && styles.arabicCentered]}>
               {isArabic ? visibilityLabel(playlist.visibility, true) + ' · قائمة مخصّصة' : visibilityLabel(playlist.visibility, false).toUpperCase() + tr(' · CUSTOM PLAYLIST', ' · PLAYLIST PERSONNELLE', '')}
             </Text>
-            <Text style={[styles.title, isArabic && styles.arabic]}>{playlist.name}</Text>
-            {playlist.description ? <Text style={[styles.description, isArabic && styles.arabic]}>{playlist.description}</Text> : null}
-            <Text style={[styles.itemCount, isArabic && styles.arabic]}>
+            <Text style={[styles.title, isArabic && styles.arabicCentered]}>{playlist.name}</Text>
+            {playlist.description ? <Text style={[styles.description, isArabic && styles.arabicCentered]}>{playlist.description}</Text> : null}
+            <Text style={[styles.itemCount, isArabic && styles.arabicCentered]}>
               {tr(
                 `${playlist.items.length} ${playlist.items.length === 1 ? 'item' : 'items'}`,
                 `${playlist.items.length} ${playlist.items.length === 1 ? 'élément' : 'éléments'}`,
@@ -196,8 +196,8 @@ export default function LearningPlaylistScreen() {
             })}
             {!playlist.items.length ? (
               <View style={styles.empty}>
-                <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{tr('This playlist is empty', 'Cette playlist est vide', 'القائمة فارغة')}</Text>
-                <Text style={[styles.emptyBody, isArabic && styles.arabic]}>
+                <Text style={[styles.emptyTitle, isArabic && styles.arabicCentered]}>{tr('This playlist is empty', 'Cette playlist est vide', 'القائمة فارغة')}</Text>
+                <Text style={[styles.emptyBody, isArabic && styles.arabicCentered]}>
                   {owned
                     ? (tr('Add recordings or lessons from their content pages.', 'Ajoutez des enregistrements ou des leçons depuis leurs pages.', 'أضف تسجيلات أو دروسًا من صفحات المحتوى.'))
                     : (tr('No items have been added yet.', 'Aucun élément n’a encore été ajouté.', 'لم تُضف عناصر إلى هذه القائمة بعد.'))}
@@ -254,5 +254,6 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', padding: SPACING.xl },
   emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700', textAlign: 'center' },
   emptyBody: { maxWidth: 460, color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: SPACING.sm },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

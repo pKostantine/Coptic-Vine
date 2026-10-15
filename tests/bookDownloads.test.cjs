@@ -528,12 +528,12 @@ test('a book stages its resources a few at a time, and Download All starts every
 test('Downloads & Storage: an X cancels a paused or failed book, a bin removes what is in, and Download All starts the rest', () => {
   const page = fs.readFileSync('src/app/downloads.tsx', 'utf8');
   // Paused and failed books offer Resume or Retry beside a cancel X, which removes without asking.
+  // The pair runs the same way round in every App Language.
   const paused = page.match(/case 'paused':[\s\S]*?break;/)[0];
   const failed = page.match(/case 'failed':[\s\S]*?break;/)[0];
   for (const block of [paused, failed]) {
-    assert.match(block, /<ActionButton/);
-    assert.match(block, /\{cancel\}/);
-    assert.match(block, /arabic && styles\.rowReverse/);
+    assert.match(block, /<View style=\{styles\.trailingPair\}>\s*<ActionButton[^\n]*\n\s*\{cancel\}/);
+    assert.doesNotMatch(block, /rowReverse/);
   }
   assert.match(page, /<CancelButton label=\{tr\(`Cancel download of \$\{book\.title\}`, `Annuler le téléchargement de \$\{book\.title\}`, `إلغاء تنزيل \$\{book\.title\}`\)\} onPress=\{onCancel\} \/>/);
   assert.match(page, /const cancelBook = \(book: BookDownloadProgress\) => void run\(\(\) => bookDownloadManager\.remove\(book\.bookKey\)\);/);
@@ -548,5 +548,7 @@ test('Downloads & Storage: an X cancels a paused or failed book, a bin removes w
   assert.match(page, /const waitingBooks = books\.filter\(\(book\) => book\.status === 'not_downloaded' \|\| book\.status === 'paused' \|\| book\.status === 'failed'\);/);
   assert.match(page, /\{waitingBooks\.length \? <DownloadAllButton arabic=\{arabic\} onPress=\{downloadAll\} \/> : null\}/);
   assert.match(page, /run\(\(\) => bookDownloadManager\.installAll\(\)\)/);
-  assert.match(page, /function DownloadAllButton[\s\S]*?arabic && styles\.rowReverse[\s\S]*?tr\('Download All', 'Tout télécharger', 'تنزيل الكل'\)/);
+  assert.match(page, /function DownloadAllButton[\s\S]*?style=\{\(\{ pressed \}\) => \[styles\.downloadAll, pressed && styles\.pressed\]\}[\s\S]*?tr\('Download All', 'Tout télécharger', 'تنزيل الكل'\)/);
+  // Nothing on the page turns round for Arabic: rows, the storage bar and chevrons keep the English layout.
+  assert.doesNotMatch(page, /rowReverse|row-reverse|chevron-back|textAlign: 'right'/);
 });

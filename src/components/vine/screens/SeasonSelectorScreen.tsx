@@ -275,7 +275,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
                   onPress={() => selectDay(rowStart(row))}
                 />
                 {row.type === 'season' && row.children.length ? (
-                  <View style={[styles.nest, isArabic && styles.nestArabic]}>
+                  <View style={styles.nest}>
                     {row.children.map((child) => (
                       <Fragment key={child.key}>
                         {liveChildKey === child.key ? liveBar : null}
@@ -302,7 +302,6 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
           styles.yearBar,
           wide ? styles.yearBarWide : null,
           { bottom: (wide ? 28 : Math.max(24, insets.bottom)) + nowPlayingInset },
-          isArabic && styles.rowReverse,
         ]}>
           <Pressable
             accessibilityRole="button"
@@ -310,9 +309,9 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
             style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}
             onPress={() => setYear((y) => (y ?? 0) - 1)}
           >
-            <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={17} color={COLORS.gold} />
+            <Icon name="chevron-back" size={17} color={COLORS.gold} />
           </Pressable>
-          <View style={[styles.yearLabel, isArabic && styles.rowReverse]}>
+          <View style={styles.yearLabel}>
             {year === currentCopticYear ? <View style={styles.yearDot} /> : null}
             <Text style={[styles.yearText, isArabic && styles.arabicText]}>{formatCopticYear(year, isArabic)}</Text>
           </View>
@@ -322,7 +321,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
             style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}
             onPress={() => setYear((y) => (y ?? 0) + 1)}
           >
-            <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+            <Icon name="chevron-forward" size={17} color={COLORS.gold} />
           </Pressable>
         </View>
       ) : null}
@@ -372,7 +371,6 @@ function SeasonCard({
         kind === 'nested' && styles.cardNested,
         current && styles.cardCurrent,
         current && (gold ? styles.glowGold : styles.glowGreen),
-        isArabic && styles.rowReverse,
         pressed && styles.pressed,
       ]}
     >
@@ -386,14 +384,14 @@ function SeasonCard({
         </Text>
       </View>
       {/* Wrapped so it stacks above the gradient on web, where a bare SVG paints beneath positioned siblings. */}
-      <View><Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={gold ? COLORS.greenDeep : COLORS.gold} /></View>
+      <View><Icon name="chevron-forward" size={17} color={gold ? COLORS.greenDeep : COLORS.gold} /></View>
     </Pressable>
   );
 }
 
 function LiveBar({ isArabic }: { isArabic: boolean }) {
   return (
-    <View style={[styles.liveBar, isArabic && styles.rowReverse]} accessibilityRole="text">
+    <View style={styles.liveBar} accessibilityRole="text">
       <View style={styles.liveDotHalo}>
         <View style={styles.liveDot} />
       </View>
@@ -410,7 +408,6 @@ const styles = StyleSheet.create({
   // 28pt from the top as every iPad and desktop page is.
   frameWide: { alignSelf: 'center', maxWidth: 752, paddingTop: 28, width: '100%' },
   yearBarWide: { left: '50%', marginLeft: -270, right: undefined, width: 540 },
-  rowReverse: { flexDirection: 'row-reverse' },
   list: { gap: 8, paddingHorizontal: 16, paddingTop: 4 },
   card: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   cardFill: { borderRadius: 16 },
@@ -430,7 +427,6 @@ const styles = StyleSheet.create({
   subtitleOnGold: { color: '#2B4A1F' },
   // A season's own feasts hang off a solid gold rail.
   nest: { borderLeftColor: COLORS.gold, borderLeftWidth: 2, gap: 8, marginLeft: 10, paddingLeft: 18 },
-  nestArabic: { borderLeftWidth: 0, borderRightColor: COLORS.gold, borderRightWidth: 2, marginLeft: 0, marginRight: 10, paddingLeft: 0, paddingRight: 18 },
   liveBar: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingVertical: 6 },
   liveDotHalo: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.2)', borderRadius: 8, height: 16, justifyContent: 'center', width: 16 },
   liveDot: { backgroundColor: COLORS.priest, borderRadius: 4, height: 8, width: 8 },
@@ -454,6 +450,6 @@ const styles = StyleSheet.create({
   yearLabel: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   yearDot: { backgroundColor: COLORS.priest, borderRadius: 4, height: 8, width: 8 },
   yearText: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicSmall: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
 });

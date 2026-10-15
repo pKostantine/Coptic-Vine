@@ -160,7 +160,7 @@ export default function LearningPlaylistPicker({
                   </Pressable>
                 ))}
                 {!playlists.length ? (
-                  <Text style={[styles.empty, isArabic && styles.arabic]}>{tr('Create custom playlists from My Learning.', 'Créez des playlists personnelles depuis Mon apprentissage.', 'أنشئ قائمة مخصّصة من صفحة «تعلّمي».')}</Text>
+                  <Text style={[styles.empty, isArabic && styles.arabicCentered]}>{tr('Create custom playlists from My Learning.', 'Créez des playlists personnelles depuis Mon apprentissage.', 'أنشئ قائمة مخصّصة من صفحة «تعلّمي».')}</Text>
                 ) : null}
               </ScrollView>
             ) : null}
@@ -195,5 +195,6 @@ const styles = StyleSheet.create({
   selectedText: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '700', marginTop: 3 },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, textAlign: 'center', padding: SPACING.md },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: SPACING.sm },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

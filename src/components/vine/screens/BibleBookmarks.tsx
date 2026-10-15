@@ -78,10 +78,10 @@ export default function BibleBookmarks() {
     >
       {books && !chapters.length ? (
         <View style={styles.empty}>
-          <Text style={[styles.emptyTitle, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          <Text style={[styles.emptyTitle, arabic && styles.arabicCentered]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {tr('No bookmarked chapters yet', 'Aucun chapitre en favori pour l’instant', 'لا توجد إصحاحات محفوظة بعد')}
           </Text>
-          <Text style={[styles.emptyHint, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          <Text style={[styles.emptyHint, arabic && styles.arabicCentered]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {tr('Bookmark a chapter from its list of verses.', 'Ajoutez un chapitre aux favoris depuis sa liste de versets.', 'احفظ إصحاحاً من قائمة آياته.')}
           </Text>
         </View>
@@ -119,12 +119,12 @@ interface BookmarkRowProps {
 /** A saved chapter, on a row like the testaments' books; its bookmark takes it off the list. */
 function BookmarkRow({ title, arabic, onPress, onRemove }: BookmarkRowProps) {
   return (
-    <View style={[styles.row, arabic && styles.rowReverse]}>
+    <View style={styles.row}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={title}
         onPress={onPress}
-        style={({ pressed }) => [styles.open, arabic && styles.rowReverse, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.open, pressed && styles.pressed]}
       >
         <Text style={[styles.title, arabic && styles.arabicText]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
           {title}
@@ -147,8 +147,8 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', gap: SPACING.xs, paddingHorizontal: 16, paddingTop: SPACING.lg },
   emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', textAlign: 'center' },
   emptyHint: { color: 'rgba(255, 255, 255, 0.6)', fontFamily: TYPOGRAPHY.body, fontSize: 14, textAlign: 'center' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  rowReverse: { flexDirection: 'row-reverse' },
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   row: {
     alignItems: 'center',
     backgroundColor: COLORS.surface,

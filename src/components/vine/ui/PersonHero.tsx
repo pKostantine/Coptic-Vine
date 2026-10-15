@@ -38,7 +38,7 @@ export default function PersonHero({ name, kicker, imageUri, bio, compact = fals
   const insets = useSafeAreaInsets();
   // The artist's photo and name are the larger: 136 and 29 on a phone, 210 and 44 beside each other; the cantor's 104 and 26, 150 and 40.
   const photoSize = wide ? (compact ? 150 : 210) : compact ? 104 : 136;
-  const alignText = wide ? (arabic ? styles.textEnd : styles.textStart) : styles.textCenter;
+  const alignText = wide ? styles.textStart : styles.textCenter;
 
   return (
     <View>
@@ -51,13 +51,13 @@ export default function PersonHero({ name, kicker, imageUri, bio, compact = fals
         <LinearGradient colors={['rgba(0, 0, 0, 0.05)', 'rgba(0, 0, 0, 0.45)', '#000000']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
       </View>
 
-      <View style={[styles.bar, { paddingTop: insets.top + (wide ? 28 : 2) }, wide && styles.barWide, arabic && styles.rowReverse]}>
+      <View style={[styles.bar, { paddingTop: insets.top + (wide ? 28 : 2) }, wide && styles.barWide]}>
         <Pressable accessibilityRole="button" accessibilityLabel={backLabel} hitSlop={6} onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <Icon name={arabic ? 'chevron-forward' : 'chevron-back'} size={20} color={COLORS.gold} />
+          <Icon name="chevron-back" size={20} color={COLORS.gold} />
         </Pressable>
       </View>
 
-      <View style={[styles.head, wide && styles.headWide, wide && arabic && styles.rowReverse]}>
+      <View style={[styles.head, wide && styles.headWide]}>
         <View style={[styles.photo, { borderRadius: photoSize / 2, height: photoSize, width: photoSize }]}>
           {imageUri ? (
             <Image source={{ uri: imageUri }} contentFit="cover" transition={160} style={StyleSheet.absoluteFill} />
@@ -68,7 +68,7 @@ export default function PersonHero({ name, kicker, imageUri, bio, compact = fals
             </>
           )}
         </View>
-        <View style={[styles.text, wide && styles.textWide, wide && (arabic ? styles.itemsEnd : styles.itemsStart)]}>
+        <View style={[styles.text, wide && styles.textWide]}>
           <Text style={[styles.kicker, compact && styles.kickerCompact, wide && styles.kickerWide, alignText, arabic && styles.arabicKicker]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {arabic ? kicker : kicker.toUpperCase()}
           </Text>
@@ -94,7 +94,6 @@ const styles = StyleSheet.create({
   glowImage: { bottom: -60, left: -60, opacity: 0.62, position: 'absolute', right: -60, top: -60 },
   bar: { flexDirection: 'row', paddingHorizontal: 16 },
   barWide: { marginBottom: 10, paddingHorizontal: WIDE_MARGIN },
-  rowReverse: { flexDirection: 'row-reverse' },
   back: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.32)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   pressed: { opacity: 0.7 },
   head: { alignItems: 'center', paddingHorizontal: 20 },
@@ -103,12 +102,9 @@ const styles = StyleSheet.create({
   initial: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontWeight: '700' },
   text: { alignItems: 'center', alignSelf: 'stretch' },
   // Beside the photo the words sit level with its middle, whichever is the taller.
-  textWide: { alignSelf: 'center', flex: 1, minWidth: 0 },
-  itemsStart: { alignItems: 'flex-start' },
-  itemsEnd: { alignItems: 'flex-end' },
+  textWide: { alignItems: 'flex-start', alignSelf: 'center', flex: 1, minWidth: 0 },
   textCenter: { textAlign: 'center' },
   textStart: { textAlign: 'left' },
-  textEnd: { textAlign: 'right' },
   kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8, marginTop: 18 },
   kickerCompact: { marginTop: 14 },
   kickerWide: { marginTop: 0 },
@@ -119,6 +115,6 @@ const styles = StyleSheet.create({
   nameWideCompact: { fontSize: 40, lineHeight: 46 },
   bio: { color: '#E2E9DF', fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 21, marginTop: 10, maxWidth: 560 },
   bioWide: { fontSize: 15, lineHeight: 22.5 },
-  // A name or bio keeps the direction of its own words: a Latin one in an Arabic layout ends with its own full stop.
+  // A name or bio keeps the direction of its own words: a Latin one, read in Arabic, ends with its own full stop.
   arabic: { fontFamily: TYPOGRAPHY.arabic },
 });

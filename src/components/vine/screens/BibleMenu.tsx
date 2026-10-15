@@ -45,12 +45,12 @@ export default function BibleMenu() {
       wide="single"
     >
       <PageGutter>
-        <View style={[styles.searchBar, arabic && styles.rowReverse]}>
+        <View style={styles.searchBar}>
           <Pressable
             accessibilityRole="search"
             accessibilityLabel={tr('Search the Bible', 'Rechercher dans la Bible', 'ابحث في الكتاب المقدس')}
             onPress={() => router.push('/bible/search')}
-            style={({ pressed }) => [styles.search, arabic && styles.rowReverse, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.search, pressed && styles.pressed]}
           >
             <Icon name="search-outline" size={19} color={COLORS.gold} />
             <Text style={[styles.searchText, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
@@ -92,10 +92,10 @@ function TestamentCard({ testament, arabic, onPress }: { testament: Testament; a
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${appText(look.range)}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, arabic && styles.rowReverse, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <LinearGradient colors={cover.gradient} locations={cover.locations} start={{ x: 0.33, y: 0 }} end={{ x: 0.67, y: 1 }} style={StyleSheet.absoluteFill} />
-      <View style={[styles.watermark, arabic ? styles.watermarkArabic : null]} pointerEvents="none">
+      <View style={styles.watermark} pointerEvents="none">
         <BuddedCross size={96} />
       </View>
       <View style={styles.cardText}>
@@ -106,15 +106,14 @@ function TestamentCard({ testament, arabic, onPress }: { testament: Testament; a
         <Text style={[styles.cardRange, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{appText(look.range)}</Text>
       </View>
       {/* Wrapped so it stacks above the gradient on web, where a bare SVG paints beneath positioned siblings. */}
-      <View><Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={20} color={COLORS.gold} /></View>
+      <View><Icon name="chevron-forward" size={20} color={COLORS.gold} /></View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  rowReverse: { flexDirection: 'row-reverse' },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  arabicTitle: { fontFamily: TYPOGRAPHY.arabic, fontSize: 25, lineHeight: 38, textAlign: 'right', writingDirection: 'rtl' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicTitle: { fontFamily: TYPOGRAPHY.arabic, fontSize: 25, lineHeight: 38, textAlign: 'left', writingDirection: 'rtl' },
   pressed: { opacity: 0.8 },
 
   searchBar: { flexDirection: 'row', gap: 10, marginBottom: 14 },
@@ -156,10 +155,9 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
   },
   watermark: { marginTop: -48, opacity: 0.12, position: 'absolute', right: 34, top: '50%' },
-  watermarkArabic: { left: 34, right: undefined },
   cardText: { flex: 1, minWidth: 0 },
   cardKicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
-  cardKickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  cardKickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', writingDirection: 'rtl' },
   cardTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 26, fontWeight: '700', marginTop: 6 },
   cardRange: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: 4 },
 });
