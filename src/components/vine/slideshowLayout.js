@@ -169,7 +169,9 @@ function buildPaginationUnits(items) {
     items: [item],
     breakBefore:
       (item.type === "title" && !item.isCollapsed && hasVisibleTitleText(item.title)) ||
-      item.type === "button" ||
+      // A button opens a slide of its own, but a run of them (the Liturgy of
+      // the Word's three at its end) shares one as far as they fit.
+      (item.type === "button" && items[index - 1]?.type !== "button") ||
       // The Antiphonary's Vatos half opens its own slide, so the Vatos pill
       // lands on its first verse rather than partway down Adam's last slide.
       (item.verse?.tune === "vatos" && items[index - 1]?.verse?.tune === "adam"),

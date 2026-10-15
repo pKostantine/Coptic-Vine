@@ -239,6 +239,24 @@ test("the Antiphonary's Vatos half opens its own slide", () => {
   ]);
 });
 
+test("a run of buttons shares a slide while they fit, and still opens a fresh one", () => {
+  const button = (index) => ({ id: `go-${index}-button`, sectionId: `go-${index}`, type: "button", title: { english: `Go ${index}` } });
+  const items = [verseItem({ id: "entry-verse-0", sectionId: "entry" }), button(0), button(1), button(2)];
+  const heights = Object.fromEntries(items.map((item) => [item.id, 120]));
+  const fit = paginateItems(items, heights, {}, 1000, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(fit.map((slide) => slide.map((entry) => entry.id)), [
+    ["entry-verse-0"],
+    ["go-0-button", "go-1-button", "go-2-button"],
+  ]);
+  // Only as many as the slide holds: the rest carry over.
+  const tight = paginateItems(items, heights, {}, 260, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(tight.map((slide) => slide.map((entry) => entry.id)), [
+    ["entry-verse-0"],
+    ["go-0-button", "go-1-button"],
+    ["go-2-button"],
+  ]);
+});
+
 test("line anchors follow the same content when page capacity changes", () => {
   const item = verseItem();
   const before = splitVerse(item, { availableHeight: 320, lineCount: 15 }).slides;
