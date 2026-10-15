@@ -26,18 +26,23 @@ const channel = (value) => { const c = value / 255; return c <= 0.03928 ? c / 12
 const luminance = (hex) => { const v = parseInt(hex.slice(1), 16); return 0.2126 * channel((v >> 16) & 255) + 0.7152 * channel((v >> 8) & 255) + 0.0722 * channel(v & 255); };
 const contrast = (a, b) => { const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (high + 0.05) / (low + 0.05); };
 const HEX = /^#[0-9A-Fa-f]{6}$/;
-const hsl = (hex) => {
+/** A colour in OKLab, the perceptual space in which equal distances look equally different. */
+const oklab = (hex) => {
   const v = parseInt(hex.slice(1), 16);
-  const [r, g, b] = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map((c) => c / 255);
-  const max = Math.max(r, g, b); const min = Math.min(r, g, b); const d = max - min;
-  const l = (max + min) / 2;
-  if (!d) return { h: 0, s: 0, l };
-  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return { h: (h * 60 + 360) % 360, s: d / (1 - Math.abs(2 * l - 1)), l };
+  const [r, g, b] = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map((c) => { const x = c / 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return { a: 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, b: 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s };
 };
-const hue = (hex) => hsl(hex).h;
-/** How far from grey a colour is, as its channels' spread: HSL saturation misleads near white and black. */
-const chroma = (hex) => { const v = parseInt(hex.slice(1), 16); const c = [(v >> 16) & 255, (v >> 8) & 255, v & 255]; return (Math.max(...c) - Math.min(...c)) / 255; };
+/**
+ * How far apart two colours are in hue and colourfulness, leaving lightness
+ * out: two shades of one ink score 0, so a pair that passes is told apart by
+ * its colour and not only by being lighter or darker. White against Night's
+ * blue is 0.10; Paper's red priest against its orange people, its closest
+ * pair, is 0.07.
+ */
+const apart = (x, y) => { const p = oklab(x); const q = oklab(y); return Math.hypot(p.a - q.a, p.b - q.b); };
 const RGBA = /^rgba\(\d+, \d+, \d+, (0(\.\d+)?|1)\)$/;
 
 const TEXT_COLORS = ['text', 'alternate', 'accent', 'priest', 'deacon', 'people', 'peopleText', 'refrain', 'metropolitan', 'subdoc', 'link'];
@@ -45,12 +50,14 @@ const QUIET_COLORS = ['comment', 'silent'];
 const SOLID_COLORS = ['page', 'surface', 'border', 'strip', 'stripActive', 'onAccent', ...TEXT_COLORS, ...QUIET_COLORS];
 const WASHES = ['accentSoft', 'accentLine', 'subdocSoft', 'subdocLine', 'linkSoft', 'linkLine'];
 
-test('there are five pages, Night first and the default, each with a name in every App Language', () => {
-  assert.deepEqual(DOCUMENT_THEME_IDS, ['night', 'walnut', 'vine', 'sepia', 'paper']);
+test('there are five pages, darkest to lightest, Night first and the default, each with a name in every App Language', () => {
+  assert.deepEqual(DOCUMENT_THEME_IDS, ['night', 'ink', 'vine', 'sepia', 'paper']);
   assert.equal(getDocumentTheme(undefined), NIGHT_DOCUMENT_THEME);
   assert.equal(getDocumentTheme('sepia').id, 'sepia');
   // A page this version doesn't know (a newer app synced it, a hand-edited file) reads as Night rather than breaking.
   assert.equal(getDocumentTheme('amber'), NIGHT_DOCUMENT_THEME);
+  // So does a page an earlier version offered and this one has dropped.
+  for (const dropped of ['slate', 'walnut']) assert.equal(getDocumentTheme(dropped), NIGHT_DOCUMENT_THEME, dropped);
   assert.equal(isDocumentThemeId('vine'), true);
   assert.equal(isDocumentThemeId('Vine'), false);
   for (const id of DOCUMENT_THEME_IDS) {
@@ -88,10 +95,39 @@ test('every text colour reads on its page: 4.5:1 for the words, 3:1 for what is 
     assert.ok(contrast(colors.text, colors.surface) >= 4.5, `${id}'s text on its surface`);
     assert.ok(contrast(colors.text, colors.strip) >= 4.5, `${id}'s text on its strip`);
     assert.ok(contrast(colors.text, colors.stripActive) >= 4.5, `${id}'s text on its lit pill`);
-    // The two voices of an alternating hymn are told apart by hue: the one
-    // verse is plain ink, the other unmistakably blue.
-    assert.ok(chroma(colors.text) <= 0.08, `${id}'s "white" verse is plain ink`);
-    assert.ok(hsl(colors.alternate).s >= 0.4 && hue(colors.alternate) >= 195 && hue(colors.alternate) <= 235, `${id}'s "blue" verse is blue`);
+    // The quiet lines are quieter than either voice of the text.
+    for (const key of QUIET_COLORS) {
+      assert.ok(contrast(colors[key], colors.page) < Math.min(contrast(colors.text, colors.page), contrast(colors.alternate, colors.page)), `${id}.${key} steps back from the text`);
+    }
+  }
+});
+
+test('every page tells its lines apart by colour, whatever colours it chooses', () => {
+  for (const id of DOCUMENT_THEME_IDS) {
+    const { colors } = DOCUMENT_THEMES[id];
+    const distinct = (a, b, within) => {
+      const gap = apart(colors[a], colors[b]);
+      assert.ok(gap >= within, `${id}: ${a} ${colors[a]} and ${b} ${colors[b]} are only ${gap.toFixed(3)} apart`);
+    };
+    // The two voices of an alternating hymn, at a glance: by hue, not only by shade.
+    distinct('text', 'alternate', 0.09);
+    // A refrain is neither voice.
+    distinct('refrain', 'text', 0.08);
+    distinct('refrain', 'alternate', 0.08);
+    // The priest, the deacon and the people each have a colour of their own,
+    // and none of them is mistaken for a verse — nor is a People line's own text.
+    distinct('priest', 'deacon', 0.06);
+    distinct('priest', 'people', 0.06);
+    distinct('deacon', 'people', 0.06);
+    for (const speaker of ['priest', 'deacon', 'people', 'peopleText']) {
+      distinct(speaker, 'text', 0.07);
+      distinct(speaker, 'alternate', 0.07);
+    }
+    // The titles stand apart from the verses under them.
+    distinct('accent', 'text', 0.07);
+    distinct('accent', 'alternate', 0.07);
+    // Opening a nested document and leaving for another service are different buttons.
+    distinct('subdoc', 'link', 0.1);
   }
 });
 
@@ -103,6 +139,11 @@ test('Night is exactly the page the services have always been read on', () => {
   );
   assert.equal(colors.strip, '#111111');
   assert.equal(colors.stripActive, '#171513');
+  assert.equal(colors.onAccent, COLORS.black);
+  assert.deepEqual(
+    [colors.accentSoft, colors.accentLine, colors.subdocSoft, colors.subdocLine, colors.linkSoft, colors.linkLine],
+    [COLORS.goldSoft, COLORS.goldLine, COLORS.subdocSoft, COLORS.subdocLine, COLORS.linkSoft, COLORS.linkLine],
+  );
   // The slideshow reads the same page under its own names.
   const slideshow = slideshowThemeFor(NIGHT_DOCUMENT_THEME);
   assert.equal(slideshow.colors.gold, COLORS.gold);
@@ -111,18 +152,47 @@ test('Night is exactly the page the services have always been read on', () => {
   assert.equal(slideshow.colors.peopleText, COLORS.peopleLight);
 });
 
-test('the light pages keep every rubric its hue, deepened to carry on paper', () => {
-  for (const id of ['sepia', 'paper']) {
+test('Paper is exactly the white page it has been', () => {
+  const { colors } = DOCUMENT_THEMES.paper;
+  assert.deepEqual(colors, {
+    page: '#FFFFFF',
+    surface: '#F3F3F1',
+    border: '#E3E3E3',
+    strip: '#F4F4F2',
+    stripActive: '#ECECE9',
+    text: '#1C1C1C',
+    alternate: '#1E4FA3',
+    accent: '#8A5A12',
+    onAccent: '#FFFFFF',
+    accentSoft: withAlpha('#8A5A12', 0.1),
+    accentLine: withAlpha('#8A5A12', 0.45),
+    priest: '#B4292B',
+    deacon: '#7A6A00',
+    people: '#A34A14',
+    peopleText: '#8A4A1E',
+    comment: '#6B7A8C',
+    silent: '#767676',
+    refrain: '#2A6F43',
+    metropolitan: '#0B6A75',
+    subdoc: '#2B5DA8',
+    subdocSoft: withAlpha('#2B5DA8', 0.1),
+    subdocLine: withAlpha('#2B5DA8', 0.4),
+    link: '#24735A',
+    linkSoft: withAlpha('#24735A', 0.1),
+    linkLine: withAlpha('#24735A', 0.4),
+  });
+});
+
+test('the light pages are dark ink on a light page, Sepia a warm parchment rather than near-white', () => {
+  for (const id of DOCUMENT_THEME_IDS.filter((page) => !DOCUMENT_THEMES[page].dark)) {
     const { colors } = DOCUMENT_THEMES[id];
-    const near = (a, b, within) => Math.min(Math.abs(hue(a) - hue(b)), 360 - Math.abs(hue(a) - hue(b))) <= within;
-    assert.ok(near(colors.priest, COLORS.priest, 12), `${id}'s priest stays red`);
-    assert.ok(near(colors.deacon, COLORS.deacon, 12), `${id}'s deacon stays yellow`);
-    assert.ok(near(colors.people, COLORS.people, 12), `${id}'s people stay orange`);
-    assert.ok(near(colors.alternate, COLORS.rowBlue, 15), `${id}'s blue verse stays blue`);
-    assert.ok(near(colors.refrain, COLORS.refrain, 15), `${id}'s refrain stays green`);
-    // Sepia is a beige rather than near-white, so it doesn't glare; still a light page under dark ink.
     assert.ok(luminance(colors.text) < 0.05 && luminance(colors.page) > 0.6, `${id} is ink on paper`);
   }
+  const parchment = DOCUMENT_THEMES.sepia.colors.page;
+  const { a, b } = oklab(parchment);
+  // Warm: a clear yellow cast, not the greyed beige of an off-white (the old #E6D9BC fell short).
+  assert.ok(b > 0.05 && b > Math.abs(a) * 2, `${parchment} reads warm`);
+  assert.ok(luminance(parchment) < 0.8, `${parchment} doesn't glare like white`);
 });
 
 test('the stored choice is a page, and Night when it is not', () => {
@@ -249,16 +319,20 @@ test('the slideshow and the screens around every reader take the page too', () =
   assert.match(read('src/app/bible/[bookKey]/[chapter].tsx'), /restoreVerse, targetVerse, theme\.id\]/, 'a change of page is a new reader');
 });
 
-test('Book Settings offers the page picker above Display: one radio per page, the chosen one checked', () => {
+test('Book Settings offers the page picker first under Display: one radio per page, the chosen one checked', () => {
   const settings = fs.readFileSync('src/components/vine/screens/SettingsScreen.tsx', 'utf8');
-  assert.match(settings, /page: \{ english: 'Page', arabic: 'الصفحة', french: 'Page' \}/);
-  assert.match(settings, /<DocumentThemePicker selected=\{preferences\.documentTheme\} onSelect=\{setDocumentTheme\} isArabic=\{arabic\} \/>/);
-  assert.ok(settings.indexOf('SETTINGS_LABELS.page,') < settings.indexOf('SETTINGS_LABELS.display)'), 'The page comes before the display settings');
-  const picker = fs.readFileSync('src/components/vine/ui/DocumentThemePicker.tsx', 'utf8');
-  assert.match(picker, /accessibilityRole="radiogroup"/);
-  assert.match(picker, /accessibilityRole="radio"/);
-  assert.match(picker, /accessibilityState=\{\{ checked: active, selected: active \}\}/);
-  assert.match(picker, /DOCUMENT_THEME_IDS\.map/);
+  const picker = '<DocumentThemePicker selected={preferences.documentTheme} onSelect={setDocumentTheme} isArabic={arabic} />';
+  assert.ok(settings.includes(picker));
+  const display = settings.indexOf('kicker(SETTINGS_LABELS.display, wide)');
+  assert.ok(display > 0 && display < settings.indexOf(picker), 'The page picker sits under the Display heading');
+  assert.ok(settings.indexOf(picker) < settings.indexOf('<FontScaleControl'), 'It comes before the text size and the rest of Display');
+  const source = fs.readFileSync('src/components/vine/ui/DocumentThemePicker.tsx', 'utf8');
+  assert.match(source, /accessibilityRole="radiogroup"/);
+  assert.match(source, /accessibilityRole="radio"/);
+  assert.match(source, /accessibilityState=\{\{ checked: active, selected: active \}\}/);
+  assert.match(source, /DOCUMENT_THEME_IDS\.map/);
   // The swatch shows the page with its two inks.
-  assert.match(picker, /<Text style=\{\{ color: theme\.colors\.text \}\}>A<\/Text>\s+<Text style=\{\{ color: theme\.colors\.alternate \}\}>a<\/Text>/);
+  assert.match(source, /<Text style=\{\{ color: theme\.colors\.text \}\}>A<\/Text>\s+<Text style=\{\{ color: theme\.colors\.alternate \}\}>a<\/Text>/);
+  // Every dark page's swatch carries the hairline that keeps it from sinking into the green sheet.
+  assert.match(source, /theme\.dark && styles\.swatchEdge/);
 });

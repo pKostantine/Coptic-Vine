@@ -15,10 +15,11 @@ interface DocumentThemePickerProps {
 /**
  * The row of pages a document can be read on, as a book app offers them: a
  * swatch of each page with "Aa" set in its own ink — the first letter the
- * page's text, the second its alternating blue, so the pair the services are
- * read in shows at a glance — and its name beneath. The chosen one wears a
- * gold ring. The swatches are 54pt in the phone's sheet and 72pt in the iPad's
- * and desktop's dialog (Coptic Vine design, "Book settings").
+ * page's text, the second its alternating voice (Night's blue, Vine's
+ * lavender), so the pair the services are read in shows at a glance — and its
+ * name beneath. The chosen one wears a gold ring. The swatches are 54pt in the
+ * phone's sheet and 72pt in the iPad's and desktop's dialog (Coptic Vine
+ * design, "Book settings").
  */
 export default function DocumentThemePicker({ selected, onSelect, isArabic = false }: DocumentThemePickerProps) {
   const wide = useLayoutMode() !== 'phone';
@@ -46,8 +47,8 @@ export default function DocumentThemePicker({ selected, onSelect, isArabic = fal
                 styles.swatch,
                 wide && styles.swatchWide,
                 { backgroundColor: theme.colors.page },
-                // The black and the dark green pages would sink into the green sheet without a hairline.
-                (id === 'night' || id === 'vine') && styles.swatchEdge,
+                // The dark pages (black, navy, deep green) would sink into the green sheet without a hairline.
+                theme.dark && styles.swatchEdge,
                 active && styles.swatchActive,
               ]}
             >
