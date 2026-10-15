@@ -37,6 +37,7 @@ import type {
   DownloadableBookKey,
 } from '@/types/bookDownloads';
 import type { OfflineDownloadRequest } from '@/types/offlineDownloads';
+import { forEachLimited, throttled } from '@/utils/concurrency';
 
 const MANIFEST_BASE_URL = (process.env.EXPO_PUBLIC_CONTENT_PACKAGES_URL || '').replace(/\/+$/, '');
 const MANIFEST_CACHE_MS = 60_000;
@@ -44,8 +45,29 @@ const AUTO_UPDATE_SETTING = 'automatic_book_updates_wifi';
 // When the published manifest was last compared against the installed books,
 // by hand or automatically: Downloads & Storage shows it under "Check for updates".
 const LAST_UPDATE_CHECK_SETTING = 'last_book_update_check';
+// How many of a book's resources are fetched and imported at once.
+const RESOURCE_CONCURRENCY = 3;
+// A book's progress is rewritten at most this often while its resources download.
+const PROGRESS_INTERVAL_MS = 250;
 
 class PausedDownloadError extends Error {}
+
+/**
+ * A resource being fetched and imported, shared by every book that needs it.
+ * A pause from the last book still wanting it stops it between steps.
+ */
+type ResourceStaging = { stopped: boolean; promise: Promise<void> };
+
+/** An installing book's pause: it stops the book at once, whatever its resources are doing. */
+type BookRun = { paused: boolean; pause: () => void; interrupted: Promise<never> };
+
+function bookRun(): BookRun {
+  let reject: (error: Error) => void = () => undefined;
+  const interrupted = new Promise<never>((_, fail) => { reject = fail; });
+  interrupted.catch(() => { /* raced by installBook; a pause before then is not an error */ });
+  const run: BookRun = { paused: false, pause: () => { run.paused = true; reject(new PausedDownloadError('Download paused.')); }, interrupted };
+  return run;
+}
 
 function absoluteUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
@@ -150,14 +172,18 @@ class NativeBookDownloadManager implements BookDownloadManager {
   private listeners = new Set<() => void>();
   private revision = 0;
   private manifestCache: { at: number; value: ContentRootManifest } | null = null;
+  private manifestRequest: Promise<ContentRootManifest> | null = null;
   private bookWorkers = new Map<DownloadableBookKey, Promise<void>>();
-  private resourceWorkers = new Map<string, Promise<void>>();
+  private bookRuns = new Map<DownloadableBookKey, BookRun>();
+  private resourceWorkers = new Map<string, ResourceStaging>();
   private activeBookResources = new Map<DownloadableBookKey, ContentResourceManifest[]>();
   private initialized: Promise<void> | null = null;
 
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   getRevision = (): number => this.revision;
   private emit() { this.revision += 1; for (const listener of this.listeners) listener(); }
+  // Every downloading book's progress is announced together, a few times a second.
+  private announceProgress = throttled(async () => this.emit(), PROGRESS_INTERVAL_MS);
   private async cleanupActivatedVersions() {
     for (const resource of await listStoredResources()) {
       if (!resource.activeVersion) continue;
@@ -178,12 +204,16 @@ class NativeBookDownloadManager implements BookDownloadManager {
   private async fetchManifest(force = false): Promise<ContentRootManifest> {
     if (!force && this.manifestCache && Date.now() - this.manifestCache.at < MANIFEST_CACHE_MS) return this.manifestCache.value;
     if (!MANIFEST_BASE_URL) throw new Error('Set EXPO_PUBLIC_CONTENT_PACKAGES_URL to the Coptic Vine content package Worker.');
-    const response = await fetch(`${MANIFEST_BASE_URL}/manifest.json`, { headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error(`Unable to check book packages (${response.status}).`);
-    const manifest = await response.json() as ContentRootManifest;
-    validatePublishedManifest(manifest);
-    this.manifestCache = { at: Date.now(), value: manifest };
-    return manifest;
+    // Books started together (Download All) share the one request in flight.
+    this.manifestRequest ??= (async () => {
+      const response = await fetch(`${MANIFEST_BASE_URL}/manifest.json`, { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`Unable to check book packages (${response.status}).`);
+      const manifest = await response.json() as ContentRootManifest;
+      validatePublishedManifest(manifest);
+      this.manifestCache = { at: Date.now(), value: manifest };
+      return manifest;
+    })().finally(() => { this.manifestRequest = null; });
+    return this.manifestRequest;
   }
 
   private async stageResource(resource: ContentResourceManifest): Promise<void> {
@@ -191,15 +221,21 @@ class NativeBookDownloadManager implements BookDownloadManager {
     const active = await getActiveResourceVersion(resource.id);
     if (active === resource.version) return;
     const running = this.resourceWorkers.get(key);
-    if (running) return running;
-    const worker = (async () => {
+    if (running && !running.stopped) return running.promise;
+    // One a pause has just stopped may still be winding down: this begins again once it has.
+    if (running) { await running.promise.catch(() => undefined); return this.stageResource(resource); }
+    const staging: ResourceStaging = { stopped: false, promise: Promise.resolve() };
+    staging.promise = (async () => {
       await setResourceState(resource.id, active ? 'update_available' : 'downloading', { bytes: resource.size, error: null, systemOwned: resource.id === 'calendar' });
       this.emit();
       const request = resourceRequest(resource);
       await downloadManager.enqueue(request);
+      // Stopped while its package was being queued: the pause came too soon to find it downloading.
+      if (staging.stopped) { await downloadManager.pause(request.packageKey); throw new PausedDownloadError('Download paused.'); }
       await waitForMediaPackage(request.packageKey);
       const files = await getPackageFiles(request.packageKey);
       for (const chunk of resource.chunks) {
+        if (staging.stopped) throw new PausedDownloadError('Download paused.');
         if (await isContentChunkImported(resource.id, resource.version, chunk.id)) continue;
         const row = files.find((file) => file.file_key === `content:${resource.id}:${chunk.sha256}`);
         if (!row?.local_uri) throw new Error(`Downloaded chunk ${chunk.id} is missing.`);
@@ -230,12 +266,12 @@ class NativeBookDownloadManager implements BookDownloadManager {
       }
       this.emit();
       throw cause;
-    }).finally(() => this.resourceWorkers.delete(key));
-    this.resourceWorkers.set(key, worker);
-    return worker;
+    }).finally(() => { if (this.resourceWorkers.get(key) === staging) this.resourceWorkers.delete(key); });
+    this.resourceWorkers.set(key, staging);
+    return staging.promise;
   }
 
-  private async installBook(bookKey: DownloadableBookKey): Promise<void> {
+  private async installBook(bookKey: DownloadableBookKey, run: BookRun): Promise<void> {
     await this.initialize();
     const previousBook = await getStoredBook(bookKey);
     const manifest = await this.fetchManifest(true);
@@ -246,27 +282,34 @@ class NativeBookDownloadManager implements BookDownloadManager {
     const totalBytes = resources.reduce((sum, resource) => sum + resource.size, 0);
     await setBookState(bookKey, 'downloading', { progress: 0, bytesWritten: 0, totalBytes, error: null });
     this.emit();
-    let completedBytes = 0;
+    // The book's progress is its resources' together: a staged one whole, the
+    // rest as far as their packages have got. It is rewritten as downloads
+    // report, and stopped before the book's final state is written, so a late
+    // report cannot land on top of it.
+    const staged = new Set<string>();
+    const report = throttled(async () => {
+      const packages = new Map((await downloadManager.listDownloads()).map((item) => [item.packageKey, item]));
+      const written = resources.reduce((sum, resource) => sum + (staged.has(resource.id)
+        ? resource.size
+        : resource.size * Math.max(0, Math.min(1, packages.get(packageKey(resource))?.progress ?? 0))), 0);
+      await setBookState(bookKey, 'downloading', { progress: totalBytes ? written / totalBytes : 0, bytesWritten: Math.round(written), totalBytes });
+      this.announceProgress.request();
+    }, PROGRESS_INTERVAL_MS);
+    const unsubscribe = downloadManager.subscribe(report.request);
+    const stopReporting = async () => { unsubscribe(); await report.stop(); };
     try {
-      for (const resource of resources) {
-        const unsubscribe = downloadManager.subscribe(() => {
-          void downloadManager.getProgress(packageKey(resource)).then((progress) => {
-            if (!progress || progress.status === 'complete') return;
-            const resourceProgress = progress.totalBytes && progress.totalBytes > 0
-              ? Math.min(resource.size, resource.size * progress.progress)
-              : resource.size * progress.progress;
-            void setBookState(bookKey, 'downloading', {
-              progress: totalBytes ? (completedBytes + resourceProgress) / totalBytes : 0,
-              bytesWritten: Math.round(completedBytes + resourceProgress), totalBytes,
-            }).then(() => this.emit());
-          });
-        });
-        try { await this.stageResource(resource); }
-        finally { unsubscribe(); }
-        completedBytes += resource.size;
-        await setBookState(bookKey, 'downloading', { progress: totalBytes ? completedBytes / totalBytes : 1, bytesWritten: completedBytes, totalBytes });
-        this.emit();
-      }
+      // A few resources at a time, in dependency order; one another book is
+      // already fetching is shared with it (stageResource). A pause stops the
+      // book at once (pause), whatever its resources are still doing.
+      await Promise.race([
+        forEachLimited(resources, RESOURCE_CONCURRENCY, async (resource) => {
+          await this.stageResource(resource);
+          staged.add(resource.id);
+          report.request();
+        }, () => run.paused),
+        run.interrupted,
+      ]);
+      await stopReporting();
       const graphOrphans = await activateBookResources(bookKey, resources.map((resource) => ({ id: resource.id, version: resource.version, bytes: resource.size })));
       for (const resource of resources) {
         const obsoletePackages = await getResourcePackageKeys(resource.id, resource.version);
@@ -281,6 +324,7 @@ class NativeBookDownloadManager implements BookDownloadManager {
       }
       this.emit();
     } catch (cause) {
+      await stopReporting();
       if (cause instanceof PausedDownloadError) await setBookState(bookKey, 'paused', { error: null });
       else await setBookState(bookKey, previousBook?.installedAt ? 'update_available' : 'failed', {
         error: cause instanceof Error ? cause.message : 'Book download failed.',
@@ -292,19 +336,54 @@ class NativeBookDownloadManager implements BookDownloadManager {
 
   install(bookKey: DownloadableBookKey): Promise<void> {
     const existing = this.bookWorkers.get(bookKey);
-    if (existing) return existing;
-    const worker = this.installBook(bookKey).finally(() => this.bookWorkers.delete(bookKey));
+    if (existing && !this.bookRuns.get(bookKey)?.paused) return existing;
+    const run = bookRun();
+    // A book just paused may still be stopping: it starts again once it has.
+    const worker: Promise<void> = (existing ?? Promise.resolve()).catch(() => undefined)
+      .then(() => this.installBook(bookKey, run))
+      .finally(() => { if (this.bookWorkers.get(bookKey) === worker) { this.bookWorkers.delete(bookKey); this.bookRuns.delete(bookKey); } });
     this.bookWorkers.set(bookKey, worker);
+    this.bookRuns.set(bookKey, run);
     return worker;
   }
 
+  /**
+   * Every book not yet downloaded, paused or failed, started together. The
+   * resources they share (Public, the Bible, the calendar…) are fetched once
+   * for all of them (stageResource). However many fail, one failure is
+   * reported; a book paused meanwhile is not a failure.
+   */
+  async installAll(): Promise<void> {
+    await this.initialize();
+    const waiting = (await listStoredBooks()).filter((book) => ['not_downloaded', 'paused', 'failed'].includes(book.status));
+    const results = await Promise.allSettled(waiting.map((book) => this.install(book.bookKey)));
+    const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected' && !(result.reason instanceof PausedDownloadError));
+    if (failure) throw failure.reason;
+  }
+
   async pause(bookKey: DownloadableBookKey): Promise<void> {
-    const resources = this.activeBookResources.get(bookKey) || [];
-    for (const resource of resources) {
+    // The install this pause stops; a resume meanwhile starts another (install).
+    const worker = this.bookWorkers.get(bookKey);
+    this.bookRuns.get(bookKey)?.pause();
+    // What another book still installing is waiting on keeps downloading for it.
+    const needed = new Set<string>();
+    for (const [other, resources] of this.activeBookResources) {
+      if (other !== bookKey && this.bookRuns.has(other) && !this.bookRuns.get(other)?.paused) for (const resource of resources) needed.add(packageKey(resource));
+    }
+    // The rest stop, and are waited for, so that removing the book next finds
+    // nothing of it still being written.
+    const stopping: Promise<unknown>[] = [];
+    for (const resource of this.activeBookResources.get(bookKey) || []) {
+      if (needed.has(packageKey(resource))) continue;
+      const staging = this.resourceWorkers.get(`${resource.id}@${resource.version}`);
+      if (staging) { staging.stopped = true; stopping.push(staging.promise.catch(() => undefined)); }
       const progress = await downloadManager.getProgress(packageKey(resource));
       if (progress && ['queued', 'downloading'].includes(progress.status)) await downloadManager.pause(progress.packageKey);
     }
-    await setBookState(bookKey, 'paused', { error: null });
+    await Promise.all(stopping);
+    // An installing book records its own pause as it stops (installBook), unless it finished first.
+    if (worker) await worker.catch(() => undefined);
+    else if (['queued', 'downloading'].includes((await getStoredBook(bookKey))?.status ?? '')) await setBookState(bookKey, 'paused', { error: null });
     this.emit();
   }
 

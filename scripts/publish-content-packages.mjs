@@ -5,6 +5,10 @@
  *
  *   PUBLISH_TOKEN=... node scripts/publish-content-packages.mjs
  *   PUBLISH_TOKEN_FILE=path/to/token node scripts/publish-content-packages.mjs
+ *   node scripts/publish-content-packages.mjs --dry-run
+ *
+ * --dry-run builds every package and reports its chunks without uploading
+ * anything or touching the manifest, so it needs no publish token.
  *
  * What to package comes from the database (get_offline_package_plan): each
  * book's resources, their dependencies and tables. The rows are read a page
@@ -42,10 +46,11 @@ const SUPABASE_URL = env('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
 const ANON_KEY = env('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 const CONTENT_URL = (env('CONTENT_PACKAGES_URL') || env('EXPO_PUBLIC_CONTENT_PACKAGES_URL')).replace(/\/+$/, '');
 const PUBLISH_TOKEN = (process.env.PUBLISH_TOKEN || (process.env.PUBLISH_TOKEN_FILE ? readFileSync(process.env.PUBLISH_TOKEN_FILE, 'utf8') : '')).trim();
+const DRY_RUN = process.argv.includes('--dry-run');
 
 if (!SUPABASE_URL || !ANON_KEY) throw new Error('EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are needed (from .env).');
-if (!CONTENT_URL) throw new Error('EXPO_PUBLIC_CONTENT_PACKAGES_URL is needed (from .env).');
-if (!PUBLISH_TOKEN) throw new Error('Set PUBLISH_TOKEN or PUBLISH_TOKEN_FILE to the content Worker\'s publish token.');
+if (!CONTENT_URL && !DRY_RUN) throw new Error('EXPO_PUBLIC_CONTENT_PACKAGES_URL is needed (from .env).');
+if (!PUBLISH_TOKEN && !DRY_RUN) throw new Error('Set PUBLISH_TOKEN or PUBLISH_TOKEN_FILE to the content Worker\'s publish token.');
 
 const TARGET_CHUNK_BYTES = 2 * 1024 * 1024;
 const encoder = new TextEncoder();
@@ -188,10 +193,12 @@ async function buildResource(resource, dates) {
   for (const table of resource.tables) {
     const rows = sortRows(resource.id, table, await readTable(resource.id, table));
     for (const row of rows) {
-      // The Bible's chunks follow its chapters, so a change to one chapter
-      // leaves every other chapter's chunk as it was.
+      // The Bible's chunks follow its books, so a change to one book leaves
+      // every other book's chunks as they were. (They once followed its
+      // chapters, which made 1,409 small chunks a device fetched one by one;
+      // a book is split only where it passes the target size.)
       const nextBucket = resource.id === 'bible'
-        ? (table === 'books' ? 'books' : `${table}:${row.book_key ?? 'unknown'}:${row.chapter_number ?? 'metadata'}`)
+        ? (table === 'books' ? 'books' : `${table}:${row.book_key ?? 'unknown'}`)
         : '';
       add(JSON.stringify(row).length + 160, nextBucket, () => {
         let target = payload.tables.find((entry) => entry.schema === resource.schema && entry.table === table);
@@ -254,7 +261,7 @@ let reused = 0;
 for (const resource of plan.resources) {
   const started = Date.now();
   const built = await buildResource(resource, dates);
-  await pool(built.chunks, 6, async (chunk) => {
+  if (!DRY_RUN) await pool(built.chunks, 6, async (chunk) => {
     const key = chunk.url.slice(1);
     if (await exists(key)) { reused += 1; return; }
     await put(key, chunk.body, 'application/json');
@@ -278,5 +285,10 @@ for (const book of Object.values(books)) {
 if (!resources.calendar) throw new Error('No calendar package was built.');
 const publishedAt = new Date().toISOString();
 const manifest = { formatVersion: 1, snapshotId: `${publishedAt}-${sha256(encoder.encode(JSON.stringify(resources))).slice(0, 8)}`, publishedAt, books, resources };
-await put('manifest.json', JSON.stringify(manifest), 'application/json');
-console.log(`Published ${Object.keys(books).length} books: ${uploaded} chunks uploaded, ${reused} already there.`);
+if (DRY_RUN) {
+  const chunkCount = Object.values(resources).reduce((sum, resource) => sum + resource.chunks.length, 0);
+  console.log(`Dry run: ${Object.keys(books).length} books, ${chunkCount} chunks built; nothing uploaded.`);
+} else {
+  await put('manifest.json', JSON.stringify(manifest), 'application/json');
+  console.log(`Published ${Object.keys(books).length} books: ${uploaded} chunks uploaded, ${reused} already there.`);
+}

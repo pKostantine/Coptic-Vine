@@ -1,13 +1,32 @@
-import { Directory, DownloadTask, File, Paths, type DownloadPauseState, type DownloadProgress } from 'expo-file-system';
+import { Directory, DownloadTask, File, Paths, type DownloadPauseState, type DownloadProgress, type DownloadTaskOptions } from 'expo-file-system';
 
-import { findPlayableLocalUri, getDownloadProgress, getPackageFiles, getStoredDownloadRequest, isEntityDownloaded, refreshPackageProgress, removeOfflinePackage, saveDownloadRequest, setPackageState, updateOfflineFile, type OfflineFileRow } from '@/services/offlineDatabase';
+import { findPlayableLocalUri, getDownloadProgress, getPackageFiles, getStoredDownloadRequest, isEntityDownloaded, refreshPackageProgress, removeOfflinePackage, saveDownloadRequest, setPackageProgress, setPackageState, updateOfflineFile, type OfflineFileRow } from '@/services/offlineDatabase';
 import { assertDownloadNetworkAllowed } from '@/services/downloadPreferences';
 import { cleanupIncompleteDownloads, getDownloadStorageSummary, isDownloadRequestStale, listDownloads, removeAllDownloadRecords, validateDownloadedFiles } from '@/services/downloadStorageManager';
 import type { OfflineDownloadManager, OfflineDownloadProgress, OfflineDownloadRequest, OfflineDownloadResource } from '@/types/offlineDownloads';
 import type { PlaybackEntityKind } from '@/types/playback';
+import { forEachLimited, throttled } from '@/utils/concurrency';
 
 const DOWNLOAD_DIRECTORY = new Directory(Paths.document, 'chc-offline', 'files');
-type ActiveTransfer = { fileKey: string; task: DownloadTask };
+// How many of a package's files are fetched at once. A book resource is many
+// small chunks, and fetched one by one each paid a whole round trip.
+const FILE_CONCURRENCY = 6;
+// Progress is saved and announced at most this often while files download:
+// each announcement re-reads the Downloads page and every book waiting on it.
+const PROGRESS_INTERVAL_MS = 250;
+
+/** One pass of a package's worker: the transfers it has in flight and how far each file has got. */
+type PackageRun = {
+  /** Set by pause, cancel and remove: no further file starts, and the pass ends without marking the package complete. */
+  stopped: boolean;
+  transfers: Map<string, DownloadTask>;
+  bytes: Map<string, number>;
+  sizes: Map<string, number | null>;
+  complete: Set<string>;
+  report: ReturnType<typeof throttled>;
+  /** Settles once the pass has ended and recorded where each file got to; never rejects. */
+  done: Promise<void>;
+};
 
 function sanitizeFilePart(value: string): string { return value.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 90) || 'media'; }
 function inferExtension(resource: OfflineDownloadResource): string {
@@ -32,13 +51,39 @@ function checksumSpec(value?: string | null): { algorithm: 'MD5' | 'SHA-1' | 'SH
 /** The liturgical calendar, which the app keeps installed itself: downloaded on any connection. */
 function isSystemResource(request: OfflineDownloadRequest): boolean { return request.domain === 'books' && request.entityId === 'calendar'; }
 
+/**
+ * Book content is many small JSON chunks, fetched on a foreground session,
+ * which starts each one at once; iOS hands background transfers to a system
+ * daemon that is slow to begin every one. Music and lessons are large files,
+ * worth letting finish after the app is put away.
+ */
+function sessionTypeFor(request: OfflineDownloadRequest, resource: OfflineDownloadResource): NonNullable<DownloadTaskOptions['sessionType']> {
+  return request.domain === 'books' || resource.role === 'content' ? 'foreground' : 'background';
+}
+
+/** A run's progress from its tally, as refreshPackageProgress works it out from the files. */
+function runProgress(run: PackageRun): { progress: number; bytesWritten: number; totalBytes: number | null } {
+  let bytesWritten = 0;
+  let knownTotal = 0;
+  let allTotalsKnown = run.sizes.size > 0;
+  for (const [fileKey, size] of run.sizes) {
+    bytesWritten += run.bytes.get(fileKey) ?? 0;
+    if (size == null || size < 0) allTotalsKnown = false; else knownTotal += size;
+  }
+  const progress = run.sizes.size === 0 ? 1 : allTotalsKnown && knownTotal > 0 ? Math.min(1, bytesWritten / knownTotal) : run.complete.size / run.sizes.size;
+  return { progress, bytesWritten, totalBytes: allTotalsKnown ? knownTotal : null };
+}
+
 class NativeDownloadManager implements OfflineDownloadManager {
-  private listeners = new Set<() => void>(); private revision = 0; private activeTransfers = new Map<string, ActiveTransfer>();
-  private packageWorkers = new Map<string, Promise<void>>(); private lastProgressWrite = new Map<string, number>();
+  private listeners = new Set<() => void>(); private revision = 0;
+  /** The pass under way for each package. */
+  private runs = new Map<string, PackageRun>();
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   getRevision = (): number => this.revision;
   private emit(): void { this.revision += 1; for (const listener of this.listeners) listener(); }
-  private async waitForWorker(packageKey: string): Promise<void> { const worker = this.packageWorkers.get(packageKey); if (worker) try { await worker; } catch { /* worker persists failure */ } }
+  // Progress from every package downloading is announced together, a few times a second.
+  private announceProgress = throttled(async () => this.emit(), PROGRESS_INTERVAL_MS);
+  private async waitForWorker(packageKey: string): Promise<void> { await this.runs.get(packageKey)?.done; }
 
   async enqueue(request: OfflineDownloadRequest): Promise<void> {
     await assertDownloadNetworkAllowed(hasVideo(request), isSystemResource(request));
@@ -50,11 +95,27 @@ class NativeDownloadManager implements OfflineDownloadManager {
   }
   async update(request: OfflineDownloadRequest): Promise<void> { await assertDownloadNetworkAllowed(hasVideo(request), isSystemResource(request)); await this.remove(request.packageKey); await saveDownloadRequest(request); await setPackageState(request.packageKey, 'queued'); this.emit(); this.startWorker(request.packageKey); }
   checkForUpdate(request: OfflineDownloadRequest): Promise<boolean> { return isDownloadRequestStale(request); }
-  async pause(packageKey: string): Promise<void> { const active = this.activeTransfers.get(packageKey); await setPackageState(packageKey, 'paused'); if (active) { await active.task.pauseAsync(); await updateOfflineFile(active.fileKey, { status: 'paused', resumeJson: JSON.stringify(active.task.savable()) }); } await refreshPackageProgress(packageKey); this.emit(); }
+  async pause(packageKey: string): Promise<void> {
+    const run = this.runs.get(packageKey); if (run) run.stopped = true;
+    await setPackageState(packageKey, 'paused');
+    // Every transfer in flight pauses, and each keeps its own resume point (see downloadFile).
+    if (run) { await Promise.all([...run.transfers.values()].map((task) => task.pauseAsync().catch(() => { /* it finished or failed as it was paused */ }))); await run.done; }
+    await refreshPackageProgress(packageKey); this.emit();
+  }
   async resume(packageKey: string): Promise<void> { const request = await getStoredDownloadRequest(packageKey); if (!request) throw new Error('This download is no longer available to resume.'); await assertDownloadNetworkAllowed(hasVideo(request), isSystemResource(request)); await this.waitForWorker(packageKey); await setPackageState(packageKey, 'queued'); this.emit(); this.startWorker(packageKey); }
-  async cancel(packageKey: string): Promise<void> { await setPackageState(packageKey, 'cancelled'); const active = this.activeTransfers.get(packageKey); if (active) { active.task.cancel(); await updateOfflineFile(active.fileKey, { status: 'cancelled', resumeJson: null }); } await refreshPackageProgress(packageKey); this.emit(); }
+  async cancel(packageKey: string): Promise<void> {
+    const run = this.runs.get(packageKey); if (run) run.stopped = true;
+    await setPackageState(packageKey, 'cancelled');
+    if (run) { for (const task of run.transfers.values()) task.cancel(); await run.done; }
+    await refreshPackageProgress(packageKey); this.emit();
+  }
   async retry(packageKey: string): Promise<void> { const request = await getStoredDownloadRequest(packageKey); if (!request) throw new Error('This download is no longer available to retry.'); await assertDownloadNetworkAllowed(hasVideo(request), isSystemResource(request)); await this.waitForWorker(packageKey); for (const file of await getPackageFiles(packageKey)) if (file.status === 'failed' || file.status === 'cancelled') await updateOfflineFile(file.file_key, { status: 'queued', error: null, resumeJson: null }); await setPackageState(packageKey, 'queued'); this.emit(); this.startWorker(packageKey); }
-  async remove(packageKey: string): Promise<void> { const active = this.activeTransfers.get(packageKey); if (active) active.task.cancel(); await this.waitForWorker(packageKey); for (const row of await removeOfflinePackage(packageKey)) if (row.local_uri) try { const file = new File(row.local_uri); if (file.exists) file.delete(); } catch { /* database removal is authoritative */ } this.emit(); }
+  async remove(packageKey: string): Promise<void> {
+    const run = this.runs.get(packageKey);
+    if (run) { run.stopped = true; for (const task of run.transfers.values()) task.cancel(); await run.done; }
+    for (const row of await removeOfflinePackage(packageKey)) if (row.local_uri) try { const file = new File(row.local_uri); if (file.exists) file.delete(); } catch { /* database removal is authoritative */ }
+    this.emit();
+  }
   async removeAll(): Promise<void> { for (const uri of await removeAllDownloadRecords()) try { const file = new File(uri); if (file.exists) file.delete(); } catch { /* database removal is authoritative */ } this.emit(); }
   async cleanupIncomplete(): Promise<number> { const count = await cleanupIncompleteDownloads(); this.emit(); return count; }
   async validateIntegrity() { const result = await validateDownloadedFiles(); this.emit(); return result; }
@@ -65,37 +126,81 @@ class NativeDownloadManager implements OfflineDownloadManager {
   async resolvePlaybackUri(playableKind: PlaybackEntityKind, playableId: string, remoteUri?: string | null): Promise<string | null> { const localUri = await findPlayableLocalUri(playableKind, playableId); return localUri && isUsableLocalFile(localUri) ? localUri : remoteUri?.trim() || null; }
 
   private startWorker(packageKey: string): void {
-    if (this.packageWorkers.has(packageKey)) return;
-    const worker = this.processPackage(packageKey).catch(async (cause) => { const state = await getDownloadProgress(packageKey); if (state?.status === 'paused' || state?.status === 'cancelled') return; await setPackageState(packageKey, 'failed', cause instanceof Error ? cause.message : 'Download failed.'); await refreshPackageProgress(packageKey); this.emit(); })
-      .finally(() => { this.packageWorkers.delete(packageKey); this.activeTransfers.delete(packageKey); });
-    this.packageWorkers.set(packageKey, worker);
+    const current = this.runs.get(packageKey);
+    if (current && !current.stopped) return;
+    const run: PackageRun = {
+      stopped: false, transfers: new Map(), bytes: new Map(), sizes: new Map(), complete: new Set(),
+      report: throttled(async () => {
+        if (run.stopped) return;
+        const { progress, bytesWritten, totalBytes } = runProgress(run);
+        await setPackageProgress(packageKey, progress, bytesWritten, totalBytes);
+        this.announceProgress.request();
+      }, PROGRESS_INTERVAL_MS),
+      done: Promise.resolve(),
+    };
+    // A pass just paused or cancelled may still be recording where its files
+    // got to; this one starts from there once it has.
+    run.done = (current?.done ?? Promise.resolve())
+      .then(() => (run.stopped ? undefined : this.processPackage(packageKey, run)))
+      .catch(async (cause) => { if (run.stopped) return; await setPackageState(packageKey, 'failed', cause instanceof Error ? cause.message : 'Download failed.'); await refreshPackageProgress(packageKey); this.emit(); })
+      .catch(() => { /* the failure could not be recorded; the package stays as it was */ })
+      .finally(() => { if (this.runs.get(packageKey) === run) this.runs.delete(packageKey); });
+    this.runs.set(packageKey, run);
   }
-  private async processPackage(packageKey: string): Promise<void> {
-    const request = await getStoredDownloadRequest(packageKey); if (!request) throw new Error('Download metadata is missing.'); await setPackageState(packageKey, 'downloading'); this.emit();
+  private async processPackage(packageKey: string, run: PackageRun): Promise<void> {
+    const request = await getStoredDownloadRequest(packageKey); if (!request) throw new Error('Download metadata is missing.');
+    if (run.stopped) return; // paused or cancelled as it began: keep the state the pause wrote
+    await setPackageState(packageKey, 'downloading'); this.emit();
+    const resources = new Map(request.resources.map((resource) => [resource.fileKey, resource]));
+    // The package's files are read once; from here its progress is tallied as
+    // they arrive rather than re-read from every file after each one.
+    const waiting: OfflineFileRow[] = [];
     for (const row of await getPackageFiles(packageKey)) {
-      const state = await getDownloadProgress(packageKey); if (state?.status === 'paused' || state?.status === 'cancelled') return;
-      if (row.status === 'complete' && isUsableLocalFile(row.local_uri, row.file_size_bytes)) continue;
-      if (row.status === 'complete') await updateOfflineFile(row.file_key, { localUri: null, status: 'queued', bytesWritten: 0, resumeJson: null });
-      await this.downloadFile(packageKey, row); const after = await getDownloadProgress(packageKey); if (after?.status === 'paused' || after?.status === 'cancelled') return;
+      const usable = row.status === 'complete' && isUsableLocalFile(row.local_uri, row.file_size_bytes);
+      run.sizes.set(row.file_key, row.file_size_bytes ?? row.total_bytes);
+      run.bytes.set(row.file_key, usable || row.resume_json ? Math.max(0, row.bytes_written) : 0);
+      if (usable) run.complete.add(row.file_key); else waiting.push(row);
     }
+    try {
+      await forEachLimited(waiting, FILE_CONCURRENCY, async (row) => {
+        const resource = resources.get(row.file_key); if (!resource) throw new Error(`Missing resource metadata for ${row.file_key}.`);
+        if (row.status === 'complete') await updateOfflineFile(row.file_key, { localUri: null, status: 'queued', bytesWritten: 0, resumeJson: null });
+        await this.downloadFile(run, row, resource, sessionTypeFor(request, resource));
+      }, () => run.stopped);
+    } finally { await run.report.stop(); }
+    if (run.stopped) return;
     await setPackageState(packageKey, 'complete'); await refreshPackageProgress(packageKey); this.emit();
   }
-  private async downloadFile(packageKey: string, row: OfflineFileRow): Promise<void> {
-    const request = await getStoredDownloadRequest(packageKey); const resource = request?.resources.find((item) => item.fileKey === row.file_key); if (!resource) throw new Error(`Missing resource metadata for ${row.file_key}.`);
+  private async downloadFile(run: PackageRun, row: OfflineFileRow, resource: OfflineDownloadResource, sessionType: NonNullable<DownloadTaskOptions['sessionType']>): Promise<void> {
     const destination = destinationFor(resource); if (destination.exists && row.status !== 'paused') try { destination.delete(); } catch { /* transfer will report failure */ }
-    const onProgress = (progress: DownloadProgress) => { const now = Date.now(); const last = this.lastProgressWrite.get(row.file_key) ?? 0; if (now - last < 250 && progress.bytesWritten < progress.totalBytes) return; this.lastProgressWrite.set(row.file_key, now); void updateOfflineFile(row.file_key, { status: 'downloading', bytesWritten: Math.max(0, progress.bytesWritten), totalBytes: progress.totalBytes >= 0 ? progress.totalBytes : null }).then(() => refreshPackageProgress(packageKey)).then(() => this.emit()); };
-    let task: DownloadTask;
-    if (row.resume_json) try { task = DownloadTask.fromSavable(JSON.parse(row.resume_json) as DownloadPauseState, { onProgress, headers: resource.headers ?? undefined }); } catch { if (destination.exists) try { destination.delete(); } catch { /* noop */ } task = File.createDownloadTask(resource.remoteUri, destination, { headers: resource.headers ?? undefined, onProgress, sessionType: 'background' }); }
-    else task = File.createDownloadTask(resource.remoteUri, destination, { headers: resource.headers ?? undefined, onProgress, sessionType: 'background' });
-    this.activeTransfers.set(packageKey, { fileKey: row.file_key, task }); await updateOfflineFile(row.file_key, { status: 'downloading', error: null }); this.emit();
+    const publishedSize = resource.fileSizeBytes != null && resource.fileSizeBytes > 0 ? resource.fileSizeBytes : null;
+    const onProgress = (progress: DownloadProgress) => {
+      const size = publishedSize ?? (progress.totalBytes >= 0 ? progress.totalBytes : null);
+      if (size != null) run.sizes.set(row.file_key, size);
+      run.bytes.set(row.file_key, Math.max(0, size == null ? progress.bytesWritten : Math.min(size, progress.bytesWritten)));
+      run.report.request();
+    };
+    const options: DownloadTaskOptions = { headers: resource.headers ?? undefined, onProgress, sessionType };
+    let task: DownloadTask | null = null;
+    if (row.resume_json) try { task = DownloadTask.fromSavable(JSON.parse(row.resume_json) as DownloadPauseState, options); } catch { if (destination.exists) try { destination.delete(); } catch { /* noop */ } }
+    task ??= File.createDownloadTask(resource.remoteUri, destination, options);
+    // Nothing may come between this look at `stopped` and the transfer
+    // starting, or a pause in between would miss the transfer.
+    if (run.stopped) { if (task.state !== 'paused') try { task.release(); } catch { /* never started */ } return; }
+    run.transfers.set(row.file_key, task);
+    const transfer = task.state === 'paused' ? task.resumeAsync() : task.downloadAsync();
     try {
-      const downloaded = task.state === 'paused' ? await task.resumeAsync() : await task.downloadAsync();
-      if (!downloaded) { if ((await getDownloadProgress(packageKey))?.status === 'paused') await updateOfflineFile(row.file_key, { status: 'paused', resumeJson: JSON.stringify(task.savable()) }); return; }
+      const downloaded = await transfer;
+      // Paused: keep where it got to, so resuming carries on from there.
+      if (!downloaded) { if (task.state === 'paused') await updateOfflineFile(row.file_key, { status: 'paused', resumeJson: JSON.stringify(task.savable()), bytesWritten: run.bytes.get(row.file_key) ?? 0 }); return; }
       if (resource.fileSizeBytes != null && resource.fileSizeBytes > 0 && downloaded.size !== resource.fileSizeBytes) throw new Error('Downloaded file size does not match the published media.');
       const checksum = checksumSpec(resource.checksum); if (checksum && (await new File(downloaded.uri).digest(checksum.algorithm)).toLowerCase() !== checksum.digest) throw new Error('Downloaded file checksum does not match the published media.');
-      await updateOfflineFile(row.file_key, { localUri: downloaded.uri, status: 'complete', bytesWritten: downloaded.size, totalBytes: downloaded.size, resumeJson: null, error: null }); await refreshPackageProgress(packageKey); this.emit();
-    } catch (cause) { const state = await getDownloadProgress(packageKey); if (state?.status === 'cancelled' || state?.status === 'paused') return; const message = cause instanceof Error ? cause.message : 'Unable to download media.'; await updateOfflineFile(row.file_key, { status: 'failed', error: message, resumeJson: null }); await refreshPackageProgress(packageKey); this.emit(); throw cause; }
-    finally { this.activeTransfers.delete(packageKey); if (task.state !== 'paused') try { task.release(); } catch { /* native runtime may already release */ } }
+      await updateOfflineFile(row.file_key, { localUri: downloaded.uri, status: 'complete', bytesWritten: downloaded.size, totalBytes: downloaded.size, resumeJson: null, error: null });
+      run.sizes.set(row.file_key, downloaded.size); run.bytes.set(row.file_key, downloaded.size); run.complete.add(row.file_key); run.report.request();
+    } catch (cause) {
+      if (run.stopped) { if (task.state === 'cancelled') await updateOfflineFile(row.file_key, { status: 'cancelled', resumeJson: null }); return; }
+      const message = cause instanceof Error ? cause.message : 'Unable to download media.'; await updateOfflineFile(row.file_key, { status: 'failed', error: message, resumeJson: null }); throw cause;
+    } finally { run.transfers.delete(row.file_key); if (task.state !== 'paused') try { task.release(); } catch { /* native runtime may already release */ } }
   }
 }
 export const downloadManager: OfflineDownloadManager = new NativeDownloadManager();

@@ -80,6 +80,8 @@ export interface ManagedContentResource {
 
 export interface BookDownloadManager {
   install(bookKey: DownloadableBookKey): Promise<void>;
+  /** Every book not downloaded, paused or failed, together; rejects with the first failure only. */
+  installAll(): Promise<void>;
   pause(bookKey: DownloadableBookKey): Promise<void>;
   resume(bookKey: DownloadableBookKey): Promise<void>;
   retry(bookKey: DownloadableBookKey): Promise<void>;

@@ -12,6 +12,10 @@ import type { PlaybackEntityKind } from '@/types/playback';
 
 const DATABASE_NAME = 'chc-offline.db';
 const DATABASE_VERSION = 2;
+// How long a connection waits for another's write to finish before giving up
+// with "database is locked". Several downloads now write while a book's
+// chunks import, and SQLite admits one writer at a time.
+const BUSY_TIMEOUT_MS = 5000;
 
 interface PackageRow {
   package_key: string;
@@ -59,9 +63,9 @@ function nowIso(): string {
 }
 
 async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
-  // Both pragmas are connection-scoped, so they must be enabled even when
+  // These pragmas are connection-scoped, so they must be enabled even when
   // this database has already reached the latest schema version.
-  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  await db.execAsync(`PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const currentVersion = row?.user_version ?? 0;
   if (currentVersion >= DATABASE_VERSION) return;
@@ -224,11 +228,41 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }
 
+/**
+ * expo-sqlite runs each exclusive transaction on a connection of its own,
+ * opened bare: without this database's foreign keys (so ON DELETE CASCADE
+ * never ran there, and removing a package left its files behind), without a
+ * busy timeout (so meeting another writer failed at once), and begun
+ * deferred (so one that read before writing failed outright if another
+ * connection wrote in between). With chunks downloading and importing side
+ * by side, any of those is a failed download. So here transactions take
+ * turns, and each turns foreign keys on, waits its turn at SQLite's write
+ * lock, and holds it before reading anything.
+ */
+function serializeTransactions(db: SQLite.SQLiteDatabase): void {
+  const exclusive = db.withExclusiveTransactionAsync.bind(db);
+  let turn: Promise<void> = Promise.resolve();
+  db.withExclusiveTransactionAsync = (task) => {
+    const run = turn.then(() => exclusive(async (txn) => {
+      // The deferred BEGIN expo-sqlite opened holds nothing yet: end it, set
+      // the connection up (foreign keys can only be switched outside a
+      // transaction), and begin again with the write lock.
+      await txn.execAsync(`COMMIT; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
+      try { await txn.execAsync('BEGIN IMMEDIATE'); }
+      catch (cause) { await txn.execAsync('BEGIN'); throw cause; } // leaves expo-sqlite a transaction to roll back
+      await task(txn);
+    }));
+    turn = run.catch(() => undefined);
+    return run;
+  };
+}
+
 export async function getOfflineDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!databasePromise) {
     databasePromise = SQLite.openDatabaseAsync(DATABASE_NAME, { useNewConnection: true })
       .then(async (db) => {
         await migrate(db);
+        serializeTransactions(db);
         // A JavaScript download task cannot survive process death. Preserve the
         // package and resume data, but expose interrupted work as paused.
         const now = nowIso();
@@ -418,21 +452,19 @@ export async function updateOfflineFile(
   },
 ): Promise<void> {
   const db = await getOfflineDatabase();
-  const current = await db.getFirstAsync<OfflineFileRow>('SELECT * FROM offline_files WHERE file_key = ?', fileKey);
-  if (!current) return;
+  // Only the columns the patch names are written, so there is nothing to read
+  // first: this runs once for every file of a download.
+  const columns: [string, SQLite.SQLiteBindValue][] = [];
+  if (patch.localUri !== undefined) columns.push(['local_uri', patch.localUri]);
+  if (patch.status !== undefined) columns.push(['status', patch.status]);
+  if (patch.bytesWritten !== undefined) columns.push(['bytes_written', patch.bytesWritten]);
+  if (patch.totalBytes !== undefined) columns.push(['total_bytes', patch.totalBytes]);
+  if (patch.resumeJson !== undefined) columns.push(['resume_json', patch.resumeJson]);
+  if (patch.error !== undefined) columns.push(['error', patch.error]);
+  columns.push(['updated_at', nowIso()]);
   await db.runAsync(
-    `UPDATE offline_files SET
-       local_uri = ?, status = ?, bytes_written = ?, total_bytes = ?,
-       resume_json = ?, error = ?, updated_at = ?
-     WHERE file_key = ?`,
-    patch.localUri !== undefined ? patch.localUri : current.local_uri,
-    patch.status ?? current.status,
-    patch.bytesWritten ?? current.bytes_written,
-    patch.totalBytes !== undefined ? patch.totalBytes : current.total_bytes,
-    patch.resumeJson !== undefined ? patch.resumeJson : current.resume_json,
-    patch.error !== undefined ? patch.error : current.error,
-    nowIso(),
-    fileKey,
+    `UPDATE offline_files SET ${columns.map(([column]) => `${column} = ?`).join(', ')} WHERE file_key = ?`,
+    [...columns.map(([, value]) => value), fileKey],
   );
 }
 
@@ -446,6 +478,24 @@ export async function setPackageState(
     'UPDATE offline_packages SET status = ?, error = ?, updated_at = ? WHERE package_key = ?',
     status,
     error,
+    nowIso(),
+    packageKey,
+  );
+}
+
+/** Records how far a package has got, as its worker has tallied it, without re-reading its files. */
+export async function setPackageProgress(
+  packageKey: string,
+  progress: number,
+  bytesWritten: number,
+  totalBytes: number | null,
+): Promise<void> {
+  const db = await getOfflineDatabase();
+  await db.runAsync(
+    'UPDATE offline_packages SET progress = ?, bytes_written = ?, total_bytes = ?, updated_at = ? WHERE package_key = ?',
+    progress,
+    bytesWritten,
+    totalBytes,
     nowIso(),
     packageKey,
   );

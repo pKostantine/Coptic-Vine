@@ -7,6 +7,7 @@ class WebBookDownloadManager implements BookDownloadManager {
   subscribe = (_listener: () => void) => () => undefined;
   getRevision = () => 0;
   install(_key: DownloadableBookKey) { return Promise.reject(unavailable()); }
+  installAll() { return Promise.reject(unavailable()); }
   pause(_key: DownloadableBookKey) { return Promise.reject(unavailable()); }
   resume(_key: DownloadableBookKey) { return Promise.reject(unavailable()); }
   retry(_key: DownloadableBookKey) { return Promise.reject(unavailable()); }

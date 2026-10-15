@@ -2,7 +2,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
@@ -101,6 +101,7 @@ function NativeDownloadsScreen() {
   const [lastCheck, setLastCheck] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const downloadingAll = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -170,6 +171,17 @@ function NativeDownloadsScreen() {
     tr('Anything another book or the calendar still uses is kept.', 'Ce qu’un autre livre ou le calendrier utilise encore est conservé.', 'يُحتفظ بكل ما يستخدمه كتاب آخر أو التقويم.'),
     () => bookDownloadManager.remove(book.bookKey),
   );
+  // Cancelling a paused or failed download discards what it had fetched so
+  // far. It asks no confirmation: nothing finished is lost.
+  const cancelBook = (book: BookDownloadProgress) => void run(() => bookDownloadManager.remove(book.bookKey));
+  const waitingBooks = books.filter((book) => book.status === 'not_downloaded' || book.status === 'paused' || book.status === 'failed');
+  const downloadAll = () => {
+    // Pressed again while one is under way (to restart a book paused since),
+    // the first press is left to report any failure, so there is one alert.
+    if (downloadingAll.current) { void bookDownloadManager.installAll().catch(() => undefined); return; }
+    downloadingAll.current = true;
+    void run(() => bookDownloadManager.installAll()).finally(() => { downloadingAll.current = false; });
+  };
 
   const storage = (
     <StorageCard
@@ -185,8 +197,9 @@ function NativeDownloadsScreen() {
   const booksSection = (
     <Section title={tr('Books', 'Livres', 'الكتب')} arabic={arabic} first={wide}>
       {books.map((book) => (
-        <BookRow key={book.bookKey} book={book} arabic={arabic} run={run} onRemove={() => confirmBookRemoval(book)} />
+        <BookRow key={book.bookKey} book={book} arabic={arabic} run={run} onRemove={() => confirmBookRemoval(book)} onCancel={() => cancelBook(book)} />
       ))}
+      {waitingBooks.length ? <DownloadAllButton arabic={arabic} onPress={downloadAll} /> : null}
       <Row
         quiet
         arabic={arabic}
@@ -373,16 +386,22 @@ function StorageCard({ arabic, segments }: { arabic: boolean; segments: { label:
   );
 }
 
-/** A book with its state and the one thing it needs: Download, Update, Resume or Retry, a ring while it downloads, or a menu once it is in. */
-function BookRow({ book, arabic, run, onRemove }: {
+/**
+ * A book with its state and what it needs: Download, Update, Resume or Retry
+ * (the last two beside an X that cancels), a ring while it downloads, or a
+ * bin once it is in.
+ */
+function BookRow({ book, arabic, run, onRemove, onCancel }: {
   book: BookDownloadProgress;
   arabic: boolean;
   run: (action: () => Promise<void>) => Promise<void>;
   onRemove: () => void;
+  onCancel: () => void;
 }) {
   const install = () => void run(() => bookDownloadManager.install(book.bookKey));
   const size = book.totalBytes ? bytes(book.totalBytes, arabic) : null;
   const withSize = (status: string) => [status, size].filter(Boolean).join(' · ');
+  const cancel = <CancelButton label={tr(`Cancel download of ${book.title}`, `Annuler le téléchargement de ${book.title}`, `إلغاء تنزيل ${book.title}`)} onPress={onCancel} />;
   let detail: ReactNode;
   let detailIcon: ReactNode = null;
   let trailing: ReactNode;
@@ -390,7 +409,7 @@ function BookRow({ book, arabic, run, onRemove }: {
     case 'installed':
       detailIcon = <Icon name="checkmark-circle" size={14} color={COLORS.gold} />;
       detail = withSize(tr('Downloaded', 'Téléchargé', 'منزّل'));
-      trailing = <MenuButton label={tr(`More for ${book.title}`, `Plus pour ${book.title}`, `المزيد لـ ${book.title}`)} onPress={onRemove} />;
+      trailing = <TrashButton label={tr(`Remove ${book.title}`, `Supprimer ${book.title}`, `إزالة ${book.title}`)} onPress={onRemove} />;
       break;
     case 'downloading':
     case 'queued':
@@ -401,11 +420,21 @@ function BookRow({ book, arabic, run, onRemove }: {
       break;
     case 'paused':
       detail = `${tr('Paused', 'En pause', 'متوقف مؤقتًا')} · ${percent(book.progress, arabic)}`;
-      trailing = <ActionButton icon="play" label={tr('Resume', 'Reprendre', 'استئناف')} arabic={arabic} onPress={install} />;
+      trailing = (
+        <View style={[styles.trailingPair, arabic && styles.rowReverse]}>
+          <ActionButton icon="play" label={tr('Resume', 'Reprendre', 'استئناف')} arabic={arabic} onPress={install} />
+          {cancel}
+        </View>
+      );
       break;
     case 'failed':
       detail = tr('Couldn’t finish downloading', 'Téléchargement interrompu', 'تعذّر إكمال التنزيل');
-      trailing = <ActionButton icon="refresh" label={tr('Retry', 'Réessayer', 'أعد المحاولة')} arabic={arabic} onPress={install} />;
+      trailing = (
+        <View style={[styles.trailingPair, arabic && styles.rowReverse]}>
+          <ActionButton icon="refresh" label={tr('Retry', 'Réessayer', 'أعد المحاولة')} arabic={arabic} onPress={install} />
+          {cancel}
+        </View>
+      );
       break;
     case 'update_available':
       detail = <><Text style={styles.detailGold}>{tr('Update available', 'Mise à jour disponible', 'يتوفر تحديث')}</Text>{size ? ` · ${size}` : ''}</>;
@@ -423,7 +452,7 @@ function BookRow({ book, arabic, run, onRemove }: {
       detail={detail}
       detailIcon={detailIcon}
       trailing={trailing}
-      // A partial download (paused, failed, waiting for an update) can still be removed, by a long press.
+      // A book downloading or waiting for an update can still be removed, by a long press.
       onLongPress={book.status === 'not_downloaded' || book.status === 'installed' ? undefined : onRemove}
     />
   );
@@ -457,7 +486,7 @@ function MediaRow({ item, details, glyph, arabic, onRemove }: {
       )}
       title={item.title}
       detail={detail}
-      trailing={<MenuButton label={tr(`More for ${item.title}`, `Plus pour ${item.title}`, `المزيد لـ ${item.title}`)} onPress={onRemove} />}
+      trailing={<TrashButton label={tr(`Remove ${item.title}`, `Supprimer ${item.title}`, `إزالة ${item.title}`)} onPress={onRemove} />}
     />
   );
 }
@@ -552,10 +581,37 @@ function ActionButton({ icon, label, arabic, filled = false, onPress }: { icon?:
   );
 }
 
-function MenuButton({ label, onPress }: { label: string; onPress: () => void }) {
+/** Removes a download (after asking): the only thing there is to do with one that is in. */
+function TrashButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={6} onPress={onPress} style={({ pressed }) => [styles.menu, pressed && styles.pressed]}>
-      <Icon name="ellipsis-horizontal" size={19} color={COLORS.muted} />
+    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={6} onPress={onPress} style={({ pressed }) => [styles.trash, pressed && styles.pressed]}>
+      <Icon name="trash-outline" size={19} color={COLORS.muted} />
+    </Pressable>
+  );
+}
+
+/** Stops a paused or failed download for good: a quiet round X beside its Resume or Retry. */
+function CancelButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={6} onPress={onPress} style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}>
+      <Icon name="close" size={15} color={COLORS.muted} />
+    </Pressable>
+  );
+}
+
+/** Every book not yet in, at once: the gold counterpart of "Remove all media downloads". */
+function DownloadAllButton({ arabic, onPress }: { arabic: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={tr('Download all books', 'Télécharger tous les livres', 'تنزيل كل الكتب')}
+      onPress={onPress}
+      style={({ pressed }) => [styles.downloadAll, arabic && styles.rowReverse, pressed && styles.pressed]}
+    >
+      <Icon name="cloud-download-outline" size={20} color={COLORS.gold} />
+      <Text style={[styles.downloadAllText, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        {tr('Download All', 'Tout télécharger', 'تنزيل الكل')}
+      </Text>
     </Pressable>
   );
 }
@@ -634,7 +690,11 @@ const styles = StyleSheet.create({
   action: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, flexDirection: 'row', gap: 5, height: 34, paddingHorizontal: 13 },
   actionFilled: { backgroundColor: COLORS.gold },
   actionText: { fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '700' },
-  menu: { alignItems: 'center', height: 36, justifyContent: 'center', width: 36 },
+  trailingPair: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  trash: { alignItems: 'center', height: 36, justifyContent: 'center', width: 36 },
+  cancel: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 99, height: 34, justifyContent: 'center', width: 34 },
+  downloadAll: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 16, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 58 },
+  downloadAllText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
   ring: { alignItems: 'center', height: 34, justifyContent: 'center', marginRight: 2, width: 34 },
   ringStop: { backgroundColor: COLORS.gold, borderRadius: 2, height: 10, width: 10 },
   empty: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
