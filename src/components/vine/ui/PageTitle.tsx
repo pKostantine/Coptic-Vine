@@ -16,14 +16,16 @@ interface PageTitleProps {
   actions?: PageTitleAction[];
   /** Inside the iPad's and desktop's columns: no gutter and no top inset of its own. */
   flush?: boolean;
+  /** Over a light glow (the Resurrection's white): dark ink and a darker gold. */
+  onLight?: boolean;
 }
 
 /** A tab's own page (Coptic Vine design, "Books"): its name large at the head, round gold buttons beside it. */
-export default function PageTitle({ title, arabic, actions = [], flush = false }: PageTitleProps) {
+export default function PageTitle({ title, arabic, actions = [], flush = false, onLight = false }: PageTitleProps) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.row, flush ? styles.flush : { paddingTop: insets.top + 6 }, arabic && styles.rowReverse]}>
-      <Text style={[styles.title, arabic && styles.arabic]} numberOfLines={1} accessibilityRole="header">
+      <Text style={[styles.title, onLight && styles.titleOnLight, arabic && styles.arabic]} numberOfLines={1} accessibilityRole="header">
         {title}
       </Text>
       <View style={[styles.actions, arabic && styles.rowReverse]}>
@@ -34,9 +36,9 @@ export default function PageTitle({ title, arabic, actions = [], flush = false }
             accessibilityLabel={action.label}
             hitSlop={4}
             onPress={action.onPress}
-            style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.button, onLight && styles.buttonOnLight, pressed && styles.pressed]}
           >
-            <Icon name={action.icon} size={22} color={COLORS.gold} />
+            <Icon name={action.icon} size={22} color={onLight ? ON_LIGHT_GOLD : COLORS.gold} />
           </Pressable>
         ))}
       </View>
@@ -44,11 +46,16 @@ export default function PageTitle({ title, arabic, actions = [], flush = false }
   );
 }
 
+// The white day block's ink and gold (the Resurrection theme, seasonAppearance.ts).
+const ON_LIGHT_INK = '#10223A';
+const ON_LIGHT_GOLD = '#8A6A12';
+
 const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16 },
   flush: { paddingHorizontal: 0, paddingTop: 0 },
   rowReverse: { flexDirection: 'row-reverse' },
   title: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 34, fontWeight: '700' },
+  titleOnLight: { color: ON_LIGHT_INK },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   actions: { flexDirection: 'row', gap: 8 },
   button: {
@@ -60,5 +67,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  buttonOnLight: { borderColor: 'rgba(138, 106, 18, 0.55)' },
   pressed: { opacity: 0.7 },
 });

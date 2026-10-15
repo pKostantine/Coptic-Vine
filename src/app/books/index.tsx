@@ -1,7 +1,8 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -67,6 +68,15 @@ export default function BooksHome() {
   // swiping between two weeks of one fast doesn't flash green behind it.
   const [glowSeason, setGlowSeason] = useState(day.theme.key);
   if (day.overview && day.theme.key !== glowSeason) setGlowSeason(day.theme.key);
+  const glow = SEASON_GLOWS[glowSeason];
+  // Under the Resurrection's white the title, and the clock above it, turn
+  // dark -- the status bar only while this page is the one showing.
+  const onLight = Boolean(glow.lightTop);
+  useFocusEffect(useCallback(() => {
+    if (!onLight) return undefined;
+    StatusBar.setStyle('dark', true);
+    return () => StatusBar.setStyle('light', true);
+  }, [onLight]));
 
   // While Pascha is being prayed the day block's footer is the way into the
   // day or eve being prayed right now.
@@ -104,6 +114,7 @@ export default function BooksHome() {
       title={tr('Books', 'Livres', 'الكتب')}
       arabic={arabic}
       flush={layout !== 'phone'}
+      onLight={onLight}
       actions={[
         { icon: 'bookmark-outline', label: tr('Open bookmarks', 'Ouvrir les signets', 'افتح العلامات'), onPress: () => router.push('/bookmarks') },
         { icon: 'settings-outline', label: tr('Open settings', 'Ouvrir les réglages', 'افتح الإعدادات'), onPress: () => setSettingsOpen(true) },
@@ -121,7 +132,8 @@ export default function BooksHome() {
   );
   const library = (
     <>
-      <Text style={[styles.section, arabic && styles.arabic]} accessibilityRole="header">
+      {/* Beside the day block, the heading sits under the glow's light too. */}
+      <Text style={[styles.section, onLight && layout !== 'phone' && styles.sectionOnLight, arabic && styles.arabic]} accessibilityRole="header">
         {tr('Library', 'Bibliothèque', 'المكتبة')}
       </Text>
       <View style={styles.shelf}>
@@ -151,7 +163,7 @@ export default function BooksHome() {
         contentContainerStyle={[styles.content, layout !== 'phone' && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
         showsVerticalScrollIndicator={false}
       >
-        <PageGlow kind={SEASON_GLOWS[glowSeason]} tall={layout !== 'phone'} />
+        <PageGlow kind={glow} tall={layout !== 'phone'} />
         {layout === 'phone' ? (
           <View style={styles.column}>
             {title}
@@ -199,6 +211,7 @@ const styles = StyleSheet.create({
   titleBeside: { paddingTop: 6 },
   rowReverse: { flexDirection: 'row-reverse' },
   section: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700', marginBottom: 12, marginTop: 28 },
+  sectionOnLight: { color: '#10223A' },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
   shelf: { gap: 12 },
   shelfRow: { flexDirection: 'row', gap: 12 },
