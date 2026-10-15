@@ -64,12 +64,10 @@ export default function BooksHome() {
   const [settingsOpen, setSettingsOpen] = useState(settingsParam === 'open');
 
   // The page glows in the season of the day the block shows, and changes with
-  // it. While a newly chosen day is still being read the block stands in the
-  // annual green for a moment; the glow keeps the season it had instead, so
-  // swiping between two weeks of one fast doesn't flash green behind it.
-  const [glowSeason, setGlowSeason] = useState(day.theme.key);
-  if (day.overview && day.theme.key !== glowSeason) setGlowSeason(day.theme.key);
-  const glow = SEASON_GLOWS[glowSeason];
+  // it -- once the new day is read: until then the day keeps the last one's
+  // season (useLiturgicalDay), so swiping between two weeks of one fast never
+  // flashes green behind it.
+  const glow = SEASON_GLOWS[day.theme.key];
   // Under the Resurrection's white the title, and the clock above it, turn
   // dark -- the status bar only while this page is the one showing.
   const onLight = Boolean(glow.lightTop);

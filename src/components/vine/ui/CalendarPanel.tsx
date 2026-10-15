@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { DAY_BLOCK_THEMES } from '../../../constants/seasonAppearance';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -17,6 +17,7 @@ import {
 } from '../../../utils/calendarService';
 import { formatCalendarDay, formatCopticMonthName, GREGORIAN_MONTHS_AR, GREGORIAN_MONTHS_EN, GREGORIAN_MONTHS_FR } from '../../../utils/localeFormat';
 import { DISABLED_TEXT_SELECTION_STYLE } from '../../../utils/textSelection';
+import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import DayControls from './DayControls';
 import Icon from './Icon';
@@ -74,6 +75,14 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   const [copticMonthName, setCopticMonthName] = useState('');
   const [days, setDays] = useState<CalendarDay[] | null>(null);
   const [feastDates, setFeastDates] = useState<Set<string>>(new Set());
+  // The month the grid on screen shows: its title changes with the grid, not
+  // a moment ahead of it while the next month is read.
+  const [shownMonth, setShownMonth] = useState<{ mode: Mode; year: number | null; month: number | null; copticName: string } | null>(null);
+  // Which way the last move went -- 1 to a later month, -1 to an earlier one,
+  // 0 to a day picked or a calendar switched -- for the grid to slide in from.
+  const slideDirection = useRef(0);
+  const reduced = useReducedMotion();
+  const [gridMotion] = useState(() => ({ x: new Animated.Value(0), opacity: new Animated.Value(1) }));
   const [pickerOpen, setPickerOpen] = useState(false);
   // The year column's window is frozen at whatever year was showing when the
   // panel opened. Deriving it from the live selection meant picking a year
@@ -122,12 +131,30 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
       if (cancelled) return;
       setDays(grid);
       setFeastDates(feasts);
+      setShownMonth(mode === 'gregorian'
+        ? { mode, year: gregorianYear, month: gregorianMonth, copticName: '' }
+        : { mode, year: copticYear, month: copticMonth, copticName: copticMonthName });
     };
     load().catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [mode, gregorianYear, gregorianMonth, copticYear, copticMonth]);
+  }, [mode, gregorianYear, gregorianMonth, copticYear, copticMonth, copticMonthName]);
+
+  // Each new month's grid slides in from the side it lies on, or fades in.
+  useEffect(() => {
+    if (!shownMonth) return;
+    const direction = slideDirection.current;
+    slideDirection.current = 0;
+    if (reduced) return;
+    gridMotion.x.setValue(direction * 24);
+    gridMotion.opacity.setValue(0.25);
+    const useNativeDriver = Platform.OS !== 'web';
+    Animated.parallel([
+      Animated.timing(gridMotion.x, { toValue: 0, duration: motionDuration(220, reduced), useNativeDriver }),
+      Animated.timing(gridMotion.opacity, { toValue: 1, duration: motionDuration(220, reduced), useNativeDriver }),
+    ]).start();
+  }, [shownMonth, reduced, gridMotion]);
 
   const goPrevGregorian = () => {
     if (gregorianMonth === 1) {
@@ -165,9 +192,12 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   const leadingBlanks = days && days.length ? WEEKDAY_INDEX[days[0].weekday] : 0;
   const displayedYear = mode === 'gregorian' ? gregorianYear : copticYear;
   const displayedMonth = mode === 'gregorian' ? gregorianMonth : copticMonth;
-  const displayedMonthName = mode === 'gregorian'
-    ? gregorianMonthName(gregorianMonth)
-    : copticMonthName ? formatCopticMonthName(copticMonthName, isArabic) : '';
+  // The title names the month the grid shows (once one has), not the one being read.
+  const titleMonth = shownMonth ?? { mode, year: displayedYear, month: displayedMonth, copticName: copticMonthName };
+  const displayedMonthName = titleMonth.mode === 'gregorian'
+    ? gregorianMonthName(titleMonth.month ?? gregorianMonth)
+    : titleMonth.copticName ? formatCopticMonthName(titleMonth.copticName, isArabic) : '';
+  const titleYear = titleMonth.year;
   const yearWindowAnchor = pickerYearAnchor ?? displayedYear ?? new Date().getUTCFullYear();
   const pickerYears = useMemo(
     () => Array.from({ length: 61 }, (_, index) => yearWindowAnchor - 30 + index),
@@ -190,8 +220,14 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   };
 
   const weekdayLetters = isArabic ? WEEKDAY_LETTERS.arabic : preferences.appLanguage === 'fr' ? WEEKDAY_LETTERS.french : WEEKDAY_LETTERS.english;
-  const goPreviousMonth = () => void (mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1));
-  const goNextMonth = () => void (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1));
+  const goPreviousMonth = () => {
+    slideDirection.current = -1;
+    void (mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1));
+  };
+  const goNextMonth = () => {
+    slideDirection.current = 1;
+    void (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1));
+  };
 
   // Pieces of the calendar, set one above another, or on a phone on its side
   // -- a postcard's height -- the controls beside the month so it all shows.
@@ -213,7 +249,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
       >
         <Text style={[styles.monthTitle, isArabic && styles.arabicText]} numberOfLines={1}>
           {displayedMonthName}
-          {displayedYear === null ? '' : ` ${formatCalendarDay(displayedYear, isArabic)}`}
+          {titleYear === null ? '' : ` ${formatCalendarDay(titleYear, isArabic)}`}
         </Text>
         <Icon name="chevron-down" size={16} color={COLORS.gold} />
       </Pressable>
@@ -267,7 +303,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
       {!days ? (
         <ActivityIndicator color={COLORS.gold} style={landscape ? styles.loadingLandscape : styles.loading} />
       ) : (
-        <View style={styles.grid}>
+        <Animated.View style={[styles.grid, { opacity: gridMotion.opacity, transform: [{ translateX: gridMotion.x }] }]}>
           {Array.from({ length: leadingBlanks }).map((_, i) => (
             <View key={`blank-${i}`} style={[styles.cell, landscape && styles.cellLandscape]} />
           ))}
@@ -302,7 +338,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
               </Pressable>
             );
           })}
-        </View>
+        </Animated.View>
       )}
 
       {landscape ? null : vine}

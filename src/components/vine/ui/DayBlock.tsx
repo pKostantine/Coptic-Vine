@@ -1,12 +1,13 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, PanResponder, type PanResponderGestureState } from 'react-native';
+import { Animated, Platform, PanResponder, type PanResponderGestureState } from 'react-native';
 
 import { useCalendar } from '../../../context/CalendarContext';
 import { appText, tr } from '../../../utils/appText';
 import { getWeekStrip, type WeekStripDay } from '../../../utils/calendarService';
 import { formatCopticDayMonth, formatDayMonthYearDate, toEasternArabicDigits } from '../../../utils/localeFormat';
 import { NEXT_SEASON_NAMES } from '../../../utils/nextSeason';
+import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import DayControls from './DayControls';
 import TodayCard, { DayStrip, type DayStripItem } from './TodayCard';
 import type { LiturgicalDay } from './useLiturgicalDay';
@@ -16,6 +17,22 @@ const WEEKDAYS = {
   french: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
   arabic: ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'],
 };
+
+/** The Sunday that opens the week a day falls in. */
+function weekStartOf(isoDate: string): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+  return date.toISOString().slice(0, 10);
+}
+
+/** The week's seven days from its Sunday, as ISO dates. */
+function weekDates(start: string): string[] {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(`${start}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + index);
+    return date.toISOString().slice(0, 10);
+  });
+}
 
 interface DayBlockProps {
   /** The liturgical day, from useLiturgicalDay — the screen reads it once and shares it. */
@@ -70,11 +87,33 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
     });
   });
 
+  // The week is read once for all its days: choosing another day of it moves
+  // only the gold pill.
+  const weekStart = weekStartOf(day.isoDate);
   useEffect(() => {
     let active = true;
-    void getWeekStrip(day.isoDate).then((days) => { if (active) setWeek({ key: day.isoDate, days }); }).catch(() => {});
+    void getWeekStrip(weekStart).then((days) => { if (active) setWeek({ key: weekStart, days }); }).catch(() => {});
     return () => { active = false; };
-  }, [day.isoDate]);
+  }, [weekStart]);
+
+  // A new week slides in from the side it lies on -- a later one from the
+  // right -- as the old one leaves, rather than the strip simply changing.
+  const reduced = useReducedMotion();
+  const [stripMotion] = useState(() => ({ x: new Animated.Value(0), opacity: new Animated.Value(1) }));
+  const shownWeek = useRef(weekStart);
+  useEffect(() => {
+    if (shownWeek.current === weekStart) return;
+    const later = weekStart > shownWeek.current;
+    shownWeek.current = weekStart;
+    if (reduced) return;
+    stripMotion.x.setValue(later ? 28 : -28);
+    stripMotion.opacity.setValue(0.2);
+    const useNativeDriver = Platform.OS !== 'web';
+    Animated.parallel([
+      Animated.timing(stripMotion.x, { toValue: 0, duration: motionDuration(220, reduced), useNativeDriver }),
+      Animated.timing(stripMotion.opacity, { toValue: 1, duration: motionDuration(220, reduced), useNativeDriver }),
+    ]).start();
+  }, [weekStart, reduced, stripMotion]);
 
   const heading = day.coptic ? formatCopticDayMonth(day.coptic.monthName, day.coptic.day, arabic) : ' ';
   const weekdayNames = arabic ? WEEKDAYS.arabic : tr(WEEKDAYS.english.join('|'), WEEKDAYS.french.join('|'), '').split('|');
@@ -82,15 +121,19 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
   const next = day.overview?.nextSeason;
   const nextName = next ? NEXT_SEASON_NAMES[next.key] : undefined;
 
-  const strip: DayStripItem[] = (week?.key === day.isoDate ? week.days : []).map((weekDay, index) => {
-    const date = new Date(`${weekDay.isoDate}T00:00:00Z`);
+  // The week's days are drawn at once, the Coptic days and feast dots as soon
+  // as they are read: the strip never empties, so the block never shrinks.
+  const readWeek = week?.key === weekStart ? week.days : null;
+  const strip: DayStripItem[] = weekDates(weekStart).map((isoDate, index) => {
+    const date = new Date(`${isoDate}T00:00:00Z`);
+    const read = readWeek?.find((weekDay) => weekDay.isoDate === isoDate);
     return {
-      key: weekDay.isoDate,
+      key: isoDate,
       label: weekdayNames[index],
-      value: digits(weekDay.gregorianDay),
-      sub: weekDay.copticDay === null ? ' ' : digits(weekDay.copticDay),
-      selected: weekDay.isoDate === day.isoDate,
-      dot: weekDay.hasFeast,
+      value: digits(date.getUTCDate()),
+      sub: read?.copticDay == null ? ' ' : digits(read.copticDay),
+      selected: isoDate === day.isoDate,
+      dot: Boolean(read?.hasFeast),
       accessibilityLabel: formatDayMonthYearDate(date, arabic),
       onPress: () => selectDate(date),
     };
@@ -103,10 +146,16 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
       arabic={arabic}
       controls={<DayControls theme={theme} seasonLabel={day.seasonLabel} arabic={arabic} onOpenSeasons={onOpenSeasons} />}
       heading={heading}
-      subheading={formatDayMonthYearDate(day.date, arabic)}
+      // The Gregorian date under the Coptic one is the day that heading is
+      // for, so the two change together when a new day is read.
+      subheading={formatDayMonthYearDate(day.copticDate, arabic)}
       onPressHeading={onOpenCalendar}
       headingAccessibilityLabel={`${heading}. ${tr('Open the calendar', 'Ouvrir le calendrier', 'افتح التقويم')}`}
-      strip={<DayStrip items={strip} theme={theme} arabic={arabic} />}
+      strip={(
+        <Animated.View style={{ opacity: stripMotion.opacity, transform: [{ translateX: stripMotion.x }] }}>
+          <DayStrip items={strip} theme={theme} arabic={arabic} />
+        </Animated.View>
+      )}
       footer={{
         label: tr('Next season', 'Prochain temps', 'الفترة القادمة'),
         value: nextName ? appText(nextName) : ' ',
