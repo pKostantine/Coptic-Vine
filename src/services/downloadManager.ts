@@ -29,6 +29,9 @@ function checksumSpec(value?: string | null): { algorithm: 'MD5' | 'SHA-1' | 'SH
   if (/^[a-f0-9]{128}$/.test(digest)) return { algorithm: 'SHA-512', digest }; return null;
 }
 
+/** The liturgical calendar, which the app keeps installed itself: downloaded on any connection. */
+function isSystemResource(request: OfflineDownloadRequest): boolean { return request.domain === 'books' && request.entityId === 'calendar'; }
+
 class NativeDownloadManager implements OfflineDownloadManager {
   private listeners = new Set<() => void>(); private revision = 0; private activeTransfers = new Map<string, ActiveTransfer>();
   private packageWorkers = new Map<string, Promise<void>>(); private lastProgressWrite = new Map<string, number>();
@@ -38,19 +41,19 @@ class NativeDownloadManager implements OfflineDownloadManager {
   private async waitForWorker(packageKey: string): Promise<void> { const worker = this.packageWorkers.get(packageKey); if (worker) try { await worker; } catch { /* worker persists failure */ } }
 
   async enqueue(request: OfflineDownloadRequest): Promise<void> {
-    await assertDownloadNetworkAllowed(hasVideo(request));
+    await assertDownloadNetworkAllowed(hasVideo(request), isSystemResource(request));
     const current = await getDownloadProgress(request.packageKey);
     if (current?.status === 'complete' && await isDownloadRequestStale(request)) { await this.update(request); return; }
     await saveDownloadRequest(request);
     if ((await getDownloadProgress(request.packageKey))?.status === 'complete') { this.emit(); return; }
     await setPackageState(request.packageKey, 'queued'); this.emit(); this.startWorker(request.packageKey);
   }
-  async update(request: OfflineDownloadRequest): Promise<void> { await assertDownloadNetworkAllowed(hasVideo(request)); await this.remove(request.packageKey); await saveDownloadRequest(request); await setPackageState(request.packageKey, 'queued'); this.emit(); this.startWorker(request.packageKey); }
+  async update(request: OfflineDownloadRequest): Promise<void> { await assertDownloadNetworkAllowed(hasVideo(request), isSystemResource(request)); await this.remove(request.packageKey); await saveDownloadRequest(request); await setPackageState(request.packageKey, 'queued'); this.emit(); this.startWorker(request.packageKey); }
   checkForUpdate(request: OfflineDownloadRequest): Promise<boolean> { return isDownloadRequestStale(request); }
   async pause(packageKey: string): Promise<void> { const active = this.activeTransfers.get(packageKey); await setPackageState(packageKey, 'paused'); if (active) { await active.task.pauseAsync(); await updateOfflineFile(active.fileKey, { status: 'paused', resumeJson: JSON.stringify(active.task.savable()) }); } await refreshPackageProgress(packageKey); this.emit(); }
-  async resume(packageKey: string): Promise<void> { const request = await getStoredDownloadRequest(packageKey); if (!request) throw new Error('This download is no longer available to resume.'); await assertDownloadNetworkAllowed(hasVideo(request)); await this.waitForWorker(packageKey); await setPackageState(packageKey, 'queued'); this.emit(); this.startWorker(packageKey); }
+  async resume(packageKey: string): Promise<void> { const request = await getStoredDownloadRequest(packageKey); if (!request) throw new Error('This download is no longer available to resume.'); await assertDownloadNetworkAllowed(hasVideo(request), isSystemResource(request)); await this.waitForWorker(packageKey); await setPackageState(packageKey, 'queued'); this.emit(); this.startWorker(packageKey); }
   async cancel(packageKey: string): Promise<void> { await setPackageState(packageKey, 'cancelled'); const active = this.activeTransfers.get(packageKey); if (active) { active.task.cancel(); await updateOfflineFile(active.fileKey, { status: 'cancelled', resumeJson: null }); } await refreshPackageProgress(packageKey); this.emit(); }
-  async retry(packageKey: string): Promise<void> { const request = await getStoredDownloadRequest(packageKey); if (!request) throw new Error('This download is no longer available to retry.'); await assertDownloadNetworkAllowed(hasVideo(request)); await this.waitForWorker(packageKey); for (const file of await getPackageFiles(packageKey)) if (file.status === 'failed' || file.status === 'cancelled') await updateOfflineFile(file.file_key, { status: 'queued', error: null, resumeJson: null }); await setPackageState(packageKey, 'queued'); this.emit(); this.startWorker(packageKey); }
+  async retry(packageKey: string): Promise<void> { const request = await getStoredDownloadRequest(packageKey); if (!request) throw new Error('This download is no longer available to retry.'); await assertDownloadNetworkAllowed(hasVideo(request), isSystemResource(request)); await this.waitForWorker(packageKey); for (const file of await getPackageFiles(packageKey)) if (file.status === 'failed' || file.status === 'cancelled') await updateOfflineFile(file.file_key, { status: 'queued', error: null, resumeJson: null }); await setPackageState(packageKey, 'queued'); this.emit(); this.startWorker(packageKey); }
   async remove(packageKey: string): Promise<void> { const active = this.activeTransfers.get(packageKey); if (active) active.task.cancel(); await this.waitForWorker(packageKey); for (const row of await removeOfflinePackage(packageKey)) if (row.local_uri) try { const file = new File(row.local_uri); if (file.exists) file.delete(); } catch { /* database removal is authoritative */ } this.emit(); }
   async removeAll(): Promise<void> { for (const uri of await removeAllDownloadRecords()) try { const file = new File(uri); if (file.exists) file.delete(); } catch { /* database removal is authoritative */ } this.emit(); }
   async cleanupIncomplete(): Promise<number> { const count = await cleanupIncompleteDownloads(); this.emit(); return count; }

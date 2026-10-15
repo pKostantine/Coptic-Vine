@@ -213,30 +213,34 @@ function NativeDownloadsScreen() {
     </Section>
   );
 
+  // Three separate choices, each meaning one thing: whether books update
+  // themselves, whether anything may use cellular data at all, and whether
+  // videos may too. (Wi-Fi only is just cellular turned off.)
+  const cellularOn = prefs.allowCellular && !prefs.wifiOnly;
   const preferencesSection = (
     <Section title={tr('Download Preferences', 'Préférences de téléchargement', 'تفضيلات التنزيل')} arabic={arabic}>
       <SwitchRow
-        label={tr('Automatic book updates on Wi-Fi', 'Mises à jour automatiques des livres en Wi-Fi', 'تحديث الكتب تلقائيًا عبر الواي فاي')}
+        label={tr('Update books automatically', 'Mettre à jour les livres automatiquement', 'تحديث الكتب تلقائيًا')}
+        detail={tr('On Wi-Fi, when a new edition is published', 'En Wi-Fi, à chaque nouvelle édition', 'عبر الواي فاي عند نشر إصدار جديد')}
         arabic={arabic}
         on={autoUpdates}
         onPress={() => { const next = !autoUpdates; setAutoUpdates(next); void setAutomaticBookUpdatesEnabled(next); }}
       />
       <SwitchRow
-        label={tr('Wi-Fi only downloads', 'Téléchargements en Wi-Fi uniquement', 'التنزيل عبر الواي فاي فقط')}
+        label={tr('Download over cellular', 'Télécharger en données cellulaires', 'التنزيل عبر بيانات الجوال')}
+        detail={cellularOn
+          ? tr('Books and music download on any connection', 'Livres et musique sur toute connexion', 'الكتب والموسيقى على أي اتصال')
+          : tr('Downloads wait for Wi-Fi', 'Les téléchargements attendent le Wi-Fi', 'تنتظر التنزيلات شبكة الواي فاي')}
         arabic={arabic}
-        on={prefs.wifiOnly}
-        onPress={() => void patchPreferences({ wifiOnly: !prefs.wifiOnly, allowCellular: prefs.wifiOnly ? prefs.allowCellular : false })}
+        on={cellularOn}
+        onPress={() => void patchPreferences({ allowCellular: !cellularOn, wifiOnly: cellularOn })}
       />
       <SwitchRow
-        label={tr('Allow cellular downloads', 'Autoriser les données cellulaires', 'السماح بالتنزيل عبر بيانات الجوال')}
+        label={tr('Videos over cellular', 'Vidéos en données cellulaires', 'الفيديو عبر بيانات الجوال')}
+        detail={tr('Lessons with video use far more data', 'Les leçons vidéo consomment bien plus de données', 'تستهلك دروس الفيديو بيانات أكثر بكثير')}
         arabic={arabic}
-        on={prefs.allowCellular && !prefs.wifiOnly}
-        onPress={() => void patchPreferences({ allowCellular: !prefs.allowCellular, wifiOnly: prefs.allowCellular ? true : false })}
-      />
-      <SwitchRow
-        label={tr('Allow video over cellular', 'Autoriser la vidéo en données cellulaires', 'السماح بالفيديو عبر بيانات الجوال')}
-        arabic={arabic}
-        on={prefs.allowVideoOnCellular}
+        on={cellularOn && prefs.allowVideoOnCellular}
+        disabled={!cellularOn}
         onPress={() => void patchPreferences({ allowVideoOnCellular: !prefs.allowVideoOnCellular })}
       />
     </Section>
@@ -506,18 +510,33 @@ function Row({ icon, title, detail, detailIcon, trailing, chevron = false, quiet
   );
 }
 
-function SwitchRow({ label, arabic, on, onPress }: { label: string; arabic: boolean; on: boolean; onPress: () => void }) {
+function SwitchRow({ label, detail, arabic, on, disabled = false, onPress }: {
+  label: string;
+  /** A word under the label on what the choice does. */
+  detail?: string;
+  arabic: boolean;
+  on: boolean;
+  /** Greyed and inert while another choice makes this one moot. */
+  disabled?: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityRole="switch"
       accessibilityLabel={label}
-      accessibilityState={{ checked: on }}
+      accessibilityState={{ checked: on, disabled }}
+      aria-checked={on}
+      aria-disabled={disabled}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, styles.switchRow, arabic && styles.rowReverse, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.row, styles.switchRow, arabic && styles.rowReverse, disabled && styles.switchRowDisabled, pressed && styles.pressed]}
     >
       <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-      <Text style={[styles.switchLabel, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
-      <Switch on={on} />
+      <View style={styles.rowText}>
+        <Text style={[styles.switchLabel, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
+        {detail ? <Text style={[styles.rowDetail, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text> : null}
+      </View>
+      <Switch on={on && !disabled} />
     </Pressable>
   );
 }
@@ -609,7 +628,8 @@ const styles = StyleSheet.create({
   thumb: { borderRadius: 10, height: 44, marginLeft: -5, width: 44 },
   thumbBlank: { alignItems: 'center', backgroundColor: COLORS.surfaceSoft, justifyContent: 'center' },
   switchRow: { minHeight: 54 },
-  switchLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
+  switchLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
+  switchRowDisabled: { opacity: 0.5 },
   badge: { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 99, color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', lineHeight: 26, overflow: 'hidden', paddingHorizontal: 10 },
   action: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, flexDirection: 'row', gap: 5, height: 34, paddingHorizontal: 13 },
   actionFilled: { backgroundColor: COLORS.gold },

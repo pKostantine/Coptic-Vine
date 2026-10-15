@@ -15,12 +15,14 @@ export default function BookSyncBootstrap() {
     const sync = async () => {
       if (!active || syncing) return;
       const network = await Network.getNetworkStateAsync();
-      if (!active || network.isConnected === false || !isWifi(network.type)) return;
+      if (!active || network.isConnected === false || network.type === Network.NetworkStateType.NONE) return;
       syncing = true;
       try {
-        // Calendar is a mandatory system resource, independent of the user's
-        // optional automatic-book-update preference.
+        // The liturgical calendar comes with the app: it is fetched on the
+        // first connection of any kind, whatever the cellular choice, and
+        // kept current the same way. Books wait for Wi-Fi below.
         await bookDownloadManager.ensureCalendar();
+        if (!isWifi(network.type)) return;
         // A dropped connection marks only the incomplete chunk failed. Resume
         // user-requested initial installs when Wi-Fi returns; intentionally
         // paused books remain paused.
@@ -37,7 +39,7 @@ export default function BookSyncBootstrap() {
 
     void sync();
     const networkSubscription = Network.addNetworkStateListener((state) => {
-      if (state.isConnected !== false && isWifi(state.type)) void sync();
+      if (state.isConnected !== false && state.type !== Network.NetworkStateType.NONE) void sync();
     });
     const appSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void sync();
