@@ -79,7 +79,6 @@ export default function MusicArtistScreen() {
   const likes = useReleaseLikes(locale);
   const libraryAuthenticated = likes.authenticated;
   const [artist, setArtist] = useState<MusicConsumerArtist | null>(null);
-  const [links, setLinks] = useState<{ id: string; links: MusicArtistLink[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [followed, setFollowed] = useState(false);
@@ -100,10 +99,6 @@ export default function MusicArtistScreen() {
       .catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : 'Unable to load artist.');
       });
-    // The links come from their own table until the artist's payload carries them.
-    musicService.getArtistLinks(artistId)
-      .then((rows) => { if (active) setLinks({ id: artistId, links: rows }); })
-      .catch(() => { if (active) setLinks({ id: artistId, links: [] }); });
     return () => { active = false; };
   }, [artistId, locale, attempt]);
 
@@ -168,7 +163,8 @@ export default function MusicArtistScreen() {
   };
 
   const shareImageUrl = musicService.resolveAsset(shareImageAsset);
-  const artistLinks = artist?.socialLinks?.length ? artist.socialLinks : links && links.id === artistId ? links.links : [];
+  // The artist's own payload carries the links (get_published_music_artist).
+  const artistLinks = artist?.socialLinks ?? [];
   // The iPad's and desktop's 36pt margins are the sections' gutter, the hero's glow running past them to the edges.
   const gutter = wide ? 36 : 16;
   const available = width - (wide ? 72 : 32);

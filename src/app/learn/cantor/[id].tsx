@@ -65,20 +65,6 @@ export default function LearningCantorScreen() {
     return () => { active = false; };
   }, [cantorId, locale, attempt]);
 
-  // The covers come from each album until the cantor's payload carries them.
-  useEffect(() => {
-    if (!cantor) return;
-    let active = true;
-    for (const album of cantor.albums) {
-      if (album.coverAsset) continue;
-      learningService.getAlbum(album.id, locale)
-        .then((detail) => { if (active) setAlbumDetails((current) => ({ ...current, [album.id]: detail })); })
-        // An album that cannot load keeps the colours of a cover without artwork.
-        .catch(() => undefined);
-    }
-    return () => { active = false; };
-  }, [cantor, locale]);
-
   // An album's covers play it from its first recording, fetched on the tap; the album playing pauses.
   const albumIsCurrent = (albumId: string) => currentItem?.kind === 'recording' && currentItem.containerId === albumId;
   const playAlbum = (albumId: string) => {
@@ -91,6 +77,8 @@ export default function LearningCantorScreen() {
     const loaded = albumDetails[albumId];
     (loaded ? Promise.resolve(loaded) : learningService.getAlbum(albumId, locale))
       .then((album) => {
+        // Kept, so playing it again doesn't load it again.
+        setAlbumDetails((current) => ({ ...current, [albumId]: album }));
         const queue = learningAlbumQueue(album);
         if (queue.length) playQueue(queue, 0);
       })
@@ -133,7 +121,7 @@ export default function LearningCantorScreen() {
                 id={album.id}
                 title={album.title}
                 subtitle={tr('Learning album', 'Album d’apprentissage', 'ألبوم تعلّم')}
-                artworkUri={learningService.resolveAsset(album.coverAsset ?? albumDetails[album.id]?.coverAsset)}
+                artworkUri={learningService.resolveAsset(album.coverAsset ?? null)}
                 width={tileWidth}
                 arabic={arabic}
                 wrapTitle
