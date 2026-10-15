@@ -156,7 +156,7 @@ test('Night is exactly the page the services have always been read on', () => {
   assert.equal(slideshow.colors.peopleText, COLORS.peopleLight);
 });
 
-test('Paper keeps its pinned colours: Night's rubrics deepened for white, and a Prussian blue', () => {
+test('Paper keeps its pinned colours: the rubrics deepened for white, and a Prussian blue', () => {
   const { colors } = DOCUMENT_THEMES.paper;
   assert.deepEqual(colors, {
     page: '#FFFFFF',
