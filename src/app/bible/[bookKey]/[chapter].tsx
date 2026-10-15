@@ -38,6 +38,7 @@ import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
 import { createBibleHighlight, isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
+import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
 
 type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
 type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
@@ -217,6 +218,16 @@ export default function BibleChapterDocument() {
   // Bumped by Retry on a failed load: a new value re-runs both loads below.
   const [reloadToken, setReloadToken] = useState(0);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  // Book Settings open as a sheet over the chapter, never as a page. The
+  // chapter stays focused and re-anchors to the reader's verse after each
+  // change (the settings-signature layout effect below); its own scroll
+  // reports are ignored while the sheet covers it.
+  const [bookSettingsOpen, setBookSettingsOpen] = useState(false);
+  const bookSettingsOpenRef = useRef(false);
+  const showBookSettings = useCallback((open: boolean) => {
+    bookSettingsOpenRef.current = open;
+    setBookSettingsOpen(open);
+  }, []);
   // A verse arrived at from a search hit or a shared link. Held in state as
   // well as in the URL so that leaving this chapter drops it -- otherwise the
   // next chapter would jump to whatever verse number the link happened to name.
@@ -254,7 +265,7 @@ export default function BibleChapterDocument() {
     setIsSelectorOpen(false);
   }, []);
 
-  // This chapter can stay mounted underneath Book Settings. Never let a
+  // This chapter can stay mounted underneath another page. Never let a
   // background iframe/WebView scroll report replace the frozen verse.
   useFocusEffect(useCallback(() => {
     focusedRef.current = true;
@@ -441,7 +452,7 @@ export default function BibleChapterDocument() {
     const selectorEdgeWidth = Math.min(240, Math.max(128, screenWidth * 0.18));
     return PanResponder.create({
       onMoveShouldSetPanResponder: (event, gestureState) => {
-        if (isStylusGestureEvent(event) || pencilGestureActive) return false;
+        if (isStylusGestureEvent(event) || pencilGestureActive || bookSettingsOpen) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
         if (!isHorizontal) return false;
         const isBackSwipe = gestureState.x0 < 56 && gestureState.dx > 24;
@@ -458,7 +469,7 @@ export default function BibleChapterDocument() {
         }
       },
     });
-  }, [goBackALevel, screenWidth, isSelectorOpen, pencilGestureActive]);
+  }, [goBackALevel, screenWidth, isSelectorOpen, pencilGestureActive, bookSettingsOpen]);
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}>
@@ -522,7 +533,7 @@ export default function BibleChapterDocument() {
                 return;
               }
               if (action.type === 'currentVerse' && action.verse) {
-                if (action.readerId !== readerId || !focusedRef.current || selectorOpenRef.current) return;
+                if (action.readerId !== readerId || !focusedRef.current || selectorOpenRef.current || bookSettingsOpenRef.current) return;
                 if (restoreGuardRef.current && restoreGuardRef.current !== action.verse) return;
                 restoreGuardRef.current = null;
                 currentVerseRef.current = action.verse;
@@ -645,11 +656,8 @@ export default function BibleChapterDocument() {
                     onPress={() => {
                       const anchor = selectorAnchorRef.current || currentVerseRef.current;
                       closeVerseSelector();
-                      blurredSnapshotRef.current = {
-                        verse: anchor,
-                        signature: latestSettingsSignatureRef.current,
-                      };
-                      router.push('/book-settings');
+                      if (anchor) currentVerseRef.current = anchor;
+                      showBookSettings(true);
                     }}
                   >
                     <Icon name="settings-outline" size={25} color={COLORS.gold} />
@@ -660,6 +668,7 @@ export default function BibleChapterDocument() {
           </Modal>
         </View>
       )}
+      <BookSettingsSheet inDocument visible={bookSettingsOpen} onClose={() => showBookSettings(false)} />
     </SafeAreaView>
   );
 }

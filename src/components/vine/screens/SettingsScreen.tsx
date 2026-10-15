@@ -1,21 +1,16 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
-import Head from 'expo-router/head';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import FontScaleControl from '@/components/vine/ui/FontScaleControl';
 import Icon from '@/components/vine/ui/Icon';
 import SaintHymnPicker from '@/components/vine/ui/SaintHymnPicker';
 import SheetFrame from '@/components/vine/ui/SheetFrame';
-import SubPageHeader from '@/components/vine/ui/SubPageHeader';
 import ToggleRow from '@/components/vine/ui/ToggleRow';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { goBack } from '@/utils/navigation';
 import { OrientationMode, VisibleLanguages } from '@/utils/preferencesStorage';
-import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { appText, tr } from '../../../utils/appText';
@@ -43,20 +38,18 @@ const labelText = (label: Label) => appText({ english: label.english || label.la
 interface BookSettingsPanelProps {
   /** Two columns — Languages and Content beside Display — on the iPad and desktop. */
   wide?: boolean;
-  /** Inside a document's own settings modal: no Downloads row (it would open a route under the modal). */
-  hosted?: boolean;
   onOpenSaintHymns: () => void;
+  /** The Downloads & Storage row, where there is one: not over a document, and not in a browser. */
+  onOpenDownloads?: () => void;
 }
 
 /**
  * The reading settings (Coptic Vine design, "Book settings"): the languages
  * as chips, the display settings as switches under a text-size slider, and
  * the content — the saints' hymns and the monastery — each group under a
- * small gold heading. Shown in a sheet over Books, as a page of its own, and
- * inside a document's settings.
+ * small gold heading. Always in BookSettingsSheet, wherever it is opened from.
  */
-export function BookSettingsPanel({ wide = false, hosted = false, onOpenSaintHymns }: BookSettingsPanelProps) {
-  const router = useRouter();
+export function BookSettingsPanel({ wide = false, onOpenSaintHymns, onOpenDownloads }: BookSettingsPanelProps) {
   const { preferences, toggleLanguage, setFontScale, setFontScaleValue, setOrientationMode, toggleSelectText, toggleSlideshowMode, toggleDisplayComments, toggleDisplaySilentPrayers, toggleDisplayNowPlayingBar, toggleInMonastery, toggleKeepScreenAwake } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
   const chosen = (preferences.selectedSaintHymns || []).length;
@@ -130,11 +123,11 @@ export function BookSettingsPanel({ wide = false, hosted = false, onOpenSaintHym
           <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
         </Pressable>
         <ToggleRow label={labelText(SETTINGS_LABELS.inMonastery)} isArabic={arabic} active={preferences.inMonastery} onPress={toggleInMonastery} />
-        {!hosted && Platform.OS !== 'web' ? (
+        {onOpenDownloads && Platform.OS !== 'web' ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={labelText(SETTINGS_LABELS.downloads)}
-            onPress={() => router.push('/downloads')}
+            onPress={onOpenDownloads}
             style={({ pressed }) => [styles.linkRow, arabic && styles.rowReverse, pressed && styles.linkRowPressed]}
           >
             <Text style={[styles.linkLabel, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{labelText(SETTINGS_LABELS.downloads)}</Text>
@@ -165,35 +158,25 @@ export function BookSettingsPanel({ wide = false, hosted = false, onOpenSaintHym
   );
 }
 
-interface SettingsScreenProps { onClose?: () => void; }
-
-/** The Book Settings as a page of its own (the /book-settings route, and a document's settings modal). */
-export default function SettingsScreen({ onClose }: SettingsScreenProps) {
-  const router = useRouter();
-  const layout = useLayoutMode();
-  const wide = layout !== 'phone';
-  const isHosted = Boolean(onClose);
-  const closeScreen = () => (onClose ? onClose() : goBack(router, '/books'));
-  const { preferences, toggleSaintHymn, clearSaintHymns } = useReadingPreferences();
-  const [saintPickerOpen, setSaintPickerOpen] = useState(false);
-  const arabic = preferences.appLanguage === 'ar';
-
-  return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, DISABLED_TEXT_SELECTION_STYLE]}>
-      {isHosted ? null : <Head><title>Coptic Vine Book Settings</title></Head>}
-      <SubPageHeader title={labelText(SETTINGS_LABELS.settings)} arabic={arabic} onBack={closeScreen} backLabel={tr('Back', 'Retour', 'رجوع')} />
-      <ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.pageCard, wide && styles.pageCardWide]}>
-          <BookSettingsPanel wide={wide} hosted={isHosted} onOpenSaintHymns={() => setSaintPickerOpen(true)} />
-        </View>
-      </ScrollView>
-      <SaintHymnPicker visible={saintPickerOpen} onClose={() => setSaintPickerOpen(false)} isArabic={arabic} selected={preferences.selectedSaintHymns || []} onToggle={toggleSaintHymn} onClearSaint={clearSaintHymns} />
-    </SafeAreaView>
-  );
+interface BookSettingsSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  /**
+   * Over a document: drawn in the page rather than as a native modal (it opens
+   * as the content list or another modal closes, and iOS presents one native
+   * modal at a time), and without the Downloads row, which would leave the
+   * document for another page.
+   */
+  inDocument?: boolean;
 }
 
-/** The Book Settings over the Books page: a sheet on a phone, a centred dialog on the iPad and desktop. */
-export function BookSettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+/**
+ * The Book Settings, wherever they are opened -- Books, Account, a document,
+ * the Bible -- never a page of their own: a sheet on a phone, a centred dialog
+ * on the iPad and desktop.
+ */
+export function BookSettingsSheet({ visible, onClose, inDocument = false }: BookSettingsSheetProps) {
+  const router = useRouter();
   const layout = useLayoutMode();
   const wide = layout !== 'phone';
   const { preferences, toggleSaintHymn, clearSaintHymns } = useReadingPreferences();
@@ -203,12 +186,21 @@ export function BookSettingsSheet({ visible, onClose }: { visible: boolean; onCl
     <SheetFrame
       visible={visible}
       onClose={onClose}
+      inline={inDocument}
       closeLabel={tr('Close the settings', 'Fermer les réglages', 'أغلق الإعدادات')}
       dialogOnTablet
       dialogWidth={layout === 'desktop' ? 780 : 740}
     >
       <View style={wide ? styles.dialogBody : null}>
-        <BookSettingsPanel wide={wide} onOpenSaintHymns={() => setSaintPickerOpen(true)} />
+        <BookSettingsPanel
+          wide={wide}
+          onOpenSaintHymns={() => setSaintPickerOpen(true)}
+          // Closed first, so Downloads isn't opened underneath the sheet.
+          onOpenDownloads={inDocument ? undefined : () => {
+            onClose();
+            router.push('/downloads');
+          }}
+        />
       </View>
       {/* Inside the sheet's own modal, so iOS presents it over the sheet. */}
       <SaintHymnPicker visible={saintPickerOpen} onClose={() => setSaintPickerOpen(false)} isArabic={arabic} selected={preferences.selectedSaintHymns || []} onToggle={toggleSaintHymn} onClearSaint={clearSaintHymns} />
@@ -217,10 +209,6 @@ export function BookSettingsSheet({ visible, onClose }: { visible: boolean; onCl
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.black },
-  pageContent: { paddingBottom: 32, paddingHorizontal: 16 },
-  pageCard: { backgroundColor: COLORS.surface, borderColor: COLORS.goldLine, borderRadius: 28, borderTopWidth: 1, paddingBottom: 22, paddingHorizontal: 16, paddingTop: 4 },
-  pageCardWide: { alignSelf: 'center', maxWidth: 780, paddingHorizontal: 24, width: '100%' },
   dialogBody: { paddingHorizontal: 8 },
   columns: { flexDirection: 'row', gap: 28 },
   column: { flex: 1, minWidth: 0 },

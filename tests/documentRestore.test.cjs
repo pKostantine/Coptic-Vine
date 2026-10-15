@@ -132,7 +132,9 @@ test('Bible verse selector freezes its opening verse across successive language 
   const html = fs.readFileSync('src/components/vine/bibleDocumentHtml.ts', 'utf8');
   assert.match(chapter, /selectorAnchorRef\.current = currentVerseRef\.current/);
   assert.match(chapter, /const anchor = selectorAnchorRef\.current \|\| currentVerseRef\.current/);
-  assert.match(chapter, /selectorOpenRef\.current\) return/);
+  // Reports are ignored while the verse selector, or the Book Settings sheet over the chapter, covers it.
+  assert.match(chapter, /selectorOpenRef\.current \|\| bookSettingsOpenRef\.current\) return/);
+  assert.doesNotMatch(chapter, /router\.push\('\/book-settings'\)/);
   assert.match(chapter, /setBibleVisibleLanguages\(next\)/);
   assert.match(chapter, /action\.readerId !== readerId/);
   assert.match(html, /message\.readerId = readerId/);

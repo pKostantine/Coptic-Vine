@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
@@ -56,7 +56,9 @@ export default function BooksHome() {
   const holyWeek = useHolyWeekSchedule();
   const day = useLiturgicalDay();
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Opened straight away for a /book-settings link (see app/book-settings.tsx).
+  const { settings: settingsParam } = useLocalSearchParams<{ settings?: string }>();
+  const [settingsOpen, setSettingsOpen] = useState(settingsParam === 'open');
   const downloadRevision = useSyncExternalStore(bookDownloadManager.subscribe, bookDownloadManager.getRevision, bookDownloadManager.getRevision);
   const [downloads, setDownloads] = useState<BookDownloadProgress[]>([]);
 
@@ -181,7 +183,13 @@ export default function BooksHome() {
       </NowPlayingAwareScrollView>
 
       <CalendarSheet visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={openSeasons} />
-      <BookSettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <BookSettingsSheet
+        visible={settingsOpen}
+        onClose={() => {
+          setSettingsOpen(false);
+          if (settingsParam) router.setParams({ settings: undefined });
+        }}
+      />
       <BottomTabBar active="books" />
     </SafeAreaView>
   );

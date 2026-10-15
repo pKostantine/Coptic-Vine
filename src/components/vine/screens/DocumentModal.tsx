@@ -22,7 +22,7 @@ import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
 import SeasonSelectorScreen from './SeasonSelectorScreen';
-import SettingsScreen from './SettingsScreen';
+import { BookSettingsSheet } from './SettingsScreen';
 import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
 import { doxologyPillNames } from '../../../utils/doxologyPillNames';
 
@@ -490,13 +490,13 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           </>
         )}
         <GlobalNowPlayingOverlay />
-        {/* Rendered from inside this document's own Modal, so Seasons and
-            Settings appear OVER the subdocument instead of behind it, and
-            closing one drops straight back into it. (The calendar is drawn
-            inline below rather than as a modal of its own.) */}
+        {/* Rendered from inside this document's own Modal, so Seasons
+            appears OVER the subdocument instead of behind it, and closing it
+            drops straight back into it. (The calendar and Book Settings are
+            drawn inline below rather than as modals of their own.) */}
         <Modal
           animationType="slide"
-          visible={overlayScreen === 'seasons' || overlayScreen === 'settings'}
+          visible={overlayScreen === 'seasons'}
           onRequestClose={() => setOverlayScreen(null)}
           supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
         >
@@ -506,7 +506,6 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             {...(isMobileDocument ? overlayInsetEdgeSwipe.handlers : {})}
           >
             {overlayScreen === 'seasons' ? <SeasonSelectorScreen onClose={() => setOverlayScreen('calendar')} /> : null}
-            {overlayScreen === 'settings' ? <SettingsScreen onClose={() => setOverlayScreen(null)} /> : null}
           </View>
         </Modal>
         <DocumentModal
@@ -526,6 +525,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           onClose={() => setOverlayScreen(null)}
           onOpenSeasons={() => setOverlayScreen('seasons')}
         />
+        {/* The Book Settings sheet, the same way and for the same reason. */}
+        <BookSettingsSheet inDocument visible={overlayScreen === 'settings'} onClose={() => setOverlayScreen(null)} />
       </SafeAreaView>
     </Modal>
   );

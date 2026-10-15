@@ -18,6 +18,7 @@ import {
 } from '../antiphonaryNavigation';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
+import { BookSettingsSheet } from './SettingsScreen';
 import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
 import { COLORS } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
@@ -213,6 +214,10 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const copticGospelRite = preferences.copticGospelRite;
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  // Book Settings open as a sheet over the document, never as a page: the
+  // document stays focused and follows each change live, re-anchoring to the
+  // hymn the reader is on (see the settings-signature layout effect below).
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeSermonHighlightId, setActiveSermonHighlightId] = useState<string | null>(null);
   // Seeded from the same module-level store selectedSlideSectionId is (see
   // below): changing a setting can unmount this screen and mount it again,
@@ -634,6 +639,11 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     setCalendarOpen(true);
   };
 
+  const openSettings = () => {
+    setSelectorOpen(false);
+    setSettingsOpen(true);
+  };
+
   // A Hyperlink teleports to another service rather than opening anything over
   // this one. Replacing this route keeps the screen below it unchanged, so
   // leaving the destination reveals that existing screen instead of inserting
@@ -715,7 +725,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       // the document while a modal covers it, so nothing it reports during
       // that window reflects real reading position. Same idea for
       // navigatingAwayRef, covering the Settings/Calendar transition itself.
-      if (selectorOpen || navigatingAwayRef.current || getPendingDocumentRestore(documentPositionKey)) return;
+      if (selectorOpen || settingsOpen || navigatingAwayRef.current || getPendingDocumentRestore(documentPositionKey)) return;
 
       const pendingTarget = pendingScrollRestoreSectionIdRef.current;
       if (pendingTarget && action.sectionId !== pendingTarget) {
@@ -849,7 +859,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // DocumentModal.tsx's own closeSwipePanResponder already correctly scopes
   // itself to close only the topmost modal; this ensures the document
   // BEHIND it never competes for the same gesture while anything covers it.
-  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen;
+  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen || settingsOpen;
 
   const gesturePanResponder = useMemo(
     () => {
@@ -987,7 +997,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               bookmarked={bookmarked}
               onToggleBookmark={() => toggleBookmark(bookmarkId)}
               onOpenCalendar={openCalendar}
-              onOpenSettings={() => navigateAway('/book-settings')}
+              onOpenSettings={openSettings}
             />
           ) : (
           <ContentSelectorDrawer
@@ -1000,7 +1010,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}
             onOpenCalendar={openCalendar}
-            onOpenSettings={() => navigateAway('/book-settings')}
+            onOpenSettings={openSettings}
             bishopPresent={preferences.bishopPresent}
             onToggleBishopPresent={() => {
               captureDocumentRestore(
@@ -1043,6 +1053,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         onClose={() => setAntiphonaryModal(null)}
       />
       <CalendarSheet inline visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={() => navigateAway('/season-selector')} />
+      <BookSettingsSheet inDocument visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </SafeAreaView>
   );
 }

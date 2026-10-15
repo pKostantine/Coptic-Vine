@@ -10,6 +10,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import { CrownOrnament } from '@/components/vine/ui/Ornaments';
@@ -553,6 +554,8 @@ function PasswordEditor({ password, confirmation, onPasswordChange, onConfirmati
 function AppSettingsSection({ gutter }: { gutter: number }) {
   const router = useRouter();
   const { user } = useAuth();
+  // A sheet over Account, as everywhere: Book Settings are never a page.
+  const [bookSettingsOpen, setBookSettingsOpen] = useState(false);
   const { preferences, setAppLanguage, contentSyncStatus } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
   const sync = !user
@@ -606,7 +609,7 @@ function AppSettingsSection({ gutter }: { gutter: number }) {
           label={tr('Book settings', 'Réglages des livres', 'إعدادات الكتب')}
           description={tr('Reading languages, text, slideshow, and display', 'Langues de lecture, texte, diaporama et affichage', 'لغات القراءة والنص والعرض التقديمي والشاشة')}
           arabic={arabic}
-          onPress={() => router.push('/book-settings')}
+          onPress={() => setBookSettingsOpen(true)}
         />
         {Platform.OS !== 'web' ? (
           <SettingsRow
@@ -618,6 +621,7 @@ function AppSettingsSection({ gutter }: { gutter: number }) {
           />
         ) : null}
       </View>
+      <BookSettingsSheet visible={bookSettingsOpen} onClose={() => setBookSettingsOpen(false)} />
     </>
   );
 }
