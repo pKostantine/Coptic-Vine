@@ -25,6 +25,14 @@ function coverFall(key: string): [string, string] {
   return COVER_FALLS[hash % COVER_FALLS.length];
 }
 
+/** The shelf's sizes: a phone's rail and grid, and the iPad's and desktop's larger grid. */
+const SIZES = {
+  regular: { play: 34, playIcon: 15, playInset: 8, heart: 18, title: 13.5, titleLine: 17.5, subtitle: 12 },
+  large: { play: 42, playIcon: 18, playInset: 12, heart: 20, title: 15, titleLine: 19.5, subtitle: 13 },
+};
+/** The name sits this far under the cover. */
+const TEXT_GAP = 9;
+
 interface ReleaseTileProps {
   /** Keys the fallback colour, so a release keeps its colour wherever it appears. */
   id: string;
@@ -33,26 +41,40 @@ interface ReleaseTileProps {
   subtitle: string | null;
   artworkUri: string | null;
   /** The tile's width; its cover is square. */
-  width: number | `${number}%`;
+  width: number;
   arabic?: boolean;
   onPress: () => void;
   /** The gold play button on the cover's corner. */
   onPlay?: () => void;
   playLabel?: string;
-  /** After the text: a heart, a chevron. */
+  /** Pause on the cover's button while this release plays. */
+  playing?: boolean;
+  /** The heart after the name, on a shelf that saves likes. */
+  liked?: boolean;
+  onToggleLike?: () => void;
+  likeLabel?: string;
+  /** After the text, inside the tile's own tap target: a chevron. */
   trailing?: ReactNode;
   /** Two lines for the title (an artist's grid) rather than one (a rail). */
   wrapTitle?: boolean;
+  /** The iPad's and desktop's grid: a larger name, heart and play button. */
+  large?: boolean;
+  /** A gold badge on the cover's corner: "New". */
+  badge?: string;
 }
 
 /**
  * A release on a shelf (Coptic Vine design, "Music"): its cover with a gold
- * play button on the corner, its name, and the artist in gold beneath.
+ * play button on the corner, its name with a heart beside it, and the artist
+ * in gold beneath.
  */
 export default function ReleaseTile({
-  id, title, subtitle, artworkUri, width, arabic = false, onPress, onPlay, playLabel, trailing, wrapTitle = false,
+  id, title, subtitle, artworkUri, width, arabic = false, onPress, onPlay, playLabel, playing = false,
+  liked = false, onToggleLike, likeLabel, trailing, wrapTitle = false, large = false, badge,
 }: ReleaseTileProps) {
   const [from, to] = coverFall(id);
+  const size = large ? SIZES.large : SIZES.regular;
+  const titleLines = large ? 3 : wrapTitle ? 2 : 1;
   return (
     <View style={[styles.tile, { width }]}>
       <Pressable
@@ -68,17 +90,24 @@ export default function ReleaseTile({
             <>
               <LinearGradient colors={[from, to]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
               <View style={styles.coverCross} pointerEvents="none">
-                <BuddedCross size={54} />
+                <BuddedCross size={Math.round(width * 0.4)} />
               </View>
             </>
           )}
+          {badge ? (
+            <View style={[styles.badge, arabic ? styles.badgeRight : styles.badgeLeft]}>
+              <Text style={[styles.badgeText, arabic && styles.arabicBadge]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{arabic ? badge : badge.toUpperCase()}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={[styles.text, arabic && styles.rowReverse]}>
           <View style={styles.titles}>
-            <Text style={[styles.title, arabic && styles.arabic]} numberOfLines={wrapTitle ? 2 : 1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
-            {subtitle ? <Text style={[styles.subtitle, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{subtitle}</Text> : null}
+            <Text style={[styles.title, { fontSize: size.title, lineHeight: size.titleLine }, arabic && styles.arabic]} numberOfLines={titleLines} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
+            {subtitle ? <Text style={[styles.subtitle, { fontSize: size.subtitle }, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{subtitle}</Text> : null}
           </View>
           {trailing}
+          {/* Room for the heart, which is a button of its own beside this one: a button in a button is invalid on web. */}
+          {onToggleLike ? <View style={{ width: size.heart }} /> : null}
         </View>
       </Pressable>
       {onPlay ? (
@@ -87,9 +116,26 @@ export default function ReleaseTile({
           accessibilityLabel={playLabel ?? `Play ${title}`}
           hitSlop={6}
           onPress={onPlay}
-          style={({ pressed }) => [styles.play, arabic ? styles.playLeft : styles.playRight, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.play,
+            { borderRadius: size.play / 2, height: size.play, top: width - size.playInset - size.play, width: size.play },
+            arabic ? { left: size.playInset } : { right: size.playInset },
+            pressed && styles.pressed,
+          ]}
         >
-          <Icon name="play" size={15} color={COLORS.greenDeep} />
+          <Icon name={playing ? 'pause' : 'play'} size={size.playIcon} color={COLORS.greenDeep} />
+        </Pressable>
+      ) : null}
+      {onToggleLike ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: liked }}
+          accessibilityLabel={likeLabel ?? title}
+          hitSlop={8}
+          onPress={onToggleLike}
+          style={({ pressed }) => [styles.heart, { top: width + TEXT_GAP + 1 }, arabic ? styles.heartLeft : styles.heartRight, pressed && styles.pressed]}
+        >
+          <Icon name={liked ? 'heart' : 'heart-outline'} size={size.heart} color={liked ? COLORS.gold : COLORS.muted} />
         </Pressable>
       ) : null}
     </View>
@@ -109,23 +155,26 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   coverCross: { alignItems: 'center', bottom: 0, justifyContent: 'center', left: 0, opacity: 0.55, position: 'absolute', right: 0, top: 0 },
-  // The play button sits on the cover's corner, 8 in from the edges, beside the tile's own tap target.
+  badge: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, height: 22, justifyContent: 'center', paddingHorizontal: 9, position: 'absolute', top: 10 },
+  badgeLeft: { left: 10 },
+  badgeRight: { right: 10 },
+  badgeText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 0.9 },
+  arabicBadge: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
+  // The play button sits on the cover's lower corner, beside the tile's own tap target.
   play: {
     alignItems: 'center',
     backgroundColor: COLORS.gold,
-    borderRadius: 17,
     boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.4)',
-    height: 34,
     justifyContent: 'center',
     position: 'absolute',
-    width: 34,
   },
-  playRight: { right: 8 },
-  playLeft: { left: 8 },
-  text: { alignItems: 'flex-start', flexDirection: 'row', gap: 6, marginTop: 9 },
+  heart: { position: 'absolute' },
+  heartRight: { right: 0 },
+  heartLeft: { left: 0 },
+  text: { alignItems: 'flex-start', flexDirection: 'row', gap: 6, marginTop: TEXT_GAP },
   rowReverse: { flexDirection: 'row-reverse' },
   titles: { flex: 1, minWidth: 0 },
-  title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '600', lineHeight: 17.5 },
-  subtitle: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
+  title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontWeight: '600' },
+  subtitle: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, marginTop: 2 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });

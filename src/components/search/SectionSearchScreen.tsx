@@ -7,45 +7,55 @@ import {
   Alert,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Icon from '@/components/vine/ui/Icon';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
-import LearningArtwork from '@/components/learning/LearningArtwork';
-import MusicArtwork from '@/components/music/MusicArtwork';
-import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
+import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useAuth } from '@/context/AuthContext';
+import { learningService } from '@/services/learningService';
 import { musicService } from '@/services/musicService';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
 import type { MusicConsumerAsset, MusicConsumerTrack } from '@/types/musicConsumer';
 import type { UnifiedSearchKind, UnifiedSearchResult } from '@/types/unifiedSearch';
-import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { goBack } from '@/utils/navigation';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
+import SearchResultRow from './SearchResultRow';
+
 type SearchSection = 'music' | 'learning';
+type SearchFilter = 'all' | UnifiedSearchKind;
 
 interface SectionSearchScreenProps {
   section: SearchSection;
 }
 
-const MUSIC_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string; fr: string }[] = [
+interface SearchGroup {
+  kind: UnifiedSearchKind;
+  en: string;
+  ar: string;
+  fr: string;
+}
+
+const MUSIC_GROUPS: SearchGroup[] = [
   { kind: 'music_artist', en: 'Artists', ar: 'الفنانون', fr: 'Artistes' },
   { kind: 'music_release', en: 'Albums & Releases', ar: 'الألبومات والإصدارات', fr: 'Albums et parutions' },
   { kind: 'music_track', en: 'Tracks', ar: 'الترانيم', fr: 'Titres' },
 ];
 
-const LEARNING_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string; fr: string }[] = [
+const LEARNING_GROUPS: SearchGroup[] = [
   { kind: 'learning_cantor', en: 'Cantors', ar: 'المعلمون', fr: 'Chantres' },
   { kind: 'learning_hymn', en: 'Hymns', ar: 'الألحان', fr: 'Hymnes' },
   { kind: 'learning_season', en: 'Seasons', ar: 'المواسم', fr: 'Temps liturgiques' },
@@ -53,20 +63,28 @@ const LEARNING_GROUPS: { kind: UnifiedSearchKind; en: string; ar: string; fr: st
   { kind: 'learning_lesson', en: 'Lessons', ar: 'الدروس', fr: 'Leçons' },
 ];
 
-function resultSubtitle(result: UnifiedSearchResult): string | null {
-  if (result.kind === 'music_artist') return result.body;
-  if (result.kind === 'music_release') {
-    return result.metadata.primaryArtist?.displayName ?? result.subtitle;
-  }
-  if (result.kind === 'music_track') {
-    return formatMusicTrackPerformers({ artists: result.metadata.artists }) || null;
-  }
-  if (result.kind === 'learning_cantor') return result.body;
-  if (result.kind === 'learning_album') return result.metadata.cantorName;
-  if (result.kind === 'learning_lesson') {
-    return [result.metadata.lessonSetTitle, result.metadata.cantorName].filter(Boolean).join(' • ');
-  }
-  return result.subtitle ?? result.body;
+/**
+ * On the iPad and desktop these groups take the right-hand column — the
+ * tracks, the lessons — beside the people and releases they belong to
+ * (Coptic Vine design, "Artists and releases left, tracks right").
+ */
+const ASIDE_KINDS: ReadonlySet<UnifiedSearchKind> = new Set(['music_track', 'learning_lesson']);
+
+/** The type filters under the field: All, then one kind of result each. */
+function filtersFor(music: boolean): { key: SearchFilter; label: string }[] {
+  return music
+    ? [
+        { key: 'all', label: tr('All', 'Tout', 'الكل') },
+        { key: 'music_artist', label: tr('Artists', 'Artistes', 'الفنانون') },
+        { key: 'music_release', label: tr('Releases', 'Parutions', 'الإصدارات') },
+        { key: 'music_track', label: tr('Tracks', 'Titres', 'الترانيم') },
+      ]
+    : [
+        { key: 'all', label: tr('All', 'Tout', 'الكل') },
+        { key: 'learning_cantor', label: tr('Cantors', 'Chantres', 'المعلمون') },
+        { key: 'learning_album', label: tr('Albums', 'Albums', 'الألبومات') },
+        { key: 'learning_lesson', label: tr('Lessons', 'Leçons', 'الدروس') },
+      ];
 }
 
 function musicTrackItem(result: Extract<UnifiedSearchResult, { kind: 'music_track' }>): MusicQueueItem {
@@ -87,28 +105,42 @@ function musicTrackItem(result: Extract<UnifiedSearchResult, { kind: 'music_trac
   };
 }
 
+/**
+ * Music's and Learn & Study's search (Coptic Vine design, "Search"): the
+ * field with Back beside it and the type filters under it, then the results
+ * in groups — each a heading drawn out into a vine over rows on cards, the
+ * search's words in gold. On the iPad and desktop the filters sit beside the
+ * field and the tracks or lessons take a column of their own.
+ */
 export default function SectionSearchScreen({ section }: SectionSearchScreenProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const layout = useLayoutMode();
+  const wide = layout !== 'phone';
   const { user } = useAuth();
   const inputRef = useRef<TextInput>(null);
   const { preferences } = useReadingPreferences();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
   const music = section === 'music';
-  const accent = music ? COLORS.gold : COLORS.learning;
-  const accentBright = music ? COLORS.goldBright : COLORS.learningBright;
   const fallback: '/music' | '/learn' = music ? '/music' : '/learn';
   const musicPlayer = useMusicPlayer();
   const learningPlayer = useLearningPlayer();
 
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<SearchFilter>('all');
+  const [focused, setFocused] = useState(false);
   const [results, setResults] = useState<UnifiedSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
+  const [followedArtistIds, setFollowedArtistIds] = useState<Set<string>>(new Set());
   const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
+  const [savedLessonIds, setSavedLessonIds] = useState<Set<string>>(new Set());
+  const [learningAuthenticated, setLearningAuthenticated] = useState(false);
   const [artistFallbackArt, setArtistFallbackArt] = useState<Record<string, MusicConsumerAsset | null>>({});
 
+  // Your library marks the results: the tracks you like, the artists you follow.
   useEffect(() => {
     if (!music) return;
     let active = true;
@@ -117,11 +149,31 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
         if (!active) return;
         setLibraryAuthenticated(library.authenticated);
         setLikedTrackIds(new Set(library.likedTracks.map((track) => track.id)));
+        setFollowedArtistIds(new Set(library.followedArtists.map((artist) => artist.id)));
       })
       .catch(() => {
         if (!active) return;
         setLibraryAuthenticated(false);
         setLikedTrackIds(new Set());
+        setFollowedArtistIds(new Set());
+      });
+    return () => { active = false; };
+  }, [locale, music, user?.id]);
+
+  // My Learning marks the lessons already saved to one of its lists.
+  useEffect(() => {
+    if (music) return;
+    let active = true;
+    learningService.getItemLibrary(locale)
+      .then((library) => {
+        if (!active) return;
+        setLearningAuthenticated(library.authenticated);
+        setSavedLessonIds(new Set(library.items.filter((item) => item.itemKind === 'lesson').map((item) => item.itemId)));
+      })
+      .catch(() => {
+        if (!active) return;
+        setLearningAuthenticated(false);
+        setSavedLessonIds(new Set());
       });
     return () => { active = false; };
   }, [locale, music, user?.id]);
@@ -190,12 +242,13 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   const grouped = useMemo(() => {
     const groups = music ? MUSIC_GROUPS : LEARNING_GROUPS;
     return groups
+      .filter((group) => filter === 'all' || group.kind === filter)
       .map((group) => ({
         ...group,
         results: results.filter((result) => result.kind === group.kind),
       }))
       .filter((group) => group.results.length > 0);
-  }, [music, results]);
+  }, [filter, music, results]);
 
   const changeQuery = (value: string) => {
     setQuery(value);
@@ -223,6 +276,27 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
       Alert.alert(
         tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
         cause instanceof Error ? cause.message : 'Unable to update Liked Songs.',
+      );
+    }
+  };
+
+  /** A lesson's bookmark: into My Learning's Will Learn list. */
+  const saveLesson = async (lessonId: string) => {
+    if (!learningAuthenticated) {
+      Alert.alert(
+        tr('Sign in required', 'Connexion requise', 'تسجيل الدخول مطلوب'),
+        tr('Sign in to save learning progress and playlists.', 'Connectez-vous pour enregistrer votre progression et vos playlists.', 'سجّل الدخول لحفظ تقدّمك وقوائم التعلّم.'),
+      );
+      return;
+    }
+    if (savedLessonIds.has(lessonId)) return;
+    try {
+      await learningService.setItemProgress('lesson', lessonId, 'will_learn');
+      setSavedLessonIds((current) => new Set(current).add(lessonId));
+    } catch (cause) {
+      Alert.alert(
+        tr('My Learning', 'Mon apprentissage', 'تعلّمي'),
+        cause instanceof Error ? cause.message : 'Unable to update My Learning.',
       );
     }
   };
@@ -285,146 +359,208 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     }
   };
 
-  const openTrackPage = (result: Extract<UnifiedSearchResult, { kind: 'music_track' }>) => {
-    router.push({ pathname: '/music/track/[id]', params: { id: result.entityId } });
-  };
-
   const hasQuery = Boolean(query.trim());
+  const filters = filtersFor(music);
+  const searchLabel = music
+    ? tr('Search Music', 'Rechercher de la musique', 'بحث في الترانيم')
+    : tr('Search Learn & Study', 'Rechercher dans Apprendre', 'بحث في التعلّم');
+
+  const renderGroup = (group: SearchGroup & { results: UnifiedSearchResult[] }) => (
+    <View key={group.kind}>
+      <SectionHeading title={tr(group.en, group.fr, group.ar)} arabic={isArabic} />
+      <View style={[styles.rows, !wide && styles.rowsPhone]}>
+        {group.results.map((result) => (
+          <SearchResultRow
+            key={result.kind + ':' + result.entityId}
+            result={result}
+            query={query}
+            arabic={isArabic}
+            active={
+              result.kind === 'music_track'
+                ? musicPlayer.currentItem?.track.id === result.entityId
+                : result.kind === 'learning_lesson'
+                  ? learningPlayer.currentItem?.id === result.entityId
+                  : false
+            }
+            following={result.kind === 'music_artist' && followedArtistIds.has(result.entityId)}
+            fallbackArt={artistFallbackArt[result.entityId] ?? null}
+            saved={
+              result.kind === 'music_track'
+                ? likedTrackIds.has(result.entityId)
+                : result.kind === 'learning_lesson' && savedLessonIds.has(result.entityId)
+            }
+            queueItem={result.kind === 'music_track' ? musicTrackItem(result) : undefined}
+            onPress={() => openResult(result)}
+            onTitlePress={result.kind === 'music_track'
+              ? () => router.push({ pathname: '/music/track/[id]', params: { id: result.entityId } })
+              : undefined}
+            onToggleSaved={result.kind === 'music_track'
+              ? () => void toggleTrackLike(result.entityId)
+              : result.kind === 'learning_lesson'
+                ? () => void saveLesson(result.entityId)
+                : undefined}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
+  const mainGroups = grouped.filter((group) => !ASIDE_KINDS.has(group.kind));
+  const asideGroups = grouped.filter((group) => ASIDE_KINDS.has(group.kind));
+
+  const field = (
+    <View style={[styles.field, focused && styles.fieldFocused, isArabic && styles.rowReverse]}>
+      <Icon name="search-outline" size={19} color={COLORS.gold} />
+      <TextInput
+        ref={inputRef}
+        accessibilityLabel={searchLabel}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoFocus
+        clearButtonMode="never"
+        onBlur={() => setFocused(false)}
+        onChangeText={changeQuery}
+        onFocus={() => setFocused(true)}
+        placeholder={music
+          ? tr('Artists, albums and tracks', 'Artistes, albums et titres', 'فنان أو ألبوم أو ترنيمة')
+          : tr('Cantors, hymns, albums and lessons', 'Chantres, hymnes, albums et leçons', 'معلّم أو لحن أو ألبوم أو درس')}
+        placeholderTextColor={`${COLORS.muted}8C`}
+        returnKeyType="search"
+        selectionColor={COLORS.gold}
+        style={[styles.input, Platform.OS === 'web' && styles.inputWeb, isArabic && styles.arabic]}
+        value={query}
+      />
+      {query ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={tr('Clear search', 'Effacer la recherche', 'مسح البحث')}
+          hitSlop={8}
+          onPress={() => {
+            changeQuery('');
+            inputRef.current?.focus();
+          }}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <Icon name="close-circle" size={19} color={COLORS.muted} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  const chipButtons = filters.map((entry) => {
+    const selected = entry.key === filter;
+    return (
+      <Pressable
+        key={entry.key}
+        accessibilityRole="radio"
+        aria-checked={selected}
+        onPress={() => setFilter(entry.key)}
+        style={({ pressed }) => [styles.chip, selected && styles.chipOn, pressed && styles.pressed]}
+      >
+        <Text style={[styles.chipText, selected && styles.chipTextOn, isArabic && styles.arabicFont]} maxFontSizeMultiplier={1.3}>
+          {entry.label}
+        </Text>
+      </Pressable>
+    );
+  });
+
+  // On a phone the filters scroll sideways if a language's names run long;
+  // beside the iPad's and desktop's field they always fit.
+  const chips = wide ? (
+    <View accessibilityRole="radiogroup" style={[styles.chips, isArabic && styles.rowReverse]}>{chipButtons}</View>
+  ) : (
+    <ScrollView
+      horizontal
+      accessibilityRole="radiogroup"
+      keyboardShouldPersistTaps="handled"
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={[styles.chips, styles.chipsPhone, isArabic && styles.rowReverse]}
+    >
+      {chipButtons}
+    </ScrollView>
+  );
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
         <title>{music ? 'Search Music' : 'Search Learn & Study'}</title>
       </Head>
+      {/* The glow stays put behind the field while the results scroll under it. */}
+      <PageGlow kind="green" tall={wide} />
 
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={tr('Back', 'Retour', 'رجوع')}
-          onPress={() => goBack(router, fallback)}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-        >
-          <Icon name="chevron-back" size={23} color={COLORS.white} />
-        </Pressable>
-
-        <View style={[
-          styles.searchBox,
-          { borderColor: music ? 'rgba(227, 181, 59,0.34)' : 'rgba(151,126,216,0.38)' },
-        ]}>
-          <Icon name="search-outline" size={19} color={COLORS.muted} />
-          <TextInput
-            ref={inputRef}
-            accessibilityLabel={music
-              ? (tr('Search Music', 'Rechercher de la musique', 'بحث في الترانيم'))
-              : (tr('Search Learn & Study', 'Rechercher dans Apprendre', 'بحث في التعلّم'))}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoFocus
-            clearButtonMode={Platform.OS === 'ios' ? 'while-editing' : 'never'}
-            onChangeText={changeQuery}
-            placeholder={music
-              ? (tr('Artists, albums, and tracks', 'Artistes, albums et titres', 'فنان أو ألبوم أو ترنيمة'))
-              : (tr('Cantors, hymns, albums, and lessons', 'Chantres, hymnes, albums et leçons', 'معلّم أو لحن أو درس'))}
-            placeholderTextColor="rgba(201,211,220,0.52)"
-            returnKeyType="search"
-            selectionColor={accent}
-            style={[
-              styles.input,
-              Platform.OS === 'web' && styles.inputWeb,
-              isArabic && styles.arabic,
-            ]}
-            value={query}
-          />
-          {query && Platform.OS !== 'ios' ? (
+      {wide ? (
+        <View style={[styles.topWide, { paddingTop: insets.top + 28 }, isArabic && styles.rowReverse]}>
+          {field}
+          {chips}
+        </View>
+      ) : (
+        <View style={{ paddingTop: insets.top + 4 }}>
+          <View style={[styles.bar, isArabic && styles.rowReverse]}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={tr('Clear search', 'Effacer la recherche', 'مسح البحث')}
-              onPress={() => {
-                changeQuery('');
-                inputRef.current?.focus();
-              }}
-              style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+              accessibilityLabel={tr('Back', 'Retour', 'رجوع')}
+              hitSlop={4}
+              onPress={() => goBack(router, fallback)}
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
             >
-              <Icon name="close" size={14} color={COLORS.muted} />
+              <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={20} color={COLORS.gold} />
             </Pressable>
-          ) : null}
+            {field}
+          </View>
+          {chips}
         </View>
-      </View>
+      )}
 
       <NowPlayingAwareScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={[styles.content, wide && styles.contentWide]}
         showsVerticalScrollIndicator={false}
       >
-        {!hasQuery ? (
-          <View style={styles.emptyState}>
-            <View style={[styles.emptySearchIcon, { borderColor: accent, backgroundColor: music ? COLORS.goldSoft : COLORS.learningSoft }]}>
-              <Icon name="search-outline" size={28} color={accentBright} />
+        <PageGutterProvider gutter={wide ? 0 : 16}>
+          {!hasQuery ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <Icon name="search" size={30} color={COLORS.gold} />
+              </View>
+              <Text style={[styles.emptyTitle, isArabic && styles.arabicFont]} maxFontSizeMultiplier={1.3}>
+                {music
+                  ? tr('Search Music', 'Rechercher de la musique', 'ابحث في الترانيم')
+                  : tr('Search Learn & Study', 'Rechercher dans Apprendre', 'ابحث في التعلّم')}
+              </Text>
+              <Text style={[styles.emptyBody, isArabic && styles.arabicFont]} maxFontSizeMultiplier={1.3}>
+                {music
+                  ? tr('Find an artist, album, EP, single or track.', 'Trouvez un artiste, un album, un EP, un single ou un titre.', 'ابحث عن فنان أو ألبوم أو ترنيمة.')
+                  : tr('Find a cantor, hymn, season, album or lesson.', 'Trouvez un chantre, une hymne, un temps liturgique, un album ou une leçon.', 'ابحث عن معلّم أو لحن أو ألبوم أو درس.')}
+              </Text>
             </View>
-            <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>
-              {music
-                ? (tr('Search Music', 'Rechercher de la musique', 'ابحث في الترانيم'))
-                : (tr('Search Learn & Study', 'Rechercher dans Apprendre', 'ابحث في التعلّم'))}
-            </Text>
-            <Text style={[styles.emptyBody, isArabic && styles.arabic]}>
-              {music
-                ? (tr('Find an artist, album, EP, single, or track.', 'Trouvez un artiste, un album, un EP, un single ou un titre.', 'ابحث عن فنان أو ألبوم أو ترنيمة.'))
-                : (tr('Find a cantor, hymn, season, album, or lesson.', 'Trouvez un chantre, une hymne, un temps liturgique, un album ou une leçon.', 'ابحث عن معلّم أو لحن أو ألبوم أو درس.'))}
-            </Text>
-          </View>
-        ) : null}
+          ) : null}
 
-        {loading ? <ActivityIndicator color={accent} style={styles.loader} /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          {loading ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {hasQuery && !loading && !error && results.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>
-              {tr('No results', 'Aucun résultat', 'لا توجد نتائج')}
-            </Text>
-            <Text style={[styles.emptyBody, isArabic && styles.arabic]}>
-              {tr('Try another spelling or a shorter search.', 'Essayez une autre orthographe ou une recherche plus courte.', 'جرّب تهجئة مختلفة أو كلمة أقصر.')}
-            </Text>
-          </View>
-        ) : null}
-
-        {!loading && grouped.map((group) => (
-          <View key={group.kind} style={styles.group}>
-            <Text style={[styles.groupTitle, { color: accentBright }, isArabic && styles.arabic]}>
-              {tr(group.en, group.fr, group.ar)}
-            </Text>
-            <View style={styles.resultCard}>
-              {group.results.map((result, index) => (
-                <SearchResultRow
-                  key={result.kind + ':' + result.entityId}
-                  result={result}
-                  music={music}
-                  active={
-                    result.kind === 'music_track'
-                      ? musicPlayer.currentItem?.track.id === result.entityId
-                      : result.kind === 'learning_lesson'
-                        ? learningPlayer.currentItem?.id === result.entityId
-                        : false
-                  }
-                  playing={
-                    result.kind === 'music_track'
-                      ? musicPlayer.currentItem?.track.id === result.entityId && musicPlayer.playing
-                      : result.kind === 'learning_lesson'
-                        ? learningPlayer.currentItem?.id === result.entityId && learningPlayer.playing
-                        : false
-                  }
-                  liked={result.kind === 'music_track' && likedTrackIds.has(result.entityId)}
-                  isArabic={isArabic}
-                  artistFallbackArt={artistFallbackArt[result.entityId] ?? null}
-                  isLast={index === group.results.length - 1}
-                  onPress={() => openResult(result)}
-                  onTrackTitlePress={result.kind === 'music_track' ? () => openTrackPage(result) : undefined}
-                  onToggleLike={result.kind === 'music_track' ? () => void toggleTrackLike(result.entityId) : undefined}
-                />
-              ))}
+          {hasQuery && !loading && !error && grouped.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyTitle, isArabic && styles.arabicFont]} maxFontSizeMultiplier={1.3}>
+                {tr('No results', 'Aucun résultat', 'لا توجد نتائج')}
+              </Text>
+              <Text style={[styles.emptyBody, isArabic && styles.arabicFont]} maxFontSizeMultiplier={1.3}>
+                {results.length
+                  ? tr('Nothing of this kind matches. Try All.', 'Rien de ce type ne correspond. Essayez Tout.', 'لا توجد نتائج من هذا النوع. جرّب الكل.')
+                  : tr('Try another spelling or a shorter search.', 'Essayez une autre orthographe ou une recherche plus courte.', 'جرّب تهجئة مختلفة أو كلمة أقصر.')}
+              </Text>
             </View>
-          </View>
-        ))}
+          ) : null}
+
+          {!loading && grouped.length ? (
+            wide && mainGroups.length && asideGroups.length ? (
+              <View style={[styles.columns, isArabic && styles.rowReverse]}>
+                <View style={styles.column}>{mainGroups.map(renderGroup)}</View>
+                <View style={styles.column}>{asideGroups.map(renderGroup)}</View>
+              </View>
+            ) : grouped.map(renderGroup)
+          ) : null}
+        </PageGutterProvider>
       </NowPlayingAwareScrollView>
 
       <BottomTabBar active={music ? 'music' : 'learn'} />
@@ -432,217 +568,78 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   );
 }
 
-function SearchResultRow({
-  result,
-  music,
-  active,
-  playing,
-  liked,
-  isArabic,
-  artistFallbackArt,
-  isLast,
-  onPress,
-  onTrackTitlePress,
-  onToggleLike,
-}: {
-  result: UnifiedSearchResult;
-  music: boolean;
-  active: boolean;
-  playing: boolean;
-  liked: boolean;
-  isArabic: boolean;
-  artistFallbackArt: MusicConsumerAsset | null;
-  isLast: boolean;
-  onPress: () => void;
-  onTrackTitlePress?: () => void;
-  onToggleLike?: () => void;
-}) {
-  const subtitle = resultSubtitle(result);
-  const accent = music ? COLORS.goldBright : COLORS.learningBright;
-
-  let artwork = null;
-  if (result.kind === 'music_artist') {
-    artwork = (
-      <MusicArtwork
-        asset={result.metadata.profileImageAsset ?? artistFallbackArt}
-        size={56}
-        rounded
-        label={result.title}
-      />
-    );
-  } else if (result.kind === 'music_release') {
-    artwork = <MusicArtwork asset={result.metadata.coverAsset} size={56} radius={9} label={result.title} />;
-  } else if (result.kind === 'music_track') {
-    artwork = <MusicArtwork asset={result.metadata.coverAsset} size={56} radius={9} label={result.metadata.releaseTitle ?? result.title} />;
-  } else if (result.kind === 'learning_cantor') {
-    artwork = <LearningArtwork asset={result.metadata.profileImageAsset} size={56} rounded label={result.title} />;
-  } else if (result.kind === 'learning_album' || result.kind === 'learning_lesson') {
-    artwork = <LearningArtwork asset={result.metadata.coverAsset} size={56} radius={9} label={result.title} />;
-  } else {
-    artwork = <LearningArtwork asset={null} size={56} radius={9} label={result.title} />;
-  }
-
-  const track = result.kind === 'music_track' ? result : null;
-  const audioLesson = result.kind === 'learning_lesson' && result.metadata.mediaType === 'audio';
-  const playable = Boolean(track || audioLesson);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.resultRow,
-        active && (music ? styles.musicActive : styles.learningActive),
-        !isLast && styles.resultDivider,
-        pressed && styles.rowPressed,
-      ]}
-    >
-      <View style={styles.artwork}>{artwork}</View>
-
-      <View style={styles.resultInfo}>
-        {track ? (
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={'Open ' + track.title}
-            onPress={(event) => {
-              event.stopPropagation();
-              onTrackTitlePress?.();
-            }}
-            style={({ pressed }) => pressed && styles.titlePressed}
-          >
-            <Text numberOfLines={1} style={styles.trackIdentity}>
-              <Text style={[styles.trackTitle, active && { color: accent }]}>{track.title}</Text>
-              {track.metadata.releaseTitle ? (
-                <Text style={styles.trackAlbum}> — {track.metadata.releaseTitle}</Text>
-              ) : null}
-            </Text>
-          </Pressable>
-        ) : (
-          <Text numberOfLines={1} style={[styles.resultTitle, active && { color: accent }]}>{result.title}</Text>
-        )}
-
-        {subtitle ? <Text numberOfLines={1} style={styles.resultSubtitle}>{subtitle}</Text> : null}
-
-        {result.kind === 'music_release' ? (
-          <Text numberOfLines={1} style={styles.tertiary}>
-            {[result.metadata.releaseType === 'ep' ? 'EP' : result.metadata.releaseType === 'album' ? 'Album' : 'Single', result.metadata.releaseDate?.slice(0, 4)]
-              .filter(Boolean)
-              .join(' • ')}
-          </Text>
-        ) : null}
-      </View>
-
-      {track && onToggleLike ? (
-        <Pressable
-          accessible={false}
-          accessibilityLabel={liked ? 'Unlike track' : 'Like track'}
-          onPress={(event) => {
-            event.stopPropagation();
-            onToggleLike();
-          }}
-          style={({ pressed }) => [styles.iconAction, pressed && styles.pressed]}
-        >
-          <Icon name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? COLORS.goldBright : COLORS.muted} />
-        </Pressable>
-      ) : null}
-
-      {track ? <MusicTrackActionsMenu item={musicTrackItem(track)} isArabic={isArabic} size={36} /> : null}
-
-      {playable ? (
-        <View style={[styles.playAction, { backgroundColor: music ? COLORS.goldSoft : COLORS.learningSoft }]}>
-          <Icon name={playing ? 'pause' : 'play'} size={16} color={accent} />
-        </View>
-      ) : (
-        <Icon name="chevron-forward" size={18} color={COLORS.muted} />
-      )}
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
-  },
+  rowReverse: { flexDirection: 'row-reverse' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicFont: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  pressed: { opacity: 0.65 },
+
+  // The phone's top: Back beside the field, 16 in from the edges.
+  bar: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingHorizontal: 16 },
   backButton: {
-    width: 42,
-    height: 42,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-  },
-  searchBox: {
-    flex: 1,
-    minWidth: 0,
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.085)',
-    borderWidth: 1,
-  },
-  input: {
-    flex: 1,
-    minWidth: 0,
     height: 42,
-    paddingVertical: 0,
+    justifyContent: 'center',
+    width: 42,
+  },
+  // The iPad's and desktop's top: the field, the filters beside it.
+  topWide: { alignItems: 'center', flexDirection: 'row', gap: 18, paddingHorizontal: 36 },
+  field: {
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    // A 2pt ring that turns gold while you type; transparent until then so the field never shifts.
+    borderColor: 'transparent',
+    borderRadius: 14,
+    borderWidth: 2,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+    height: 46,
+    minWidth: 0,
+    paddingLeft: 12,
+    paddingRight: 10,
+  },
+  fieldFocused: { borderColor: COLORS.gold },
+  input: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
     color: COLORS.white,
+    flex: 1,
     fontFamily: TYPOGRAPHY.body,
     fontSize: 16,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
+    height: 42,
+    minWidth: 0,
+    paddingVertical: 0,
   },
+  // The browser's own focus outline gives way to the field's gold ring.
   inputWeb: {
     outlineStyle: 'none',
     outlineWidth: 0,
     boxShadow: 'none',
-  } as any,
-  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
-  clearButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.09)',
-  },
-  content: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 36 },
+  } as object,
+
+  chips: { flexDirection: 'row', gap: 8 },
+  chipsPhone: { paddingHorizontal: 16, paddingTop: 14 },
+  chip: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 99, height: 34, justifyContent: 'center', paddingHorizontal: 15 },
+  chipOn: { backgroundColor: COLORS.gold },
+  chipText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
+  chipTextOn: { color: COLORS.greenDeep },
+
+  content: { paddingBottom: 28 },
+  contentWide: { paddingHorizontal: 36 },
   loader: { marginTop: 28 },
-  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center', padding: SPACING.xl },
-  emptyState: { alignItems: 'center', paddingHorizontal: 24, paddingVertical: 58 },
-  emptySearchIcon: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 20, fontWeight: '700', marginTop: 16, textAlign: 'center' },
-  emptyBody: { maxWidth: 440, color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: 'center' },
-  group: { marginBottom: 20 },
-  groupTitle: { fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '800', marginHorizontal: 4, marginBottom: 8 },
-  resultCard: { overflow: 'hidden', borderRadius: 16, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  resultRow: { minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 10, paddingVertical: 9 },
-  resultDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
-  rowPressed: { backgroundColor: 'rgba(255,255,255,0.055)' },
-  musicActive: { backgroundColor: COLORS.goldSoft },
-  learningActive: { backgroundColor: COLORS.learningSoft },
-  artwork: { width: 56, height: 56 },
-  resultInfo: { flex: 1, minWidth: 0 },
-  resultTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
-  trackIdentity: { fontFamily: TYPOGRAPHY.body, fontSize: 15, lineHeight: 20 },
-  trackTitle: { color: COLORS.white, fontWeight: '800' },
-  trackAlbum: { color: COLORS.muted, fontWeight: '400' },
-  titlePressed: { opacity: 0.65 },
-  resultSubtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 4 },
-  tertiary: { color: 'rgba(201,211,220,0.55)', fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3 },
-  iconAction: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  playAction: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  pressed: { opacity: 0.65, transform: [{ scale: 0.94 }] },
+  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, padding: 32, textAlign: 'center' },
+
+  emptyState: { alignItems: 'center', paddingHorizontal: 40, paddingTop: 78 },
+  emptyIcon: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 36, height: 72, justifyContent: 'center', width: 72 },
+  emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700', marginTop: 18, textAlign: 'center' },
+  emptyBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, marginTop: 6, maxWidth: 440, textAlign: 'center' },
+
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
+  column: { flex: 1, minWidth: 0 },
+  rows: { gap: 6 },
+  rowsPhone: { marginHorizontal: 16 },
 });

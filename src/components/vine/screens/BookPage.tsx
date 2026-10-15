@@ -373,20 +373,21 @@ const styles = StyleSheet.create({
   },
 
   hero: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 24 },
+  // 52pt inside its hairline, 54 across.
   medallion: {
     alignItems: 'center',
     backgroundColor: COLORS.goldSoft,
     borderColor: 'rgba(227, 181, 59, 0.35)',
-    borderRadius: 26,
+    borderRadius: 27,
     borderWidth: 1,
     boxShadow: '0px 0px 30px rgba(227, 181, 59, 0.22)',
-    height: 52,
+    height: 54,
     justifyContent: 'center',
-    width: 52,
+    width: 54,
   },
   kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 2.2, marginTop: 12, textAlign: 'center' },
   kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13.5, letterSpacing: 0 },
-  title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 36, fontWeight: '700', lineHeight: 40, marginTop: 6, textAlign: 'center' },
+  title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 36, fontWeight: '700', lineHeight: 38, marginTop: 6, textAlign: 'center' },
   titleArabic: { fontFamily: TYPOGRAPHY.arabic, lineHeight: 52, writingDirection: 'rtl' },
   subtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, marginTop: 8, textAlign: 'center' },
 
@@ -394,20 +395,22 @@ const styles = StyleSheet.create({
   sectionTitle: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700' },
 
   rows: { gap: 8 },
+  // A row is 60pt with its name alone, 70 beside an icon. Its hairline is
+  // kept but clear: the cards carry no outline, only their surface.
   row: {
     alignItems: 'center',
     backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
+    borderColor: 'transparent',
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 14,
-    minHeight: 58,
+    minHeight: 60,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   rowPressed: { backgroundColor: COLORS.surfaceSoft },
-  rowIcon: { alignItems: 'flex-start', width: 32 },
+  rowIcon: { alignItems: 'flex-start', height: 40, justifyContent: 'center', width: 32 },
   rowIconArabic: { alignItems: 'flex-end' },
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700' },

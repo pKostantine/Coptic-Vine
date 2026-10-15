@@ -24,3 +24,4 @@ class WebDownloadManager implements OfflineDownloadManager {
   resolvePlaybackUri(_playableKind: PlaybackEntityKind, _playableId: string, remoteUri?: string | null): Promise<string | null> { return Promise.resolve(remoteUri?.trim() || null); }
 }
 export const downloadManager: OfflineDownloadManager = new WebDownloadManager();
+export async function getDownloadPackageDetails(_packageKey: string): Promise<{ artworkUri: string | null; mediaCount: number }> { return { artworkUri: null, mediaCount: 0 }; }

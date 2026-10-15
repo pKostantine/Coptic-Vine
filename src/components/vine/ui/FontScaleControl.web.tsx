@@ -5,6 +5,7 @@ import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { toEasternArabicDigits } from '@/utils/localeFormat';
 import { MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
 import type { FontScaleControlProps } from './FontScaleControl';
+import Icon from './Icon';
 
 const THUMB = 24;
 
@@ -12,13 +13,43 @@ const THUMB = 24;
  * Web font-size control (Coptic Vine design, "Book settings"): the setting's
  * name and its value, then a gold track between a small A and a large one. A
  * click on the track sets the size there; the keyboard and a screen reader
- * step it. Keeping @expo/ui's slider off this path also keeps it out of the
+ * step it. On a desktop it is a plain row instead, the value between − and +
+ * buttons. Keeping @expo/ui's slider off this path also keeps it out of the
  * web bundle. The native build gets FontScaleControl.tsx.
  */
-export default function FontScaleControl({ fontScale, isArabic, label, onStep, onSetValue }: FontScaleControlProps) {
+export default function FontScaleControl({ fontScale, isArabic, label, onStep, onSetValue, compact = false, stepper = false }: FontScaleControlProps) {
   const [width, setWidth] = useState(0);
   const steps = MAX_FONT_SCALE - MIN_FONT_SCALE;
   const fraction = (fontScale - MIN_FONT_SCALE) / steps;
+  const value = isArabic ? toEasternArabicDigits(fontScale) : fontScale;
+
+  if (stepper) {
+    const stepButton = (delta: 1 | -1) => {
+      const atEnd = delta < 0 ? fontScale <= MIN_FONT_SCALE : fontScale >= MAX_FONT_SCALE;
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={delta < 0 ? 'Decrease font size' : 'Increase font size'}
+          accessibilityState={{ disabled: atEnd }}
+          disabled={atEnd}
+          onPress={() => onStep(delta)}
+          style={({ pressed }) => [styles.stepButton, atEnd && styles.stepButtonDisabled, pressed && styles.stepButtonPressed]}
+        >
+          <Icon name={delta < 0 ? 'remove' : 'add'} size={17} color={COLORS.gold} />
+        </Pressable>
+      );
+    };
+    return (
+      <View style={[styles.stepperRow, isArabic && styles.rowReverse]}>
+        <Text style={[styles.label, styles.stepperLabel, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{label}</Text>
+        <View style={styles.stepper}>
+          {stepButton(-1)}
+          <Text style={styles.stepperValue} maxFontSizeMultiplier={1.3}>{value}</Text>
+          {stepButton(1)}
+        </View>
+      </View>
+    );
+  }
 
   const setFromPoint = (event: GestureResponderEvent) => {
     if (width <= 0) return;
@@ -27,11 +58,11 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
   };
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, compact && styles.cardCompact]}>
       <View style={[styles.header, isArabic && styles.rowReverse]}>
         <Text style={[styles.label, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{label}</Text>
         <Text style={[styles.value, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>
-          {isArabic ? toEasternArabicDigits(fontScale) : fontScale}
+          {value}
         </Text>
       </View>
       <View style={styles.row}>
@@ -63,6 +94,16 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
 
 const styles = StyleSheet.create({
   card: { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, gap: 10, paddingBottom: 13, paddingHorizontal: 16, paddingTop: 11 },
+  // The phone sheet's tighter row.
+  cardCompact: { paddingBottom: 11, paddingTop: 9 },
+  // The desktop's row: as tall as the switches under it, the stepper at its end.
+  stepperRow: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, flexDirection: 'row', gap: 10, minHeight: 44, paddingLeft: 16, paddingRight: 10 },
+  stepperLabel: { flex: 1, minWidth: 0 },
+  stepper: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  stepButton: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
+  stepButtonPressed: { opacity: 0.7 },
+  stepButtonDisabled: { opacity: 0.4 },
+  stepperValue: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '700', minWidth: 30, textAlign: 'center' },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   rowReverse: { flexDirection: 'row-reverse' },
   label: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },

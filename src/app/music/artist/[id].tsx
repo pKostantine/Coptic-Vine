@@ -18,6 +18,7 @@ import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { usePlayRelease } from '@/hooks/usePlayRelease';
+import { useReleaseLikes } from '@/hooks/useReleaseLikes';
 import { musicService } from '@/services/musicService';
 import type { MusicArtistLink, MusicConsumerArtist, MusicConsumerAsset, MusicConsumerReleaseSummary } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
@@ -52,10 +53,14 @@ function releaseLine(release: MusicConsumerReleaseSummary): string {
   return [release.releaseDate?.slice(0, 4), kind].filter(Boolean).join(' · ');
 }
 
+/** The iPad's and desktop's releases: covers about 200pt wide, 22pt apart, as on the Music tab. */
+const GRID_GAP = 22;
+
 /**
  * An artist (Coptic Vine design, "Artist"): their photo glowing out of the
  * page, their name and bio, Follow and Share, the places they publish, then
- * their releases as covers.
+ * their releases as covers, each with a heart. The iPad and desktop set the
+ * photo beside the name.
  */
 export default function MusicArtistScreen() {
   const router = useRouter();
@@ -69,13 +74,15 @@ export default function MusicArtistScreen() {
   const width = useContentWidth();
   const wide = layout !== 'phone';
   const { play, isPlaying } = usePlayRelease(locale);
+  // Likes come from the listener's library, which also says whether they can follow.
+  const likes = useReleaseLikes(locale);
+  const libraryAuthenticated = likes.authenticated;
   const [artist, setArtist] = useState<MusicConsumerArtist | null>(null);
   const [links, setLinks] = useState<{ id: string; links: MusicArtistLink[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [followed, setFollowed] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
-  const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
   const [shareArtwork, setShareArtwork] = useState<MusicConsumerAsset | null>(null);
   const [shareArtworkLoaded, setShareArtworkLoaded] = useState(false);
 
@@ -102,22 +109,11 @@ export default function MusicArtistScreen() {
   useEffect(() => {
     if (!artistId) return;
     let active = true;
-    Promise.all([
-      musicService.getArtistFollowed(artistId),
-      musicService.getLibrary(locale),
-    ])
-      .then(([isFollowed, library]) => {
-        if (!active) return;
-        setFollowed(isFollowed);
-        setLibraryAuthenticated(library.authenticated);
-      })
-      .catch(() => {
-        if (!active) return;
-        setFollowed(false);
-        setLibraryAuthenticated(false);
-      });
+    musicService.getArtistFollowed(artistId)
+      .then((isFollowed) => { if (active) setFollowed(isFollowed); })
+      .catch(() => { if (active) setFollowed(false); });
     return () => { active = false; };
-  }, [artistId, locale, user?.id]);
+  }, [artistId, user?.id]);
 
   useEffect(() => {
     if (!artist || artist.profileImageAsset || shareArtworkLoaded) return;
@@ -172,10 +168,12 @@ export default function MusicArtistScreen() {
 
   const shareImageUrl = musicService.resolveAsset(shareImageAsset);
   const artistLinks = artist?.socialLinks?.length ? artist.socialLinks : links && links.id === artistId ? links.links : [];
-  const gutter = wide ? 0 : 16;
+  // The iPad's and desktop's 36pt margins are the sections' gutter, the hero's glow running past them to the edges.
+  const gutter = wide ? 36 : 16;
   const available = width - (wide ? 72 : 32);
-  const columns = wide ? Math.max(3, Math.floor((available + 12) / 172)) : 2;
-  const tileWidth = Math.floor((available - 12 * (columns - 1)) / columns);
+  const gap = wide ? GRID_GAP : 12;
+  const columns = wide ? Math.max(3, Math.floor((available + GRID_GAP) / (200 + GRID_GAP))) : 2;
+  const tileWidth = Math.floor((available - gap * (columns - 1)) / columns);
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -202,7 +200,7 @@ export default function MusicArtistScreen() {
           )}
         </View>
       ) : (
-        <NowPlayingAwareScrollView contentContainerStyle={[styles.content, wide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <PageGutterProvider gutter={gutter}>
             <PersonHero
               name={artist.displayName}
@@ -214,7 +212,7 @@ export default function MusicArtistScreen() {
               onBack={() => goBack(router, '/music')}
               backLabel={tr('Go back', 'Retour', 'رجوع')}
             >
-              <View style={[styles.actions, arabic && styles.rowReverse]}>
+              <View style={[styles.actions, wide && styles.actionsWide, arabic && styles.rowReverse]}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ selected: followed }}
@@ -238,16 +236,16 @@ export default function MusicArtistScreen() {
                 </Pressable>
               </View>
               {artistLinks.length ? (
-                <View style={[styles.links, wide && (arabic ? styles.linksEnd : styles.linksStart), arabic && styles.rowReverse]}>
+                <View style={[styles.links, wide && styles.linksWide, wide && (arabic ? styles.linksEnd : styles.linksStart), arabic && styles.rowReverse]}>
                   {artistLinks.map((link) => (
                     <Pressable
                       key={link.id ?? `${link.platform}:${link.url}`}
                       accessibilityRole="link"
                       accessibilityLabel={linkName(link)}
                       onPress={() => openLink(link)}
-                      style={({ pressed }) => [styles.link, pressed && styles.linkPressed]}
+                      style={({ pressed }) => [styles.link, wide && styles.linkWide, pressed && styles.linkPressed]}
                     >
-                      <BrandIcon name={link.platform} size={19} color={COLORS.gold} />
+                      <BrandIcon name={link.platform} size={wide ? 19 : 16} color={COLORS.gold} />
                     </Pressable>
                   ))}
                 </View>
@@ -256,23 +254,30 @@ export default function MusicArtistScreen() {
 
             <SectionHeading title={tr('Releases', 'Parutions', 'الإصدارات')} arabic={arabic} />
             {artist.releases.length ? (
-              <View style={[styles.grid, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
-                {artist.releases.map((release) => (
-                  <ReleaseTile
-                    key={release.id}
-                    id={release.id}
-                    title={release.title}
-                    subtitle={releaseLine(release)}
-                    artworkUri={musicService.resolveAsset(release.coverAsset)}
-                    width={tileWidth}
-                    arabic={arabic}
-                    wrapTitle
-                    onPress={() => router.push(`/music/release/${release.id}`)}
-                    onPlay={() => play(release)}
-                    playLabel={`${isPlaying(release.id) ? tr('Pause', 'Pause', 'إيقاف مؤقت') : tr('Play', 'Lire', 'تشغيل')}: ${release.title}`}
-                    trailing={<Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.muted} />}
-                  />
-                ))}
+              <View style={[styles.grid, { gap, paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+                {artist.releases.map((release) => {
+                  const liked = likes.isLiked(release.id);
+                  return (
+                    <ReleaseTile
+                      key={release.id}
+                      id={release.id}
+                      title={release.title}
+                      subtitle={releaseLine(release)}
+                      artworkUri={musicService.resolveAsset(release.coverAsset)}
+                      width={tileWidth}
+                      arabic={arabic}
+                      wrapTitle
+                      large={wide}
+                      onPress={() => router.push(`/music/release/${release.id}`)}
+                      onPlay={() => play(release)}
+                      playing={isPlaying(release.id)}
+                      playLabel={`${isPlaying(release.id) ? tr('Pause', 'Pause', 'إيقاف مؤقت') : tr('Play', 'Lire', 'تشغيل')}: ${release.title}`}
+                      liked={liked}
+                      onToggleLike={() => likes.toggle(release.id)}
+                      likeLabel={`${liked ? tr('Unlike release', 'Retirer des favoris', 'إزالة الإعجاب') : tr('Like release', 'Ajouter aux favoris', 'إعجاب')}: ${release.title}`}
+                    />
+                  );
+                })}
               </View>
             ) : (
               <View style={[styles.empty, { marginHorizontal: gutter }]}>
@@ -291,7 +296,6 @@ export default function MusicArtistScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   content: { paddingBottom: 32 },
-  contentWide: { paddingHorizontal: 36, paddingTop: 20 },
   pending: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
   pendingBack: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   loader: { marginTop: 48 },
@@ -299,17 +303,21 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.6 },
   rowReverse: { flexDirection: 'row-reverse' },
   actions: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 16 },
+  actionsWide: { marginTop: 20 },
   follow: { alignItems: 'center', backgroundColor: COLORS.gold, borderColor: COLORS.gold, borderRadius: 99, borderWidth: 1, flexDirection: 'row', gap: 6, height: 40, paddingLeft: 14, paddingRight: 18 },
   followOff: { backgroundColor: 'transparent', borderColor: COLORS.goldLine },
   followText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
   followTextOff: { color: COLORS.gold },
   share: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.12)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
-  links: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 16 },
+  // A phone keeps the links to one row of small rounds; the iPad and desktop set them larger.
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 16 },
+  linksWide: { gap: 10 },
   linksStart: { justifyContent: 'flex-start' },
   linksEnd: { justifyContent: 'flex-end' },
-  link: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)', borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
+  link: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
+  linkWide: { borderRadius: 22, height: 44, width: 44 },
   linkPressed: { backgroundColor: 'rgba(227, 181, 59, 0.2)' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
   empty: { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14 },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },

@@ -8,13 +8,15 @@ interface ToggleRowProps {
   active: boolean;
   onPress: () => void;
   disabled?: boolean;
+  /** The row's least height: 48 by default; Book Settings sets 44, and 40 in the phone sheet. */
+  minHeight?: number;
 }
 
 /**
  * A setting on a switch (Coptic Vine design, "Book settings"): its name on a
  * quiet row, the switch gold when on.
  */
-export default function ToggleRow({ label, isArabic = false, active, onPress, disabled = false }: ToggleRowProps) {
+export default function ToggleRow({ label, isArabic = false, active, onPress, disabled = false, minHeight }: ToggleRowProps) {
   const on = active && !disabled;
   return (
     <Pressable
@@ -22,7 +24,7 @@ export default function ToggleRow({ label, isArabic = false, active, onPress, di
       accessibilityLabel={label}
       accessibilityState={{ checked: on, disabled }}
       onPress={disabled ? undefined : onPress}
-      style={({ pressed }) => [styles.row, isArabic && styles.rowReverse, disabled && styles.rowDisabled, pressed && !disabled && styles.pressed]}
+      style={({ pressed }) => [styles.row, minHeight !== undefined && [styles.rowSized, { minHeight }], isArabic && styles.rowReverse, disabled && styles.rowDisabled, pressed && !disabled && styles.pressed]}
     >
       <Text style={[styles.label, isArabic && styles.labelArabic, disabled && styles.labelDisabled]} maxFontSizeMultiplier={1.3}>{label}</Text>
       <Switch on={on} />
@@ -51,6 +53,8 @@ const styles = StyleSheet.create({
     paddingRight: 10,
     paddingVertical: 8,
   },
+  // A row of a set height centres the 28pt switch in it, so a 40pt row has 6pt either side.
+  rowSized: { paddingVertical: 6 },
   rowReverse: { flexDirection: 'row-reverse' },
   rowDisabled: { opacity: 0.5 },
   pressed: { backgroundColor: 'rgba(255, 255, 255, 0.09)' },

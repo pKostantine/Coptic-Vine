@@ -89,7 +89,7 @@ export default function TodayCard({
   );
 
   return (
-    <View style={[styles.block, { borderColor: theme.border }]}>
+    <View style={styles.block}>
       {background ?? <ThemeBackground theme={theme} />}
 
       <View style={[styles.inner, !footer && styles.innerAlone]}>
@@ -264,12 +264,15 @@ function Gradient({ theme }: { theme: DayBlockTheme }) {
 }
 
 const styles = StyleSheet.create({
-  block: { borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
+  // No outline: depth comes from the season's gradient (Coptic Vine design, "no line").
+  block: { borderRadius: 24, overflow: 'hidden' },
   inner: { paddingHorizontal: 16, paddingTop: 16 },
   innerAlone: { paddingBottom: 18 },
   rowReverse: { flexDirection: 'row-reverse' },
   date: { marginTop: 20 },
-  heading: { fontFamily: TYPOGRAPHY.title, fontSize: 40, fontWeight: '700', lineHeight: 46 },
+  // The design sets the date solid (line-height 1) with 8pt under it; two
+  // points of that gap move into the line so a descender is never clipped.
+  heading: { fontFamily: TYPOGRAPHY.title, fontSize: 40, fontWeight: '700', lineHeight: 42 },
   headingSmall: { fontFamily: TYPOGRAPHY.title, fontSize: 30, fontWeight: '700', lineHeight: 34 },
   subheading: { fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 6 },
   strip: { flexDirection: 'row', gap: 4, marginTop: 20 },

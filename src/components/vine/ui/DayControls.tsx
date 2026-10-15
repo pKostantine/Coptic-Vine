@@ -136,10 +136,22 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
   );
 }
 
-/** The red Live dot: a soft red halo on the annual green, a white ring on every other season's colour. */
+/**
+ * The red Live dot: a soft red halo on the annual green; on every other
+ * season's colour a white ring hugging the dot, a faint dark halo outside it.
+ */
 function LiveDot({ ring }: { ring: DayBlockTheme['liveRing'] }) {
+  if (ring === 'white') {
+    return (
+      <View style={[styles.dotHalo, styles.dotHaloDark]}>
+        <View style={styles.dotRing}>
+          <View style={styles.dot} />
+        </View>
+      </View>
+    );
+  }
   return (
-    <View style={[styles.dotHalo, ring === 'white' ? styles.dotHaloWhite : styles.dotHaloRed]}>
+    <View style={[styles.dotHalo, styles.dotHaloRed]}>
       <View style={styles.dot} />
     </View>
   );
@@ -153,7 +165,9 @@ const styles = StyleSheet.create({
   liveText: { fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   dotHalo: { alignItems: 'center', borderRadius: 8, height: 16, justifyContent: 'center', width: 16 },
   dotHaloRed: { backgroundColor: 'rgba(214, 69, 69, 0.2)' },
-  dotHaloWhite: { backgroundColor: 'rgba(0, 0, 0, 0.18)', borderColor: '#FFFFFF', borderWidth: 2, height: 14, width: 14 },
+  // The design's `0 0 0 2px #fff, 0 0 0 5px rgba(0,0,0,.18)` around the 8pt dot.
+  dotHaloDark: { backgroundColor: 'rgba(0, 0, 0, 0.18)', borderRadius: 9, height: 18, marginHorizontal: -1, width: 18 },
+  dotRing: { alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 6, height: 12, justifyContent: 'center', width: 12 },
   dot: { backgroundColor: COLORS.priest, borderRadius: 4, height: 8, width: 8 },
   idleDot: { borderRadius: 5, borderWidth: 1.5, height: 9, width: 9 },
   season: {

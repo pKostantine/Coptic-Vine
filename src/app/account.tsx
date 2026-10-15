@@ -14,8 +14,8 @@ import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import { CrownOrnament } from '@/components/vine/ui/Ornaments';
-import PageTitle from '@/components/vine/ui/PageTitle';
 import SegmentNav from '@/components/vine/ui/SegmentNav';
+import TabHeader from '@/components/vine/ui/TabHeader';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -38,7 +38,8 @@ const MAX_FONT_SCALE = 1.3;
  * The Account tab (Coptic Vine design, "Account"): who is signed in under the
  * vine crown, then the profile to edit, the app's settings and the account's
  * security, each a section drawn out into a vine. The iPad and desktop set
- * the profile and app settings beside the editing and security.
+ * the profile card and its editing in a narrow column beside the app
+ * settings and security.
  */
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
@@ -48,6 +49,7 @@ export default function AccountScreen() {
   const arabic = preferences.appLanguage === 'ar';
   const wide = layout !== 'phone';
   const gutter = wide ? 0 : 16;
+  const columns = [styles.columns, layout === 'tablet' && styles.columnsTablet, arabic && styles.rowReverse];
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -59,14 +61,14 @@ export default function AccountScreen() {
       >
         <PageGlow kind="green" tall={wide} />
         <PageGutterProvider gutter={gutter}>
-          <PageTitle title={tr('Account', 'Compte', 'الحساب')} arabic={arabic} flush={wide} />
+          <TabHeader title={tr('Account', 'Compte', 'الحساب')} arabic={arabic} wide={wide} />
           {loading ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
-          {!loading && user ? <SignedInAccount key={user.id} recoveryMode={recoveryMode} wide={wide} gutter={gutter} /> : null}
+          {!loading && user ? <SignedInAccount key={user.id} recoveryMode={recoveryMode} wide={wide} tablet={layout === 'tablet'} gutter={gutter} /> : null}
           {!loading && !user ? (
             wide ? (
-              <View style={[styles.columns, arabic && styles.rowReverse]}>
-                <View style={styles.column}><SignedOutAccount gutter={gutter} /></View>
-                <View style={styles.column}><AppSettingsSection gutter={gutter} /></View>
+              <View style={columns}>
+                <View style={styles.sideColumn}><SignedOutAccount gutter={gutter} wide /></View>
+                <View style={[styles.column, styles.columnHeadFlush]}><AppSettingsSection gutter={gutter} /></View>
               </View>
             ) : (
               <>
@@ -82,7 +84,7 @@ export default function AccountScreen() {
   );
 }
 
-function SignedOutAccount({ gutter }: { gutter: number }) {
+function SignedOutAccount({ gutter, wide = false }: { gutter: number; wide?: boolean }) {
   const auth = useAuth();
   const { preferences } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
@@ -188,7 +190,7 @@ function SignedOutAccount({ gutter }: { gutter: number }) {
       <View style={[styles.framed, { marginHorizontal: gutter }]}>
         <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
         <View style={styles.crown} pointerEvents="none"><CrownOrnament width={300} height={58} /></View>
-        <View style={styles.framedBody}>
+        <View style={[styles.framedBody, wide && styles.framedBodyWide]}>
           <Text style={[styles.framedTitle, arabic && styles.arabicCentered]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Your Coptic Vine account', 'Votre compte Coptic Vine', 'حساب كوبتك فاين الخاص بك')}</Text>
           <Text style={[styles.framedText, arabic && styles.arabicCentered]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {tr('Keep your likes, follows, playlists, and learning progress with you across devices.', 'Retrouvez vos favoris, abonnements, playlists et progrès sur tous vos appareils.', 'احفظ الإعجابات والمتابعات وقوائم التشغيل وتقدّم التعلّم على أجهزتك.')}
@@ -196,7 +198,7 @@ function SignedOutAccount({ gutter }: { gutter: number }) {
         </View>
       </View>
 
-      <View style={[styles.formCard, { marginHorizontal: gutter }]}>
+      <View style={[styles.formCard, styles.formAfterCard, { marginHorizontal: gutter }]}>
         <SegmentNav items={modes} active={mode} arabic={arabic} role="radiogroup" onSelect={(key) => { setMode(key); setError(null); setNotice(null); }} />
 
         <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.googleButton, arabic && styles.rowReverse, pressed && styles.pressed]} onPress={() => void googleSignIn()}>
@@ -257,7 +259,7 @@ function SignedOutAccount({ gutter }: { gutter: number }) {
   );
 }
 
-function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean; wide: boolean; gutter: number }) {
+function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode: boolean; wide: boolean; tablet: boolean; gutter: number }) {
   const auth = useAuth();
   const { preferences } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
@@ -275,6 +277,8 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // On the iPad and desktop a message shows in the column its action is in: the profile's, or security's.
+  const [messageAt, setMessageAt] = useState<'profile' | 'security'>('profile');
   const provider = user.app_metadata.provider === 'google' ? 'Google' : tr('Email', 'E-mail', 'البريد الإلكتروني');
   const verified = Boolean(user.email_confirmed_at);
   const verifiedLabel = tr('Verified', 'Vérifié', 'موثّق');
@@ -294,6 +298,7 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
       return;
     }
     const emailChanged = normalizedEmail !== (user.email ?? '').toLowerCase();
+    setMessageAt('profile');
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -312,6 +317,7 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
 
   const changePhoto = async () => {
     if (avatarBusy) return;
+    setMessageAt('profile');
     setAvatarBusy(true);
     setError(null);
     setNotice(null);
@@ -329,6 +335,7 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
 
   const clearPhoto = async () => {
     if (avatarBusy) return;
+    setMessageAt('profile');
     setAvatarBusy(true);
     setError(null);
     setNotice(null);
@@ -344,6 +351,8 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
   };
 
   const savePassword = async () => {
+    // The recovery form sits with the profile; the change-password form with security.
+    setMessageAt(recoveryMode ? 'profile' : 'security');
     setError(null);
     setNotice(null);
     if (newPassword.length < 8) {
@@ -369,6 +378,7 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
   };
 
   const signOut = async () => {
+    setMessageAt('security');
     setBusy(true);
     setError(null);
     try {
@@ -386,13 +396,13 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
     </>
   );
 
-  // Who is signed in, under the crown.
+  // Who is signed in, under the crown. The iPad's shorter page sets the photo a little smaller.
   const profileCard = (
     <View style={[styles.framed, { marginHorizontal: gutter }]}>
       <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <View style={styles.crown} pointerEvents="none"><CrownOrnament width={300} height={58} /></View>
-      <View style={styles.profileBody}>
-        <View style={styles.avatar}>
+      <View style={[styles.profileBody, tablet && styles.profileBodyTablet]}>
+        <View style={[styles.avatar, tablet && styles.avatarTablet]}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
           ) : (
@@ -407,7 +417,7 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
         </Text>
         <Text numberOfLines={1} style={styles.profileEmail} maxFontSizeMultiplier={MAX_FONT_SCALE}>{user.email}</Text>
         <View style={[styles.verifiedPill, arabic && styles.rowReverse]}>
-          {verified ? <Icon name="checkmark" size={13} color={COLORS.gold} /> : null}
+          {verified ? <Icon name="checkmark-circle" size={13} color={COLORS.gold} /> : null}
           <Text style={[styles.verifiedText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {tr(`${provider} account`, `Compte ${provider}`, `حساب ${provider}`)}{verified ? ` · ${verifiedLabel}` : ''}
           </Text>
@@ -419,7 +429,7 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
             style={({ pressed }) => [styles.photoButton, styles.photoButtonGold, arabic && styles.rowReverse, avatarBusy && styles.disabled, pressed && styles.pressed]}
             onPress={() => void changePhoto()}
           >
-            {avatarBusy ? <ActivityIndicator size="small" color={COLORS.greenDeep} /> : <Icon name="person-circle-outline" size={17} color={COLORS.greenDeep} />}
+            {avatarBusy ? <ActivityIndicator size="small" color={COLORS.greenDeep} /> : <Icon name="camera-outline" size={15} color={COLORS.greenDeep} />}
             <Text style={[styles.photoButtonText, styles.photoButtonTextGold, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
               {avatarUrl ? tr('Change photo', 'Changer la photo', 'تغيير الصورة') : tr('Add photo', 'Ajouter une photo', 'إضافة صورة')}
             </Text>
@@ -441,13 +451,14 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
         {tr('Choose the name that appears on your Coptic Vine account.', 'Choisissez le nom qui apparaît sur votre compte Coptic Vine.', 'عدّل الاسم الذي يظهر في حساب كوبتك فاين الخاص بك.')}
       </Text>
       <View style={[styles.formCard, { marginHorizontal: gutter }]}>
+        <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
         <Field label={tr('Display name', 'Nom affiché', 'الاسم المعروض')}>
-          <TextInput value={displayName} onChangeText={setDisplayName} style={[styles.input, arabic && styles.arabic]} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={PLACEHOLDER} />
+          <TextInput value={displayName} onChangeText={setDisplayName} style={[styles.input, tablet && styles.inputTablet, arabic && styles.arabic]} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={PLACEHOLDER} />
         </Field>
         <Field label={tr('Email', 'E-mail', 'البريد الإلكتروني')}>
-          <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} style={styles.input} placeholder="you@example.com" placeholderTextColor={PLACEHOLDER} />
+          <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} style={[styles.input, tablet && styles.inputTablet]} placeholder="you@example.com" placeholderTextColor={PLACEHOLDER} />
         </Field>
-        <Pressable accessibilityRole="button" disabled={busy || !displayName.trim() || !email.trim()} style={({ pressed }) => [styles.saveButton, (busy || !displayName.trim() || !email.trim()) && styles.disabled, pressed && styles.pressed]} onPress={() => void saveProfile()}>
+        <Pressable accessibilityRole="button" disabled={busy || !displayName.trim() || !email.trim()} style={({ pressed }) => [styles.saveButton, tablet && styles.saveButtonTablet, (busy || !displayName.trim() || !email.trim()) && styles.disabled, pressed && styles.pressed]} onPress={() => void saveProfile()}>
           <Text style={[styles.saveButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Save profile', 'Enregistrer le profil', 'حفظ الملف الشخصي')}</Text>
         </Pressable>
       </View>
@@ -459,18 +470,20 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
       <SectionHeading title={tr('Security', 'Sécurité', 'الأمان')} arabic={arabic} />
       <View style={[styles.rows, { marginHorizontal: gutter }]}>
         <SettingsRow
-          icon="person-circle-outline"
+          icon="mail-outline"
           label={tr('Sign-in method', 'Méthode de connexion', 'طريقة تسجيل الدخول')}
           description={provider}
           value={verified ? verifiedLabel : undefined}
           arabic={arabic}
+          compact={tablet}
         />
         {!recoveryMode ? (
           <SettingsRow
-            icon="settings-outline"
+            icon="key-outline"
             label={tr('Change password', 'Changer le mot de passe', 'تغيير كلمة المرور')}
             description={tr('Set a new password for email sign-in.', 'Définissez un nouveau mot de passe pour la connexion par e-mail.', 'عيّن كلمة مرور جديدة لتسجيل الدخول بالبريد الإلكتروني.')}
             arabic={arabic}
+            compact={tablet}
             expanded={showPasswordEditor}
             onPress={() => setShowPasswordEditor((current) => !current)}
           />
@@ -481,7 +494,8 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
           </View>
         ) : null}
         <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.signOut, arabic && styles.rowReverse, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void signOut()}>
-          <Icon name="close" size={18} color={SIGN_OUT} />
+          {/* The arrow leads out of the door: leftward too in Arabic. */}
+          <Icon name="log-out-outline" size={19} color={SIGN_OUT} style={arabic ? styles.mirrored : undefined} />
           <Text style={[styles.signOutText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Sign out', 'Se déconnecter', 'تسجيل الخروج')}</Text>
         </Pressable>
       </View>
@@ -500,16 +514,18 @@ function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean
 
   if (wide) {
     return (
-      <View style={[styles.columns, arabic && styles.rowReverse]}>
-        <View style={styles.column}>
+      <View style={[styles.columns, tablet && styles.columnsTablet, arabic && styles.rowReverse]}>
+        <View style={styles.sideColumn}>
           {profileCard}
-          <AppSettingsSection gutter={gutter} />
-        </View>
-        <View style={styles.column}>
           {recovery}
           {profileForm}
+          {messageAt === 'profile' ? messages : null}
+        </View>
+        {/* App settings level with the profile card: no section margin over it at the top of its column. */}
+        <View style={[styles.column, styles.columnHeadFlush]}>
+          <AppSettingsSection gutter={gutter} compact={tablet} />
           {security}
-          {messages}
+          {messageAt === 'security' ? messages : null}
         </View>
       </View>
     );
@@ -551,7 +567,7 @@ function PasswordEditor({ password, confirmation, onPasswordChange, onConfirmati
 }
 
 /** App language, Book settings and (on a phone) Downloads — the settings that follow the account. */
-function AppSettingsSection({ gutter }: { gutter: number }) {
+function AppSettingsSection({ gutter, compact = false }: { gutter: number; compact?: boolean }) {
   const router = useRouter();
   const { user } = useAuth();
   // A sheet over Account, as everywhere: Book Settings are never a page.
@@ -564,7 +580,7 @@ function AppSettingsSection({ gutter }: { gutter: number }) {
       ? { label: tr('Syncing', 'Synchronisation', 'جارٍ المزامنة'), icon: 'time-outline' as const, color: COLORS.gold }
       : contentSyncStatus === 'error'
         ? { label: tr('Offline', 'Hors ligne', 'غير متصل'), icon: 'close' as const, color: '#FF8A7A' }
-        : { label: tr('Synced', 'Synchronisé', 'تمت المزامنة'), icon: 'checkmark' as const, color: COLORS.gold };
+        : { label: tr('Synced', 'Synchronisé', 'تمت المزامنة'), icon: 'cloud-done-outline' as const, color: COLORS.gold };
 
   return (
     <>
@@ -573,7 +589,7 @@ function AppSettingsSection({ gutter }: { gutter: number }) {
         arabic={arabic}
         trailing={(
           <View style={[styles.sync, arabic && styles.rowReverse]} accessibilityLabel={sync.label}>
-            <Icon name={sync.icon} size={15} color={sync.color} />
+            <Icon name={sync.icon} size={16} color={sync.color} />
             <Text style={[styles.syncText, { color: sync.color }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{sync.label}</Text>
           </View>
         )}
@@ -605,10 +621,11 @@ function AppSettingsSection({ gutter }: { gutter: number }) {
       </View>
       <View style={[styles.rows, styles.rowsAfterLanguages, { marginHorizontal: gutter }]}>
         <SettingsRow
-          icon="book"
+          icon="book-outline"
           label={tr('Book settings', 'Réglages des livres', 'إعدادات الكتب')}
           description={tr('Reading languages, text, slideshow, and display', 'Langues de lecture, texte, diaporama et affichage', 'لغات القراءة والنص والعرض التقديمي والشاشة')}
           arabic={arabic}
+          compact={compact}
           onPress={() => setBookSettingsOpen(true)}
         />
         {Platform.OS !== 'web' ? (
@@ -617,6 +634,7 @@ function AppSettingsSection({ gutter }: { gutter: number }) {
             label={tr('Downloads and storage', 'Téléchargements et stockage', 'التنزيلات والتخزين')}
             description={tr('Manage books, music, and learning saved offline', 'Gérez les livres, la musique et les leçons enregistrés hors ligne', 'إدارة الكتب والموسيقى والدروس المحفوظة دون اتصال')}
             arabic={arabic}
+            compact={compact}
             onPress={() => router.push('/downloads')}
           />
         ) : null}
@@ -627,7 +645,7 @@ function AppSettingsSection({ gutter }: { gutter: number }) {
 }
 
 /** One settings row: a gold icon, the setting and a word about it, then a value or a chevron. */
-function SettingsRow({ icon, label, description, value, arabic, onPress, expanded }: {
+function SettingsRow({ icon, label, description, value, arabic, onPress, expanded, compact = false }: {
   icon: IconName;
   label: string;
   description?: string;
@@ -635,27 +653,30 @@ function SettingsRow({ icon, label, description, value, arabic, onPress, expande
   arabic: boolean;
   onPress?: () => void;
   expanded?: boolean;
+  /** The iPad's shorter rows. */
+  compact?: boolean;
 }) {
   const body = (
     <>
       <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-      <Icon name={icon} size={21} color={COLORS.gold} />
+      {/* Each icon in a View of its own: on web a bare SVG would paint under the gradient behind it. */}
+      <View><Icon name={icon} size={21} color={COLORS.gold} /></View>
       <View style={styles.rowText}>
         <Text style={[styles.rowLabel, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
         {description ? <Text style={[styles.rowDescription, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{description}</Text> : null}
       </View>
       {value ? <Text style={[styles.rowValue, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{value}</Text> : null}
-      {onPress ? <Icon name={expanded ? 'chevron-down' : arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /> : null}
+      {onPress ? <View><Icon name={expanded ? 'chevron-down' : arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /></View> : null}
     </>
   );
-  if (!onPress) return <View style={[styles.row, arabic && styles.rowReverse]}>{body}</View>;
+  if (!onPress) return <View style={[styles.row, compact && styles.rowCompact, arabic && styles.rowReverse]}>{body}</View>;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={description ? `${label}. ${description}` : label}
       accessibilityState={expanded === undefined ? undefined : { expanded }}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, arabic && styles.rowReverse, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.row, compact && styles.rowCompact, arabic && styles.rowReverse, pressed && styles.pressed]}
     >
       {body}
     </Pressable>
@@ -680,8 +701,14 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   content: { paddingBottom: 28 },
   contentWide: { paddingHorizontal: 36 },
-  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
+  // The iPad's and desktop's columns: the profile in 360pt (less on a portrait iPad), the settings in the rest.
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 32, marginTop: 18 },
+  columnsTablet: { marginTop: 12 },
+  sideColumn: { maxWidth: 360, width: '42%' },
   column: { flex: 1, minWidth: 0 },
+  // Cancels SectionHeading's own top margin, leaving the design's 4pt.
+  columnHeadFlush: { marginTop: -22 },
+  mirrored: { transform: [{ scaleX: -1 }] },
   rowReverse: { flexDirection: 'row-reverse' },
   loader: { marginVertical: 32 },
   pressed: { opacity: 0.75 },
@@ -691,10 +718,14 @@ const styles = StyleSheet.create({
   framed: { backgroundColor: COLORS.surface, borderColor: 'rgba(227, 181, 59, 0.3)', borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
   crown: { alignItems: 'center', left: 8, opacity: 0.85, position: 'absolute', right: 8, top: 8 },
   framedBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 48 },
+  // The column's title runs to one line, out under the crown's sprigs: set it below them.
+  framedBodyWide: { paddingTop: 66 },
   framedTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', lineHeight: 29, textAlign: 'center' },
   framedText: { color: '#DFE6EC', fontFamily: TYPOGRAPHY.body, fontSize: 14.5, lineHeight: 22, marginTop: 10, textAlign: 'center' },
   profileBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 54 },
+  profileBodyTablet: { paddingBottom: 14, paddingTop: 48 },
   avatar: { alignItems: 'center', backgroundColor: COLORS.greenDeep, borderRadius: 46, boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.5)', height: 92, justifyContent: 'center', overflow: 'hidden', width: 92 },
+  avatarTablet: { borderRadius: 40, height: 80, width: 80 },
   avatarText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 32, fontWeight: '700' },
   profileName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: 14, textAlign: 'center' },
   profileEmail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: 4, textAlign: 'center' },
@@ -708,13 +739,16 @@ const styles = StyleSheet.create({
 
   sectionBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, lineHeight: 19, marginBottom: 12, marginTop: -4 },
   formCard: { backgroundColor: COLORS.surface, borderRadius: 20, gap: 16, overflow: 'hidden', padding: 16 },
+  formAfterCard: { marginTop: 12 },
   field: { gap: 8 },
   fieldLabel: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.2 },
   input: { backgroundColor: 'rgba(0, 0, 0, 0.38)', borderRadius: 14, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, height: 48, paddingHorizontal: 14 },
+  inputTablet: { height: 44 },
   passwordField: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.38)', borderRadius: 14, flexDirection: 'row' },
   passwordInput: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, height: 48, paddingHorizontal: 14 },
   showButton: { alignItems: 'center', height: 48, justifyContent: 'center', width: 48 },
   saveButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 14, height: 46, justifyContent: 'center', marginTop: 2 },
+  saveButtonTablet: { height: 42, marginTop: -2 },
   saveButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },
   googleButton: { alignItems: 'center', borderColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 8, height: 48, justifyContent: 'center', paddingHorizontal: 16 },
   googleMark: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 18, fontWeight: '800' },
@@ -735,13 +769,15 @@ const styles = StyleSheet.create({
   language: { alignItems: 'center', borderRadius: 16, flex: 1, flexDirection: 'row', gap: 10, minWidth: 0, overflow: 'hidden', padding: 12 },
   radio: { borderColor: 'rgba(205, 216, 203, 0.45)', borderRadius: 9, borderWidth: 2, height: 18, width: 18 },
   radioActive: { borderColor: COLORS.gold, borderWidth: 5 },
-  languageText: { flex: 1, minWidth: 0 },
+  // Hugs its words, so a native name in Arabic ends under its English one.
+  languageText: { flexShrink: 1, minWidth: 0 },
   languageLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, fontWeight: '700' },
   languageNative: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 1 },
   languageNativeActive: { color: COLORS.goldBright },
   rows: { gap: 8 },
   rowsAfterLanguages: { marginTop: 10 },
   row: { alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 18, flexDirection: 'row', gap: 14, overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 14 },
+  rowCompact: { paddingVertical: 11 },
   rowText: { flex: 1, minWidth: 0 },
   rowLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600' },
   rowDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 18, marginTop: 2 },

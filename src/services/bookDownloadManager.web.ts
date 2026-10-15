@@ -24,3 +24,4 @@ class WebBookDownloadManager implements BookDownloadManager {
 export const bookDownloadManager: BookDownloadManager = new WebBookDownloadManager();
 export async function getAutomaticBookUpdatesEnabled(): Promise<boolean> { return false; }
 export async function setAutomaticBookUpdatesEnabled(_enabled: boolean): Promise<void> {}
+export async function getLastBookUpdateCheck(): Promise<string | null> { return null; }

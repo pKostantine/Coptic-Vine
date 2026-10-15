@@ -1,16 +1,19 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { type ErrorBoundaryProps, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/vine/ui/AppHeader';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
-import Icon from '@/components/vine/ui/Icon';
-import MusicArtwork from '@/components/music/MusicArtwork';
+import Icon, { type IconName } from '@/components/vine/ui/Icon';
+import PageTitle from '@/components/vine/ui/PageTitle';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
+import ReleaseTile from '@/components/music/ReleaseTile';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
+import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
@@ -19,9 +22,23 @@ import { downloadManager } from '@/services/downloadManager';
 import { musicService } from '@/services/musicService';
 import type { MusicLibraryPayload } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
+import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
 type LibraryFolder = 'likes' | 'playlists' | 'releases' | 'following' | 'downloads';
+
+/** The iPad's and desktop's page margins (Coptic Vine design, "Layout and spacing"). */
+const WIDE_MARGIN = 36;
+/** Recently Played on the iPad and desktop: one row of five covers, 22 apart. */
+const GRID_COLUMNS = 5;
+const GRID_GAP = 22;
+
+/** A tile's count line: "3 tracks", or "None yet" for an empty folder. */
+function countLine(count: number, one: [string, string, string], many: [string, string, string]): string {
+  if (count === 0) return tr('None yet', 'Aucun pour l’instant', 'لا شيء بعد');
+  const [english, french, arabic] = count === 1 ? one : many;
+  return tr(`${count} ${english}`, `${count} ${french}`, `${count} ${arabic}`);
+}
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const router = useRouter();
@@ -45,8 +62,18 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   );
 }
 
+/**
+ * Music's Library (Coptic Vine design, "Library"): Liked Tracks large up top
+ * with a play button, your collections as tiles beside or beneath it, then
+ * what you've played lately. On the iPad and desktop the title and the
+ * section pill share a row and Liked Tracks stands beside the tiles.
+ */
 export default function MusicLibraryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const layout = useLayoutMode();
+  const contentWidth = useContentWidth();
+  const wide = layout !== 'phone';
   const { user } = useAuth();
   const { preferences } = useReadingPreferences();
   const { playQueue } = useMusicPlayer();
@@ -88,6 +115,12 @@ export default function MusicLibraryScreen() {
     coverAsset: release?.coverAsset ?? null,
   })), [library?.recentTracks]);
 
+  const likedQueue = useMemo(() => (library?.likedTracks ?? []).map((track) => ({
+    track,
+    releaseId: track.releaseId,
+    coverAsset: track.releaseCoverAsset ?? null,
+  })), [library?.likedTracks]);
+
   const openFolder = (section: LibraryFolder | 'recent-tracks' | 'recent-releases') => {
     router.push({ pathname: '/music/library/[section]', params: { section } });
   };
@@ -95,122 +128,217 @@ export default function MusicLibraryScreen() {
   const folders = ([
     {
       id: 'likes',
-      title: tr('Liked tracks', 'Titres aimés', 'الترانيم المعجبة'),
-      count: library?.likedTracks.length ?? 0,
-      detail: tr('Saved tracks', 'Titres enregistrés', 'الترانيم المحفوظة'),
+      title: tr('Liked Tracks', 'Titres aimés', 'الترانيم المعجبة'),
+      detail: countLine(library?.likedTracks.length ?? 0, ['track', 'titre', 'ترنيمة'], ['tracks', 'titres', 'ترنيمة']),
+      icon: 'heart',
     },
     {
       id: 'playlists',
       title: tr('Playlists', 'Playlists', 'قوائم التشغيل'),
-      count: library?.playlists.length ?? 0,
-      detail: tr('Your collections', 'Vos collections', 'مجموعاتك'),
+      detail: countLine(library?.playlists.length ?? 0, ['playlist', 'playlist', 'قائمة'], ['playlists', 'playlists', 'قائمة']),
+      icon: 'list-outline',
     },
     {
       id: 'releases',
-      title: tr('Liked releases', 'Parutions aimées', 'الإصدارات المعجبة'),
-      count: library?.likedReleases.length ?? 0,
-      detail: tr('Saved albums and releases', 'Albums et parutions enregistrés', 'الألبومات والإصدارات المحفوظة'),
+      title: tr('Liked Releases', 'Parutions aimées', 'الإصدارات المعجبة'),
+      detail: countLine(library?.likedReleases.length ?? 0, ['release', 'parution', 'إصدار'], ['releases', 'parutions', 'إصدار']),
+      icon: 'disc-outline',
     },
     {
       id: 'following',
-      title: tr('Following', 'Suivi', 'الفنانون المتابَعون'),
-      count: library?.followedArtists.length ?? 0,
-      detail: tr('Artists you follow', 'Artistes suivis', 'الفنانون الذين تتابعهم'),
+      title: tr('Following', 'Abonnements', 'المتابَعون'),
+      detail: countLine(library?.followedArtists.length ?? 0, ['artist', 'artiste', 'فنان'], ['artists', 'artistes', 'فنان']),
+      icon: 'people-outline',
     },
     {
       id: 'downloads',
       title: tr('Downloads', 'Téléchargements', 'التنزيلات'),
-      count: downloadCount,
-      detail: Platform.OS === 'web'
-        ? (tr('Available in the mobile app', 'Disponible dans l’application mobile', 'متاحة في تطبيق الهاتف'))
-        : (tr('Saved on this device', 'Enregistré sur cet appareil', 'محفوظة على هذا الجهاز')),
+      detail: countLine(downloadCount, ['download', 'téléchargement', 'تنزيل'], ['downloads', 'téléchargements', 'تنزيل']),
+      icon: 'arrow-down-circle-outline',
     },
-  ] satisfies { id: LibraryFolder; title: string; count: number; detail: string }[])
+  ] satisfies { id: LibraryFolder; title: string; detail: string; icon: IconName }[])
     .filter((folder) => Platform.OS !== 'web' || folder.id !== 'downloads');
+
+  // Liked Tracks heads the page on its own card; the other folders are tiles,
+  // two to a row (the website has no Downloads, so its third tile runs across).
+  const [likes, ...collections] = folders;
+  const tileRows: (typeof collections)[] = [];
+  for (let index = 0; index < collections.length; index += 2) tileRows.push(collections.slice(index, index + 2));
+
+  const likedCount = library?.likedTracks.length ?? 0;
+  const gutter = wide ? 0 : 16;
+  const gridTile = (contentWidth - WIDE_MARGIN * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+  const recentTracks = library?.recentTracks.slice(0, wide ? GRID_COLUMNS : 10) ?? [];
+  const recentReleases = library?.recentReleases.slice(0, wide ? GRID_COLUMNS : 10) ?? [];
+  const seeAll = (section: 'recent-tracks' | 'recent-releases') => (
+    <Pressable accessibilityRole="button" hitSlop={8} onPress={() => openFolder(section)} style={({ pressed }) => pressed && styles.pressed}>
+      <Text style={[styles.seeAll, isArabic && styles.arabicFont]}>{tr('See all', 'Tout voir', 'الكل')}</Text>
+    </Pressable>
+  );
+
+  // The card opens Liked Tracks; its play button sits over the card as a
+  // sibling, so neither is a button inside the other.
+  const hero = (
+    <View style={[styles.hero, wide && styles.heroWide]}>
+      <LinearGradient colors={[COLORS.green, COLORS.greenDeep]} locations={[0, 0.8]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${likes.title}, ${likes.detail}`}
+        onPress={() => openFolder('likes')}
+        style={({ pressed }) => [
+          styles.heroOpen,
+          wide ? styles.heroOpenWide : isArabic ? styles.heroOpenArabic : styles.heroOpenStart,
+          wide && isArabic && styles.heroOpenWideArabic,
+          pressed && styles.pressed,
+        ]}
+      >
+        <View style={[styles.heroIcon, wide && styles.heroIconWide]}>
+          <Icon name="heart" size={wide ? 28 : 25} color={COLORS.gold} />
+        </View>
+        <View style={[styles.heroText, wide ? (isArabic ? styles.heroTextWideArabic : styles.heroTextWide) : styles.heroTextPhone]}>
+          <Text style={[styles.heroTitle, wide && styles.heroTitleWide, isArabic && styles.arabic]} numberOfLines={1}>{likes.title}</Text>
+          <Text style={[styles.heroDetail, wide && styles.heroDetailWide, isArabic && styles.arabic]} numberOfLines={1}>{likes.detail}</Text>
+        </View>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={tr('Play Liked Tracks', 'Lire les titres aimés', 'تشغيل الترانيم المعجبة')}
+        aria-disabled={!likedCount}
+        disabled={!likedCount}
+        hitSlop={6}
+        onPress={() => playQueue(likedQueue, 0)}
+        style={({ pressed }) => [
+          styles.heroPlay,
+          wide ? styles.heroPlayWide : styles.heroPlayPhone,
+          isArabic ? { left: wide ? 22 : 16 } : { right: wide ? 22 : 16 },
+          !likedCount && styles.disabled,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Icon name="play" size={wide ? 23 : 19} color={COLORS.greenDeep} />
+      </Pressable>
+    </View>
+  );
+
+  const tiles = (
+    <View style={[styles.tiles, wide && styles.tilesWide]}>
+      {tileRows.map((row) => (
+        <View key={row.map((folder) => folder.id).join(':')} style={[styles.tileRow, wide && styles.tileRowWide, isArabic && styles.rowReverse]}>
+          {row.map((folder) => (
+            <Pressable
+              key={folder.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${folder.title}, ${folder.detail}`}
+              onPress={() => openFolder(folder.id)}
+              style={({ pressed }) => [styles.tile, isArabic && styles.tileArabic, pressed && styles.pressed]}
+            >
+              <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+              {/* In a View of its own so it draws over the gradient on the web, as the text does. */}
+              <View><Icon name={folder.icon} size={22} color={COLORS.gold} /></View>
+              <View style={styles.tileText}>
+                <Text style={[styles.tileTitle, isArabic && styles.arabic]} numberOfLines={1}>{folder.title}</Text>
+                <Text style={[styles.tileDetail, isArabic && styles.arabic]} numberOfLines={1}>{folder.detail}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+
+  /** A shelf of covers: a rail on a phone, one row of five on the iPad and desktop. */
+  const shelf = (children: ReactNode) => (wide ? (
+    <View style={[styles.grid, isArabic && styles.rowReverse]}>{children}</View>
+  ) : (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.rail, isArabic && styles.rowReverse]}>
+      {children}
+    </ScrollView>
+  ));
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{tr('Your Library — Coptic Vine', 'Votre bibliothèque — Coptic Vine', 'مكتبتي — كوبتك فاين')}</title></Head>
-      <AppHeader
-        title={{ english: 'Your Library', arabic: 'مكتبتك', french: 'Votre bibliothèque' }}
-        visibleLanguages={{ english: !isArabic, arabic: isArabic }}
-      />
-      <MusicSectionNav active="library" />
 
-      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {loading ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        {!loading && library && !library.authenticated ? (
-          <View style={styles.authCard}>
-            <Text style={[styles.authTitle, isArabic && styles.arabic]}>{tr('Sign in to your Coptic Vine account', 'Connectez-vous à votre compte Coptic Vine', 'سجّل الدخول إلى حساب كوبتك فاين')}</Text>
-            <Text style={[styles.authBody, isArabic && styles.arabic]}>
-              {tr('Likes, playlists, follows, and listening history are tied to your account.', 'Vos favoris, playlists, abonnements et historique d’écoute sont liés à votre compte.', 'الإعجابات وقوائم التشغيل وسجل الاستماع مرتبطة بحسابك.')}
-            </Text>
-            <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => router.push('/account')}>
-              <Text style={styles.primaryButtonText}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        <View style={styles.folderList}>
-          {folders.map((folder) => (
-            <Pressable
-              key={folder.id}
-              accessibilityRole="button"
-              onPress={() => openFolder(folder.id)}
-              style={({ pressed }) => [styles.folderRow, pressed && styles.pressed]}
-            >
-              <View style={styles.folderText}>
-                <Text style={[styles.folderTitle, isArabic && styles.arabic]}>{folder.title}</Text>
-                <Text style={[styles.folderDetail, isArabic && styles.arabic]}>{folder.count} · {folder.detail}</Text>
+      <NowPlayingAwareScrollView
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        showsVerticalScrollIndicator={false}
+      >
+        <PageGlow kind="green" tall={wide} />
+        <PageGutterProvider gutter={gutter}>
+          {wide ? (
+            <View style={[styles.headerWide, isArabic && styles.rowReverse]}>
+              <Text style={[styles.titleWide, isArabic && styles.arabicFont]} numberOfLines={1} accessibilityRole="header">
+                {tr('Your Library', 'Votre bibliothèque', 'مكتبتك')}
+              </Text>
+              <View style={styles.navWide}>
+                <MusicSectionNav active="library" flush />
               </View>
-              <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={20} color={COLORS.muted} />
-            </Pressable>
-          ))}
-        </View>
+            </View>
+          ) : (
+            <>
+              <PageTitle title={tr('Your Library', 'Votre bibliothèque', 'مكتبتك')} arabic={isArabic} />
+              <MusicSectionNav active="library" />
+            </>
+          )}
 
-        {library?.authenticated ? (
-          <>
-            <RecentHeading
-              title={tr('Recently played tracks', 'Titres écoutés récemment', 'الترانيم المشغّلة مؤخراً')}
-              action={tr('See all', 'Tout voir', 'الكل')}
-              isArabic={isArabic}
-              onPress={() => openFolder('recent-tracks')}
-            />
-            {library.recentTracks.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalRow}>
-                {library.recentTracks.slice(0, 10).map((recent, index) => (
-                  <Pressable accessibilityRole="button" key={recent.track.id} style={styles.recentCard} onPress={() => playQueue(recentQueue, index)}>
-                    <MusicArtwork asset={recent.release?.coverAsset} size={144} label={recent.track.title} />
-                    <Text numberOfLines={1} style={[styles.recentTitle, isArabic && styles.arabic]}>{recent.track.title}</Text>
-                    <Text numberOfLines={1} style={[styles.recentMeta, isArabic && styles.arabic]}>
-                      {formatMusicTrackPerformers(recent.track, recent.release?.primaryArtist?.displayName ?? '')}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            ) : <Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Tracks will appear here after you listen.', 'Les titres apparaîtront ici après votre écoute.', 'ستظهر الترانيم هنا بعد الاستماع.')}</Text>}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <RecentHeading
-              title={tr('Recently played releases', 'Parutions écoutées récemment', 'الإصدارات المشغّلة مؤخراً')}
-              action={tr('See all', 'Tout voir', 'الكل')}
-              isArabic={isArabic}
-              onPress={() => openFolder('recent-releases')}
-            />
-            {library.recentReleases.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalRow}>
-                {library.recentReleases.slice(0, 10).map((release) => (
-                  <Pressable accessibilityRole="button" key={release.id} style={styles.recentCard} onPress={() => router.push(`/music/release/${release.id}`)}>
-                    <MusicArtwork asset={release.coverAsset} size={144} label={release.title} />
-                    <Text numberOfLines={1} style={[styles.recentTitle, isArabic && styles.arabic]}>{release.title}</Text>
-                    <Text numberOfLines={1} style={[styles.recentMeta, isArabic && styles.arabic]}>{release.primaryArtist?.displayName ?? release.releaseType}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            ) : <Text style={[styles.emptyText, isArabic && styles.arabic]}>{tr('Releases will appear here after you listen.', 'Les parutions apparaîtront ici après votre écoute.', 'ستظهر الإصدارات هنا بعد الاستماع.')}</Text>}
-          </>
-        ) : null}
+          {!loading && library && !library.authenticated ? (
+            <View style={[styles.authCard, !wide && styles.gutter]}>
+              <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+              <Text style={[styles.authTitle, isArabic && styles.arabic]}>{tr('Sign in to your Coptic Vine account', 'Connectez-vous à votre compte Coptic Vine', 'سجّل الدخول إلى حساب كوبتك فاين')}</Text>
+              <Text style={[styles.authBody, isArabic && styles.arabic]}>
+                {tr('Likes, playlists, follows, and listening history are tied to your account.', 'Vos favoris, playlists, abonnements et historique d’écoute sont liés à votre compte.', 'الإعجابات وقوائم التشغيل وسجل الاستماع مرتبطة بحسابك.')}
+              </Text>
+              <Pressable accessibilityRole="button" style={[styles.primaryButton, isArabic && styles.primaryButtonArabic]} onPress={() => router.push('/account')}>
+                <Text style={[styles.primaryButtonText, isArabic && styles.arabicFont]}>{tr('Open Account', 'Ouvrir le compte', 'فتح الحساب')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {loading && !library ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : (
+            <View style={[styles.top, wide ? styles.topWide : styles.gutter, wide && isArabic && styles.rowReverse]}>
+              {hero}
+              {tiles}
+            </View>
+          )}
+
+          {library?.authenticated ? (
+            <>
+              <SectionHeading title={tr('Recently Played', 'Écoutés récemment', 'المشغّلة مؤخراً')} arabic={isArabic} trailing={seeAll('recent-tracks')} />
+              {recentTracks.length ? shelf(recentTracks.map((recent, index) => (
+                <ReleaseTile
+                  key={recent.track.id}
+                  id={recent.release?.id ?? recent.track.id}
+                  title={recent.track.title}
+                  subtitle={formatMusicTrackPerformers(recent.track, recent.release?.primaryArtist?.displayName ?? '') || null}
+                  artworkUri={musicService.resolveAsset(recent.release?.coverAsset)}
+                  width={wide ? gridTile : 136}
+                  arabic={isArabic}
+                  wrapTitle={wide}
+                  onPress={() => playQueue(recentQueue, index)}
+                  onPlay={() => playQueue(recentQueue, index)}
+                  playLabel={`${tr('Play', 'Lire', 'تشغيل')}: ${recent.track.title}`}
+                />
+              ))) : <EmptyLine text={tr('Tracks will appear here after you listen.', 'Les titres apparaîtront ici après votre écoute.', 'ستظهر الترانيم هنا بعد الاستماع.')} arabic={isArabic} gutter={gutter} />}
+
+              <SectionHeading title={tr('Recently Played Releases', 'Parutions écoutées récemment', 'الإصدارات المشغّلة مؤخراً')} arabic={isArabic} trailing={seeAll('recent-releases')} />
+              {recentReleases.length ? shelf(recentReleases.map((release) => (
+                <ReleaseTile
+                  key={release.id}
+                  id={release.id}
+                  title={release.title}
+                  subtitle={release.primaryArtist?.displayName ?? release.releaseType}
+                  artworkUri={musicService.resolveAsset(release.coverAsset)}
+                  width={wide ? gridTile : 136}
+                  arabic={isArabic}
+                  wrapTitle={wide}
+                  onPress={() => router.push(`/music/release/${release.id}`)}
+                />
+              ))) : <EmptyLine text={tr('Releases will appear here after you listen.', 'Les parutions apparaîtront ici après votre écoute.', 'ستظهر الإصدارات هنا بعد الاستماع.')} arabic={isArabic} gutter={gutter} />}
+            </>
+          ) : null}
+        </PageGutterProvider>
       </NowPlayingAwareScrollView>
 
       <BottomTabBar active="music" />
@@ -218,57 +346,86 @@ export default function MusicLibraryScreen() {
   );
 }
 
-function RecentHeading({
-  title,
-  action,
-  isArabic,
-  onPress,
-}: {
-  title: string;
-  action: string;
-  isArabic: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <View style={styles.sectionHeading}>
-      <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{title}</Text>
-      <Pressable accessibilityRole="button" onPress={onPress} style={styles.seeAllButton}>
-        <Text style={[styles.seeAllText, isArabic && styles.arabic]}>{action}</Text>
-      </Pressable>
-    </View>
-  );
+function EmptyLine({ text, arabic, gutter }: { text: string; arabic: boolean; gutter: number }) {
+  return <Text style={[styles.emptyText, { marginHorizontal: gutter }, arabic && styles.arabic]}>{text}</Text>;
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  content: { alignSelf: 'center', gap: SPACING.md, maxWidth: 1120, padding: SPACING.md, paddingBottom: SPACING.xl * 2, width: '100%' },
+  content: { paddingBottom: 28 },
+  contentWide: { paddingHorizontal: WIDE_MARGIN },
+  gutter: { marginHorizontal: 16 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicFont: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  pressed: { opacity: 0.8 },
+  disabled: { opacity: 0.45 },
   loader: { marginVertical: SPACING.xl },
-  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center' },
+  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, marginTop: SPACING.md, textAlign: 'center' },
+
+  // The iPad's and desktop's head: the title, and the section pill at the far end.
+  headerWide: { alignItems: 'center', flexDirection: 'row', gap: 24, justifyContent: 'space-between' },
+  titleWide: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 38, fontWeight: '700', lineHeight: 42 },
+  navWide: { width: 440 },
+
+  // Liked Tracks over the tiles on a phone; beside them, a column each, on the iPad and desktop.
+  top: { gap: 10, marginTop: 18 },
+  topWide: { alignItems: 'stretch', flexDirection: 'row', gap: 14, marginTop: 26 },
+  hero: { borderRadius: 22, boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.35)', overflow: 'hidden' },
+  heroWide: { flex: 1, minHeight: 202 },
+  heroOpen: { alignItems: 'center', flexDirection: 'row', gap: 14, padding: 16 },
+  // On a phone the play button sits at the row's end: the text stops short of it.
+  heroOpenStart: { paddingRight: 76 },
+  heroOpenArabic: { flexDirection: 'row-reverse', paddingLeft: 76 },
+  heroOpenWide: { alignItems: 'flex-start', flex: 1, flexDirection: 'column', gap: 0, padding: 22 },
+  heroOpenWideArabic: { alignItems: 'flex-end' },
+  heroIcon: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.28)', borderRadius: 16, height: 52, justifyContent: 'center', width: 52 },
+  heroIconWide: { height: 60, width: 60 },
+  heroText: { minWidth: 0 },
+  heroTextPhone: { flex: 1 },
+  // On the iPad and desktop the name sits at the card's foot, clear of the play button.
+  heroTextWide: { alignSelf: 'stretch', marginTop: 'auto', paddingRight: 72, paddingTop: 16 },
+  heroTextWideArabic: { alignSelf: 'stretch', marginTop: 'auto', paddingLeft: 72, paddingTop: 16 },
+  heroTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
+  heroTitleWide: { fontSize: 30 },
+  heroDetail: { color: 'rgba(255, 255, 255, 0.78)', fontFamily: TYPOGRAPHY.body, fontSize: 13.5, marginTop: 2 },
+  heroDetailWide: { fontSize: 15 },
+  heroPlay: {
+    alignItems: 'center',
+    backgroundColor: COLORS.gold,
+    boxShadow: '0px 8px 18px rgba(0, 0, 0, 0.35)',
+    justifyContent: 'center',
+    position: 'absolute',
+  },
+  heroPlayPhone: { borderRadius: 23, height: 46, marginTop: -23, top: '50%', width: 46 },
+  heroPlayWide: { borderRadius: 28, bottom: 22, height: 56, width: 56 },
+
+  tiles: { gap: 10 },
+  tilesWide: { flex: 1 },
+  tileRow: { flexDirection: 'row', gap: 10 },
+  tileRowWide: { flex: 1 },
+  tile: { borderRadius: 18, flex: 1, minHeight: 96, minWidth: 0, overflow: 'hidden', padding: 14 },
+  tileArabic: { alignItems: 'flex-end' },
+  tileText: { alignSelf: 'stretch', marginTop: 'auto', paddingTop: 12 },
+  tileTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },
+  tileDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
+
+  seeAll: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  rail: { gap: 12, paddingHorizontal: 16, paddingTop: 4 },
+  grid: { flexDirection: 'row', gap: GRID_GAP, paddingTop: 4 },
+  emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
+
+  authCard: { borderRadius: 18, gap: SPACING.sm, marginTop: 18, overflow: 'hidden', padding: SPACING.md },
+  authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700' },
+  authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, lineHeight: 19 },
+
   crashCard: { backgroundColor: COLORS.greenDeep, borderColor: COLORS.goldLine, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.md, margin: SPACING.md, padding: SPACING.lg },
   crashTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
   crashBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
   crashActions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  primaryButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.gold, borderRadius: RADII.pill, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.lg },
-  primaryButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
+  primaryButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: COLORS.gold, borderRadius: RADII.pill, justifyContent: 'center', marginTop: 4, minHeight: 40, paddingHorizontal: SPACING.lg },
+  primaryButtonArabic: { alignSelf: 'flex-end' },
+  primaryButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
   secondaryButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: RADII.pill, borderWidth: 1, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.lg },
   secondaryButtonText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
-  authCard: { backgroundColor: COLORS.greenDeep, borderColor: COLORS.border, borderRadius: RADII.lg, borderWidth: 1, gap: SPACING.sm, padding: SPACING.lg },
-  authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
-  authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
-  folderList: { borderBottomColor: COLORS.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  folderRow: { alignItems: 'center', borderTopColor: COLORS.border, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 72, paddingHorizontal: SPACING.xs },
-  folderText: { flex: 1, minWidth: 0 },
-  folderTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 17, fontWeight: '700' },
-  folderDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 4 },
-  sectionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.lg },
-  sectionTitle: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 23, fontWeight: '800' },
-  seeAllButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: SPACING.sm },
-  seeAllText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
-  horizontalRow: { gap: SPACING.md, paddingRight: SPACING.lg },
-  recentCard: { width: 144 },
-  recentTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800', marginTop: 8 },
-  recentMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3 },
-  emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
-  pressed: { opacity: 0.58 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });

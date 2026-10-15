@@ -96,3 +96,10 @@ class NativeDownloadManager implements OfflineDownloadManager {
   }
 }
 export const downloadManager: OfflineDownloadManager = new NativeDownloadManager();
+
+/** A download's saved cover and how many tracks or recordings it holds, for listing it (Downloads & Storage). */
+export async function getDownloadPackageDetails(packageKey: string): Promise<{ artworkUri: string | null; mediaCount: number }> {
+  const files = await getPackageFiles(packageKey);
+  const artwork = files.find((file) => file.role === 'artwork' && file.local_uri);
+  return { artworkUri: artwork?.local_uri ?? null, mediaCount: files.filter((file) => file.role === 'media').length };
+}

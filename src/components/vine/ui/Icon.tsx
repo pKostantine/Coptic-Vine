@@ -2,6 +2,11 @@ import { StyleProp, ViewStyle } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 export type IconName =
+  | 'search'
+  | 'close-circle'
+  | 'disc-outline'
+  | 'people-outline'
+  | 'arrow-down-circle-outline'
   | 'chevron-back'
   | 'chevron-forward'
   | 'chevron-down'
@@ -49,7 +54,19 @@ export type IconName =
   | 'cloudy-night-outline'
   | 'moon-outline'
   | 'sunny-outline'
-  | 'create-outline';
+  | 'create-outline'
+  | 'checkmark-circle'
+  | 'arrow-down'
+  | 'refresh'
+  | 'cloud-download-outline'
+  | 'shield-checkmark-outline'
+  | 'construct-outline'
+  | 'book-outline'
+  | 'camera-outline'
+  | 'cloud-done-outline'
+  | 'mail-outline'
+  | 'key-outline'
+  | 'log-out-outline';
 
 interface IconProps {
   name: IconName;
@@ -296,6 +313,46 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
           <Path d="M256 48v272M144 224l112 112 112-112M80 400v48h352v-48" fill="none" stroke={color} strokeWidth={34} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
+    case 'checkmark-circle':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29-134.4 160a16 16 0 0 1-12 5.71h-.27a16 16 0 0 1-11.89-5.3l-57.6-64a16 16 0 1 1 23.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0 1 24.5 20.58z" fill={color} />
+        </Svg>
+      );
+    case 'arrow-down':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="m112 268 144 144 144-144M256 392V100" fill="none" stroke={color} strokeWidth={48} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'refresh':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M320 146s24.36-12-64-12a160 160 0 1 0 160 160" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeMiterlimit={10} />
+          <Path d="m256 58 80 80-80 80" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'cloud-download-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M320 336h76c55 0 100-21.21 100-75.6s-53-73.47-96-75.6C391.11 99.74 329 48 256 48c-69 0-113.44 45.79-128 91.2-60 5.7-112 35.88-112 98.4S70 336 136 336h56M192 400.1l64 63.9 64-63.9M256 224v224.03" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'shield-checkmark-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M336 176 225.2 304 176 255.8" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M463.1 112.37C373.68 96.33 336.71 84.45 256 48c-80.71 36.45-117.68 48.33-207.1 64.37C32.7 369.13 240.58 457.79 256 464c15.42-6.21 223.3-94.87 207.1-351.63z" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'construct-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M436.67 184.11a27.17 27.17 0 0 1-38.3 0l-22.48-22.49a27.15 27.15 0 0 1 0-38.29l50.89-50.89a.85.85 0 0 0-.26-1.38C393.68 57 351.09 64.15 324.05 91c-25.88 25.69-27.35 64.27-17.87 98a27 27 0 0 1-7.67 27.14l-173 160.76a40.76 40.76 0 1 0 57.57 57.54l162.15-173.3a27 27 0 0 1 26.77-7.7c33.46 8.94 71.49 7.26 97.07-17.94 27.49-27.08 33.42-74.94 20.1-102.33a.85.85 0 0 0-1.36-.22z" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeMiterlimit={10} />
+          <Path d="M224 284c-17.48-17-25.49-24.91-31-30.29a18.24 18.24 0 0 1-3.33-21.35 20.76 20.76 0 0 1 3.5-4.62l15.68-15.29a18.66 18.66 0 0 1 5.63-3.87 18.11 18.11 0 0 1 20 3.62c5.45 5.29 15.43 15 33.41 32.52M317.07 291.3c40.95 38.1 90.62 83.27 110 99.41a13.46 13.46 0 0 1 .94 19.92L394.63 444a14 14 0 0 1-20.29-.76c-16.53-19.18-61.09-67.11-99.27-107" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="m17.34 193.5 29.41-28.74a4.71 4.71 0 0 1 3.41-1.35 4.85 4.85 0 0 1 3.41 1.35 9.86 9.86 0 0 0 8.19 2.77c3.83-.42 7.92-1.6 10.57-4.12 6-5.8-.94-17.23 4.34-24.54a207 207 0 0 1 19.78-22.6c6-5.88 29.84-28.32 69.9-44.45A107.31 107.31 0 0 1 206.67 64c22.59 0 40 10 46.26 15.67a89.54 89.54 0 0 1 10.28 11.64 78.92 78.92 0 0 0-9.21-2.77 68.82 68.82 0 0 0-20-1.26c-13.33 1.09-29.41 7.26-38 14-13.9 11-19.87 25.72-20.81 44.71-.68 14.12 2.72 22.1 36.1 55.49a6.6 6.6 0 0 1-.34 9.16l-18.22 18a6.88 6.88 0 0 1-9.54.09c-21.94-21.94-36.65-33.09-45-38.16s-15.07-6.5-18.3-6.85a30.85 30.85 0 0 0-18.27 3.87 11.39 11.39 0 0 0-2.64 2 14.14 14.14 0 0 0 .42 20.08l1.71 1.6a4.63 4.63 0 0 1 0 6.64L71.73 246.6a4.71 4.71 0 0 1-3.41 1.4 4.86 4.86 0 0 1-3.41-1.35l-47.57-46.43a4.88 4.88 0 0 1 0-6.72z" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
     case 'trash-outline':
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
@@ -519,6 +576,90 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="M336 192h56a40 40 0 0 1 40 40v184a40 40 0 0 1-40 40H120a40 40 0 0 1-40-40V232a40 40 0 0 1 40-40h56" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
           <Path d="M256 336V64M160 160l96-96 96 96" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'search':
+      // The bold magnifier on a search page's empty state.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M456.69 421.39 362.6 327.3a173.81 173.81 0 0 0 34.84-104.58C397.44 126.38 319.06 48 222.72 48S48 126.38 48 222.72s78.38 174.72 174.72 174.72A173.81 173.81 0 0 0 327.3 362.6l94.09 94.09a25 25 0 0 0 35.3-35.3ZM97.92 222.72a124.8 124.8 0 1 1 124.8 124.8 124.95 124.95 0 0 1-124.8-124.8Z"
+            fill={color}
+          />
+        </Svg>
+      );
+    case 'close-circle':
+      // A search field's Clear button: a cross cut out of a filled disc.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48Zm75.31 260.69a16 16 0 1 1-22.62 22.62L256 278.63l-52.69 52.68a16 16 0 0 1-22.62-22.62L233.37 256l-52.68-52.69a16 16 0 0 1 22.62-22.62L256 233.37l52.69-52.68a16 16 0 0 1 22.62 22.62L278.63 256Z"
+            fill={color}
+          />
+        </Svg>
+      );
+    case 'disc-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Circle cx="256" cy="256" r="208" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
+          <Circle cx="256" cy="256" r="96" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
+          <Circle cx="256" cy="256" r="32" fill={color} />
+        </Svg>
+      );
+    case 'people-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M402 168c-2.93 40.67-33.1 72-66 72s-63.12-31.32-66-72c-3-42.31 26.37-72 66-72s69 30.46 66 72Z" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M336 304c-65.17 0-127.84 32.37-143.54 95.41-2.08 8.34 3.15 16.59 11.72 16.59h263.65c8.57 0 13.77-8.25 11.72-16.59C463.85 335.36 401.18 304 336 304Z" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
+          <Path d="M200 185.94c-2.34 32.48-26.72 58.06-53 58.06s-50.7-25.57-53-58.06C91.61 152.15 115.34 128 147 128s55.39 24.77 53 57.94Z" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M206 306c-18.05-8.27-37.93-11.45-59-11.45-52 0-102.1 25.85-114.65 76.2-1.65 6.66 2.53 13.25 9.37 13.25H154" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeMiterlimit={10} />
+        </Svg>
+      );
+    case 'arrow-down-circle-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M176 262.62 256 342l80-79.38M256 330.97V170" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M256 64C150 64 64 150 64 256s86 192 192 192 192-86 192-192S362 64 256 64Z" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
+        </Svg>
+      );
+    case 'book-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M256 160c16-63.16 76.43-95.41 208-96a15.94 15.94 0 0 1 16 16v288a16 16 0 0 1-16 16c-128 0-177.45 25.81-208 64-30.37-38-80-64-208-64-9.88 0-16-8.05-16-17.93V80a15.94 15.94 0 0 1 16-16c131.57.59 192 32.84 208 96zM256 160v288" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'camera-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M350.54 148.68l-26.62-42.06C318.31 100.08 310.62 96 302 96h-92c-8.62 0-16.31 4.08-21.92 10.62l-26.62 42.06C155.85 155.23 148.62 160 140 160H80a32 32 0 0 0-32 32v192a32 32 0 0 0 32 32h352a32 32 0 0 0 32-32V192a32 32 0 0 0-32-32h-59c-8.65 0-16.85-4.77-22.46-11.32z" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Circle cx="256" cy="272" r="80" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
+          <Path d="M124 158v-22h-24v22" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'cloud-done-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M400 240c-8.89-89.54-71-144-144-144-69 0-113.44 48.2-128 96-60 6-112 43.59-112 112 0 66 54 112 120 112h260c55 0 100-27.44 100-88 0-59.82-53-85.76-96-88z" fill="none" stroke={color} strokeWidth={32} strokeLinejoin="round" />
+          <Path d="M317 208 209.2 336 163 284.8" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'mail-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Rect x="48" y="96" width="416" height="320" rx="40" ry="40" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="m112 160 144 112 144-112" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'key-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M218.1 167.17c0 13 0 25.6 4.1 37.4-43.1 50.6-156.9 184.3-167.5 194.5a20.17 20.17 0 0 0-6.7 15c0 8.5 5.2 16.7 9.6 21.3 6.6 6.9 34.8 33 40 28 15.4-15 18.5-19 24.8-25.2 9.5-9.3-1-28.3 2.3-36s6.8-9.2 12.5-10.4 15.8 2.9 23.7 3c8.3.1 12.8-3.4 19-9.2 5-4.6 8.6-8.9 8.7-15.6.2-9-12.8-20.9-3.1-30.4s23.7 6.2 34 5 22.8-15.5 24.1-21.6-11.7-21.8-9.7-30.7c.7-3 6.8-10 11.4-11s25 6.9 29.6 5.9c5.6-1.2 12.1-7.1 17.4-10.4 15.5 6.7 29.6 9.4 47.7 9.4 68.5 0 124-53.4 124-119.2S408.5 48 340 48s-121.9 53.37-121.9 119.17zM400 144a32 32 0 1 1-32-32 32 32 0 0 1 32 32z" fill="none" stroke={color} strokeWidth={32} strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'log-out-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M304 336v40a40 40 0 0 1-40 40H104a40 40 0 0 1-40-40V136a40 40 0 0 1 40-40h152c22.09 0 48 17.91 48 40v40M368 336l80-80-80-80M176 256h256" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     default:

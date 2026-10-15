@@ -48,8 +48,8 @@ test('Library uses searchable folders and recent listening sections', () => {
   assert.match(folder, /Search liked releases/);
   assert.match(folder, /Search followed artists/);
   assert.match(folder, /Search downloads/);
-  assert.match(library, /Recently played tracks/);
-  assert.match(library, /Recently played releases/);
+  assert.match(library, /'Recently Played'/);
+  assert.match(library, /'Recently Played Releases'/);
   assert.match(migration, /create or replace function public\.record_music_play/);
   assert.match(migration, /'recentTracks'/);
   assert.match(migration, /'recentReleases'/);

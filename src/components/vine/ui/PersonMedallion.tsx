@@ -11,7 +11,7 @@ interface PersonMedallionProps {
   name: string;
   /** The person's photo, or null for their initial on vine green. */
   imageUri: string | null;
-  /** The circle's diameter; the row's item is a little wider than it. */
+  /** The circle's diameter, and the item's width: 92 on a phone's rail, 140 in the iPad's and desktop's row. */
   size: number;
   arabic?: boolean;
   onPress: () => void;
@@ -24,6 +24,8 @@ interface PersonMedallionProps {
  */
 export default function PersonMedallion({ name, imageUri, size, arabic = false, onPress }: PersonMedallionProps) {
   const initial = name.trim().charAt(0).toUpperCase() || '♪';
+  // The larger medallions of the iPad and desktop set their names a size up.
+  const large = size >= 120;
   return (
     <Pressable
       accessibilityRole="button"
@@ -41,7 +43,7 @@ export default function PersonMedallion({ name, imageUri, size, arabic = false, 
           </>
         )}
       </View>
-      <Text style={[styles.name, arabic && styles.arabic]} numberOfLines={3} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+      <Text style={[styles.name, large && styles.nameLarge, arabic && styles.arabic]} numberOfLines={3} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {name}
       </Text>
     </Pressable>
@@ -60,5 +62,6 @@ const styles = StyleSheet.create({
   },
   initial: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontWeight: '700' },
   name: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600', lineHeight: 18, marginTop: 10, textAlign: 'center' },
+  nameLarge: { fontSize: 15.5, lineHeight: 19.5 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

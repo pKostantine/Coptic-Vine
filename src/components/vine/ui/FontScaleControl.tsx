@@ -14,6 +14,13 @@ export interface FontScaleControlProps {
   onStep: (delta: number) => void;
   /** Sets the scale outright — what the slider reports as it moves. */
   onSetValue: (value: number) => void;
+  /** The phone sheet's tighter row: 2pt less above and below. */
+  compact?: boolean;
+  /**
+   * The desktop's row: the value between − and + buttons instead of a track.
+   * Only a desktop browser asks for it, so only the web control draws it.
+   */
+  stepper?: boolean;
 }
 
 /**
@@ -44,9 +51,10 @@ export default function FontScaleControl({
   isArabic,
   label,
   onSetValue,
+  compact = false,
 }: FontScaleControlProps) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, compact && styles.cardCompact]}>
       <View style={[styles.header, isArabic && styles.rowReverse]}>
         <Text style={[styles.label, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{label}</Text>
         <Text style={[styles.value, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>
@@ -90,6 +98,7 @@ export default function FontScaleControl({
 
 const styles = StyleSheet.create({
   card: { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, gap: 10, paddingBottom: 13, paddingHorizontal: 16, paddingTop: 11 },
+  cardCompact: { paddingBottom: 11, paddingTop: 9 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   rowReverse: { flexDirection: 'row-reverse' },
   label: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },

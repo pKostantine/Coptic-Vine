@@ -59,7 +59,7 @@ function splitSaintTitle(title: string): { main: string; detail: string | null }
 
 /**
  * Home (Coptic Vine design system, "HomeHero"): the seal on a green glow with
- * the day beneath it, the Agpeya hour to pray now,
+ * "Pray. Read. Learn." and the day beneath it, the Agpeya hour to pray now,
  * then two framed cards under a gold crown — the day's readings, one service
  * at a time, and the saints of today and tomorrow. Home always shows the
  * live day, whatever date the Books screen has been moved to.
@@ -188,6 +188,9 @@ export default function HomeScreen() {
             style={styles.logo}
           />
         </View>
+        <Text style={[styles.heroTag, arabic && styles.arabicCentered]} maxFontSizeMultiplier={1.3}>
+          {tr('Pray. Read. Learn.', 'Prier. Lire. Apprendre.', 'صلِّ. اقرأ. تعلَّم.')}
+        </Text>
         <Text style={[styles.heroDate, arabic && styles.arabicCentered]} maxFontSizeMultiplier={1.3}>
           {dayLine(liveDate, styles.heroCoptic)}
         </Text>
@@ -222,9 +225,7 @@ export default function HomeScreen() {
   const frame = (
     <>
       <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-      <View style={styles.crown} pointerEvents="none">
-        <CrownOrnament width={300} height={58} />
-      </View>
+      <Crown wide={wideLayout} />
     </>
   );
   /** A pill of options across a framed card: the services, today and tomorrow. */
@@ -252,7 +253,7 @@ export default function HomeScreen() {
   // The card's head opens the Lectionary; each reading opens its service at
   // that reading (lectionaryHref).
   const readingsCard = (
-    <View style={[card, styles.framed]}>
+    <View style={card}>
       {frame}
       <Pressable
         accessibilityRole="button"
@@ -285,7 +286,7 @@ export default function HomeScreen() {
   );
 
   const synaxCard = (
-    <View style={[card, styles.framed]}>
+    <View style={card}>
       {frame}
       <View style={styles.framedHead}>
         <Text style={[styles.framedKicker, arabic && styles.arabicTight]}>{tr('Synaxarium', 'Synaxaire', 'السنكسار')}</Text>
@@ -371,6 +372,26 @@ export default function HomeScreen() {
   );
 }
 
+/** The crown's own proportions, 300 by 58. */
+const CROWN_ASPECT = 58 / 300;
+/** On the iPad and desktop the crown keeps this width, centred on the wider card. */
+const WIDE_CROWN_WIDTH = 340;
+
+/**
+ * The vine crown over a framed card. On a phone it spans the card, 8pt in
+ * from either side, its tendrils falling beside the kicker; wider cards keep
+ * it at 340pt in the middle.
+ */
+function Crown({ wide }: { wide: boolean }) {
+  const [width, setWidth] = useState(0);
+  const crownWidth = wide ? WIDE_CROWN_WIDTH : width;
+  return (
+    <View style={styles.crown} pointerEvents="none" onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))}>
+      {crownWidth > 0 ? <CrownOrnament width={crownWidth} height={Math.round(crownWidth * CROWN_ASPECT)} /> : null}
+    </View>
+  );
+}
+
 /** The green glow behind the seal: a radial light over a green-to-black fall. */
 function HeroGlow() {
   return (
@@ -397,7 +418,8 @@ const styles = StyleSheet.create({
   column: { alignSelf: 'center', maxWidth: 640, width: '100%' },
   contentWide: { paddingHorizontal: 36 },
   columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
-  columnNarrow: { flex: 1, minWidth: 0 },
+  // The seal's column a little narrower than the two cards' (0.9 : 1 : 1).
+  columnNarrow: { flex: 0.9, minWidth: 0 },
   columnWide: { flex: 1, minWidth: 0 },
   cardWide: { marginHorizontal: 0 },
   flex: { flex: 1, minWidth: 0 },
@@ -416,14 +438,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 184,
   },
-  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 24, textAlign: 'center' },
+  heroTag: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: 26, textAlign: 'center' },
+  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 8, textAlign: 'center' },
   heroCoptic: { color: COLORS.goldBright, fontWeight: '600' },
   heroDivider: { alignItems: 'center', marginBottom: 22, marginTop: 20 },
+  // No outlines on the cards: depth comes from their fills (Coptic Vine design, "no line").
   card: {
     backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
     borderRadius: 20,
-    borderWidth: 1,
     marginBottom: 14,
     marginHorizontal: 16,
     overflow: 'hidden',
@@ -443,8 +465,7 @@ const styles = StyleSheet.create({
   },
   prayButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
 
-  // The framed cards: a gold-edged card under the vine crown, its head centred.
-  framed: { borderColor: 'rgba(227, 181, 59, 0.3)' },
+  // The framed cards: under the vine crown, their head centred.
   crown: { alignItems: 'center', left: 8, opacity: 0.85, position: 'absolute', right: 8, top: 8 },
   framedHead: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 44 },
   framedKicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 1.7, textAlign: 'center', textTransform: 'uppercase' },

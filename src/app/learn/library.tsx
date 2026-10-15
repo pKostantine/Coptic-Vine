@@ -1,4 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useMemo, useState } from 'react';
@@ -22,7 +23,7 @@ import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAware
 import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
-import PageTitle from '@/components/vine/ui/PageTitle';
+import TabHeader from '@/components/vine/ui/TabHeader';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -62,7 +63,7 @@ function toQueueItem(item: LearningLibraryItem): LearningQueueItem {
  * My Learning (Coptic Vine design, "My Learning"): the three lists as tabs
  * with their counts, each recording or lesson on a card with the way to move
  * it forward, then the custom playlists. The iPad and desktop set the lists
- * beside the playlists.
+ * (the wider column) beside the playlists, under a line across both.
  */
 export default function LearningLibraryScreen() {
   const router = useRouter();
@@ -184,7 +185,8 @@ export default function LearningLibraryScreen() {
   const inGutter = { paddingHorizontal: gutter };
   const rowDirection = arabic && styles.rowReverse;
 
-  const lists = (
+  // Across the page, over both columns on the iPad and desktop.
+  const intro = (
     <>
       <View style={[styles.introRow, inGutter, rowDirection]}>
         <Text style={[styles.intro, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
@@ -214,8 +216,12 @@ export default function LearningLibraryScreen() {
           </Pressable>
         </View>
       ) : null}
+    </>
+  );
 
-      <View accessibilityRole="tablist" style={[styles.tabs, { marginHorizontal: gutter }, rowDirection]}>
+  const lists = (
+    <>
+      <View accessibilityRole="tablist" style={[styles.tabs, wide && styles.tabsFlush, { marginHorizontal: gutter }, rowDirection]}>
         {STATE_ORDER.map((state) => {
           const count = library.items.filter((item) => item.state === state).length;
           const active = state === activeState;
@@ -250,6 +256,7 @@ export default function LearningLibraryScreen() {
             : null;
           return (
             <View key={item.itemKind + ':' + item.itemId} style={styles.itemCard}>
+              <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
               <View style={[styles.itemTop, rowDirection]}>
               <Pressable accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.cantorName}`} style={({ pressed }) => [styles.itemMain, rowDirection, pressed && styles.pressed]} onPress={() => openItem(item)}>
                 <View style={styles.thumb}>
@@ -383,12 +390,13 @@ export default function LearningLibraryScreen() {
       >
         <PageGlow kind="green" tall={wide} />
         <PageGutterProvider gutter={gutter}>
-          <PageTitle title={tr('Learn & Study', 'Apprendre', 'تعلّم وادرس')} arabic={arabic} flush={wide} />
-          <LearningSectionNav active="library" flush={wide} />
+          <TabHeader title={tr('Learn & Study', 'Apprendre', 'تعلّم وادرس')} arabic={arabic} wide={wide} nav={<LearningSectionNav active="library" flush={wide} />} />
+          {intro}
           {wide ? (
             <View style={[styles.columns, rowDirection]}>
-              <View style={styles.column}>{lists}</View>
-              <View style={styles.column}>{playlists}</View>
+              <View style={styles.listsColumn}>{lists}</View>
+              {/* The playlists' heading level with the tabs: no section margin over it at the top of its column. */}
+              <View style={[styles.column, styles.columnHeadFlush]}>{playlists}</View>
             </View>
           ) : (
             <>
@@ -408,8 +416,12 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   content: { paddingBottom: 28 },
   contentWide: { paddingHorizontal: 36 },
-  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28, marginTop: 22 },
+  // The lists take the wider share, 1.25 to the playlists' 1.
+  listsColumn: { flex: 1.25, minWidth: 0 },
   column: { flex: 1, minWidth: 0 },
+  // Cancels SectionHeading's own top margin.
+  columnHeadFlush: { marginTop: -26 },
   rowReverse: { flexDirection: 'row-reverse' },
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.42 },
@@ -427,6 +439,7 @@ const styles = StyleSheet.create({
   authButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
 
   tabs: { borderBottomColor: 'rgba(255, 255, 255, 0.08)', borderBottomWidth: 1, flexDirection: 'row', gap: 22, marginTop: 18 },
+  tabsFlush: { marginTop: 0 },
   tab: { alignItems: 'center', borderBottomColor: 'transparent', borderBottomWidth: 2, flexDirection: 'row', gap: 7, marginBottom: -1, paddingBottom: 12 },
   tabActive: { borderBottomColor: COLORS.gold },
   tabLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
@@ -437,7 +450,7 @@ const styles = StyleSheet.create({
   tabCountTextActive: { color: COLORS.greenDeep },
 
   items: { gap: 10, marginTop: 14 },
-  itemCard: { backgroundColor: COLORS.surface, borderRadius: 20, padding: 12 },
+  itemCard: { backgroundColor: COLORS.surface, borderRadius: 20, overflow: 'hidden', padding: 12 },
   itemTop: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   itemMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 14, minWidth: 0 },
   thumb: { position: 'relative' },

@@ -14,6 +14,8 @@ interface LearningSeasonTileProps {
   now?: boolean;
   nowLabel?: string;
   arabic?: boolean;
+  /** The iPad's and desktop's four across: a taller tile and a larger name. */
+  large?: boolean;
   onPress: () => void;
 }
 
@@ -21,25 +23,25 @@ interface LearningSeasonTileProps {
  * A season to learn (Coptic Vine design, "Learn", By Season): a tile in the
  * season's colours, a faded budded cross on its corner, its name at the foot.
  */
-export default function LearningSeasonTile({ title, look, now = false, nowLabel = 'Now', arabic = false, onPress }: LearningSeasonTileProps) {
+export default function LearningSeasonTile({ title, look, now = false, nowLabel = 'Now', arabic = false, large = false, onPress }: LearningSeasonTileProps) {
   const textColor = look.light ? COLORS.greenDeep : COLORS.white;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={now ? `${title}, ${nowLabel}` : title}
       onPress={onPress}
-      style={({ pressed }) => [styles.tile, arabic && styles.tileArabic, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.tile, large && styles.tileLarge, arabic && styles.tileArabic, pressed && styles.pressed]}
     >
       <LinearGradient colors={[look.from, look.to]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
       <View style={[styles.cross, arabic ? styles.crossLeft : styles.crossRight, look.light && styles.crossLight]} pointerEvents="none">
         <BuddedCross size={68} />
       </View>
       {now ? (
-        <View style={[styles.now, arabic ? styles.nowRight : styles.nowLeft]}>
+        <View style={[styles.now, large && styles.nowLarge, arabic ? (large ? styles.nowRightLarge : styles.nowRight) : (large ? styles.nowLeftLarge : styles.nowLeft)]}>
           <Text style={[styles.nowText, arabic && styles.arabicBadge]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{arabic ? nowLabel : nowLabel.toUpperCase()}</Text>
         </View>
       ) : null}
-      <Text style={[styles.title, { color: textColor }, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+      <Text style={[styles.title, large && styles.titleLarge, { color: textColor }, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {title}
       </Text>
     </Pressable>
@@ -56,6 +58,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
+  tileLarge: { height: 124, paddingHorizontal: 18, paddingVertical: 16 },
   tileArabic: { alignItems: 'flex-end' },
   pressed: { opacity: 0.85 },
   cross: { opacity: 0.22, position: 'absolute', top: -8 },
@@ -65,8 +68,12 @@ const styles = StyleSheet.create({
   now: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, height: 22, justifyContent: 'center', paddingHorizontal: 9, position: 'absolute', top: 12 },
   nowLeft: { left: 12 },
   nowRight: { right: 12 },
+  nowLarge: { top: 16 },
+  nowLeftLarge: { left: 16 },
+  nowRightLarge: { right: 16 },
   nowText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 0.9 },
   arabicBadge: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
   title: { fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700', lineHeight: 20 },
+  titleLarge: { fontSize: 21, lineHeight: 24 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });

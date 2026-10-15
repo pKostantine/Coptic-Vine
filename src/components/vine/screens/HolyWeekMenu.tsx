@@ -35,7 +35,8 @@ const CRIMSON: DayBlockTheme = {
   from: '#760618',
   to: '#050101',
   toAt: 0.8,
-  border: '#1D1D1D',
+  // No outline: the card is its crimson alone.
+  border: 'transparent',
   text: '#FFFFFF',
   muted: 'rgba(255, 255, 255, 0.72)',
   strong: 'rgba(255, 255, 255, 0.85)',
@@ -145,6 +146,9 @@ export default function HolyWeekMenu() {
           theme={CRIMSON}
           background={<CrimsonGlow />}
           arabic={arabic}
+          // The week card has no control row, but its day still drops 20pt
+          // from the top as it does beneath one.
+          controls={<View />}
           heading={entryLabel(day)}
           subheading={subheading}
           strip={<DayStrip items={strip} theme={CRIMSON} arabic={arabic} />}
@@ -226,7 +230,9 @@ function HoursOf({ day, current, arabic, bookmarked, onOpen }: { day: HolyWeekDa
   return (
     <View style={styles.hours}>
       <View style={[styles.hoursHead, arabic && styles.rowReverse]}>
-        <Icon name={eve ? 'moon' : 'sunny'} size={17} color={accent} />
+        <View style={styles.hoursIcon}>
+          <Icon name={eve ? 'moon' : 'sunny'} size={17} color={accent} />
+        </View>
         <Text style={[styles.kind, { color: accent }, arabic && styles.kindArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
           {arabic ? kind : kind.toUpperCase()}
         </Text>
@@ -276,10 +282,13 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.75 },
   crimsonBase: { backgroundColor: '#050101' },
 
-  dayAndEve: { borderColor: '#1D1D1D', borderRadius: 22, borderWidth: 1, marginTop: 14, overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 4 },
+  // Like the week card, the hours carry no outline (the hairline stays, clear).
+  dayAndEve: { borderColor: 'transparent', borderRadius: 22, borderWidth: 1, marginTop: 14, overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 4 },
   separator: { backgroundColor: 'rgba(255, 255, 255, 0.1)', height: 1 },
   hours: { gap: 6, paddingBottom: 16, paddingTop: 14 },
-  hoursHead: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 6 },
+  // "DAY" sits on the day's name's baseline; the sun or moon centres on the row.
+  hoursHead: { alignItems: 'baseline', flexDirection: 'row', gap: 10, marginBottom: 6 },
+  hoursIcon: { alignSelf: 'center' },
   kind: { fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
   kindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0 },
   nowTag: { backgroundColor: COLORS.gold, borderRadius: 99, justifyContent: 'center', paddingHorizontal: 9, paddingVertical: 2 },
@@ -288,7 +297,7 @@ const styles = StyleSheet.create({
   dayTitleLatin: { marginLeft: 'auto' },
   dayTitleArabic: { fontFamily: TYPOGRAPHY.arabic, marginRight: 'auto', writingDirection: 'rtl' },
   chipRow: { flexDirection: 'row', gap: 6 },
-  chip: { alignItems: 'center', borderRadius: 12, borderWidth: 1, flex: 1, height: 38, justifyContent: 'center', minWidth: 0, paddingHorizontal: 6 },
+  chip: { alignItems: 'center', borderRadius: 12, borderWidth: 1, flex: 1, height: 40, justifyContent: 'center', minWidth: 0, paddingHorizontal: 6 },
   chipDay: { backgroundColor: 'rgba(227, 181, 59, 0.12)', borderColor: 'rgba(227, 181, 59, 0.28)' },
   chipEve: { backgroundColor: 'rgba(142, 197, 255, 0.1)', borderColor: 'rgba(142, 197, 255, 0.28)' },
   chipText: { fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },

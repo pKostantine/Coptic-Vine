@@ -41,6 +41,9 @@ import type { OfflineDownloadRequest } from '@/types/offlineDownloads';
 const MANIFEST_BASE_URL = (process.env.EXPO_PUBLIC_CONTENT_PACKAGES_URL || '').replace(/\/+$/, '');
 const MANIFEST_CACHE_MS = 60_000;
 const AUTO_UPDATE_SETTING = 'automatic_book_updates_wifi';
+// When the published manifest was last compared against the installed books,
+// by hand or automatically: Downloads & Storage shows it under "Check for updates".
+const LAST_UPDATE_CHECK_SETTING = 'last_book_update_check';
 
 class PausedDownloadError extends Error {}
 
@@ -136,6 +139,11 @@ export async function getAutomaticBookUpdatesEnabled(): Promise<boolean> {
 
 export async function setAutomaticBookUpdatesEnabled(enabled: boolean): Promise<void> {
   await setContentSetting(AUTO_UPDATE_SETTING, enabled ? 'true' : 'false');
+}
+
+/** When the books were last checked for updates (ISO time), or null if never. */
+export async function getLastBookUpdateCheck(): Promise<string | null> {
+  return (await getContentSetting(LAST_UPDATE_CHECK_SETTING)) || null;
 }
 
 class NativeBookDownloadManager implements BookDownloadManager {
@@ -341,6 +349,7 @@ class NativeBookDownloadManager implements BookDownloadManager {
       const stale = (await Promise.all(resourceIds.map(async (id) => (await getActiveResourceVersion(id)) !== manifest.resources[id].version))).some(Boolean);
       if (stale) { await setBookState(book.bookKey, 'update_available'); updates.push(book.bookKey); }
     }
+    await setContentSetting(LAST_UPDATE_CHECK_SETTING, new Date().toISOString());
     const network = await Network.getNetworkStateAsync();
     const wifi = network.isConnected !== false && [Network.NetworkStateType.WIFI, Network.NetworkStateType.ETHERNET].includes(network.type as any);
     const automatic = await getAutomaticBookUpdatesEnabled();

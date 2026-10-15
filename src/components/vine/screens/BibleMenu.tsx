@@ -143,9 +143,10 @@ const styles = StyleSheet.create({
   },
 
   testaments: { gap: 12 },
+  // The cards carry no outline, only their green (the hairline stays, clear, so they keep their size).
   card: {
     alignItems: 'center',
-    borderColor: 'rgba(227, 181, 59, 0.3)',
+    borderColor: 'transparent',
     borderRadius: 22,
     borderWidth: 1,
     flexDirection: 'row',

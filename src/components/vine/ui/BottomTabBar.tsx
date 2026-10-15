@@ -36,8 +36,12 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
     account: tr('Account', 'Compte', 'الحساب'),
   };
   const labelStyle = [styles.tabLabel, isCompactLandscape && styles.tabLabelLandscape, tablet && styles.tabLabelTablet, isArabic && styles.tabLabelArabic];
-  const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape, tablet && styles.tabTablet];
-  const iconSize = isCompactLandscape ? 22 : tablet ? 24 : 27;
+  // A phone with a home indicator: the indicator's own band is the space
+  // under the labels, as under a native tab bar, less the part the indicator
+  // doesn't need -- not that band on top of the tabs' own padding.
+  const aboveHomeIndicator = !tablet && insets.bottom > 0;
+  const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape, tablet && styles.tabTablet, aboveHomeIndicator && styles.tabAboveHomeIndicator];
+  const iconSize = isCompactLandscape ? 22 : tablet ? 24 : 23;
 
   // Tell floating UI (the now-playing bar) where this bar's top edge is, so it
   // can sit just above it. Only while focused: screens lower in a stack keep
@@ -82,7 +86,10 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
       {/* The bar's green runs on under the iPhone's home indicator, with the
           tabs themselves above it. No screen with the tab bar insets its
           own bottom edge, so this is the only place it is made room for. */}
-      <View accessibilityRole="tablist" style={[styles.bar, tablet && styles.barTablet, { paddingBottom: insets.bottom + (tablet ? 14 : 0) }]}>
+      <View
+        accessibilityRole="tablist"
+        style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet ? insets.bottom + 14 : Math.max(insets.bottom - 8, 0) }]}
+      >
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'home' }} accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
         <Icon name="home-outline" size={iconSize} color={active === 'home' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'home' && styles.tabLabelActive]}>{labels.home}</Text>
@@ -113,7 +120,8 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
-  // The tab bar sits on the deep green under a gold hairline (Coptic Vine, "TabBar").
+  // The tab bar sits on the deep green under a gold hairline (Coptic Vine, "TabBar"):
+  // 23pt glyphs over 11pt labels, 10pt from the hairline.
   shell: { backgroundColor: COLORS.greenDeep },
   bar: {
     backgroundColor: COLORS.greenDeep,
@@ -124,7 +132,7 @@ const styles = StyleSheet.create({
   tab: {
     alignItems: 'center',
     flex: 1,
-    gap: 2,
+    gap: 3,
     justifyContent: 'center',
     paddingHorizontal: 0,
     paddingVertical: 10,
@@ -132,6 +140,7 @@ const styles = StyleSheet.create({
   },
   // The iPad's tabs: a centred row of 80pt items, 56pt apart.
   barTablet: { gap: 56, justifyContent: 'center', paddingBottom: 14, paddingTop: 6 },
+  tabAboveHomeIndicator: { paddingBottom: 0 },
   tabTablet: { borderRadius: 16, flexBasis: 80, flexGrow: 0, flexShrink: 0, gap: 4, paddingVertical: 8, width: 80 },
   tabLabelTablet: { fontSize: 11.5 },
   tabLandscape: {
@@ -142,9 +151,9 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     color: COLORS.muted,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.body,
+    fontSize: 11,
+    fontWeight: '600',
   },
   tabLabelLandscape: {
     fontSize: 14,

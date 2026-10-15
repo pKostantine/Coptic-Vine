@@ -12,8 +12,8 @@ import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
-import PageTitle from '@/components/vine/ui/PageTitle';
 import PersonMedallion from '@/components/vine/ui/PersonMedallion';
+import TabHeader from '@/components/vine/ui/TabHeader';
 import { useLiturgicalDay } from '@/components/vine/ui/useLiturgicalDay';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -25,18 +25,18 @@ import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
 
-/** How many season tiles sit side by side: two on a phone, more as the page widens. */
-function tileColumnsFor(width: number): number {
-  if (width >= 1100) return 4;
-  if (width >= 700) return 3;
-  return 2;
+/** How many season tiles sit side by side: two on a phone, four on the iPad and desktop (three on a narrow iPad). */
+function tileColumnsFor(width: number, wide: boolean): number {
+  if (!wide) return 2;
+  return width >= 900 ? 4 : 3;
 }
 
 /**
  * Learn & Study's Discover page (Coptic Vine design, "Learn"): the cantors as
  * medallions, then the seasons as tiles in their own colours, the Church's
  * present season marked "Now"; and, for someone part-way through, what they
- * were learning.
+ * were learning. The iPad and desktop set the cantors in a row of larger
+ * medallions and the seasons four across.
  */
 export default function LearningHomeScreen() {
   const router = useRouter();
@@ -73,8 +73,9 @@ export default function LearningHomeScreen() {
   const continueLearning = library?.items.filter((item) => item.state === 'learning').slice(0, 4) ?? [];
   const gutter = wide ? 0 : 16;
   const available = width - (wide ? 72 : 32);
-  const columns = tileColumnsFor(available);
-  const tileWidth = Math.floor((available - 10 * (columns - 1)) / columns);
+  const columns = tileColumnsFor(available, wide);
+  const tileGap = wide ? 16 : 10;
+  const tileWidth = Math.floor((available - tileGap * (columns - 1)) / columns);
   // The season the Church is in wears the "Now" badge: the first tile in the day's colours.
   const seasons = (home?.seasons ?? []).map((season) => ({ season, look: learningSeasonLook(season) }));
   const nowId = seasons.find(({ look }) => look.theme === day.theme.key)?.season.id ?? null;
@@ -97,8 +98,7 @@ export default function LearningHomeScreen() {
       >
         <PageGlow kind="green" tall={wide} />
         <PageGutterProvider gutter={gutter}>
-          <PageTitle title={tr('Learn & Study', 'Apprendre', 'تعلّم وادرس')} arabic={arabic} flush={wide} />
-          <LearningSectionNav active="home" flush={wide} />
+          <TabHeader title={tr('Learn & Study', 'Apprendre', 'تعلّم وادرس')} arabic={arabic} wide={wide} nav={<LearningSectionNav active="home" flush={wide} />} />
 
           {!home && !error ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
           {error ? (
@@ -120,18 +120,33 @@ export default function LearningHomeScreen() {
                 trailing={browseAll(tr('All cantors', 'Tous les chantres', 'كل المعلّمين'), () => router.push('/learn/cantors'))}
               />
               {home.cantors.length ? (
-                <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.people, { paddingHorizontal: gutter }]}>
-                  {home.cantors.map((cantor) => (
-                    <PersonMedallion
-                      key={cantor.id}
-                      name={cantor.displayName}
-                      imageUri={learningService.resolveAsset(cantor.profileImageAsset)}
-                      size={92}
-                      arabic={arabic}
-                      onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: cantor.id } })}
-                    />
-                  ))}
-                </NowPlayingAwareScrollView>
+                wide ? (
+                  <View style={[styles.peopleWide, arabic && styles.rowReverse]}>
+                    {home.cantors.map((cantor) => (
+                      <PersonMedallion
+                        key={cantor.id}
+                        name={cantor.displayName}
+                        imageUri={learningService.resolveAsset(cantor.profileImageAsset)}
+                        size={140}
+                        arabic={arabic}
+                        onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: cantor.id } })}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.people, { paddingHorizontal: gutter }]}>
+                    {home.cantors.map((cantor) => (
+                      <PersonMedallion
+                        key={cantor.id}
+                        name={cantor.displayName}
+                        imageUri={learningService.resolveAsset(cantor.profileImageAsset)}
+                        size={92}
+                        arabic={arabic}
+                        onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: cantor.id } })}
+                      />
+                    ))}
+                  </NowPlayingAwareScrollView>
+                )
               ) : (
                 <Text style={[styles.empty, { marginHorizontal: gutter }, arabic && styles.arabic]}>{tr('No cantors yet.', 'Aucun chantre pour l’instant.', 'لا يوجد معلّمون بعد.')}</Text>
               )}
@@ -141,7 +156,7 @@ export default function LearningHomeScreen() {
                 arabic={arabic}
                 trailing={browseAll(tr('All seasons', 'Tous les temps', 'كل المواسم'), () => router.push('/learn/seasons'))}
               />
-              <View style={[styles.tiles, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+              <View style={[styles.tiles, { gap: tileGap, paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
                 {seasons.map(({ season, look }) => (
                   <View key={season.id} style={{ width: tileWidth }}>
                     <LearningSeasonTile
@@ -150,6 +165,7 @@ export default function LearningHomeScreen() {
                       now={season.id === nowId}
                       nowLabel={tr('Now', 'Maintenant', 'الآن')}
                       arabic={arabic}
+                      large={wide}
                       onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: season.id } })}
                     />
                   </View>
@@ -204,7 +220,9 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   rowReverse: { flexDirection: 'row-reverse' },
   people: { gap: 16 },
-  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  // The iPad's and desktop's cantors: 140pt medallions, 28pt apart, wrapping when there are many.
+  peopleWide: { flexDirection: 'row', flexWrap: 'wrap', gap: 28 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap' },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
   continueList: { gap: 8 },
   continueCard: {

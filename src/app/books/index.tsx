@@ -133,7 +133,7 @@ export default function BooksHome() {
   );
   const library = (
     <>
-      <Text style={[styles.section, layout !== 'phone' && styles.sectionBeside, arabic && styles.arabic]} accessibilityRole="header">
+      <Text style={[styles.section, arabic && styles.arabic]} accessibilityRole="header">
         {tr('Library', 'Bibliothèque', 'المكتبة')}
       </Text>
       <View style={styles.shelf}>
@@ -174,7 +174,7 @@ export default function BooksHome() {
         ) : (
           <View style={[styles.columns, arabic && styles.rowReverse]}>
             <View style={layout === 'desktop' ? styles.dayColumn : styles.half}>
-              {title}
+              <View style={styles.titleBeside}>{title}</View>
               {dayBlock}
             </View>
             <View style={styles.half}>{library}</View>
@@ -205,8 +205,9 @@ const styles = StyleSheet.create({
   columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
   dayColumn: { width: 420 },
   half: { flex: 1, minWidth: 0 },
-  // Beside the day block the library's heading lines up with the page title.
-  sectionBeside: { marginTop: 10 },
+  // In the iPad's and desktop's columns the title keeps the 6pt it has under a
+  // phone's status bar; the library's heading beside it then sits its 28pt down.
+  titleBeside: { paddingTop: 6 },
   rowReverse: { flexDirection: 'row-reverse' },
   section: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700', marginBottom: 12, marginTop: 28 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },

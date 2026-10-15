@@ -2,7 +2,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
@@ -14,6 +14,7 @@ import LoadFailure from '@/components/vine/ui/LoadFailure';
 import { BuddedCross } from '@/components/vine/ui/Ornaments';
 import PersonHero from '@/components/vine/ui/PersonHero';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
+import { learningAlbumQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningCantorDetail } from '@/types/learningPlatform';
@@ -22,9 +23,15 @@ import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../../utils/appText';
 
+/** The iPad's and desktop's columns, and the covers three across in each. */
+const COLUMN_GAP = 32;
+const GRID_GAP = 22;
+
 /**
  * A cantor (Coptic Vine design, "Cantor"): their photo glowing out of the
- * page and their name, then their learning albums and lesson sets as covers.
+ * page and their name, then their learning albums (each with a play button)
+ * and lesson sets as covers. The iPad and desktop set the photo beside the
+ * name and the albums beside the lesson sets.
  */
 export default function LearningCantorScreen() {
   const router = useRouter();
@@ -39,6 +46,8 @@ export default function LearningCantorScreen() {
   const [cantor, setCantor] = useState<LearningCantorDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const { currentItem, playing, playQueue, togglePlayback } = useLearningPlayer();
+  const [loadingAlbumId, setLoadingAlbumId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!cantorId) return;
@@ -53,18 +62,100 @@ export default function LearningCantorScreen() {
     return () => { active = false; };
   }, [cantorId, locale, attempt]);
 
-  const gutter = wide ? 0 : 16;
+  // An album's covers play it from its first recording, fetched on the tap; the album playing pauses.
+  const albumIsCurrent = (albumId: string) => currentItem?.kind === 'recording' && currentItem.containerId === albumId;
+  const playAlbum = (albumId: string) => {
+    if (albumIsCurrent(albumId)) {
+      togglePlayback();
+      return;
+    }
+    if (loadingAlbumId) return;
+    setLoadingAlbumId(albumId);
+    learningService.getAlbum(albumId, locale)
+      .then((album) => {
+        const queue = learningAlbumQueue(album);
+        if (queue.length) playQueue(queue, 0);
+      })
+      .catch((cause) => Alert.alert(tr('Play album', 'Lire l’album', 'تشغيل الألبوم'), cause instanceof Error ? cause.message : 'Unable to play this album.'))
+      .finally(() => setLoadingAlbumId((current) => (current === albumId ? null : current)));
+  };
+
+  // The iPad's and desktop's 36pt margins are the sections' gutter, the hero's glow running past them to the edges.
+  const gutter = wide ? 36 : 16;
   const available = width - (wide ? 72 : 32);
-  const columns = wide ? Math.max(3, Math.floor((available + 12) / 172)) : 2;
-  const tileWidth = Math.floor((available - 12 * (columns - 1)) / columns);
+  // A phone sets two 140pt covers side by side; the iPad and desktop three in each of two columns.
+  const gap = wide ? GRID_GAP : 12;
+  const tileWidth = wide ? Math.floor(((available - COLUMN_GAP) / 2 - GRID_GAP * 2) / 3) : 140;
   const chevron = <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />;
 
+  // In the iPad's and desktop's columns the sections sit flush; the row of columns takes the margins.
+  const sectionGutter = wide ? 0 : gutter;
   const empty = (text: string) => (
-    <View style={[styles.empty, { marginHorizontal: gutter }, arabic && styles.rowReverse]}>
+    <View style={[styles.empty, { marginHorizontal: sectionGutter }, arabic && styles.rowReverse]}>
       <View style={styles.emptyCross}><BuddedCross size={22} /></View>
       <Text style={[styles.emptyText, arabic && styles.arabic]}>{text}</Text>
     </View>
   );
+
+  const albums = cantor ? (
+    <>
+      <SectionHeading title={tr('Learning Albums', 'Albums d’apprentissage', 'ألبومات التعلّم')} arabic={arabic} />
+      <Text style={[styles.sub, { paddingHorizontal: sectionGutter }, arabic && styles.arabic]}>
+        {tr('Ordered recordings for listening and review', 'Enregistrements ordonnés pour l’écoute et la révision', 'تسجيلات مرتبة للاستماع والمراجعة')}
+      </Text>
+      {cantor.albums.length ? (
+        <View style={[styles.grid, { gap, paddingHorizontal: sectionGutter }, arabic && styles.rowReverse]}>
+          {cantor.albums.map((album) => {
+            const albumPlaying = albumIsCurrent(album.id) && playing;
+            return (
+              <ReleaseTile
+                key={album.id}
+                id={album.id}
+                title={album.title}
+                subtitle={tr('Learning album', 'Album d’apprentissage', 'ألبوم تعلّم')}
+                artworkUri={learningService.resolveAsset(album.coverAsset)}
+                width={tileWidth}
+                arabic={arabic}
+                wrapTitle
+                onPress={() => router.push({ pathname: '/learn/album/[id]', params: { id: album.id } })}
+                onPlay={() => playAlbum(album.id)}
+                playing={albumPlaying}
+                playLabel={`${albumPlaying ? tr('Pause', 'Pause', 'إيقاف مؤقت') : tr('Play', 'Lire', 'تشغيل')}: ${album.title}`}
+                trailing={chevron}
+              />
+            );
+          })}
+        </View>
+      ) : empty(tr('No published learning albums yet.', 'Aucun album d’apprentissage publié pour l’instant.', 'لا توجد ألبومات منشورة بعد.'))}
+    </>
+  ) : null;
+
+  const lessonSets = cantor ? (
+    <>
+      <SectionHeading title={tr('Lesson Sets', 'Séries de leçons', 'مجموعات الدروس')} arabic={arabic} />
+      <Text style={[styles.sub, { paddingHorizontal: sectionGutter }, arabic && styles.arabic]}>
+        {tr('Step-by-step study for individual hymns', 'Étude pas à pas de chaque hymne', 'دروس خطوة بخطوة لكل لحن')}
+      </Text>
+      {cantor.lessonSets.length ? (
+        <View style={[styles.grid, { gap, paddingHorizontal: sectionGutter }, arabic && styles.rowReverse]}>
+          {cantor.lessonSets.map((lessonSet) => (
+            <ReleaseTile
+              key={lessonSet.id}
+              id={lessonSet.id}
+              title={lessonSet.title}
+              subtitle={tr('Hymn course', 'Cours d’hymne', 'منهج لحن')}
+              artworkUri={learningService.resolveAsset(lessonSet.coverAsset ?? null)}
+              width={tileWidth}
+              arabic={arabic}
+              wrapTitle
+              onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
+              trailing={chevron}
+            />
+          ))}
+        </View>
+      ) : empty(tr('No published lesson sets yet.', 'Aucune série de leçons publiée pour l’instant.', 'لا توجد مجموعات دروس منشورة بعد.'))}
+    </>
+  ) : null;
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -81,7 +172,7 @@ export default function LearningCantorScreen() {
           )}
         </View>
       ) : (
-        <NowPlayingAwareScrollView contentContainerStyle={[styles.content, wide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <PageGutterProvider gutter={gutter}>
             <PersonHero
               name={cantor.displayName}
@@ -95,51 +186,19 @@ export default function LearningCantorScreen() {
               backLabel={tr('Go back', 'Retour', 'رجوع')}
             />
 
-            <SectionHeading title={tr('Learning Albums', 'Albums d’apprentissage', 'ألبومات التعلّم')} arabic={arabic} />
-            <Text style={[styles.sub, { paddingHorizontal: gutter }, arabic && styles.arabic]}>
-              {tr('Ordered recordings for listening and review', 'Enregistrements ordonnés pour l’écoute et la révision', 'تسجيلات مرتبة للاستماع والمراجعة')}
-            </Text>
-            {cantor.albums.length ? (
-              <View style={[styles.grid, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
-                {cantor.albums.map((album) => (
-                  <ReleaseTile
-                    key={album.id}
-                    id={album.id}
-                    title={album.title}
-                    subtitle={tr('Learning album', 'Album d’apprentissage', 'ألبوم تعلّم')}
-                    artworkUri={learningService.resolveAsset(album.coverAsset)}
-                    width={tileWidth}
-                    arabic={arabic}
-                    wrapTitle
-                    onPress={() => router.push({ pathname: '/learn/album/[id]', params: { id: album.id } })}
-                    trailing={chevron}
-                  />
-                ))}
-              </View>
-            ) : empty(tr('No published learning albums yet.', 'Aucun album d’apprentissage publié pour l’instant.', 'لا توجد ألبومات منشورة بعد.'))}
-
-            <SectionHeading title={tr('Lesson Sets', 'Séries de leçons', 'مجموعات الدروس')} arabic={arabic} />
-            <Text style={[styles.sub, { paddingHorizontal: gutter }, arabic && styles.arabic]}>
-              {tr('Step-by-step study for individual hymns', 'Étude pas à pas de chaque hymne', 'دروس خطوة بخطوة لكل لحن')}
-            </Text>
-            {cantor.lessonSets.length ? (
-              <View style={[styles.grid, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
-                {cantor.lessonSets.map((lessonSet) => (
-                  <ReleaseTile
-                    key={lessonSet.id}
-                    id={lessonSet.id}
-                    title={lessonSet.title}
-                    subtitle={tr('Hymn course', 'Cours d’hymne', 'منهج لحن')}
-                    artworkUri={learningService.resolveAsset(lessonSet.coverAsset ?? null)}
-                    width={tileWidth}
-                    arabic={arabic}
-                    wrapTitle
-                    onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
-                    trailing={chevron}
-                  />
-                ))}
-              </View>
-            ) : empty(tr('No published lesson sets yet.', 'Aucune série de leçons publiée pour l’instant.', 'لا توجد مجموعات دروس منشورة بعد.'))}
+            {wide ? (
+              <PageGutterProvider gutter={0}>
+                <View style={[styles.columns, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+                  <View style={styles.column}>{albums}</View>
+                  <View style={styles.column}>{lessonSets}</View>
+                </View>
+              </PageGutterProvider>
+            ) : (
+              <>
+                {albums}
+                {lessonSets}
+              </>
+            )}
           </PageGutterProvider>
         </NowPlayingAwareScrollView>
       )}
@@ -151,14 +210,15 @@ export default function LearningCantorScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   content: { paddingBottom: 32 },
-  contentWide: { paddingHorizontal: 36, paddingTop: 20 },
   pending: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
   pendingBack: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   loader: { marginTop: 48 },
   pressed: { opacity: 0.7 },
   rowReverse: { flexDirection: 'row-reverse' },
   sub: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, lineHeight: 19, marginBottom: 12, marginTop: -4 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: COLUMN_GAP },
+  column: { flex: 1, minWidth: 0 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
   empty: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   emptyCross: { opacity: 0.5 },
   emptyText: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14 },

@@ -99,7 +99,8 @@ export default function SaintHymnPicker({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const { preferences } = useReadingPreferences();
-  const wide = useLayoutMode() !== 'phone';
+  const layout = useLayoutMode();
+  const wide = layout !== 'phone';
 
   const label = (entry: { english: string; arabic: string; french?: string }) => (appText(entry));
   const localized = isArabic && styles.arabicText;
@@ -275,7 +276,10 @@ export default function SaintHymnPicker({
           // Native hands the touch to this responder alone; this makes both
           // behave the same way.
           event?.stopPropagation?.();
-          openPreview(target);
+          // Side by side the preview pane has no back button of its own: the
+          // lit eye that opened it closes it again.
+          if (open && wide) setPreview(null);
+          else openPreview(target);
         }}
       >
         <Icon name="eye-outline" size={19} color={open ? COLORS.greenDeep : COLORS.gold} />
@@ -292,13 +296,16 @@ export default function SaintHymnPicker({
         accessibilityRole="button"
         accessibilityLabel={`${item.name}, ${item.options.map((option) => option.label).join(', ')}`}
         accessibilityState={single ? { selected: count > 0 } : { expanded: item.base === expandedBase }}
-        style={({ pressed }) => [styles.saintRow, rowDirection, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.saintRow, highlighted && styles.saintRowOn, rowDirection, pressed && styles.pressed]}
         onPress={() => openSaint(item)}
       >
+        {/* A saint fades straight down; the one whose hymns are open, or whose
+            one hymn is chosen, lifts in the vine green at the design's 160°. */}
         <LinearGradient
           colors={highlighted ? [COLORS.green, COLORS.greenDeep] : [COLORS.surfaceDeep, COLORS.surface]}
-          start={{ x: 0.2, y: 0 }}
-          end={{ x: 0.8, y: 1 }}
+          locations={highlighted ? [0, 0.8] : [0, 1]}
+          start={highlighted ? { x: 0.33, y: 0 } : { x: 0.5, y: 0 }}
+          end={highlighted ? { x: 0.67, y: 1 } : { x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
@@ -325,9 +332,9 @@ export default function SaintHymnPicker({
     );
   };
 
-  /** A saint's hymns to choose from (Coptic Vine design, "Choose hymns"). */
+  /** A saint's hymns to choose from (Coptic Vine design, "Choose hymns"): on a phone straight on its sheet, wider on a pane of its own. */
   const chooser = expanded ? (
-    <View style={styles.chooser}>
+    <View style={wide ? styles.pane : null}>
       <View style={[styles.chooserHead, rowDirection]}>
         <View style={styles.flex}>
           <Text style={[styles.kicker, isArabic && styles.kickerArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{isArabic ? expanded.name : expanded.name.toUpperCase()}</Text>
@@ -370,11 +377,13 @@ export default function SaintHymnPicker({
 
   /** A hymn's text, with the way to include it (Coptic Vine design, "Preview"). */
   const previewPanel = preview ? (
-    <View style={styles.preview}>
+    <View style={wide ? styles.pane : styles.previewSheet}>
       <View style={[styles.previewHead, rowDirection]}>
-        <Pressable accessibilityRole="button" accessibilityLabel={tr('Close preview', 'Fermer l’aperçu', 'أغلق المعاينة')} style={({ pressed }) => [styles.previewBack, pressed && styles.pressed]} onPress={() => setPreview(null)}>
-          <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={19} color={COLORS.gold} />
-        </Pressable>
+        {wide ? null : (
+          <Pressable accessibilityRole="button" accessibilityLabel={tr('Close preview', 'Fermer l’aperçu', 'أغلق المعاينة')} style={({ pressed }) => [styles.previewBack, pressed && styles.pressed]} onPress={() => setPreview(null)}>
+            <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={19} color={COLORS.gold} />
+          </Pressable>
+        )}
         <Text style={[styles.previewTitle, localized]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>{previewTitle(preview)}</Text>
         <Pressable
           accessibilityRole="switch"
@@ -415,7 +424,7 @@ export default function SaintHymnPicker({
   ) : null;
 
   const search = (
-    <View style={[styles.search, rowDirection]}>
+    <View style={[styles.search, wide && styles.searchFlush, rowDirection]}>
       <Icon name="search-outline" size={19} color={COLORS.gold} />
       <TextInput
         value={query}
@@ -440,7 +449,7 @@ export default function SaintHymnPicker({
       data={filtered}
       keyExtractor={(entry) => entry.base}
       style={styles.list}
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={[styles.listContent, wide && styles.listContentFlush]}
       keyboardShouldPersistTaps="handled"
       initialNumToRender={16}
       windowSize={9}
@@ -460,15 +469,17 @@ export default function SaintHymnPicker({
       <View style={[styles.page, DISABLED_TEXT_SELECTION_STYLE]} {...edgeSwipeHandlers}>
         <PageGlow kind="green" tall={wide} />
         <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.flex}>
-          <SubPageHeader title={label(LABELS.title)} arabic={isArabic} onBack={closePicker} backLabel={tr('Back', 'Retour', 'رجوع')} />
+          <View style={wide ? styles.headerWide : null}>
+            <SubPageHeader title={label(LABELS.title)} arabic={isArabic} onBack={closePicker} backLabel={tr('Back', 'Retour', 'رجوع')} />
+          </View>
 
           {wide ? (
             <View style={[styles.columns, rowDirection]}>
-              <View style={styles.listColumn}>
+              <View style={[styles.listColumn, layout === 'desktop' ? styles.listColumnDesktop : styles.listColumnTablet]}>
                 {search}
                 {list}
               </View>
-              {chooser ? <View style={styles.chooserColumn}>{chooser}</View> : null}
+              {chooser ? <View style={layout === 'desktop' ? styles.chooserColumnDesktop : styles.chooserColumnTablet}>{chooser}</View> : null}
               {previewPanel ? <View style={styles.previewColumn}>{previewPanel}</View> : null}
             </View>
           ) : (
@@ -537,6 +548,7 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     paddingVertical: 13,
   },
+  saintRowOn: { boxShadow: '0px 10px 24px rgba(0, 0, 0, 0.35)' },
   saintText: { flex: 1, minWidth: 0 },
   saintName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700', lineHeight: 21 },
   saintHymns: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
@@ -546,12 +558,22 @@ const styles = StyleSheet.create({
   eye: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.28)', borderRadius: 19, height: 38, justifyContent: 'center', width: 38 },
   eyeOpen: { backgroundColor: COLORS.gold },
 
-  columns: { alignItems: 'flex-start', flex: 1, flexDirection: 'row', gap: 20, paddingHorizontal: 16 },
-  listColumn: { alignSelf: 'stretch', flex: 1, maxWidth: 460, minWidth: 0 },
-  chooserColumn: { width: 300 },
-  previewColumn: { flex: 1.2, minWidth: 0 },
+  // The iPad and desktop set the page in the design's 28 by 36pt margins
+  // (SubPageHeader brings 6 and 16 of them), the title 18pt over the columns.
+  headerWide: { marginBottom: 4, paddingHorizontal: 20, paddingTop: 22 },
+  columns: { alignItems: 'flex-start', flex: 1, flexDirection: 'row', gap: 20, paddingHorizontal: 36 },
+  // The saints, then the hymns, at fixed widths; the preview takes the rest.
+  listColumn: { alignSelf: 'stretch', minWidth: 0 },
+  listColumnTablet: { width: 380 },
+  listColumnDesktop: { width: 400 },
+  chooserColumnTablet: { width: 300 },
+  chooserColumnDesktop: { width: 320 },
+  previewColumn: { flex: 1, minWidth: 0 },
+  pane: { backgroundColor: COLORS.surface, borderRadius: 22, padding: 18 },
+  // In their column the search and the saints run to its edges.
+  searchFlush: { marginHorizontal: 0 },
+  listContentFlush: { paddingHorizontal: 0 },
 
-  chooser: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 16 },
   chooserHead: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginBottom: 14 },
   kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
   kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
@@ -567,7 +589,9 @@ const styles = StyleSheet.create({
   optionLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600', minWidth: 0 },
   optionLabelOn: { color: COLORS.goldBright },
 
-  preview: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 16 },
+  // On a phone the preview is its sheet's whole content: it fills it, in the
+  // sheet's 16pt gutter (a sheet that doesn't scroll adds none of its own).
+  previewSheet: { flexShrink: 1, paddingHorizontal: 16 },
   previewHead: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginBottom: 12 },
   previewBack: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 19, height: 38, justifyContent: 'center', width: 38 },
   previewTitle: { color: COLORS.gold, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700', lineHeight: 23, minWidth: 0, paddingTop: 7 },

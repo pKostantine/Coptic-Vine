@@ -1,29 +1,39 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon, { type IconName } from '@/components/vine/ui/Icon';
+import { BuddedCross } from '@/components/vine/ui/Ornaments';
+import PageTitle from '@/components/vine/ui/PageTitle';
 import SubPageHeader from '@/components/vine/ui/SubPageHeader';
-import ToggleRow from '@/components/vine/ui/ToggleRow';
+import { Switch } from '@/components/vine/ui/ToggleRow';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { bookDownloadManager, getAutomaticBookUpdatesEnabled, setAutomaticBookUpdatesEnabled } from '@/services/bookDownloadManager';
-import { downloadManager } from '@/services/downloadManager';
+import {
+  bookDownloadManager, getAutomaticBookUpdatesEnabled, getLastBookUpdateCheck, setAutomaticBookUpdatesEnabled,
+} from '@/services/bookDownloadManager';
+import { downloadManager, getDownloadPackageDetails } from '@/services/downloadManager';
 import { getDownloadPreferences, setDownloadPreferences, type DownloadPreferences } from '@/services/downloadPreferences';
-import type { BookDownloadProgress, BookDownloadStatus, ManagedContentResource } from '@/types/bookDownloads';
-import type { OfflineDownloadProgress, OfflineDownloadStatus, OfflineStorageSummary } from '@/types/offlineDownloads';
+import type { BookDownloadProgress, ManagedContentResource } from '@/types/bookDownloads';
+import type { OfflineDownloadProgress, OfflineStorageSummary } from '@/types/offlineDownloads';
 import { tr } from '@/utils/appText';
-import { toEasternArabicDigits } from '@/utils/localeFormat';
+import { formatDayMonthDate, toEasternArabicDigits } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 const EMPTY: OfflineStorageSummary = { packageCount: 0, completeCount: 0, failedCount: 0, totalBytes: 0, musicBytes: 0, learningBytes: 0, bookBytes: 0 };
 const MAX_FONT_SCALE = 1.3;
+// The storage bar's colours, told apart by lightness as much as by hue.
+const MUSIC_GREEN = '#9FD09A';
+const LEARNING_GREY = 'rgba(255, 255, 255, 0.3)';
 
 function bytes(value: number, arabic: boolean): string {
   const text = value < 1024 ? `${value} B`
@@ -38,25 +48,20 @@ function percent(progress: number, arabic: boolean) {
   return arabic ? toEasternArabicDigits(text) : text;
 }
 
-const BOOK_STATUS: Record<BookDownloadStatus, () => string> = {
-  not_downloaded: () => tr('Not downloaded', 'Non téléchargé', 'غير منزّل'),
-  queued: () => tr('Waiting to download', 'En attente', 'في انتظار التنزيل'),
-  downloading: () => tr('Downloading', 'Téléchargement', 'جارٍ التنزيل'),
-  paused: () => tr('Paused', 'En pause', 'متوقف مؤقتًا'),
-  installed: () => tr('Downloaded', 'Téléchargé', 'منزّل'),
-  update_available: () => tr('Update available', 'Mise à jour disponible', 'يتوفر تحديث'),
-  failed: () => tr('Couldn’t finish downloading', 'Téléchargement interrompu', 'تعذّر إكمال التنزيل'),
-};
-
-const MEDIA_STATUS: Record<OfflineDownloadStatus, () => string> = {
-  idle: () => tr('Waiting to download', 'En attente', 'في انتظار التنزيل'),
-  queued: () => tr('Waiting to download', 'En attente', 'في انتظار التنزيل'),
-  downloading: () => tr('Downloading', 'Téléchargement', 'جارٍ التنزيل'),
-  paused: () => tr('Paused', 'En pause', 'متوقف مؤقتًا'),
-  complete: () => tr('Downloaded', 'Téléchargé', 'منزّل'),
-  failed: () => tr('Couldn’t finish downloading', 'Téléchargement interrompu', 'تعذّر إكمال التنزيل'),
-  cancelled: () => tr('Cancelled', 'Annulé', 'أُلغي'),
-};
+/** "today, 12:13 PM", "yesterday, …", or the day itself. */
+function lastChecked(iso: string, appLanguage: string): string {
+  const date = new Date(iso);
+  const arabic = appLanguage === 'ar';
+  const locale = arabic ? 'ar-EG' : appLanguage === 'fr' ? 'fr-FR' : 'en-US';
+  let time = '';
+  try { time = date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }); } catch { time = ''; }
+  const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+  const days = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86_400_000);
+  const day = days === 0 ? tr('today', 'aujourd’hui', 'اليوم')
+    : days === 1 ? tr('yesterday', 'hier', 'أمس')
+      : formatDayMonthDate(date, arabic);
+  return time ? `${day}, ${time}` : day;
+}
 
 function subscribe(listener: () => void) {
   const media = downloadManager.subscribe(listener);
@@ -72,11 +77,13 @@ export default function DownloadsScreen() {
   return <NativeDownloadsScreen />;
 }
 
+type MediaDetails = Record<string, { artworkUri: string | null; mediaCount: number }>;
+
 /**
- * Downloads & Storage (Coptic Vine design): the page's green glow, the space
- * used on a green block, then the books, the calendar, when to download, the
- * music and lessons kept offline, and upkeep -- each under a section heading,
- * every item on a card of its own.
+ * Downloads & Storage (Coptic Vine design, "Library, Search, Downloads"): the
+ * space used at a glance, then each book with its state and the one thing it
+ * needs, the calendar, when to download, the music and lessons kept offline,
+ * and maintenance. One column on a phone, three on the iPad.
  */
 function NativeDownloadsScreen() {
   const router = useRouter();
@@ -86,20 +93,27 @@ function NativeDownloadsScreen() {
   const currentRevision = useSyncExternalStore(subscribe, revision, revision);
   const [summary, setSummary] = useState<OfflineStorageSummary>(EMPTY);
   const [mediaItems, setMediaItems] = useState<OfflineDownloadProgress[]>([]);
+  const [mediaDetails, setMediaDetails] = useState<MediaDetails>({});
   const [books, setBooks] = useState<BookDownloadProgress[]>([]);
   const [resources, setResources] = useState<ManagedContentResource[]>([]);
   const [prefs, setPrefs] = useState<DownloadPreferences>({ wifiOnly: false, allowCellular: true, allowVideoOnCellular: false });
   const [autoUpdates, setAutoUpdates] = useState(true);
+  const [lastCheck, setLastCheck] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([downloadManager.getStorageSummary(), downloadManager.listDownloads(), getDownloadPreferences(), bookDownloadManager.listBooks(), bookDownloadManager.listResources(), getAutomaticBookUpdatesEnabled()])
-      .then(([nextSummary, items, nextPrefs, nextBooks, nextResources, automatic]) => {
-        if (!active) return;
-        setSummary(nextSummary); setMediaItems(items.filter((item) => item.domain !== 'books')); setPrefs(nextPrefs);
-        setBooks(nextBooks); setResources(nextResources); setAutoUpdates(automatic);
-      });
+    void Promise.all([
+      downloadManager.getStorageSummary(), downloadManager.listDownloads(), getDownloadPreferences(),
+      bookDownloadManager.listBooks(), bookDownloadManager.listResources(), getAutomaticBookUpdatesEnabled(), getLastBookUpdateCheck(),
+    ]).then(async ([nextSummary, items, nextPrefs, nextBooks, nextResources, automatic, checkedAt]) => {
+      const media = items.filter((item) => item.domain !== 'books');
+      const details = Object.fromEntries(await Promise.all(media.map(async (item) => [item.packageKey, await getDownloadPackageDetails(item.packageKey)] as const)));
+      if (!active) return;
+      setSummary(nextSummary); setMediaItems(media); setMediaDetails(details); setPrefs(nextPrefs);
+      setBooks(nextBooks); setResources(nextResources); setAutoUpdates(automatic); setLastCheck(checkedAt);
+    });
     return () => { active = false; };
   }, [currentRevision]);
 
@@ -110,6 +124,10 @@ function NativeDownloadsScreen() {
   const learning = mediaItems.filter((item) => item.domain === 'learning');
   const run = async (action: () => Promise<void>) => {
     try { await action(); } catch (error) { if (error instanceof Error && error.message !== 'Download paused.') Alert.alert(tr('Download', 'Téléchargement', 'التنزيل'), error.message); }
+  };
+  const checkForUpdates = async () => {
+    setChecking(true);
+    try { await run(() => bookDownloadManager.checkForUpdates(true)); } finally { setChecking(false); }
   };
   const maintenance = async (kind: 'validate' | 'cleanup') => {
     setBusy(true);
@@ -125,305 +143,474 @@ function NativeDownloadsScreen() {
       } else {
         const count = await downloadManager.cleanupIncomplete();
         Alert.alert(
-          tr('Unfinished downloads cleared', 'Téléchargements inachevés effacés', 'تم مسح التنزيلات غير المكتملة'),
-          tr(`${count} unfinished file${count === 1 ? '' : 's'} removed.`, `${count} fichier${count === 1 ? '' : 's'} inachevé${count === 1 ? '' : 's'} supprimé${count === 1 ? '' : 's'}.`, `أُزيل ${toEasternArabicDigits(count)} ملف غير مكتمل.`),
+          tr('Incomplete downloads cleaned', 'Téléchargements incomplets nettoyés', 'تم تنظيف التنزيلات غير المكتملة'),
+          tr(`${count} incomplete file${count === 1 ? '' : 's'} removed.`, `${count} fichier${count === 1 ? '' : 's'} incomplet${count === 1 ? '' : 's'} supprimé${count === 1 ? '' : 's'}.`, `أُزيل ${toEasternArabicDigits(count)} ملف غير مكتمل.`),
         );
       }
     } finally { setBusy(false); }
   };
   const removeAllMedia = () => Alert.alert(
-    tr('Remove all music and lessons?', 'Supprimer toute la musique et les leçons ?', 'إزالة كل الموسيقى والدروس؟'),
+    tr('Remove all media downloads?', 'Supprimer tous les médias téléchargés ?', 'إزالة كل تنزيلات الوسائط؟'),
     tr('Everything downloaded from Music and Learn & Study is removed. Books and the calendar stay.', 'Tout ce qui a été téléchargé depuis Musique et Apprendre est supprimé. Les livres et le calendrier restent.', 'تُزال كل التنزيلات من الموسيقى والتعلّم. تبقى الكتب والتقويم.'),
     [
       { text: tr('Cancel', 'Annuler', 'إلغاء'), style: 'cancel' },
       { text: tr('Remove all', 'Tout supprimer', 'إزالة الكل'), style: 'destructive', onPress: () => { void downloadManager.removeAll(); } },
     ],
   );
-  const confirmBookRemoval = (book: BookDownloadProgress) => Alert.alert(
-    tr(`Remove ${book.title}?`, `Supprimer ${book.title} ?`, `إزالة ${book.title}؟`),
-    tr('Anything another book or the calendar still uses is kept.', 'Ce qu’un autre livre ou le calendrier utilise encore est conservé.', 'يُحتفظ بكل ما يستخدمه كتاب آخر أو التقويم.'),
+  const confirmRemoval = (title: string, message: string, remove: () => Promise<void>) => Alert.alert(
+    tr(`Remove ${title}?`, `Supprimer ${title} ?`, `إزالة ${title}؟`),
+    message,
     [
       { text: tr('Cancel', 'Annuler', 'إلغاء'), style: 'cancel' },
-      { text: tr('Remove', 'Supprimer', 'إزالة'), style: 'destructive', onPress: () => { void run(() => bookDownloadManager.remove(book.bookKey)); } },
+      { text: tr('Remove', 'Supprimer', 'إزالة'), style: 'destructive', onPress: () => { void run(remove); } },
     ],
   );
+  const confirmBookRemoval = (book: BookDownloadProgress) => confirmRemoval(
+    book.title,
+    tr('Anything another book or the calendar still uses is kept.', 'Ce qu’un autre livre ou le calendrier utilise encore est conservé.', 'يُحتفظ بكل ما يستخدمه كتاب آخر أو التقويم.'),
+    () => bookDownloadManager.remove(book.bookKey),
+  );
 
-  // The one thing a book's row offers besides removing it.
-  const bookAction = (book: BookDownloadProgress): { icon: IconName; label: string; onPress: () => void } | null => {
-    switch (book.status) {
-      case 'installed': return null;
-      case 'downloading':
-      case 'queued': return { icon: 'pause', label: tr('Pause', 'Pause', 'إيقاف مؤقت'), onPress: () => void run(() => bookDownloadManager.pause(book.bookKey)) };
-      case 'paused': return { icon: 'play', label: tr('Resume', 'Reprendre', 'استئناف'), onPress: () => void run(() => bookDownloadManager.install(book.bookKey)) };
-      case 'failed': return { icon: 'repeat', label: tr('Retry', 'Réessayer', 'أعد المحاولة'), onPress: () => void run(() => bookDownloadManager.install(book.bookKey)) };
-      case 'update_available': return { icon: 'download-outline', label: tr('Update', 'Mettre à jour', 'تحديث'), onPress: () => void run(() => bookDownloadManager.install(book.bookKey)) };
-      default: return { icon: 'download-outline', label: tr('Download', 'Télécharger', 'تنزيل'), onPress: () => void run(() => bookDownloadManager.install(book.bookKey)) };
-    }
-  };
-  const bookDetail = (book: BookDownloadProgress) => {
-    const status = BOOK_STATUS[book.status]();
-    if (book.status === 'downloading' || book.status === 'paused') return `${status} · ${percent(book.progress, arabic)}`;
-    return book.totalBytes ? `${status} · ${bytes(book.totalBytes, arabic)}` : status;
-  };
+  const storage = (
+    <StorageCard
+      arabic={arabic}
+      segments={[
+        { label: tr('Books', 'Livres', 'الكتب'), bytes: contentBytes, color: COLORS.gold },
+        { label: tr('Music', 'Musique', 'الترانيم'), bytes: summary.musicBytes, color: MUSIC_GREEN },
+        { label: tr('Learning', 'Apprentissage', 'التعلّم'), bytes: summary.learningBytes, color: LEARNING_GREY },
+      ]}
+    />
+  );
 
-  const used = summary.musicBytes + summary.learningBytes + contentBytes;
+  const booksSection = (
+    <Section title={tr('Books', 'Livres', 'الكتب')} arabic={arabic} first={wide}>
+      {books.map((book) => (
+        <BookRow key={book.bookKey} book={book} arabic={arabic} run={run} onRemove={() => confirmBookRemoval(book)} />
+      ))}
+      <Row
+        quiet
+        arabic={arabic}
+        icon={<Icon name="refresh" size={21} color={COLORS.gold} />}
+        title={checking ? tr('Checking for updates…', 'Recherche de mises à jour…', 'جارٍ البحث عن تحديثات…') : tr('Check for updates', 'Rechercher des mises à jour', 'البحث عن تحديثات')}
+        detail={lastCheck ? tr(`Last checked ${lastChecked(lastCheck, reading.appLanguage)}`, `Dernière vérification ${lastChecked(lastCheck, reading.appLanguage)}`, `آخر فحص ${lastChecked(lastCheck, reading.appLanguage)}`) : undefined}
+        onPress={checking ? undefined : () => void checkForUpdates()}
+      />
+    </Section>
+  );
+
+  const calendarSection = (
+    <Section title={tr('Calendar', 'Calendrier', 'التقويم')} arabic={arabic} first={wide}>
+      <Row
+        arabic={arabic}
+        icon={<Icon name="calendar-outline" size={21} color={COLORS.gold} />}
+        title={tr('Liturgical Calendar', 'Calendrier liturgique', 'التقويم الليتورجي')}
+        detail={[
+          tr('Kept up to date automatically', 'Tenu à jour automatiquement', 'يُحدَّث تلقائيًا'),
+          calendar?.bytes ? bytes(calendar.bytes, arabic) : null,
+        ].filter(Boolean).join(' · ')}
+        trailing={<Text style={[styles.badge, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Auto', 'Auto', 'تلقائي')}</Text>}
+      />
+    </Section>
+  );
+
+  const preferencesSection = (
+    <Section title={tr('Download Preferences', 'Préférences de téléchargement', 'تفضيلات التنزيل')} arabic={arabic}>
+      <SwitchRow
+        label={tr('Automatic book updates on Wi-Fi', 'Mises à jour automatiques des livres en Wi-Fi', 'تحديث الكتب تلقائيًا عبر الواي فاي')}
+        arabic={arabic}
+        on={autoUpdates}
+        onPress={() => { const next = !autoUpdates; setAutoUpdates(next); void setAutomaticBookUpdatesEnabled(next); }}
+      />
+      <SwitchRow
+        label={tr('Wi-Fi only downloads', 'Téléchargements en Wi-Fi uniquement', 'التنزيل عبر الواي فاي فقط')}
+        arabic={arabic}
+        on={prefs.wifiOnly}
+        onPress={() => void patchPreferences({ wifiOnly: !prefs.wifiOnly, allowCellular: prefs.wifiOnly ? prefs.allowCellular : false })}
+      />
+      <SwitchRow
+        label={tr('Allow cellular downloads', 'Autoriser les données cellulaires', 'السماح بالتنزيل عبر بيانات الجوال')}
+        arabic={arabic}
+        on={prefs.allowCellular && !prefs.wifiOnly}
+        onPress={() => void patchPreferences({ allowCellular: !prefs.allowCellular, wifiOnly: prefs.allowCellular ? true : false })}
+      />
+      <SwitchRow
+        label={tr('Allow video over cellular', 'Autoriser la vidéo en données cellulaires', 'السماح بالفيديو عبر بيانات الجوال')}
+        arabic={arabic}
+        on={prefs.allowVideoOnCellular}
+        onPress={() => void patchPreferences({ allowVideoOnCellular: !prefs.allowVideoOnCellular })}
+      />
+    </Section>
+  );
+
+  const mediaSection = (title: string, items: OfflineDownloadProgress[], glyph: IconName, first = false) => (
+    <Section title={title} arabic={arabic} first={first}>
+      {items.length ? items.map((item) => (
+        <MediaRow
+          key={item.packageKey}
+          item={item}
+          details={mediaDetails[item.packageKey]}
+          glyph={glyph}
+          arabic={arabic}
+          onRemove={() => confirmRemoval(item.title, tr('It can be downloaded again at any time.', 'Vous pourrez le télécharger à nouveau.', 'يمكن تنزيله مرة أخرى في أي وقت.'), () => downloadManager.remove(item.packageKey))}
+        />
+      )) : (
+        <View style={[styles.empty, arabic && styles.rowReverse]}>
+          <Icon name="cloud-download-outline" size={20} color={COLORS.gold} style={styles.emptyGlyph} />
+          <Text style={[styles.emptyText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('No downloads yet.', 'Aucun téléchargement pour l’instant.', 'لا توجد تنزيلات بعد.')}</Text>
+        </View>
+      )}
+    </Section>
+  );
+
+  const maintenanceSection = (
+    <Section title={tr('Maintenance', 'Entretien', 'الصيانة')} arabic={arabic}>
+      <Row
+        arabic={arabic}
+        icon={<Icon name="shield-checkmark-outline" size={21} color={COLORS.gold} />}
+        title={tr('Verify downloaded files', 'Vérifier les fichiers téléchargés', 'التحقق من الملفات المنزّلة')}
+        chevron
+        onPress={busy ? undefined : () => void maintenance('validate')}
+      />
+      <Row
+        arabic={arabic}
+        icon={<Icon name="construct-outline" size={21} color={COLORS.gold} />}
+        title={tr('Clean incomplete downloads', 'Nettoyer les téléchargements incomplets', 'تنظيف التنزيلات غير المكتملة')}
+        chevron
+        onPress={busy ? undefined : () => void maintenance('cleanup')}
+      />
+      <Pressable accessibilityRole="button" onPress={removeAllMedia} style={({ pressed }) => [styles.destructive, arabic && styles.rowReverse, pressed && styles.pressed]}>
+        <Icon name="trash-outline" size={19} color={DESTRUCTIVE} />
+        <Text style={[styles.destructiveText, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          {tr('Remove all media downloads', 'Supprimer tous les médias téléchargés', 'إزالة كل تنزيلات الوسائط')}
+        </Text>
+      </Pressable>
+    </Section>
+  );
+
+  const title = tr('Downloads & Storage', 'Téléchargements et stockage', 'التنزيلات والتخزين');
 
   return (
     <View style={styles.page}>
       <PageGlow kind="green" tall={wide} />
       <SafeAreaView edges={['left', 'right']} style={styles.flex}>
-        <SubPageHeader
-          title={tr('Downloads & Storage', 'Téléchargements et stockage', 'التنزيلات والتخزين')}
-          arabic={arabic}
-          onBack={() => goBack(router, '/account' as any)}
-          backLabel={tr('Back', 'Retour', 'رجوع')}
-        />
-        <NowPlayingAwareScrollView contentContainerStyle={[styles.content, wide && styles.contentWide]} showsVerticalScrollIndicator={false}>
-          <PageGutterProvider gutter={16}>
-            <View style={[styles.gutter, styles.block]}>
-              <LinearGradient colors={[COLORS.green, COLORS.greenDeep]} start={{ x: 0.15, y: 0 }} end={{ x: 0.85, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
-              <Text style={[styles.eyebrow, arabic && styles.eyebrowArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                {tr('ON THIS DEVICE', 'SUR CET APPAREIL', 'على هذا الجهاز')}
-              </Text>
-              <Text style={[styles.total, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{bytes(used, arabic)}</Text>
-              <View style={[styles.tiles, arabic && styles.rowReverse]}>
-                <StatTile label={tr('Books', 'Livres', 'الكتب')} value={bytes(contentBytes, arabic)} arabic={arabic} />
-                <StatTile label={tr('Music', 'Musique', 'الترانيم')} value={bytes(summary.musicBytes, arabic)} arabic={arabic} />
-                <StatTile label={tr('Learn', 'Apprendre', 'التعلّم')} value={bytes(summary.learningBytes, arabic)} arabic={arabic} />
+        {wide ? (
+          <View style={styles.wideHeader}><PageTitle title={title} arabic={arabic} /></View>
+        ) : (
+          <SubPageHeader title={title} arabic={arabic} onBack={() => goBack(router, '/account' as any)} backLabel={tr('Back', 'Retour', 'رجوع')} />
+        )}
+        <NowPlayingAwareScrollView contentContainerStyle={wide ? styles.contentWide : styles.content} showsVerticalScrollIndicator={false}>
+          {wide ? (
+            // The iPad's three columns: storage and the books; the calendar,
+            // when to download and music; then lessons and maintenance.
+            <PageGutterProvider gutter={0}>
+              <View style={[styles.columns, arabic && styles.rowReverse]}>
+                <View style={styles.column}>{storage}{booksSection}</View>
+                <View style={styles.column}>{calendarSection}{preferencesSection}{mediaSection(tr('Music', 'Musique', 'الترانيم'), music, 'musical-notes-outline')}</View>
+                <View style={styles.column}>{mediaSection(tr('Learning', 'Apprentissage', 'التعلّم'), learning, 'school-outline', true)}{maintenanceSection}</View>
               </View>
-            </View>
-
-            <SectionHeading
-              title={tr('Books', 'Livres', 'الكتب')}
-              arabic={arabic}
-              trailing={(
-                <Pressable accessibilityRole="button" hitSlop={8} onPress={() => void run(() => bookDownloadManager.checkForUpdates(true))} style={({ pressed }) => pressed && styles.pressed}>
-                  <Text style={[styles.textButton, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Check for updates', 'Rechercher des mises à jour', 'البحث عن تحديثات')}</Text>
-                </Pressable>
-              )}
-            />
-            <View style={[styles.gutter, styles.rows]}>
-              {books.map((book) => (
-                <ItemRow
-                  key={book.bookKey}
-                  icon="library-outline"
-                  title={book.title}
-                  detail={bookDetail(book)}
-                  progress={book.status === 'downloading' || book.status === 'paused' ? book.progress : undefined}
-                  arabic={arabic}
-                  action={bookAction(book)}
-                  onRemove={book.status === 'not_downloaded' ? undefined : () => confirmBookRemoval(book)}
-                />
-              ))}
-            </View>
-
-            <SectionHeading title={tr('Calendar', 'Calendrier', 'التقويم')} arabic={arabic} />
-            <View style={[styles.gutter, styles.rows]}>
-              <ItemRow
-                icon="calendar-outline"
-                title={tr('Liturgical Calendar', 'Calendrier liturgique', 'التقويم الليتورجي')}
-                detail={`${tr('Kept up to date for you', 'Tenu à jour pour vous', 'يُحدَّث تلقائيًا')} · ${calendar ? BOOK_STATUS[calendar.state]() : tr('Waiting for Wi-Fi', 'En attente du Wi-Fi', 'في انتظار الواي فاي')}`}
-                value={calendar?.bytes ? bytes(calendar.bytes, arabic) : undefined}
-                arabic={arabic}
-              />
-            </View>
-
-            <SectionHeading title={tr('When to Download', 'Quand télécharger', 'متى يتم التنزيل')} arabic={arabic} />
-            <View style={[styles.gutter, styles.rows]}>
-              <ToggleRow
-                label={tr('Update books automatically on Wi-Fi', 'Mettre à jour les livres en Wi-Fi', 'تحديث الكتب تلقائيًا عبر الواي فاي')}
-                isArabic={arabic}
-                active={autoUpdates}
-                onPress={() => { const next = !autoUpdates; setAutoUpdates(next); void setAutomaticBookUpdatesEnabled(next); }}
-              />
-              <ToggleRow
-                label={tr('Download on Wi-Fi only', 'Télécharger en Wi-Fi uniquement', 'التنزيل عبر الواي فاي فقط')}
-                isArabic={arabic}
-                active={prefs.wifiOnly}
-                onPress={() => void patchPreferences({ wifiOnly: !prefs.wifiOnly, allowCellular: prefs.wifiOnly ? prefs.allowCellular : false })}
-              />
-              <ToggleRow
-                label={tr('Allow cellular data', 'Autoriser les données cellulaires', 'السماح ببيانات الجوال')}
-                isArabic={arabic}
-                active={prefs.allowCellular && !prefs.wifiOnly}
-                onPress={() => void patchPreferences({ allowCellular: !prefs.allowCellular, wifiOnly: prefs.allowCellular ? true : false })}
-              />
-              <ToggleRow
-                label={tr('Allow video on cellular data', 'Autoriser la vidéo en données cellulaires', 'السماح بالفيديو عبر بيانات الجوال')}
-                isArabic={arabic}
-                active={prefs.allowVideoOnCellular}
-                onPress={() => void patchPreferences({ allowVideoOnCellular: !prefs.allowVideoOnCellular })}
-              />
-            </View>
-
-            <MediaSection title={tr('Music', 'Musique', 'الترانيم')} icon="musical-notes-outline" items={music} arabic={arabic} onRemove={(key) => void run(() => downloadManager.remove(key))} />
-            <MediaSection title={tr('Learn & Study', 'Apprendre et étudier', 'التعلّم والدراسة')} icon="school-outline" items={learning} arabic={arabic} onRemove={(key) => void run(() => downloadManager.remove(key))} />
-
-            <SectionHeading title={tr('Upkeep', 'Entretien', 'الصيانة')} arabic={arabic} />
-            <View style={[styles.gutter, styles.rows]}>
-              <ItemRow
-                icon="eye-outline"
-                title={tr('Check downloaded files', 'Vérifier les fichiers téléchargés', 'فحص الملفات المنزّلة')}
-                detail={tr('Find any file that needs downloading again', 'Trouver les fichiers à télécharger à nouveau', 'العثور على أي ملف يحتاج إلى التنزيل من جديد')}
-                arabic={arabic}
-                onPress={busy ? undefined : () => void maintenance('validate')}
-              />
-              <ItemRow
-                icon="trash-outline"
-                title={tr('Clear unfinished downloads', 'Effacer les téléchargements inachevés', 'مسح التنزيلات غير المكتملة')}
-                detail={tr('Free the space taken by downloads that stopped partway', 'Libérer l’espace des téléchargements interrompus', 'تحرير المساحة التي تشغلها التنزيلات المتوقفة')}
-                arabic={arabic}
-                onPress={busy ? undefined : () => void maintenance('cleanup')}
-              />
-              <Pressable accessibilityRole="button" onPress={removeAllMedia} style={({ pressed }) => [styles.destructive, pressed && styles.pressed]}>
-                <Text style={[styles.destructiveText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                  {tr('Remove all music and lessons', 'Supprimer toute la musique et les leçons', 'إزالة كل الموسيقى والدروس')}
-                </Text>
-              </Pressable>
-            </View>
-          </PageGutterProvider>
+            </PageGutterProvider>
+          ) : (
+            <PageGutterProvider gutter={16}>
+              <View style={styles.gutter}>{storage}</View>
+              {booksSection}
+              {calendarSection}
+              {preferencesSection}
+              {mediaSection(tr('Music', 'Musique', 'الترانيم'), music, 'musical-notes-outline')}
+              {mediaSection(tr('Learning', 'Apprentissage', 'التعلّم'), learning, 'school-outline')}
+              {maintenanceSection}
+            </PageGutterProvider>
+          )}
         </NowPlayingAwareScrollView>
+        <BottomTabBar active="account" />
       </SafeAreaView>
     </View>
   );
 }
 
-/** The space one kind of download takes, on an inset tile in the green block. */
-function StatTile({ label, value, arabic }: { label: string; value: string; arabic: boolean }) {
+/** A section heading over its rows, 6pt apart. In the iPad's columns the first one sits at the top. */
+function Section({ title, arabic, first = false, children }: { title: string; arabic: boolean; first?: boolean; children: ReactNode }) {
   return (
-    <View style={styles.tile}>
-      <Text style={[styles.tileLabel, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
-      <Text style={[styles.tileValue, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{value}</Text>
+    <>
+      <View style={first ? styles.firstSection : null}>
+        <SectionHeading title={title} arabic={arabic} />
+      </View>
+      <View style={styles.rows}>{children}</View>
+    </>
+  );
+}
+
+/** The space used: the total, a bar split by what takes it, and a key. */
+function StorageCard({ arabic, segments }: { arabic: boolean; segments: { label: string; bytes: number; color: string }[] }) {
+  const total = segments.reduce((sum, segment) => sum + segment.bytes, 0);
+  const [value, unit] = bytes(total, arabic).split(' ');
+  return (
+    <View style={styles.storage}>
+      <LinearGradient colors={[COLORS.green, COLORS.greenDeep]} locations={[0, 0.8]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <Text style={[styles.eyebrow, arabic && styles.eyebrowArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('STORAGE USED', 'STOCKAGE UTILISÉ', 'المساحة المستخدمة')}</Text>
+      <Text style={[styles.total, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        {value} <Text style={styles.totalUnit}>{unit}</Text>
+      </Text>
+      <View style={[styles.bar, arabic && styles.rowReverse]}>
+        {segments.filter((segment) => segment.bytes > 0).map((segment) => (
+          <View key={segment.label} style={{ backgroundColor: segment.color, flex: segment.bytes }} />
+        ))}
+      </View>
+      <View style={[styles.legend, arabic && styles.rowReverse]}>
+        {segments.map((segment) => (
+          <View key={segment.label} style={[styles.legendItem, arabic && styles.rowReverse]}>
+            <View style={[styles.legendDot, { backgroundColor: segment.color }]} />
+            <Text style={[styles.legendText, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{`${segment.label} ${bytes(segment.bytes, arabic)}`}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
 
-/** One download on its own card: a gold glyph, its name and state, then what can be done with it. */
-function ItemRow({ icon, title, detail, value, progress, arabic, action, onRemove, onPress }: {
-  icon: IconName;
-  title: string;
-  detail?: string;
-  value?: string;
-  /** A gold bar under the state while a download is under way or paused. */
-  progress?: number;
+/** A book with its state and the one thing it needs: Download, Update, Resume or Retry, a ring while it downloads, or a menu once it is in. */
+function BookRow({ book, arabic, run, onRemove }: {
+  book: BookDownloadProgress;
   arabic: boolean;
-  action?: { icon: IconName; label: string; onPress: () => void } | null;
-  onRemove?: () => void;
+  run: (action: () => Promise<void>) => Promise<void>;
+  onRemove: () => void;
+}) {
+  const install = () => void run(() => bookDownloadManager.install(book.bookKey));
+  const size = book.totalBytes ? bytes(book.totalBytes, arabic) : null;
+  const withSize = (status: string) => [status, size].filter(Boolean).join(' · ');
+  let detail: ReactNode;
+  let trailing: ReactNode;
+  switch (book.status) {
+    case 'installed':
+      detail = <><Icon name="checkmark-circle" size={14} color={COLORS.gold} />{withSize(tr('Downloaded', 'Téléchargé', 'منزّل'))}</>;
+      trailing = <MenuButton label={tr(`More for ${book.title}`, `Plus pour ${book.title}`, `المزيد لـ ${book.title}`)} onPress={onRemove} />;
+      break;
+    case 'downloading':
+    case 'queued':
+      detail = book.status === 'queued'
+        ? tr('Waiting to download', 'En attente', 'في انتظار التنزيل')
+        : `${tr('Downloading', 'Téléchargement', 'جارٍ التنزيل')} · ${percent(book.progress, arabic)}`;
+      trailing = <ProgressRing progress={book.status === 'queued' ? 0 : book.progress} label={tr(`Pause ${book.title}`, `Mettre ${book.title} en pause`, `إيقاف ${book.title} مؤقتًا`)} onPress={() => void run(() => bookDownloadManager.pause(book.bookKey))} />;
+      break;
+    case 'paused':
+      detail = `${tr('Paused', 'En pause', 'متوقف مؤقتًا')} · ${percent(book.progress, arabic)}`;
+      trailing = <ActionButton icon="play" label={tr('Resume', 'Reprendre', 'استئناف')} arabic={arabic} onPress={install} />;
+      break;
+    case 'failed':
+      detail = tr('Couldn’t finish downloading', 'Téléchargement interrompu', 'تعذّر إكمال التنزيل');
+      trailing = <ActionButton icon="refresh" label={tr('Retry', 'Réessayer', 'أعد المحاولة')} arabic={arabic} onPress={install} />;
+      break;
+    case 'update_available':
+      detail = <><Text style={styles.detailGold}>{tr('Update available', 'Mise à jour disponible', 'يتوفر تحديث')}</Text>{size ? ` · ${size}` : ''}</>;
+      trailing = <ActionButton label={tr('Update', 'Mettre à jour', 'تحديث')} arabic={arabic} filled onPress={install} />;
+      break;
+    default:
+      detail = withSize(tr('Not downloaded', 'Non téléchargé', 'غير منزّل'));
+      trailing = <ActionButton icon="arrow-down" label={tr('Download', 'Télécharger', 'تنزيل')} arabic={arabic} onPress={install} />;
+  }
+  return (
+    <Row
+      arabic={arabic}
+      icon={<BuddedCross size={22} />}
+      title={book.title}
+      detail={detail}
+      trailing={trailing}
+      // A partial download (paused, failed, waiting for an update) can still be removed, by a long press.
+      onLongPress={book.status === 'not_downloaded' || book.status === 'installed' ? undefined : onRemove}
+    />
+  );
+}
+
+/** A downloaded release, album or playlist: its saved cover, how many tracks, and its size. */
+function MediaRow({ item, details, glyph, arabic, onRemove }: {
+  item: OfflineDownloadProgress;
+  details?: { artworkUri: string | null; mediaCount: number };
+  glyph: IconName;
+  arabic: boolean;
+  onRemove: () => void;
+}) {
+  const inProgress = item.status === 'downloading' || item.status === 'queued' || item.status === 'paused';
+  const count = details?.mediaCount ?? 0;
+  const tracks = count > 1
+    ? tr(`${count} tracks`, `${count} pistes`, `${toEasternArabicDigits(count)} مقاطع`)
+    : null;
+  const detail = inProgress
+    ? `${item.status === 'paused' ? tr('Paused', 'En pause', 'متوقف مؤقتًا') : tr('Downloading', 'Téléchargement', 'جارٍ التنزيل')} · ${percent(item.progress, arabic)}`
+    : item.status === 'failed'
+      ? tr('Couldn’t finish downloading', 'Téléchargement interrompu', 'تعذّر إكمال التنزيل')
+      : [tracks, bytes(item.bytesWritten, arabic)].filter(Boolean).join(' · ');
+  return (
+    <Row
+      arabic={arabic}
+      icon={details?.artworkUri ? (
+        <Image source={{ uri: details.artworkUri }} contentFit="cover" style={styles.thumb} />
+      ) : (
+        <View style={[styles.thumb, styles.thumbBlank]}><Icon name={glyph} size={20} color={COLORS.gold} /></View>
+      )}
+      title={item.title}
+      detail={detail}
+      trailing={<MenuButton label={tr(`More for ${item.title}`, `Plus pour ${item.title}`, `المزيد لـ ${item.title}`)} onPress={onRemove} />}
+    />
+  );
+}
+
+/** One row card: a gold glyph or cover, the name over its state, then whatever the row offers. */
+function Row({ icon, title, detail, trailing, chevron = false, quiet = false, arabic, onPress, onLongPress }: {
+  icon: ReactNode;
+  title: string;
+  detail?: ReactNode;
+  trailing?: ReactNode;
+  chevron?: boolean;
+  /** The quieter "Check for updates" row, without the cards' fade. */
+  quiet?: boolean;
+  arabic: boolean;
   onPress?: () => void;
+  onLongPress?: () => void;
 }) {
   const body = (
     <>
-      <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-      <Icon name={icon} size={21} color={COLORS.gold} />
+      {quiet ? null : <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />}
+      <View style={styles.rowIcon}>{icon}</View>
       <View style={styles.rowText}>
         <Text style={[styles.rowTitle, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
-        {detail ? <Text style={[styles.rowDetail, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text> : null}
-        {progress !== undefined ? (
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.max(2, Math.min(100, Math.round(progress * 100)))}%` }, arabic && styles.progressFillArabic]} />
-          </View>
+        {detail ? (
+          <Text style={[styles.rowDetail, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text>
         ) : null}
       </View>
-      {value ? <Text style={[styles.rowValue, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{value}</Text> : null}
-      {action ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={`${action.label} ${title}`} onPress={action.onPress} style={({ pressed }) => [styles.chip, arabic && styles.rowReverse, pressed && styles.pressed]}>
-          <Icon name={action.icon} size={14} color={COLORS.gold} />
-          <Text style={[styles.chipText, arabic && styles.arabicChip]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{action.label}</Text>
-        </Pressable>
-      ) : null}
-      {onRemove ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={tr(`Remove ${title}`, `Supprimer ${title}`, `إزالة ${title}`)} hitSlop={8} onPress={onRemove} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
-          <Icon name="trash-outline" size={19} color={COLORS.muted} />
-        </Pressable>
-      ) : null}
-      {onPress ? <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /> : null}
+      {trailing}
+      {chevron ? <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} style={styles.chevron} /> : null}
     </>
   );
-  if (!onPress) return <View style={[styles.row, arabic && styles.rowReverse]}>{body}</View>;
+  const style = [styles.row, quiet && styles.rowQuiet, arabic && styles.rowReverse];
+  if (!onPress && !onLongPress) return <View style={style}>{body}</View>;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={detail ? `${title}. ${detail}` : title}
+      accessibilityLabel={title}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, arabic && styles.rowReverse, pressed && styles.pressed]}
+      onLongPress={onLongPress}
+      style={({ pressed }) => [...style, pressed && onPress && styles.pressed]}
     >
       {body}
     </Pressable>
   );
 }
 
-function MediaSection({ title, icon, items, arabic, onRemove }: {
-  title: string;
-  icon: IconName;
-  items: OfflineDownloadProgress[];
-  arabic: boolean;
-  onRemove: (key: string) => void;
-}) {
+function SwitchRow({ label, arabic, on, onPress }: { label: string; arabic: boolean; on: boolean; onPress: () => void }) {
   return (
-    <>
-      <SectionHeading title={title} arabic={arabic} />
-      <View style={[styles.gutter, styles.rows]}>
-        {items.length ? items.map((item) => (
-          <ItemRow
-            key={item.packageKey}
-            icon={icon}
-            title={item.title}
-            detail={item.status === 'downloading' || item.status === 'paused'
-              ? `${MEDIA_STATUS[item.status]()} · ${percent(item.progress, arabic)}`
-              : `${MEDIA_STATUS[item.status]()} · ${bytes(item.bytesWritten, arabic)}`}
-            progress={item.status === 'downloading' || item.status === 'paused' ? item.progress : undefined}
-            arabic={arabic}
-            onRemove={() => onRemove(item.packageKey)}
-          />
-        )) : <Empty arabic={arabic}>{tr('Nothing downloaded yet.', 'Rien de téléchargé pour l’instant.', 'لا توجد تنزيلات بعد.')}</Empty>}
-      </View>
-    </>
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: on }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, styles.switchRow, arabic && styles.rowReverse, pressed && styles.pressed]}
+    >
+      <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <Text style={[styles.switchLabel, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
+      <Switch on={on} />
+    </Pressable>
   );
 }
 
-function Empty({ arabic, children }: { arabic: boolean; children: ReactNode }) {
-  return <Text style={[styles.empty, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{children}</Text>;
+/** A row's one action: gold on gold's wash, or filled gold for an update waiting. */
+function ActionButton({ icon, label, arabic, filled = false, onPress }: { icon?: IconName; label: string; arabic: boolean; filled?: boolean; onPress: () => void }) {
+  const color = filled ? COLORS.greenDeep : COLORS.gold;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.action, filled && styles.actionFilled, arabic && styles.rowReverse, pressed && styles.pressed]}>
+      {icon ? <Icon name={icon} size={15} color={color} /> : null}
+      <Text style={[styles.actionText, { color }, arabic && styles.arabicFont]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
+    </Pressable>
+  );
 }
+
+function MenuButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={6} onPress={onPress} style={({ pressed }) => [styles.menu, pressed && styles.pressed]}>
+      <Icon name="ellipsis-horizontal" size={19} color={COLORS.muted} />
+    </Pressable>
+  );
+}
+
+/** How far a download has got, round a stop square that pauses it. */
+function ProgressRing({ progress, label, onPress }: { progress: number; label: string; onPress: () => void }) {
+  const size = 34;
+  const stroke = 3;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={6} onPress={onPress} style={({ pressed }) => [styles.ring, pressed && styles.pressed]}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255, 255, 255, 0.12)" strokeWidth={stroke} fill="#0F2617" />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={COLORS.gold}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={circumference * (1 - Math.max(0, Math.min(1, progress)))}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <View style={styles.ringStop} />
+    </Pressable>
+  );
+}
+
+const DESTRUCTIVE = '#FF8A7A';
 
 const styles = StyleSheet.create({
   page: { backgroundColor: COLORS.black, flex: 1 },
   flex: { flex: 1 },
-  content: { paddingBottom: 32 },
-  contentWide: { alignSelf: 'center', maxWidth: 720, width: '100%' },
+  content: { paddingBottom: 28 },
+  contentWide: { paddingBottom: 28, paddingHorizontal: 36 },
+  wideHeader: { paddingHorizontal: 20 },
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 24, marginTop: 2 },
+  column: { flex: 1, minWidth: 0 },
   gutter: { marginHorizontal: 16 },
   rowReverse: { flexDirection: 'row-reverse' },
   pressed: { opacity: 0.82 },
+  firstSection: { marginTop: -22 },
 
-  // The space used, on the day block's green.
-  block: { borderRadius: 24, overflow: 'hidden', paddingBottom: 16, paddingHorizontal: 18, paddingTop: 18 },
-  eyebrow: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
+  // The space used, on the day block's green (the design's "dl-st").
+  storage: { borderRadius: 22, boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.35)', marginTop: 4, overflow: 'hidden', padding: 18 },
+  eyebrow: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
   eyebrowArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
-  total: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 40, fontWeight: '700', marginTop: 6 },
-  tiles: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  tile: { backgroundColor: 'rgba(0, 0, 0, 0.32)', borderRadius: 14, flex: 1, minWidth: 0, paddingHorizontal: 12, paddingVertical: 10 },
-  tileLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5 },
-  tileValue: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', marginTop: 2 },
+  total: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 40, fontWeight: '700', lineHeight: 44, marginTop: 8 },
+  totalUnit: { color: COLORS.goldBright, fontSize: 20 },
+  bar: { backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: 99, flexDirection: 'row', gap: 3, height: 10, marginTop: 16, overflow: 'hidden' },
+  legend: { columnGap: 14, flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, rowGap: 6 },
+  legendItem: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  legendDot: { borderRadius: 4, height: 8, width: 8 },
+  legendText: { color: 'rgba(255, 255, 255, 0.85)', fontFamily: TYPOGRAPHY.body, fontSize: 13 },
 
-  textButton: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '700' },
-
-  rows: { gap: 8 },
-  row: { alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 18, flexDirection: 'row', gap: 14, overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 14 },
+  // Rows 6pt apart, each a card fading down to the surface (the design's "dl-r").
+  rows: { gap: 6, marginHorizontal: 16 },
+  row: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, minHeight: 58, overflow: 'hidden', paddingLeft: 14, paddingRight: 10, paddingVertical: 9 },
+  rowQuiet: { backgroundColor: 'rgba(255, 255, 255, 0.04)' },
+  rowIcon: { alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1, minWidth: 0 },
-  rowTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600' },
-  rowDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 18, marginTop: 2 },
-  rowValue: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
-  progressTrack: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 2, height: 4, marginTop: 8, overflow: 'hidden' },
-  progressFill: { backgroundColor: COLORS.gold, borderRadius: 2, height: 4 },
-  progressFillArabic: { alignSelf: 'flex-end' },
-  // A row's one action, on gold's 13% wash (the design's chip).
-  chip: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, flexDirection: 'row', gap: 5, height: 32, paddingHorizontal: 12 },
-  chipText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
-  arabicChip: { fontFamily: TYPOGRAPHY.arabic },
-  iconButton: { alignItems: 'center', height: 32, justifyContent: 'center', width: 28 },
-  empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, paddingHorizontal: 2 },
-
-  destructive: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.12)', borderRadius: 18, justifyContent: 'center', marginTop: 6, paddingVertical: 15 },
-  destructiveText: { color: '#FF8A7A', fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },
+  rowTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600', lineHeight: 20 },
+  rowDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
+  detailGold: { color: COLORS.goldBright, fontWeight: '600' },
+  chevron: { marginRight: 4 },
+  thumb: { borderRadius: 10, height: 44, marginLeft: -5, width: 44 },
+  thumbBlank: { alignItems: 'center', backgroundColor: COLORS.surfaceSoft, justifyContent: 'center' },
+  switchRow: { minHeight: 54 },
+  switchLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
+  badge: { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 99, color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', lineHeight: 26, overflow: 'hidden', paddingHorizontal: 10 },
+  action: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, flexDirection: 'row', gap: 5, height: 34, paddingHorizontal: 13 },
+  actionFilled: { backgroundColor: COLORS.gold },
+  actionText: { fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '700' },
+  menu: { alignItems: 'center', height: 36, justifyContent: 'center', width: 36 },
+  ring: { alignItems: 'center', height: 34, justifyContent: 'center', marginRight: 2, width: 34 },
+  ringStop: { backgroundColor: COLORS.gold, borderRadius: 2, height: 10, width: 10 },
+  empty: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  emptyGlyph: { opacity: 0.7 },
+  emptyText: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
+  destructive: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.12)', borderRadius: 16, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 58 },
+  destructiveText: { color: DESTRUCTIVE, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
 
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicFont: { fontFamily: TYPOGRAPHY.arabic },
 });

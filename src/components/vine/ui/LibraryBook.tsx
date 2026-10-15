@@ -114,7 +114,8 @@ export default function LibraryBook({
 }
 
 const styles = StyleSheet.create({
-  book: { borderColor: COLORS.border, borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  // No outline: the card's fade from surfaceDeep gives it its edge (Coptic Vine design, "no line").
+  book: { borderRadius: 20, overflow: 'hidden' },
   bookTile: { flex: 1 },
   bookWide: { flex: 1 },
   pressed: { backgroundColor: 'rgba(255, 255, 255, 0.05)' },

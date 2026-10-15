@@ -237,7 +237,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
           <title>{`Coptic Vine ${title}`}</title>
         </Head>
       )}
-      {wide ? <PageGlow kind="green" tall /> : null}
+      <PageGlow kind="green" tall={wide} />
       <View style={[styles.frame, wide && styles.frameWide]}>
         <SubPageHeader title={title} arabic={isArabic} onBack={closeScreen} backLabel={tr('Close the seasons', 'Fermer les temps liturgiques', 'أغلق الفترات')} />
 
