@@ -107,7 +107,7 @@ test('each reading opens its service at that reading', () => {
   assert.match(menu, /readingLinesFor\(service, today\?\.citations\[service\], arabic\)/);
   assert.doesNotMatch(menu, /const READING_LABELS|const linesFor/);
   const home = fs.readFileSync('src/components/vine/screens/HomeScreen.tsx', 'utf8');
-  assert.match(home, /router\.push\(lectionaryHref\(service, line\) as never\)/);
+  assert.match(home, /router\.push\(lectionaryHref\(shownReadings\.service, line\) as never\)/);
 });
 
 test('Home shows every service’s readings for the rite’s day, each opening its service', () => {
@@ -116,7 +116,8 @@ test('Home shows every service’s readings for the rite’s day, each opening i
   assert.match(home, /const readingsDate = livePeriod === 'evening' \? tomorrow : liveDate;/);
   assert.match(home, /LECTIONARY_SERVICES\.map\(\(service\) =>/);
   assert.match(home, /withPropheciesAsOneLine\(readingLinesFor\(service, dayReadings\?\.citations\?\.\[service\], arabic\)\)/);
-  assert.match(home, /router\.push\(lectionaryHref\(service\) as never\)/);
+  // One service shows at a time, chosen on the card's pill; the card's head opens the Lectionary.
+  assert.match(home, /segment\(serviceReadings\.map\(\(\{ service, title \}\) => \(\{ key: service, label: title \}\)\), shownReadings\.service, setReadingsService\)/);
   assert.match(home, /router\.push\('\/lectionary' as never\)/);
   assert.doesNotMatch(home, /'\/lectionary\/liturgy'/);
   // A day whose readings could not be loaded keeps the outline, with a dash where a citation would be.

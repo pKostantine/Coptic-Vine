@@ -1,24 +1,62 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import Icon from '@/components/vine/ui/Icon';
-import ShareMetadata from '@/components/vine/ui/ShareMetadata';
-import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import ReleaseTile from '@/components/music/ReleaseTile';
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
+import { PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import BrandIcon from '@/components/vine/ui/BrandIcon';
+import Icon from '@/components/vine/ui/Icon';
+import LoadFailure from '@/components/vine/ui/LoadFailure';
+import PersonHero from '@/components/vine/ui/PersonHero';
+import ShareMetadata from '@/components/vine/ui/ShareMetadata';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { usePlayRelease } from '@/hooks/usePlayRelease';
 import { musicService } from '@/services/musicService';
-import type { MusicConsumerArtist, MusicConsumerAsset } from '@/types/musicConsumer';
+import type { MusicArtistLink, MusicConsumerArtist, MusicConsumerAsset, MusicConsumerReleaseSummary } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
+import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../../utils/appText';
+
+/** Each platform's name, for the link's label and its spoken name. */
+const LINK_NAMES: Record<string, string> = {
+  website: 'Website',
+  linktree: 'Linktree',
+  youtube: 'YouTube',
+  soundcloud: 'SoundCloud',
+  spotify: 'Spotify',
+  apple_music: 'Apple Music',
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  x: 'X',
+  bandcamp: 'Bandcamp',
+};
+
+function linkName(link: MusicArtistLink): string {
+  return link.label || LINK_NAMES[link.platform] || link.platform.replace(/^custom:/, '');
+}
+
+/** "2026 · Album" */
+function releaseLine(release: MusicConsumerReleaseSummary): string {
+  const kind = release.releaseType === 'album' ? tr('Album', 'Album', 'ألبوم') : release.releaseType === 'ep' ? 'EP' : tr('Single', 'Single', 'أغنية');
+  return [release.releaseDate?.slice(0, 4), kind].filter(Boolean).join(' · ');
+}
+
+/**
+ * An artist (Coptic Vine design, "Artist"): their photo glowing out of the
+ * page, their name and bio, Follow and Share, the places they publish, then
+ * their releases as covers.
+ */
 export default function MusicArtistScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -26,8 +64,15 @@ export default function MusicArtistScreen() {
   const artistId = Array.isArray(params.id) ? params.id[0] : params.id;
   const { preferences } = useReadingPreferences();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
+  const arabic = locale === 'ar';
+  const layout = useLayoutMode();
+  const width = useContentWidth();
+  const wide = layout !== 'phone';
+  const { play, isPlaying } = usePlayRelease(locale);
   const [artist, setArtist] = useState<MusicConsumerArtist | null>(null);
+  const [links, setLinks] = useState<{ id: string; links: MusicArtistLink[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [followed, setFollowed] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
@@ -47,8 +92,12 @@ export default function MusicArtistScreen() {
       .catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : 'Unable to load artist.');
       });
+    // The links come from their own table until the artist's payload carries them.
+    musicService.getArtistLinks(artistId)
+      .then((rows) => { if (active) setLinks({ id: artistId, links: rows }); })
+      .catch(() => { if (active) setLinks({ id: artistId, links: [] }); });
     return () => { active = false; };
-  }, [artistId, locale]);
+  }, [artistId, locale, attempt]);
 
   useEffect(() => {
     if (!artistId) return;
@@ -89,7 +138,6 @@ export default function MusicArtistScreen() {
       );
       return;
     }
-
     setFollowBusy(true);
     try {
       const next = !followed;
@@ -116,16 +164,22 @@ export default function MusicArtistScreen() {
     });
   };
 
+  const openLink = (link: MusicArtistLink) => {
+    Linking.openURL(link.url).catch(() => {
+      Alert.alert(linkName(link), tr('This link could not be opened.', 'Ce lien n’a pas pu être ouvert.', 'تعذّر فتح هذا الرابط.'));
+    });
+  };
+
   const shareImageUrl = musicService.resolveAsset(shareImageAsset);
+  const artistLinks = artist?.socialLinks?.length ? artist.socialLinks : links && links.id === artistId ? links.links : [];
+  const gutter = wide ? 0 : 16;
+  const available = width - (wide ? 72 : 32);
+  const columns = wide ? Math.max(3, Math.floor((available + 12) / 172)) : 2;
+  const tileWidth = Math.floor((available - 12 * (columns - 1)) / columns);
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} onPress={() => goBack(router, '/music')} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
-        <Text style={styles.headerTitle}>Artist</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
+      <Head><title>{artist ? `${artist.displayName} — Coptic Vine` : tr('Artist — Coptic Vine', 'Artiste — Coptic Vine', 'فنان — كوبتك فاين')}</title></Head>
       {artist ? (
         <ShareMetadata
           title={artist.displayName}
@@ -137,59 +191,95 @@ export default function MusicArtistScreen() {
       ) : null}
 
       {!artist ? (
-        error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={COLORS.gold} style={styles.loader} />
+        <View style={styles.pending}>
+          <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} onPress={() => goBack(router, '/music')} style={({ pressed }) => [styles.pendingBack, pressed && styles.pressed]}>
+            <Icon name={arabic ? 'chevron-forward' : 'chevron-back'} size={20} color={COLORS.gold} />
+          </Pressable>
+          {error ? (
+            <LoadFailure error={error} layout="inline" onRetry={() => setAttempt((count) => count + 1)} />
+          ) : (
+            <ActivityIndicator color={COLORS.gold} style={styles.loader} />
+          )}
+        </View>
       ) : (
-        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.hero}>
-            <MusicArtwork asset={artist.profileImageAsset} size={168} rounded label={artist.displayName} />
-            <Text style={styles.name}>{artist.displayName}</Text>
-            {artist.biography ? <Text style={styles.bio}>{artist.biography}</Text> : null}
-            <View style={styles.artistActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={followed ? 'Unfollow artist' : 'Follow artist'}
-                disabled={followBusy}
-                onPress={() => void toggleFollow()}
-                style={({ pressed }) => [
-                  styles.followButton,
-                  followed && styles.followButtonActive,
-                  followBusy && styles.disabledButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                {followed ? <Icon name="checkmark" size={17} color={COLORS.black} /> : null}
-                <Text style={[styles.followButtonText, followed && styles.followButtonTextActive]}>
-                  {followed ? (tr('Following', 'Suivi', 'متابَع')) : (tr('Follow', 'Suivre', 'متابعة'))}
-                </Text>
-              </Pressable>
+        <NowPlayingAwareScrollView contentContainerStyle={[styles.content, wide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+          <PageGutterProvider gutter={gutter}>
+            <PersonHero
+              name={artist.displayName}
+              kicker={tr('Artist', 'Artiste', 'فنان')}
+              imageUri={musicService.resolveAsset(artist.profileImageAsset)}
+              bio={artist.biography}
+              arabic={arabic}
+              wide={wide}
+              onBack={() => goBack(router, '/music')}
+              backLabel={tr('Go back', 'Retour', 'رجوع')}
+            >
+              <View style={[styles.actions, arabic && styles.rowReverse]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: followed }}
+                  accessibilityLabel={followed ? tr('Unfollow artist', 'Ne plus suivre l’artiste', 'إلغاء متابعة الفنان') : tr('Follow artist', 'Suivre l’artiste', 'متابعة الفنان')}
+                  disabled={followBusy}
+                  onPress={() => void toggleFollow()}
+                  style={({ pressed }) => [styles.follow, !followed && styles.followOff, arabic && styles.rowReverse, followBusy && styles.disabled, pressed && styles.pressed]}
+                >
+                  {followBusy ? <ActivityIndicator size="small" color={followed ? COLORS.greenDeep : COLORS.gold} /> : followed ? <Icon name="checkmark" size={17} color={COLORS.greenDeep} /> : <Icon name="add" size={17} color={COLORS.gold} />}
+                  <Text style={[styles.followText, !followed && styles.followTextOff, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
+                    {followed ? tr('Following', 'Suivi', 'متابَع') : tr('Follow', 'Suivre', 'متابعة')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={tr('Share artist', 'Partager l’artiste', 'مشاركة الفنان')}
+                  onPress={() => void shareArtist()}
+                  style={({ pressed }) => [styles.share, pressed && styles.pressed]}
+                >
+                  <Icon name="share-outline" size={19} color={COLORS.white} />
+                </Pressable>
+              </View>
+              {artistLinks.length ? (
+                <View style={[styles.links, wide && (arabic ? styles.linksEnd : styles.linksStart), arabic && styles.rowReverse]}>
+                  {artistLinks.map((link) => (
+                    <Pressable
+                      key={link.id ?? `${link.platform}:${link.url}`}
+                      accessibilityRole="link"
+                      accessibilityLabel={linkName(link)}
+                      onPress={() => openLink(link)}
+                      style={({ pressed }) => [styles.link, pressed && styles.linkPressed]}
+                    >
+                      <BrandIcon name={link.platform} size={19} color={COLORS.gold} />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </PersonHero>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Share artist"
-                onPress={() => void shareArtist()}
-                style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}
-              >
-                <Icon name="share-outline" size={20} color={COLORS.white} />
-              </Pressable>
-            </View>
-          </View>
-
-          <Text style={styles.sectionTitle}>Releases</Text>
-          <View style={styles.grid}>
-            {artist.releases.map((release) => (
-              <Pressable accessibilityRole="button" key={release.id} style={styles.releaseCard} onPress={() => router.push(`/music/release/${release.id}`)}>
-                <MusicArtwork asset={release.coverAsset} size={148} label={release.title} />
-                <Text numberOfLines={1} style={styles.releaseTitle}>{release.title}</Text>
-                <Text numberOfLines={1} style={styles.releaseMeta}>
-                  {[
-                    release.releaseDate?.slice(0, 4),
-                    release.releaseType === 'album' ? 'Album' : release.releaseType === 'ep' ? 'EP' : 'Single',
-                  ].filter(Boolean).join(' • ')}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          {!artist.releases.length ? <Text style={styles.empty}>No published releases yet.</Text> : null}
+            <SectionHeading title={tr('Releases', 'Parutions', 'الإصدارات')} arabic={arabic} />
+            {artist.releases.length ? (
+              <View style={[styles.grid, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+                {artist.releases.map((release) => (
+                  <ReleaseTile
+                    key={release.id}
+                    id={release.id}
+                    title={release.title}
+                    subtitle={releaseLine(release)}
+                    artworkUri={musicService.resolveAsset(release.coverAsset)}
+                    width={tileWidth}
+                    arabic={arabic}
+                    wrapTitle
+                    onPress={() => router.push(`/music/release/${release.id}`)}
+                    onPlay={() => play(release)}
+                    playLabel={`${isPlaying(release.id) ? tr('Pause', 'Pause', 'إيقاف مؤقت') : tr('Play', 'Lire', 'تشغيل')}: ${release.title}`}
+                    trailing={<Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.muted} />}
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={[styles.empty, { marginHorizontal: gutter }]}>
+                <Text style={[styles.emptyText, arabic && styles.arabic]}>{tr('No published releases yet.', 'Aucune parution publiée pour l’instant.', 'لا توجد إصدارات منشورة بعد.')}</Text>
+              </View>
+            )}
+          </PageGutterProvider>
         </NowPlayingAwareScrollView>
       )}
 
@@ -200,29 +290,27 @@ export default function MusicArtistScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  header: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
-  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  backText: { color: COLORS.gold, fontSize: 38, lineHeight: 40 },
-  headerTitle: { flex: 1, textAlign: 'center', color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700' },
-  headerSpacer: { width: 44 },
-  content: { paddingBottom: SPACING.xl },
-  hero: { alignItems: 'center', padding: SPACING.lg },
-  name: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 30, fontWeight: '700', textAlign: 'center', marginTop: SPACING.md },
-  bio: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 680, marginTop: SPACING.md },
-  artistActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
-  followButton: { minHeight: 44, paddingHorizontal: SPACING.lg, borderRadius: RADII.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: COLORS.gold, borderWidth: 1, borderColor: COLORS.gold },
-  followButtonActive: { backgroundColor: COLORS.goldBright },
-  followButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  followButtonTextActive: { color: COLORS.black },
-  shareButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  disabledButton: { opacity: 0.45 },
-  pressed: { opacity: 0.7, transform: [{ scale: 0.96 }] },
-  sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700', marginHorizontal: SPACING.md, marginBottom: SPACING.md },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, paddingHorizontal: SPACING.md },
-  releaseCard: { width: 148, paddingBottom: SPACING.sm },
-  releaseTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', marginTop: SPACING.sm },
-  releaseMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3 },
-  empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, marginHorizontal: SPACING.md, padding: SPACING.lg, borderRadius: RADII.md, backgroundColor: COLORS.surface, textAlign: 'center' },
-  loader: { marginTop: SPACING.xl },
-  error: { color: COLORS.priest, textAlign: 'center', margin: SPACING.xl, fontFamily: TYPOGRAPHY.body },
+  content: { paddingBottom: 32 },
+  contentWide: { paddingHorizontal: 36, paddingTop: 20 },
+  pending: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
+  pendingBack: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  loader: { marginTop: 48 },
+  pressed: { opacity: 0.7 },
+  disabled: { opacity: 0.6 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  actions: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 16 },
+  follow: { alignItems: 'center', backgroundColor: COLORS.gold, borderColor: COLORS.gold, borderRadius: 99, borderWidth: 1, flexDirection: 'row', gap: 6, height: 40, paddingLeft: 14, paddingRight: 18 },
+  followOff: { backgroundColor: 'transparent', borderColor: COLORS.goldLine },
+  followText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
+  followTextOff: { color: COLORS.gold },
+  share: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.12)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 16 },
+  linksStart: { justifyContent: 'flex-start' },
+  linksEnd: { justifyContent: 'flex-end' },
+  link: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)', borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
+  linkPressed: { backgroundColor: 'rgba(227, 181, 59, 0.2)' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  empty: { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14 },
+  emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

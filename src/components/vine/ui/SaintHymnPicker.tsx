@@ -1,4 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,8 +16,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from '@/components/vine/ui/Icon';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import SheetFrame from '@/components/vine/ui/SheetFrame';
+import SubPageHeader from '@/components/vine/ui/SubPageHeader';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import DocumentWebView from '@/components/vine/DocumentWebView';
+import { PageGlow } from '@/components/vine/screens/BookPage';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { fontScaleToPx } from '@/utils/preferencesStorage';
@@ -28,8 +32,9 @@ import {
   SaintHymnPreviewHymn,
 } from '@/utils/saintHymns';
 import { DISABLED_TEXT_SELECTION_STYLE, EDITABLE_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
-import { appText } from '../../../utils/appText';
+import { appText, tr } from '../../../utils/appText';
 interface SaintHymnPickerProps {
   visible: boolean;
   onClose: () => void;
@@ -44,10 +49,13 @@ const LABELS = {
   search: { english: 'Search saints', arabic: 'ابحث عن قديس', french: 'Rechercher des saints' },
   empty: { english: 'No saints match that search.', arabic: 'لا يوجد قديس مطابق.', french: 'Aucun saint ne correspond à cette recherche.' },
   clear: { english: 'Clear', arabic: 'مسح', french: 'Effacer' },
-  done: { english: 'Done', arabic: 'تم', french: 'Terminé' },
-  close: { english: 'Close', arabic: 'إغلاق', french: 'Fermer' },
+  choose: { english: 'Choose hymns', arabic: 'اختر الألحان', french: 'Choisir les hymnes' },
+  included: { english: 'Included', arabic: 'مُضاف', french: 'Inclus' },
+  include: { english: 'Include', arabic: 'إضافة', french: 'Inclure' },
   noPreview: { english: 'This hymn has no text yet.', arabic: 'لا يوجد نص لهذا اللحن بعد.', french: 'Cette hymne n’a pas encore de texte.' },
 };
+
+const MAX_FONT_SCALE = 1.3;
 
 interface PreviewTarget {
   token: string;
@@ -62,6 +70,12 @@ function searchKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+/**
+ * The saints' hymns (Coptic Vine design, "Saint Hymns"): a page of saints,
+ * each naming its hymns with the chosen ones in gold; a saint's hymns to
+ * choose from on a sheet; and any hymn's text on a sheet of its own. On the
+ * iPad and desktop the three stand side by side.
+ */
 export default function SaintHymnPicker({
   visible,
   onClose,
@@ -73,8 +87,8 @@ export default function SaintHymnPicker({
   const [saints, setSaints] = useState<SaintEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  // The saint whose own hymn menu is open on top of the list. Only saints with
-  // more than one choice get one — see the comment on openSaint below.
+  // The saint whose own hymn menu is open beside or over the list. Only saints
+  // with more than one choice get one — see the comment on openSaint below.
   const [expandedBase, setExpandedBase] = useState<string | null>(null);
   // The hymn whose text is being read, over whichever of those two it was
   // opened from. Choosing a saint hymn otherwise means recognising it by name;
@@ -84,9 +98,11 @@ export default function SaintHymnPicker({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const { preferences } = useReadingPreferences();
+  const wide = useLayoutMode() !== 'phone';
 
   const label = (entry: { english: string; arabic: string; french?: string }) => (appText(entry));
   const localized = isArabic && styles.arabicText;
+  const rowDirection = isArabic && styles.rowReverse;
 
   useEffect(() => {
     if (!visible) return;
@@ -169,14 +185,14 @@ export default function SaintHymnPicker({
 
   // Keep the WebView viewport stable after it mounts. Resizing it from its own
   // content-height messages can make WKWebView repeatedly reflow on iOS.
-  const previewBodyHeight = Math.min(560, Math.max(180, Math.round(windowHeight * 0.55)));
+  const previewBodyHeight = wide ? Math.max(320, Math.round(windowHeight * 0.6)) : Math.min(560, Math.max(180, Math.round(windowHeight * 0.5)));
 
   // The reader's own size, but held to something a window this wide can still
   // show three columns of. At the top of the text-size range a real document
   // line is taller than this whole window.
   const previewFontSize = Math.min(fontScaleToPx(preferences.fontScale), 20);
 
-  // Closing clears this sheet's own transient state, so it never reopens with
+  // Closing clears this page's own transient state, so it never reopens with
   // a stale search or a saint's menu still hanging open behind it. Done on the
   // close path rather than in an effect watching `visible` — every close goes
   // through here, and the effect was setting state mid-reconciliation.
@@ -232,204 +248,245 @@ export default function SaintHymnPicker({
 
   const countFor = (entry: SaintEntry) => entry.options.filter((option) => selectedSet.has(option.token)).length;
 
+  /** "Doxology for Archangel Michael" */
+  const previewTitle = (target: PreviewTarget) => tr(`${target.label} for ${target.saintName}`, `${target.label} pour ${target.saintName}`, `${target.label} - ${target.saintName}`);
+
   // Sits inside the row it belongs to, so it has to claim the touch before the
-  // row's own handler runs. A full 44pt box rather than an icon with slop
+  // row's own handler runs. A full 38pt disc rather than an icon with slop
   // around it: the target is then where it looks like it is, which matters
   // most for the row where the tap that misses it picks the saint instead.
-  const previewButton = (target: PreviewTarget) => (
-    <Pressable
-      accessibilityLabel={`Preview ${target.label} for ${target.saintName}`}
-      hitSlop={6}
-      style={styles.previewButton}
-      onPress={(event) => {
-        // On the web the row around this one would otherwise see the same
-        // click and toggle the saint, so reading a hymn would also pick it.
-        // Native hands the touch to this responder alone; this makes both
-        // behave the same way.
-        event?.stopPropagation?.();
-        openPreview(target);
-      }}
-    >
-      <Icon name="eye-outline" size={21} color={COLORS.muted} />
-    </Pressable>
+  const eyeButton = (target: PreviewTarget) => {
+    const open = preview?.token === target.token;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Preview ${target.label} for ${target.saintName}`}
+        accessibilityState={{ selected: open }}
+        hitSlop={4}
+        style={({ pressed }) => [styles.eye, open && styles.eyeOpen, pressed && styles.pressed]}
+        onPress={(event) => {
+          // On the web the row around this one would otherwise see the same
+          // click and toggle the saint, so reading a hymn would also pick it.
+          // Native hands the touch to this responder alone; this makes both
+          // behave the same way.
+          event?.stopPropagation?.();
+          openPreview(target);
+        }}
+      >
+        <Icon name="eye-outline" size={19} color={open ? COLORS.greenDeep : COLORS.gold} />
+      </Pressable>
+    );
+  };
+
+  const saintRow = (item: SaintEntry) => {
+    const count = countFor(item);
+    const single = item.options.length === 1;
+    const highlighted = single ? count > 0 : item.base === expandedBase;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.options.map((option) => option.label).join(', ')}`}
+        accessibilityState={single ? { selected: count > 0 } : { expanded: item.base === expandedBase }}
+        style={({ pressed }) => [styles.saintRow, rowDirection, pressed && styles.pressed]}
+        onPress={() => openSaint(item)}
+      >
+        <LinearGradient
+          colors={highlighted ? [COLORS.green, COLORS.greenDeep] : [COLORS.surfaceDeep, COLORS.surface]}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        <View style={styles.saintText}>
+          <Text style={[styles.saintName, localized]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{item.name}</Text>
+          <Text style={[styles.saintHymns, localized]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {item.options.map((option, index) => (
+              <Text key={option.token}>
+                {index > 0 ? ' · ' : ''}
+                <Text style={selectedSet.has(option.token) ? styles.saintHymnOn : undefined}>{option.label}</Text>
+              </Text>
+            ))}
+          </Text>
+        </View>
+        {count > 0 ? (
+          <View style={styles.count}>
+            <Text style={styles.countText} maxFontSizeMultiplier={MAX_FONT_SCALE}>{count}</Text>
+          </View>
+        ) : null}
+        {single
+          ? eyeButton({ token: item.options[0].token, category: item.options[0].category, label: item.options[0].label, saintName: item.name })
+          : <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />}
+      </Pressable>
+    );
+  };
+
+  /** A saint's hymns to choose from (Coptic Vine design, "Choose hymns"). */
+  const chooser = expanded ? (
+    <View style={styles.chooser}>
+      <View style={[styles.chooserHead, rowDirection]}>
+        <View style={styles.flex}>
+          <Text style={[styles.kicker, isArabic && styles.kickerArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{isArabic ? expanded.name : expanded.name.toUpperCase()}</Text>
+          <Text style={[styles.chooserTitle, localized]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>{label(LABELS.choose)}</Text>
+          <Text style={[styles.chooserCount, localized]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {tr(`${countFor(expanded)} of ${expanded.options.length} selected`, `${countFor(expanded)} sur ${expanded.options.length} sélectionnés`, `${countFor(expanded)} من ${expanded.options.length} مختارة`)}
+          </Text>
+        </View>
+        {countFor(expanded) > 0 ? (
+          <Pressable accessibilityRole="button" hitSlop={8} style={({ pressed }) => [styles.clear, pressed && styles.pressed]} onPress={() => onClearSaint(expanded.base)}>
+            <Text style={[styles.clearText, localized]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label(LABELS.clear)}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      <View style={styles.options}>
+        {expanded.options.map((option) => {
+          const active = selectedSet.has(option.token);
+          return (
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: active }}
+              accessibilityLabel={option.label}
+              key={option.token}
+              style={({ pressed }) => [styles.option, active && styles.optionOn, rowDirection, pressed && styles.pressed]}
+              onPress={() => onToggle(option.token)}
+            >
+              <View style={[styles.check, active && styles.checkOn]}>
+                {active ? <Icon name="checkmark" size={15} color={COLORS.greenDeep} /> : null}
+              </View>
+              <Text style={[styles.optionLabel, active && styles.optionLabelOn, localized]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                {option.label}
+              </Text>
+              {eyeButton({ token: option.token, category: option.category, label: option.label, saintName: expanded.name })}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  ) : null;
+
+  /** A hymn's text, with the way to include it (Coptic Vine design, "Preview"). */
+  const previewPanel = preview ? (
+    <View style={styles.preview}>
+      <View style={[styles.previewHead, rowDirection]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={tr('Close preview', 'Fermer l’aperçu', 'أغلق المعاينة')} style={({ pressed }) => [styles.previewBack, pressed && styles.pressed]} onPress={() => setPreview(null)}>
+          <Icon name={isArabic ? 'chevron-forward' : 'chevron-back'} size={19} color={COLORS.gold} />
+        </Pressable>
+        <Text style={[styles.previewTitle, localized]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>{previewTitle(preview)}</Text>
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: selectedSet.has(preview.token) }}
+          accessibilityLabel={label(LABELS.include)}
+          style={({ pressed }) => [styles.includePill, rowDirection, pressed && styles.pressed]}
+          onPress={() => onToggle(preview.token)}
+        >
+          <Icon name={selectedSet.has(preview.token) ? 'checkmark' : 'add'} size={15} color={COLORS.gold} />
+          <Text style={[styles.includeText, localized]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label(selectedSet.has(preview.token) ? LABELS.included : LABELS.include)}</Text>
+        </Pressable>
+      </View>
+      {previewError ? (
+        <Text style={[styles.message, localized]}>{previewError}</Text>
+      ) : !previewHymns ? (
+        <ActivityIndicator color={COLORS.gold} style={styles.previewLoading} />
+      ) : previewHymns.length === 0 ? (
+        <Text style={[styles.message, localized]}>{label(LABELS.noPreview)}</Text>
+      ) : (
+        <View style={[styles.previewBody, { height: previewBodyHeight }]}>
+          <DocumentWebView
+            sections={previewSections}
+            fontSize={previewFontSize}
+            visibleColumns={previewVisibleColumns}
+            appLanguage={preferences.appLanguage}
+            // The preview is here to be read and quoted from, so its
+            // text selects and copies. The page around it stays
+            // unselectable chrome.
+            selectText
+            displayComments={preferences.displayComments}
+            displaySilentPrayers={preferences.displaySilentPrayers}
+            bishopPresent={preferences.bishopPresent}
+            copticRecitedPrayers={preferences.visibleLanguages.copticRecitedPrayers}
+          />
+        </View>
+      )}
+    </View>
+  ) : null;
+
+  const search = (
+    <View style={[styles.search, rowDirection]}>
+      <Icon name="search-outline" size={19} color={COLORS.gold} />
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder={label(LABELS.search)}
+        placeholderTextColor="rgba(205, 216, 203, 0.55)"
+        style={[styles.searchInput, Platform.OS === 'web' && styles.searchInputWeb, localized, EDITABLE_TEXT_SELECTION_STYLE]}
+        autoCorrect={false}
+        autoCapitalize="none"
+        returnKeyType="search"
+        clearButtonMode="while-editing"
+      />
+    </View>
+  );
+
+  const list = error ? (
+    <Text style={[styles.message, localized]}>{error}</Text>
+  ) : !saints ? (
+    <ActivityIndicator color={COLORS.gold} style={styles.loading} />
+  ) : (
+    <FlatList
+      data={filtered}
+      keyExtractor={(entry) => entry.base}
+      style={styles.list}
+      contentContainerStyle={styles.listContent}
+      keyboardShouldPersistTaps="handled"
+      initialNumToRender={16}
+      windowSize={9}
+      showsVerticalScrollIndicator={false}
+      ListEmptyComponent={<Text style={[styles.message, localized]}>{label(LABELS.empty)}</Text>}
+      renderItem={({ item }) => saintRow(item)}
+    />
   );
 
   return (
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
       onRequestClose={closeTopLayer}
       supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
     >
-      <View style={styles.modalRoot}>
-        <View style={styles.overlay}>
-        <Pressable accessibilityLabel="Close saint hymns" style={styles.backdrop} onPress={closePicker} />
-        <SafeAreaView edges={['bottom']} style={[styles.sheet, DISABLED_TEXT_SELECTION_STYLE]}>
-          <View style={styles.grabber} />
+      <View style={[styles.page, DISABLED_TEXT_SELECTION_STYLE]}>
+        <PageGlow kind="green" tall={wide} />
+        <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.flex}>
+          <SubPageHeader title={label(LABELS.title)} arabic={isArabic} onBack={closePicker} backLabel={tr('Back', 'Retour', 'رجوع')} />
 
-          <View style={styles.header}>
-            <Text style={[styles.title, localized]}>{label(LABELS.title)}</Text>
-            <Pressable accessibilityLabel="Done" style={styles.doneButton} onPress={closePicker}>
-              <Text style={[styles.doneText, localized]}>{label(LABELS.done)}</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.searchRow}>
-            <Icon name="search-outline" size={20} color={COLORS.muted} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={label(LABELS.search)}
-              placeholderTextColor={COLORS.muted}
-              style={[styles.searchInput, Platform.OS === 'web' && styles.searchInputWeb, localized, EDITABLE_TEXT_SELECTION_STYLE]}
-              autoCorrect={false}
-              autoCapitalize="none"
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-            />
-          </View>
-
-          {error ? (
-            <Text style={[styles.message, localized]}>{error}</Text>
-          ) : !saints ? (
-            <ActivityIndicator color={COLORS.gold} style={styles.loading} />
-          ) : (
-            <FlatList
-              data={filtered}
-              keyExtractor={(entry) => entry.base}
-              style={styles.list}
-              keyboardShouldPersistTaps="handled"
-              initialNumToRender={16}
-              windowSize={9}
-              ListEmptyComponent={<Text style={[styles.message, localized]}>{label(LABELS.empty)}</Text>}
-              renderItem={({ item }) => {
-                const count = countFor(item);
-                const single = item.options.length === 1;
-                return (
-                  <Pressable accessibilityRole="button"
-                    style={[styles.saintRow, count > 0 && styles.saintRowActive]}
-                    onPress={() => openSaint(item)}
-                  >
-                    <View style={styles.saintTextGroup}>
-                      <Text style={[styles.saintName, localized]}>{item.name}</Text>
-                      <Text style={[styles.saintMeta, localized]}>
-                        {single ? item.options[0].label : item.options.map((option) => option.label).join(' · ')}
-                      </Text>
-                    </View>
-                    {single
-                      ? previewButton({
-                          token: item.options[0].token,
-                          category: item.options[0].category,
-                          label: item.options[0].label,
-                          saintName: item.name,
-                        })
-                      : null}
-                    {count > 0 ? (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{count}</Text>
-                      </View>
-                    ) : null}
-                    {single ? null : <Icon name="chevron-forward" size={22} color={COLORS.muted} />}
-                  </Pressable>
-                );
-              }}
-            />
-          )}
-          </SafeAreaView>
-        </View>
-
-        {/* These are ordinary layers inside the picker modal. Stacking native
-            modals can leave iOS with an invisible view that captures touches. */}
-        {expanded ? (
-          <View style={[styles.popoverOverlay, styles.modalLayer]}>
-          <Pressable
-            accessibilityLabel="Close saint hymn menu"
-            style={styles.backdrop}
-            onPress={() => setExpandedBase(null)}
-          />
-          <View style={[styles.popover, DISABLED_TEXT_SELECTION_STYLE]}>
-            <Text style={[styles.popoverTitle, localized]}>{expanded?.name}</Text>
-            {expanded?.options.map((option) => {
-              const active = selectedSet.has(option.token);
-              return (
-                <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
-                  key={option.token}
-                  style={[styles.optionRow, active && styles.optionRowActive]}
-                  onPress={() => onToggle(option.token)}
-                >
-                  <Text style={[styles.optionLabel, active && styles.optionLabelActive, localized]}>
-                    {option.label}
-                  </Text>
-                  <View style={styles.optionActions}>
-                    {previewButton({
-                      token: option.token,
-                      category: option.category,
-                      label: option.label,
-                      saintName: expanded?.name ?? '',
-                    })}
-                    {active ? <Icon name="checkmark" size={22} color={COLORS.gold} /> : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-            <View style={styles.popoverActions}>
-              {expanded && countFor(expanded) > 0 ? (
-                <Pressable accessibilityRole="button" style={styles.popoverAction} onPress={() => onClearSaint(expanded.base)}>
-                  <Text style={[styles.popoverActionText, localized]}>{label(LABELS.clear)}</Text>
-                </Pressable>
-              ) : null}
-              <Pressable accessibilityRole="button" style={styles.popoverAction} onPress={() => setExpandedBase(null)}>
-                <Text style={[styles.popoverActionText, localized]}>{label(LABELS.done)}</Text>
-              </Pressable>
-            </View>
-          </View>
-          </View>
-        ) : null}
-
-        {/* Declared last and given a higher z-index so it covers either the
-            saint list or an open saint hymn menu. */}
-        {preview ? (
-          <View style={[styles.popoverOverlay, styles.modalLayer, styles.previewLayer]}>
-          <Pressable accessibilityLabel="Close preview" style={styles.backdrop} onPress={() => setPreview(null)} />
-          <View style={[styles.previewCard, DISABLED_TEXT_SELECTION_STYLE]}>
-            <Text style={[styles.popoverTitle, localized]} numberOfLines={2}>
-              {preview?.saintName}
-            </Text>
-            <Text style={[styles.previewSubtitle, localized]}>{preview?.label}</Text>
-
-            {previewError ? (
-              <Text style={[styles.message, localized]}>{previewError}</Text>
-            ) : !previewHymns ? (
-              <ActivityIndicator color={COLORS.gold} style={styles.previewLoading} />
-            ) : previewHymns.length === 0 ? (
-              <Text style={[styles.message, localized]}>{label(LABELS.noPreview)}</Text>
-            ) : (
-              <View style={[styles.previewBody, { height: previewBodyHeight }]}>
-                <DocumentWebView
-                  sections={previewSections}
-                  fontSize={previewFontSize}
-                  visibleColumns={previewVisibleColumns}
-                  appLanguage={preferences.appLanguage}
-                  // The preview is here to be read and quoted from, so its
-                  // text selects and copies. The card around it stays
-                  // unselectable chrome.
-                  selectText
-                  displayComments={preferences.displayComments}
-                  displaySilentPrayers={preferences.displaySilentPrayers}
-                  bishopPresent={preferences.bishopPresent}
-                  copticRecitedPrayers={preferences.visibleLanguages.copticRecitedPrayers}
-                />
+          {wide ? (
+            <View style={[styles.columns, rowDirection]}>
+              <View style={styles.listColumn}>
+                {search}
+                {list}
               </View>
-            )}
-
-            <View style={styles.popoverActions}>
-              <Pressable accessibilityRole="button" style={styles.popoverAction} onPress={() => setPreview(null)}>
-                <Text style={[styles.popoverActionText, localized]}>{label(LABELS.close)}</Text>
-              </Pressable>
+              {chooser ? <View style={styles.chooserColumn}>{chooser}</View> : null}
+              {previewPanel ? <View style={styles.previewColumn}>{previewPanel}</View> : null}
             </View>
-          </View>
-          </View>
+          ) : (
+            <>
+              {search}
+              {list}
+            </>
+          )}
+        </SafeAreaView>
+
+        {/* On a phone the saint's hymns and the preview rise as sheets inside
+            this modal: stacking native modals can leave iOS with an invisible
+            view that captures touches. The preview is declared last, so it
+            covers an open hymn menu. */}
+        {!wide ? (
+          <SheetFrame inline visible={Boolean(expanded)} onClose={() => setExpandedBase(null)} closeLabel={tr('Close the hymns', 'Fermer les hymnes', 'أغلق الألحان')}>
+            {chooser}
+          </SheetFrame>
+        ) : null}
+        {!wide ? (
+          <SheetFrame inline visible={Boolean(preview)} onClose={() => setPreview(null)} closeLabel={tr('Close preview', 'Fermer l’aperçu', 'أغلق المعاينة')} scroll={false}>
+            {previewPanel}
+          </SheetFrame>
         ) : null}
       </View>
     </Modal>
@@ -437,47 +494,22 @@ export default function SaintHymnPicker({
 }
 
 const styles = StyleSheet.create({
-  modalRoot: { flex: 1, position: 'relative' },
-  overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: {
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.border,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderTopWidth: 1,
-    // Fixed, not maxHeight: the sheet keeps one size whatever the search
-    // narrows the list to, instead of collapsing towards the search field as
-    // results drop away and springing back when they return.
-    height: '86%',
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-  },
-  grabber: {
-    alignSelf: 'center',
-    backgroundColor: COLORS.border,
-    borderRadius: 2,
-    height: 4,
-    marginBottom: SPACING.sm,
-    width: 44,
-  },
-  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '800' },
-  doneButton: { justifyContent: 'center', minHeight: 44, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs },
-  doneText: { color: COLORS.gold, fontSize: 16, fontWeight: '700' },
-  searchRow: {
+  page: { backgroundColor: COLORS.black, flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  pressed: { opacity: 0.75 },
+  search: {
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderColor: COLORS.border,
-    borderRadius: RADII.sm,
-    borderWidth: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
-    minHeight: 48,
-    paddingHorizontal: SPACING.md,
+    gap: 10,
+    height: 48,
+    marginBottom: 12,
+    marginHorizontal: 16,
+    paddingHorizontal: 16,
   },
-  searchInput: { color: COLORS.white, flex: 1, fontSize: 16, paddingVertical: SPACING.sm + 2 },
+  searchInput: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, height: 48, minWidth: 0 },
   // The rounded search row already frames the field; the browser's own focus
   // ring drew a second, square box inside it.
   searchInputWeb: {
@@ -485,105 +517,59 @@ const styles = StyleSheet.create({
     outlineWidth: 0,
     boxShadow: 'none',
   } as any,
-  list: { flex: 1, marginTop: SPACING.sm },
-  loading: { flex: 1, paddingVertical: SPACING.xl },
-  message: { color: COLORS.muted, flex: 1, fontSize: 14, paddingVertical: SPACING.lg, textAlign: 'center' },
+  list: { flex: 1 },
+  listContent: { gap: 8, paddingBottom: 28, paddingHorizontal: 16 },
+  loading: { flex: 1, paddingVertical: 32 },
+  message: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, paddingHorizontal: 16, paddingVertical: 24, textAlign: 'center' },
   saintRow: {
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderColor: COLORS.border,
-    borderRadius: RADII.sm,
-    borderWidth: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 18,
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-    // Comfortably past the 44pt a fingertip actually covers, with two lines of
-    // text inside it.
-    minHeight: 62,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  saintRowActive: { backgroundColor: '#171513', borderColor: COLORS.goldLine },
-  saintTextGroup: { flex: 1, gap: 2 },
-  saintName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '700' },
-  saintMeta: { color: COLORS.muted, fontSize: 13, lineHeight: 18 },
-  badge: {
-    alignItems: 'center',
-    backgroundColor: COLORS.goldSoft,
-    borderColor: COLORS.goldLine,
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minWidth: 26,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  badgeText: { color: COLORS.gold, fontSize: 13, fontWeight: '800' },
-  popoverOverlay: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: SPACING.lg },
-  modalLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 1 },
-  previewLayer: { zIndex: 2 },
-  popover: {
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: SPACING.sm,
-    maxWidth: 420,
-    padding: SPACING.md,
-    width: '100%',
-  },
-  popoverTitle: {
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: SPACING.xs,
-  },
-  optionRow: {
-    alignItems: 'center',
-    borderColor: COLORS.border,
-    borderRadius: RADII.sm,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'space-between',
-    // These are the rows a choice is actually made on, and they were a third
-    // shorter than a fingertip. The preview button inside one is its own 44pt
-    // box on top of this.
-    minHeight: 54,
-    paddingLeft: SPACING.md,
-    paddingRight: SPACING.sm,
-    // Small, so the 44pt button inside sets the height rather than adding to
-    // it; minHeight above is what the row actually comes out at.
-    paddingVertical: SPACING.xs,
-  },
-  optionRowActive: { backgroundColor: '#171513', borderColor: COLORS.goldLine },
-  optionLabel: { color: COLORS.white, flexShrink: 1, fontSize: 16, fontWeight: '600' },
-  optionLabelActive: { color: COLORS.gold, fontWeight: '800' },
-  optionActions: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm },
-  previewButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
-  previewCard: {
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    maxHeight: '90%',
-    maxWidth: 460,
-    padding: SPACING.md,
-    width: '100%',
-  },
-  previewSubtitle: { color: COLORS.gold, fontSize: 14, fontWeight: '700', marginBottom: SPACING.sm },
-  previewLoading: { paddingVertical: SPACING.xl },
-  // The document renderer scrolls within this stable viewport.
-  previewBody: {
-    borderColor: COLORS.border,
-    borderRadius: RADII.sm,
-    borderWidth: 1,
-    flexShrink: 1,
+    gap: 10,
     overflow: 'hidden',
+    paddingLeft: 16,
+    paddingRight: 12,
+    paddingVertical: 13,
   },
-  popoverActions: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end', marginTop: SPACING.xs },
-  popoverAction: { justifyContent: 'center', minHeight: 44, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs },
-  popoverActionText: { color: COLORS.gold, fontSize: 15, fontWeight: '700' },
+  saintText: { flex: 1, minWidth: 0 },
+  saintName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700', lineHeight: 21 },
+  saintHymns: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
+  saintHymnOn: { color: COLORS.goldBright, fontWeight: '700' },
+  count: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, height: 24, justifyContent: 'center', minWidth: 24, paddingHorizontal: 7 },
+  countText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, fontWeight: '800' },
+  eye: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.28)', borderRadius: 19, height: 38, justifyContent: 'center', width: 38 },
+  eyeOpen: { backgroundColor: COLORS.gold },
+
+  columns: { alignItems: 'flex-start', flex: 1, flexDirection: 'row', gap: 20, paddingHorizontal: 16 },
+  listColumn: { alignSelf: 'stretch', flex: 1, maxWidth: 460, minWidth: 0 },
+  chooserColumn: { width: 300 },
+  previewColumn: { flex: 1.2, minWidth: 0 },
+
+  chooser: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 16 },
+  chooserHead: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginBottom: 14 },
+  kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
+  kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  chooserTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', lineHeight: 28, marginTop: 5 },
+  chooserCount: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, marginTop: 4 },
+  clear: { paddingHorizontal: 2, paddingVertical: 6 },
+  clearText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
+  options: { gap: 6 },
+  option: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 16, flexDirection: 'row', gap: 12, minHeight: 52, paddingLeft: 14, paddingRight: 7, paddingVertical: 7 },
+  optionOn: { backgroundColor: COLORS.goldSoft },
+  check: { alignItems: 'center', borderColor: 'rgba(205, 216, 203, 0.4)', borderRadius: 12, borderWidth: 1.5, height: 24, justifyContent: 'center', width: 24 },
+  checkOn: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
+  optionLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600', minWidth: 0 },
+  optionLabelOn: { color: COLORS.goldBright },
+
+  preview: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 16 },
+  previewHead: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginBottom: 12 },
+  previewBack: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 19, height: 38, justifyContent: 'center', width: 38 },
+  previewTitle: { color: COLORS.gold, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700', lineHeight: 23, minWidth: 0, paddingTop: 7 },
+  includePill: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, flexDirection: 'row', gap: 5, height: 34, paddingHorizontal: 13 },
+  includeText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '700' },
+  previewLoading: { paddingVertical: 32 },
+  // The document renderer scrolls within this stable viewport.
+  previewBody: { backgroundColor: COLORS.black, borderRadius: 18, overflow: 'hidden' },
   arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });

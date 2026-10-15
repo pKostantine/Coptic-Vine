@@ -1,0 +1,113 @@
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import type { ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
+import Icon from './Icon';
+
+const MAX_FONT_SCALE = 1.3;
+
+interface PersonHeroProps {
+  name: string;
+  /** The small gold line over the name: "Artist", "Cantor". */
+  kicker: string;
+  imageUri: string | null;
+  bio?: string | null;
+  /** A smaller photo and name (the cantor). */
+  compact?: boolean;
+  arabic?: boolean;
+  /** On the iPad and desktop the photo sits beside the name instead of over it. */
+  wide?: boolean;
+  onBack: () => void;
+  backLabel: string;
+  /** Under the name: the follow and share buttons, the links. */
+  children?: ReactNode;
+}
+
+/**
+ * The head of an artist's or cantor's page (Coptic Vine design, "Artist" and
+ * "Cantor"): their photo glowing out of the page's top, a round back button
+ * over it, then the photo itself, the kicker, their name and a short bio.
+ */
+export default function PersonHero({ name, kicker, imageUri, bio, compact = false, arabic = false, wide = false, onBack, backLabel, children }: PersonHeroProps) {
+  const insets = useSafeAreaInsets();
+  const photoSize = wide ? 150 : compact ? 104 : 136;
+  const initial = name.trim().charAt(0).toUpperCase() || '♪';
+  const alignText = wide ? (arabic ? styles.textEnd : styles.textStart) : styles.textCenter;
+
+  return (
+    <View>
+      <View style={styles.glow} pointerEvents="none">
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} contentFit="cover" blurRadius={42} style={styles.glowImage} />
+        ) : (
+          <LinearGradient colors={[COLORS.greenMid, COLORS.greenDeep]} style={StyleSheet.absoluteFill} />
+        )}
+        <LinearGradient colors={['rgba(0, 0, 0, 0.05)', 'rgba(0, 0, 0, 0.45)', '#000000']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
+      </View>
+
+      <View style={[styles.bar, { paddingTop: insets.top + 2 }, arabic && styles.rowReverse]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={backLabel} hitSlop={6} onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+          <Icon name={arabic ? 'chevron-forward' : 'chevron-back'} size={20} color={COLORS.gold} />
+        </Pressable>
+      </View>
+
+      <View style={[styles.head, wide && styles.headWide, wide && arabic && styles.rowReverse]}>
+        <View style={[styles.photo, { borderRadius: photoSize / 2, height: photoSize, width: photoSize }]}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} contentFit="cover" transition={160} style={StyleSheet.absoluteFill} />
+          ) : (
+            <>
+              <LinearGradient colors={[COLORS.green, COLORS.greenDeep]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
+              <Text style={[styles.initial, { fontSize: Math.round(photoSize * 0.4) }]} maxFontSizeMultiplier={1}>{initial}</Text>
+            </>
+          )}
+        </View>
+        <View style={[styles.text, wide && styles.textWide, wide && (arabic ? styles.itemsEnd : styles.itemsStart)]}>
+          <Text style={[styles.kicker, compact && !wide && styles.kickerCompact, alignText, arabic && styles.arabicKicker]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {arabic ? kicker : kicker.toUpperCase()}
+          </Text>
+          <Text style={[styles.name, compact && !wide && styles.nameCompact, alignText, arabic && styles.arabic]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {name}
+          </Text>
+          {bio ? (
+            <Text style={[styles.bio, alignText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+              {bio}
+            </Text>
+          ) : null}
+          {children}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  glow: { height: 500, left: 0, overflow: 'hidden', position: 'absolute', right: 0, top: 0 },
+  // The photo, blurred, bleeding past the edges so the blur has no hard rim.
+  glowImage: { bottom: -60, left: -60, opacity: 0.62, position: 'absolute', right: -60, top: -60 },
+  bar: { flexDirection: 'row', paddingHorizontal: 16 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  back: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.32)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  pressed: { opacity: 0.7 },
+  head: { alignItems: 'center', paddingHorizontal: 20 },
+  headWide: { alignItems: 'center', flexDirection: 'row', gap: 28, paddingHorizontal: 0, paddingTop: 8 },
+  photo: { alignItems: 'center', backgroundColor: COLORS.greenDeep, boxShadow: '0px 18px 40px rgba(0, 0, 0, 0.55)', justifyContent: 'center', overflow: 'hidden' },
+  initial: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontWeight: '700' },
+  text: { alignItems: 'center', alignSelf: 'stretch' },
+  textWide: { flex: 1, minWidth: 0 },
+  itemsStart: { alignItems: 'flex-start' },
+  itemsEnd: { alignItems: 'flex-end' },
+  textCenter: { textAlign: 'center' },
+  textStart: { textAlign: 'left' },
+  textEnd: { textAlign: 'right' },
+  kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8, marginTop: 18 },
+  kickerCompact: { marginTop: 14 },
+  arabicKicker: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0 },
+  name: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 29, fontWeight: '700', lineHeight: 34, marginTop: 6 },
+  nameCompact: { fontSize: 26, lineHeight: 30 },
+  bio: { color: '#E2E9DF', fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 21, marginTop: 10, maxWidth: 560 },
+  arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+});

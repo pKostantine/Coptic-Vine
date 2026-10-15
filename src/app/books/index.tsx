@@ -11,6 +11,7 @@ import CalendarSheet from '@/components/vine/ui/CalendarSheet';
 import DayBlock from '@/components/vine/ui/DayBlock';
 import LibraryBook from '@/components/vine/ui/LibraryBook';
 import PageTitle from '@/components/vine/ui/PageTitle';
+import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
 import { useLiturgicalDay } from '@/components/vine/ui/useLiturgicalDay';
 import { CATEGORIES, HOLY_WEEK_DAYS, holyWeekDayHref, type CategoryDef } from '@/constants/manifest';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
@@ -55,6 +56,7 @@ export default function BooksHome() {
   const holyWeek = useHolyWeekSchedule();
   const day = useLiturgicalDay();
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const downloadRevision = useSyncExternalStore(bookDownloadManager.subscribe, bookDownloadManager.getRevision, bookDownloadManager.getRevision);
   const [downloads, setDownloads] = useState<BookDownloadProgress[]>([]);
 
@@ -114,7 +116,7 @@ export default function BooksHome() {
       flush={layout !== 'phone'}
       actions={[
         { icon: 'bookmark-outline', label: tr('Open bookmarks', 'Ouvrir les signets', 'افتح العلامات'), onPress: () => router.push('/bookmarks') },
-        { icon: 'settings-outline', label: tr('Open settings', 'Ouvrir les réglages', 'افتح الإعدادات'), onPress: () => router.push('/book-settings') },
+        { icon: 'settings-outline', label: tr('Open settings', 'Ouvrir les réglages', 'افتح الإعدادات'), onPress: () => setSettingsOpen(true) },
       ]}
     />
   );
@@ -179,6 +181,7 @@ export default function BooksHome() {
       </NowPlayingAwareScrollView>
 
       <CalendarSheet visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={openSeasons} />
+      <BookSettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <BottomTabBar active="books" />
     </SafeAreaView>
   );

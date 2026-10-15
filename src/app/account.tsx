@@ -1,22 +1,27 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/vine/ui/AppHeader';
-import BottomTabBar from '@/components/vine/ui/BottomTabBar';
-import Icon from '@/components/vine/ui/Icon';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import Icon, { type IconName } from '@/components/vine/ui/Icon';
+import { CrownOrnament } from '@/components/vine/ui/Ornaments';
+import PageTitle from '@/components/vine/ui/PageTitle';
+import SegmentNav from '@/components/vine/ui/SegmentNav';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { pickAndUploadProfileAvatar, removeProfileAvatar } from '@/services/profileAvatarService';
 import { authMessage } from '@/utils/authMessages';
 import { getCurrentAppLanguage, type AppLanguage } from '@/utils/preferencesStorage';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../utils/appText';
 // Each language also named in itself, so it can be found whatever the app is showing.
@@ -26,35 +31,60 @@ const APP_LANGUAGE_OPTIONS: { key: AppLanguage; label: string; native: string }[
   { key: 'ar', label: 'Arabic', native: 'العربية' },
 ];
 
+const MAX_FONT_SCALE = 1.3;
+
+/**
+ * The Account tab (Coptic Vine design, "Account"): who is signed in under the
+ * vine crown, then the profile to edit, the app's settings and the account's
+ * security, each a section drawn out into a vine. The iPad and desktop set
+ * the profile and app settings beside the editing and security.
+ */
 export default function AccountScreen() {
+  const insets = useSafeAreaInsets();
+  const layout = useLayoutMode();
   const { preferences } = useReadingPreferences();
   const { user, loading, recoveryMode } = useAuth();
-  const isArabic = preferences.appLanguage === 'ar';
+  const arabic = preferences.appLanguage === 'ar';
+  const wide = layout !== 'phone';
+  const gutter = wide ? 0 : 16;
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{`${tr('Account', 'Compte', 'الحساب')} — Coptic Vine`}</title></Head>
-      <AppHeader
-        title={{ english: 'Account', arabic: 'الحساب', french: 'Compte' }}
-        visibleLanguages={{ english: !isArabic, arabic: isArabic }}
-      />
-      <NowPlayingAwareScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.container}>
+      <NowPlayingAwareScrollView
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <PageGlow kind="green" tall={wide} />
+        <PageGutterProvider gutter={gutter}>
+          <PageTitle title={tr('Account', 'Compte', 'الحساب')} arabic={arabic} flush={wide} />
           {loading ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
-          {!loading && user ? <SignedInAccount key={user.id} recoveryMode={recoveryMode} /> : null}
-          {!loading && !user ? <SignedOutAccount /> : null}
-          <AppSettingsSection />
-        </View>
+          {!loading && user ? <SignedInAccount key={user.id} recoveryMode={recoveryMode} wide={wide} gutter={gutter} /> : null}
+          {!loading && !user ? (
+            wide ? (
+              <View style={[styles.columns, arabic && styles.rowReverse]}>
+                <View style={styles.column}><SignedOutAccount gutter={gutter} /></View>
+                <View style={styles.column}><AppSettingsSection gutter={gutter} /></View>
+              </View>
+            ) : (
+              <>
+                <SignedOutAccount gutter={gutter} />
+                <AppSettingsSection gutter={gutter} />
+              </>
+            )
+          ) : null}
+        </PageGutterProvider>
       </NowPlayingAwareScrollView>
       <BottomTabBar active="account" />
     </SafeAreaView>
   );
 }
 
-function SignedOutAccount() {
+function SignedOutAccount({ gutter }: { gutter: number }) {
   const auth = useAuth();
   const { preferences } = useReadingPreferences();
-  const isArabic = preferences.appLanguage === 'ar';
+  const arabic = preferences.appLanguage === 'ar';
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -147,93 +177,89 @@ function SignedOutAccount() {
     }
   };
 
+  const modes = [
+    { key: 'signIn' as const, label: tr('Sign in', 'Se connecter', 'تسجيل الدخول') },
+    { key: 'signUp' as const, label: tr('Create account', 'Créer un compte', 'إنشاء حساب') },
+  ];
+
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Your Coptic Vine account', 'Votre compte Coptic Vine', 'حساب كوبتك فاين الخاص بك')}</Text>
-      <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
-        {tr('Keep your likes, follows, playlists, and learning progress with you across devices.', 'Retrouvez vos favoris, abonnements, playlists et progrès sur tous vos appareils.', 'احفظ الإعجابات والمتابعات وقوائم التشغيل وتقدّم التعلّم على أجهزتك.')}
-      </Text>
-
-      <View accessibilityRole="tablist" style={styles.segmentedControl}>
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: mode === 'signIn' }}
-          style={[styles.segment, mode === 'signIn' && styles.segmentActive]}
-          onPress={() => { setMode('signIn'); setError(null); setNotice(null); }}
-        >
-          <Text style={[styles.segmentText, mode === 'signIn' && styles.segmentTextActive, isArabic && styles.arabicText]}>{tr('Sign in', 'Se connecter', 'تسجيل الدخول')}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: mode === 'signUp' }}
-          style={[styles.segment, mode === 'signUp' && styles.segmentActive]}
-          onPress={() => { setMode('signUp'); setError(null); setNotice(null); }}
-        >
-          <Text style={[styles.segmentText, mode === 'signUp' && styles.segmentTextActive, isArabic && styles.arabicText]}>{tr('Create account', 'Créer un compte', 'إنشاء حساب')}</Text>
-        </Pressable>
-      </View>
-
-      <Pressable accessibilityRole="button" disabled={busy} style={styles.googleButton} onPress={() => void googleSignIn()}>
-        <Text style={styles.googleMark}>G</Text>
-        <Text style={[styles.googleButtonText, isArabic && styles.arabicText]}>{tr('Continue with Google', 'Continuer avec Google', 'المتابعة عبر Google')}</Text>
-      </Pressable>
-
-      <View style={styles.dividerRow}>
-        <View style={styles.divider} />
-        <Text style={[styles.dividerText, isArabic && styles.arabicText]}>{tr('or use email', 'ou avec votre e-mail', 'أو عبر البريد الإلكتروني')}</Text>
-        <View style={styles.divider} />
-      </View>
-
-      {mode === 'signUp' ? (
-        <Field label={tr('Name', 'Nom', 'الاسم')}>
-          <TextInput autoCapitalize="words" autoComplete="name" value={displayName} onChangeText={setDisplayName} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={COLORS.muted} style={styles.input} />
-        </Field>
-      ) : null}
-
-      <Field label={tr('Email', 'E-mail', 'البريد الإلكتروني')}>
-        <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={COLORS.muted} style={styles.input} />
-      </Field>
-
-      <Field label={tr('Password', 'Mot de passe', 'كلمة المرور')}>
-        <View style={styles.passwordField}>
-          <TextInput autoCapitalize="none" autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} secureTextEntry={!showPassword} value={password} onChangeText={setPassword} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={COLORS.muted} style={styles.passwordInput} />
-          <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? tr('Hide password', 'Masquer le mot de passe', 'إخفاء كلمة المرور') : tr('Show password', 'Afficher le mot de passe', 'إظهار كلمة المرور')} onPress={() => setShowPassword((current) => !current)} style={styles.showButton}>
-            <Icon name="eye-outline" size={20} color={showPassword ? COLORS.gold : COLORS.muted} />
-          </Pressable>
+    <>
+      <View style={[styles.framed, { marginHorizontal: gutter }]}>
+        <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <View style={styles.crown} pointerEvents="none"><CrownOrnament width={300} height={58} /></View>
+        <View style={styles.framedBody}>
+          <Text style={[styles.framedTitle, arabic && styles.arabicCentered]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Your Coptic Vine account', 'Votre compte Coptic Vine', 'حساب كوبتك فاين الخاص بك')}</Text>
+          <Text style={[styles.framedText, arabic && styles.arabicCentered]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {tr('Keep your likes, follows, playlists, and learning progress with you across devices.', 'Retrouvez vos favoris, abonnements, playlists et progrès sur tous vos appareils.', 'احفظ الإعجابات والمتابعات وقوائم التشغيل وتقدّم التعلّم على أجهزتك.')}
+          </Text>
         </View>
-      </Field>
+      </View>
 
-      {mode === 'signUp' ? (
-        <Field label={tr('Confirm password', 'Confirmer le mot de passe', 'تأكيد كلمة المرور')}>
-          <TextInput autoCapitalize="none" autoComplete="new-password" secureTextEntry={!showPassword} value={confirmPassword} onChangeText={setConfirmPassword} placeholder={tr('Enter it again', 'Saisissez-le à nouveau', 'أدخلها مرة أخرى')} placeholderTextColor={COLORS.muted} style={styles.input} />
+      <View style={[styles.formCard, { marginHorizontal: gutter }]}>
+        <SegmentNav items={modes} active={mode} arabic={arabic} role="radiogroup" onSelect={(key) => { setMode(key); setError(null); setNotice(null); }} />
+
+        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.googleButton, arabic && styles.rowReverse, pressed && styles.pressed]} onPress={() => void googleSignIn()}>
+          <Text style={styles.googleMark}>G</Text>
+          <Text style={[styles.googleButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Continue with Google', 'Continuer avec Google', 'المتابعة عبر Google')}</Text>
+        </Pressable>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.divider} />
+          <Text style={[styles.dividerText, arabic && styles.arabic]}>{tr('or use email', 'ou avec votre e-mail', 'أو عبر البريد الإلكتروني')}</Text>
+          <View style={styles.divider} />
+        </View>
+
+        {mode === 'signUp' ? (
+          <Field label={tr('Name', 'Nom', 'الاسم')}>
+            <TextInput autoCapitalize="words" autoComplete="name" value={displayName} onChangeText={setDisplayName} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
+          </Field>
+        ) : null}
+
+        <Field label={tr('Email', 'E-mail', 'البريد الإلكتروني')}>
+          <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={PLACEHOLDER} style={styles.input} />
         </Field>
-      ) : null}
 
-      {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
-      {notice ? <Text accessibilityRole="alert" style={styles.noticeText}>{notice}</Text> : null}
+        <Field label={tr('Password', 'Mot de passe', 'كلمة المرور')}>
+          <View style={[styles.passwordField, arabic && styles.rowReverse]}>
+            <TextInput autoCapitalize="none" autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} secureTextEntry={!showPassword} value={password} onChangeText={setPassword} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={PLACEHOLDER} style={[styles.passwordInput, arabic && styles.arabic]} />
+            <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? tr('Hide password', 'Masquer le mot de passe', 'إخفاء كلمة المرور') : tr('Show password', 'Afficher le mot de passe', 'إظهار كلمة المرور')} onPress={() => setShowPassword((current) => !current)} style={styles.showButton}>
+              <Icon name="eye-outline" size={20} color={showPassword ? COLORS.gold : COLORS.muted} />
+            </Pressable>
+          </View>
+        </Field>
 
-      <Pressable accessibilityRole="button" disabled={busy} style={[styles.primaryButton, busy && styles.disabled]} onPress={() => void submit()}>
-        {busy ? <ActivityIndicator color={COLORS.black} /> : <Text style={[styles.primaryButtonText, isArabic && styles.arabicText]}>{mode === 'signIn' ? tr('Sign in', 'Se connecter', 'تسجيل الدخول') : tr('Create account', 'Créer un compte', 'إنشاء حساب')}</Text>}
-      </Pressable>
+        {mode === 'signUp' ? (
+          <Field label={tr('Confirm password', 'Confirmer le mot de passe', 'تأكيد كلمة المرور')}>
+            <TextInput autoCapitalize="none" autoComplete="new-password" secureTextEntry={!showPassword} value={confirmPassword} onChangeText={setConfirmPassword} placeholder={tr('Enter it again', 'Saisissez-le à nouveau', 'أدخلها مرة أخرى')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
+          </Field>
+        ) : null}
 
-      {mode === 'signIn' ? (
-        <Pressable accessibilityRole="button" disabled={busy} style={styles.textButton} onPress={() => void resetPassword()}>
-          <Text style={[styles.textButtonText, isArabic && styles.arabicText]}>{tr('Forgot your password?', 'Mot de passe oublié ?', 'هل نسيت كلمة المرور؟')}</Text>
+        {error ? <Text accessibilityRole="alert" style={[styles.errorText, arabic && styles.arabic]}>{error}</Text> : null}
+        {notice ? <Text accessibilityRole="alert" style={[styles.noticeText, arabic && styles.arabic]}>{notice}</Text> : null}
+
+        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.saveButton, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void submit()}>
+          {busy ? <ActivityIndicator color={COLORS.greenDeep} /> : <Text style={[styles.saveButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{mode === 'signIn' ? tr('Sign in', 'Se connecter', 'تسجيل الدخول') : tr('Create account', 'Créer un compte', 'إنشاء حساب')}</Text>}
         </Pressable>
-      ) : null}
-      {confirmationEmail ? (
-        <Pressable accessibilityRole="button" disabled={busy} style={styles.textButton} onPress={() => void resendConfirmation()}>
-          <Text style={[styles.textButtonText, isArabic && styles.arabicText]}>{tr('Resend confirmation email', 'Renvoyer l’e-mail de confirmation', 'إعادة إرسال بريد التأكيد')}</Text>
-        </Pressable>
-      ) : null}
-    </View>
+
+        {mode === 'signIn' ? (
+          <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]} onPress={() => void resetPassword()}>
+            <Text style={[styles.textButtonText, arabic && styles.arabic]}>{tr('Forgot your password?', 'Mot de passe oublié ?', 'هل نسيت كلمة المرور؟')}</Text>
+          </Pressable>
+        ) : null}
+        {confirmationEmail ? (
+          <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]} onPress={() => void resendConfirmation()}>
+            <Text style={[styles.textButtonText, arabic && styles.arabic]}>{tr('Resend confirmation email', 'Renvoyer l’e-mail de confirmation', 'إعادة إرسال بريد التأكيد')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </>
   );
 }
 
-function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
+function SignedInAccount({ recoveryMode, wide, gutter }: { recoveryMode: boolean; wide: boolean; gutter: number }) {
   const auth = useAuth();
   const { preferences } = useReadingPreferences();
-  const isArabic = preferences.appLanguage === 'ar';
+  const arabic = preferences.appLanguage === 'ar';
   const user = auth.user!;
   const currentName = typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : '';
   const customAvatarUrl = typeof user.user_metadata.chc_avatar_url === 'string' ? user.user_metadata.chc_avatar_url : null;
@@ -249,7 +275,8 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const provider = user.app_metadata.provider === 'google' ? 'Google' : tr('Email', 'E-mail', 'البريد الإلكتروني');
-  const verified = user.email_confirmed_at ? tr(' · Verified', ' · Vérifié', ' · موثّق') : '';
+  const verified = Boolean(user.email_confirmed_at);
+  const verifiedLabel = tr('Verified', 'Vérifié', 'موثّق');
   const initials = (currentName || user.email || 'CV')
     .split(/\s+/)
     .map((part) => part[0])
@@ -351,99 +378,149 @@ function SignedInAccount({ recoveryMode }: { recoveryMode: boolean }) {
     }
   };
 
-  return (
+  const messages = (
     <>
-      <View style={[styles.section, styles.profileHero]}>
-        <View style={styles.profileHeader}>
-          <View style={styles.profileAvatar}>
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.profileAvatarImage} contentFit="cover" transition={150} />
-            ) : (
-              <Text style={styles.avatarText}>{initials}</Text>
-            )}
-          </View>
+      {error ? <Text accessibilityRole="alert" style={[styles.errorText, { marginHorizontal: gutter }, arabic && styles.arabic]}>{error}</Text> : null}
+      {notice ? <Text accessibilityRole="alert" style={[styles.noticeText, { marginHorizontal: gutter }, arabic && styles.arabic]}>{notice}</Text> : null}
+    </>
+  );
 
-          <View style={styles.profileIdentity}>
-            <Text numberOfLines={1} style={[styles.identityName, isArabic && styles.arabicText]}>{currentName || tr('Coptic Vine listener', 'Auditeur Coptic Vine', 'مستمع كوبتك فاين')}</Text>
-            <Text numberOfLines={1} style={styles.identityEmail}>{user.email}</Text>
-            <Text style={[styles.identityMeta, isArabic && styles.arabicText]}>{tr(`${provider} account`, `Compte ${provider}`, `حساب ${provider}`)}{verified}</Text>
-          </View>
+  // Who is signed in, under the crown.
+  const profileCard = (
+    <View style={[styles.framed, { marginHorizontal: gutter }]}>
+      <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <View style={styles.crown} pointerEvents="none"><CrownOrnament width={300} height={58} /></View>
+      <View style={styles.profileBody}>
+        <View style={styles.avatar}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          ) : (
+            <>
+              <LinearGradient colors={[COLORS.green, COLORS.greenDeep]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
+              <Text style={styles.avatarText} maxFontSizeMultiplier={1}>{initials}</Text>
+            </>
+          )}
         </View>
-
-        <View style={styles.profilePhotoActions}>
+        <Text numberOfLines={1} style={[styles.profileName, arabic && styles.arabicCentered]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          {currentName || tr('Coptic Vine listener', 'Auditeur Coptic Vine', 'مستمع كوبتك فاين')}
+        </Text>
+        <Text numberOfLines={1} style={styles.profileEmail} maxFontSizeMultiplier={MAX_FONT_SCALE}>{user.email}</Text>
+        <View style={[styles.verifiedPill, arabic && styles.rowReverse]}>
+          {verified ? <Icon name="checkmark" size={13} color={COLORS.gold} /> : null}
+          <Text style={[styles.verifiedText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {tr(`${provider} account`, `Compte ${provider}`, `حساب ${provider}`)}{verified ? ` · ${verifiedLabel}` : ''}
+          </Text>
+        </View>
+        <View style={[styles.photoButtons, arabic && styles.rowReverse]}>
           <Pressable
             accessibilityRole="button"
             disabled={avatarBusy}
-            style={[styles.photoButton, avatarBusy && styles.disabled]}
+            style={({ pressed }) => [styles.photoButton, styles.photoButtonGold, arabic && styles.rowReverse, avatarBusy && styles.disabled, pressed && styles.pressed]}
             onPress={() => void changePhoto()}
           >
-            {avatarBusy ? <ActivityIndicator size="small" color={COLORS.goldBright} /> : <Icon name="person-circle-outline" size={18} color={COLORS.goldBright} />}
-            <Text style={[styles.photoButtonText, isArabic && styles.arabicText]}>{avatarUrl ? tr('Change photo', 'Changer la photo', 'تغيير الصورة') : tr('Add photo', 'Ajouter une photo', 'إضافة صورة')}</Text>
+            {avatarBusy ? <ActivityIndicator size="small" color={COLORS.greenDeep} /> : <Icon name="person-circle-outline" size={17} color={COLORS.greenDeep} />}
+            <Text style={[styles.photoButtonText, styles.photoButtonTextGold, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+              {avatarUrl ? tr('Change photo', 'Changer la photo', 'تغيير الصورة') : tr('Add photo', 'Ajouter une photo', 'إضافة صورة')}
+            </Text>
           </Pressable>
           {customAvatarUrl ? (
-            <Pressable accessibilityRole="button" disabled={avatarBusy} style={styles.removePhotoButton} onPress={() => void clearPhoto()}>
-              <Text style={[styles.removePhotoText, isArabic && styles.arabicText]}>{tr('Remove', 'Supprimer', 'إزالة')}</Text>
+            <Pressable accessibilityRole="button" disabled={avatarBusy} style={({ pressed }) => [styles.photoButton, pressed && styles.pressed]} onPress={() => void clearPhoto()}>
+              <Text style={[styles.photoButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Remove', 'Supprimer', 'إزالة')}</Text>
             </Pressable>
           ) : null}
         </View>
       </View>
+    </View>
+  );
 
-      {recoveryMode ? (
-        <View style={[styles.section, styles.recoverySection]}>
-          <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Choose a new password', 'Choisissez un nouveau mot de passe', 'اختر كلمة مرور جديدة')}</Text>
-          <Text style={[styles.sectionBody, isArabic && styles.arabic]}>{tr('Finish recovering your account by setting a new password.', 'Terminez la récupération de votre compte en définissant un nouveau mot de passe.', 'أكمل استعادة حسابك بتعيين كلمة مرور جديدة.')}</Text>
-          <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
-        </View>
-      ) : null}
-
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Profile', 'Profil', 'الملف الشخصي')}</Text>
-        <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
-          {tr('Choose the name that appears on your Coptic Vine account.', 'Choisissez le nom qui apparaît sur votre compte Coptic Vine.', 'عدّل الاسم الذي يظهر في حساب كوبتك فاين الخاص بك.')}
-        </Text>
+  const profileForm = (
+    <>
+      <SectionHeading title={tr('Profile', 'Profil', 'الملف الشخصي')} arabic={arabic} />
+      <Text style={[styles.sectionBody, { paddingHorizontal: gutter }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        {tr('Choose the name that appears on your Coptic Vine account.', 'Choisissez le nom qui apparaît sur votre compte Coptic Vine.', 'عدّل الاسم الذي يظهر في حساب كوبتك فاين الخاص بك.')}
+      </Text>
+      <View style={[styles.formCard, { marginHorizontal: gutter }]}>
         <Field label={tr('Display name', 'Nom affiché', 'الاسم المعروض')}>
-          <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={COLORS.muted} />
+          <TextInput value={displayName} onChangeText={setDisplayName} style={[styles.input, arabic && styles.arabic]} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={PLACEHOLDER} />
         </Field>
         <Field label={tr('Email', 'E-mail', 'البريد الإلكتروني')}>
-          <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} style={styles.input} placeholder="you@example.com" placeholderTextColor={COLORS.muted} />
+          <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} style={styles.input} placeholder="you@example.com" placeholderTextColor={PLACEHOLDER} />
         </Field>
-        <Pressable accessibilityRole="button" disabled={busy || !displayName.trim() || !email.trim()} style={[styles.secondaryButton, (busy || !displayName.trim() || !email.trim()) && styles.disabled]} onPress={() => void saveProfile()}>
-          <Text style={[styles.secondaryButtonText, isArabic && styles.arabicText]}>{tr('Save profile', 'Enregistrer le profil', 'حفظ الملف الشخصي')}</Text>
+        <Pressable accessibilityRole="button" disabled={busy || !displayName.trim() || !email.trim()} style={({ pressed }) => [styles.saveButton, (busy || !displayName.trim() || !email.trim()) && styles.disabled, pressed && styles.pressed]} onPress={() => void saveProfile()}>
+          <Text style={[styles.saveButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Save profile', 'Enregistrer le profil', 'حفظ الملف الشخصي')}</Text>
         </Pressable>
       </View>
+    </>
+  );
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Security', 'Sécurité', 'الأمان')}</Text>
-        <Text style={[styles.accountDetailLabel, isArabic && styles.arabic]}>{tr('Sign-in method', 'Méthode de connexion', 'طريقة تسجيل الدخول')}</Text>
-        <Text style={[styles.accountDetailValue, isArabic && styles.arabic]}>{provider}{verified}</Text>
-
+  const security = (
+    <>
+      <SectionHeading title={tr('Security', 'Sécurité', 'الأمان')} arabic={arabic} />
+      <View style={[styles.rows, { marginHorizontal: gutter }]}>
+        <SettingsRow
+          icon="person-circle-outline"
+          label={tr('Sign-in method', 'Méthode de connexion', 'طريقة تسجيل الدخول')}
+          description={provider}
+          value={verified ? verifiedLabel : undefined}
+          arabic={arabic}
+        />
         {!recoveryMode ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: showPasswordEditor }}
-            style={[styles.disclosureRow, isArabic && styles.rowReverse]}
+          <SettingsRow
+            icon="settings-outline"
+            label={tr('Change password', 'Changer le mot de passe', 'تغيير كلمة المرور')}
+            description={tr('Set a new password for email sign-in.', 'Définissez un nouveau mot de passe pour la connexion par e-mail.', 'عيّن كلمة مرور جديدة لتسجيل الدخول بالبريد الإلكتروني.')}
+            arabic={arabic}
+            expanded={showPasswordEditor}
             onPress={() => setShowPasswordEditor((current) => !current)}
-          >
-            <View>
-              <Text style={[styles.disclosureText, isArabic && styles.arabic]}>{tr('Change password', 'Changer le mot de passe', 'تغيير كلمة المرور')}</Text>
-              <Text style={[styles.disclosureDescription, isArabic && styles.arabic]}>{tr('Set a new password for email sign-in.', 'Définissez un nouveau mot de passe pour la connexion par e-mail.', 'عيّن كلمة مرور جديدة لتسجيل الدخول بالبريد الإلكتروني.')}</Text>
-            </View>
-            <Icon name={showPasswordEditor ? 'chevron-down' : 'chevron-forward'} size={18} color={COLORS.goldBright} />
-          </Pressable>
+          />
         ) : null}
         {showPasswordEditor && !recoveryMode ? (
-          <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
+          <View style={styles.formCard}>
+            <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
+          </View>
         ) : null}
-
-        {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
-        {notice ? <Text accessibilityRole="alert" style={styles.noticeText}>{notice}</Text> : null}
-      </View>
-
-      <View style={[styles.section, styles.signOutSection]}>
-        <Pressable accessibilityRole="button" disabled={busy} style={styles.signOutButton} onPress={() => void signOut()}>
-          <Text style={[styles.signOutText, isArabic && styles.arabicText]}>{tr('Sign out', 'Se déconnecter', 'تسجيل الخروج')}</Text>
+        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.signOut, arabic && styles.rowReverse, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void signOut()}>
+          <Icon name="close" size={18} color={SIGN_OUT} />
+          <Text style={[styles.signOutText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Sign out', 'Se déconnecter', 'تسجيل الخروج')}</Text>
         </Pressable>
       </View>
+    </>
+  );
+
+  const recovery = recoveryMode ? (
+    <>
+      <SectionHeading title={tr('Choose a new password', 'Choisissez un nouveau mot de passe', 'اختر كلمة مرور جديدة')} arabic={arabic} />
+      <Text style={[styles.sectionBody, { paddingHorizontal: gutter }, arabic && styles.arabic]}>{tr('Finish recovering your account by setting a new password.', 'Terminez la récupération de votre compte en définissant un nouveau mot de passe.', 'أكمل استعادة حسابك بتعيين كلمة مرور جديدة.')}</Text>
+      <View style={[styles.formCard, { marginHorizontal: gutter }]}>
+        <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
+      </View>
+    </>
+  ) : null;
+
+  if (wide) {
+    return (
+      <View style={[styles.columns, arabic && styles.rowReverse]}>
+        <View style={styles.column}>
+          {profileCard}
+          <AppSettingsSection gutter={gutter} />
+        </View>
+        <View style={styles.column}>
+          {recovery}
+          {profileForm}
+          {security}
+          {messages}
+        </View>
+      </View>
+    );
+  }
+  return (
+    <>
+      {profileCard}
+      {recovery}
+      {profileForm}
+      <AppSettingsSection gutter={gutter} />
+      {security}
+      {messages}
     </>
   );
 }
@@ -456,82 +533,127 @@ function PasswordEditor({ password, confirmation, onPasswordChange, onConfirmati
   busy: boolean;
   onSave: () => void;
 }) {
+  const arabic = getCurrentAppLanguage() === 'ar';
   return (
-    <View style={styles.passwordEditor}>
+    <>
       <Field label={tr('New password', 'Nouveau mot de passe', 'كلمة المرور الجديدة')}>
-        <TextInput secureTextEntry autoComplete="new-password" value={password} onChangeText={onPasswordChange} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={COLORS.muted} style={styles.input} />
+        <TextInput secureTextEntry autoComplete="new-password" value={password} onChangeText={onPasswordChange} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
       </Field>
       <Field label={tr('Confirm new password', 'Confirmer le nouveau mot de passe', 'تأكيد كلمة المرور الجديدة')}>
-        <TextInput secureTextEntry autoComplete="new-password" value={confirmation} onChangeText={onConfirmationChange} placeholder={tr('Enter it again', 'Saisissez-le à nouveau', 'أدخلها مرة أخرى')} placeholderTextColor={COLORS.muted} style={styles.input} />
+        <TextInput secureTextEntry autoComplete="new-password" value={confirmation} onChangeText={onConfirmationChange} placeholder={tr('Enter it again', 'Saisissez-le à nouveau', 'أدخلها مرة أخرى')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
       </Field>
-      <Pressable accessibilityRole="button" disabled={busy} style={[styles.primaryButton, busy && styles.disabled]} onPress={onSave}>
-        <Text style={[styles.primaryButtonText, getCurrentAppLanguage() === 'ar' && styles.arabicText]}>{tr('Update password', 'Mettre à jour le mot de passe', 'تحديث كلمة المرور')}</Text>
+      <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.saveButton, busy && styles.disabled, pressed && styles.pressed]} onPress={onSave}>
+        <Text style={[styles.saveButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Update password', 'Mettre à jour le mot de passe', 'تحديث كلمة المرور')}</Text>
       </Pressable>
-    </View>
+    </>
   );
 }
 
-function AppSettingsSection() {
+/** App language, Book settings and (on a phone) Downloads — the settings that follow the account. */
+function AppSettingsSection({ gutter }: { gutter: number }) {
   const router = useRouter();
   const { user } = useAuth();
   const { preferences, setAppLanguage, contentSyncStatus } = useReadingPreferences();
-  const isArabic = preferences.appLanguage === 'ar';
-  const syncLabel = !user
-    ? (tr('On this device', 'Sur cet appareil', 'على هذا الجهاز'))
+  const arabic = preferences.appLanguage === 'ar';
+  const sync = !user
+    ? { label: tr('On this device', 'Sur cet appareil', 'على هذا الجهاز'), icon: 'person-circle-outline' as const, color: COLORS.muted }
     : contentSyncStatus === 'syncing'
-      ? (tr('Syncing', 'Synchronisation', 'جارٍ المزامنة'))
+      ? { label: tr('Syncing', 'Synchronisation', 'جارٍ المزامنة'), icon: 'time-outline' as const, color: COLORS.gold }
       : contentSyncStatus === 'error'
-        ? (tr('Offline', 'Hors ligne', 'غير متصل'))
-        : (tr('Synced', 'Synchronisé', 'تمت المزامنة'));
+        ? { label: tr('Offline', 'Hors ligne', 'غير متصل'), icon: 'close' as const, color: '#FF8A7A' }
+        : { label: tr('Synced', 'Synchronisé', 'تمت المزامنة'), icon: 'checkmark' as const, color: COLORS.gold };
 
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeadingRow}>
-        <Icon name="settings-outline" size={22} color={COLORS.goldBright} />
-        <Text style={[styles.sectionTitle, styles.sectionHeadingTitle, isArabic && styles.arabic]}>{tr('App settings', 'Paramètres de l’application', 'إعدادات التطبيق')}</Text>
-        <Text style={[styles.syncStatus, user && contentSyncStatus === 'error' && styles.syncStatusError]}>{syncLabel}</Text>
-      </View>
-      <Text style={[styles.fieldLabel, isArabic && styles.arabic]}>{tr('App language', 'Langue de l’application', 'لغة التطبيق')}</Text>
-      <View style={styles.languageOptions}>
+    <>
+      <SectionHeading
+        title={tr('App settings', 'Paramètres de l’application', 'إعدادات التطبيق')}
+        arabic={arabic}
+        trailing={(
+          <View style={[styles.sync, arabic && styles.rowReverse]} accessibilityLabel={sync.label}>
+            <Icon name={sync.icon} size={15} color={sync.color} />
+            <Text style={[styles.syncText, { color: sync.color }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{sync.label}</Text>
+          </View>
+        )}
+      />
+      <Text style={[styles.kicker, { paddingHorizontal: gutter }, arabic && styles.arabicKicker]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        {arabic ? tr('App language', 'Langue de l’application', 'لغة التطبيق') : tr('App language', 'Langue de l’application', 'لغة التطبيق').toUpperCase()}
+      </Text>
+      <View accessibilityRole="radiogroup" style={[styles.languages, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
         {APP_LANGUAGE_OPTIONS.map((option) => {
           const active = preferences.appLanguage === option.key;
           return (
-            <Pressable key={option.key} accessibilityRole="radio" accessibilityState={{ checked: active }} style={[styles.languageButton, active && styles.languageButtonActive]} onPress={() => setAppLanguage(option.key)}>
-              <View style={[styles.radioOuter, active && styles.radioOuterActive]}>{active ? <View style={styles.radioInner} /> : null}</View>
-              <View style={styles.languageTextGroup}>
-                <Text style={styles.languageLabel}>{option.label}</Text>
-                <Text style={option.key === 'ar' ? styles.languageArabic : styles.languageNative}>{option.native}</Text>
+            <Pressable
+              key={option.key}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: active }}
+              accessibilityLabel={`${option.label}, ${option.native}`}
+              style={({ pressed }) => [styles.language, arabic && styles.rowReverse, pressed && styles.pressed]}
+              onPress={() => setAppLanguage(option.key)}
+            >
+              <LinearGradient colors={active ? [COLORS.green, COLORS.greenDeep] : [COLORS.surfaceDeep, COLORS.surface]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
+              <View style={[styles.radio, active && styles.radioActive]} />
+              <View style={styles.languageText}>
+                <Text style={styles.languageLabel} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{option.label}</Text>
+                <Text style={[styles.languageNative, active && styles.languageNativeActive, option.key === 'ar' && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{option.native}</Text>
               </View>
             </Pressable>
           );
         })}
       </View>
-      <SettingsLink
-        label={tr('Book settings', 'Réglages des livres', 'إعدادات الكتب')}
-        description={tr('Reading languages, text, slideshow, and display', 'Langues de lecture, texte, diaporama et affichage', 'لغات القراءة والنص والعرض التقديمي والشاشة')}
-        arabic={isArabic}
-        onPress={() => router.push('/book-settings')}
-      />
-      {Platform.OS !== 'web' ? (
-        <SettingsLink
-          label={tr('Downloads and storage', 'Téléchargements et stockage', 'التنزيلات والتخزين')}
-          description={tr('Manage books, music, and learning saved offline', 'Gérez les livres, la musique et les leçons enregistrés hors ligne', 'إدارة الكتب والموسيقى والدروس المحفوظة دون اتصال')}
-          arabic={isArabic}
-          onPress={() => router.push('/downloads')}
+      <View style={[styles.rows, styles.rowsAfterLanguages, { marginHorizontal: gutter }]}>
+        <SettingsRow
+          icon="book"
+          label={tr('Book settings', 'Réglages des livres', 'إعدادات الكتب')}
+          description={tr('Reading languages, text, slideshow, and display', 'Langues de lecture, texte, diaporama et affichage', 'لغات القراءة والنص والعرض التقديمي والشاشة')}
+          arabic={arabic}
+          onPress={() => router.push('/book-settings')}
         />
-      ) : null}
-    </View>
+        {Platform.OS !== 'web' ? (
+          <SettingsRow
+            icon="download-outline"
+            label={tr('Downloads and storage', 'Téléchargements et stockage', 'التنزيلات والتخزين')}
+            description={tr('Manage books, music, and learning saved offline', 'Gérez les livres, la musique et les leçons enregistrés hors ligne', 'إدارة الكتب والموسيقى والدروس المحفوظة دون اتصال')}
+            arabic={arabic}
+            onPress={() => router.push('/downloads')}
+          />
+        ) : null}
+      </View>
+    </>
   );
 }
 
-function SettingsLink({ label, description, arabic, onPress }: { label: string; description: string; arabic: boolean; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${label}. ${description}`} style={[styles.settingsLink, arabic && styles.rowReverse]} onPress={onPress}>
-      <View style={styles.settingsLinkText}>
-        <Text style={[styles.settingsLinkLabel, arabic && styles.arabic]}>{label}</Text>
-        <Text style={[styles.settingsLinkDescription, arabic && styles.arabic]}>{description}</Text>
+/** One settings row: a gold icon, the setting and a word about it, then a value or a chevron. */
+function SettingsRow({ icon, label, description, value, arabic, onPress, expanded }: {
+  icon: IconName;
+  label: string;
+  description?: string;
+  value?: string;
+  arabic: boolean;
+  onPress?: () => void;
+  expanded?: boolean;
+}) {
+  const body = (
+    <>
+      <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <Icon name={icon} size={21} color={COLORS.gold} />
+      <View style={styles.rowText}>
+        <Text style={[styles.rowLabel, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
+        {description ? <Text style={[styles.rowDescription, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{description}</Text> : null}
       </View>
-      <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.goldBright} />
+      {value ? <Text style={[styles.rowValue, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{value}</Text> : null}
+      {onPress ? <Icon name={expanded ? 'chevron-down' : arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /> : null}
+    </>
+  );
+  if (!onPress) return <View style={[styles.row, arabic && styles.rowReverse]}>{body}</View>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={description ? `${label}. ${description}` : label}
+      accessibilityState={expanded === undefined ? undefined : { expanded }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, arabic && styles.rowReverse, pressed && styles.pressed]}
+    >
+      {body}
     </Pressable>
   );
 }
@@ -539,93 +661,90 @@ function SettingsLink({ label, description, arabic, onPress }: { label: string; 
 /** A labelled input. The label follows the App Language's direction, read from the module store so the many fields need no prop for it. */
 function Field({ label, children }: { label: string; children: ReactNode }) {
   const arabic = getCurrentAppLanguage() === 'ar';
-  return <View style={styles.field}><Text style={[styles.fieldLabel, arabic && styles.arabic]}>{label}</Text>{children}</View>;
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.fieldLabel, arabic && styles.arabicKicker]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{arabic ? label : label.toUpperCase()}</Text>
+      {children}
+    </View>
+  );
 }
+
+const PLACEHOLDER = 'rgba(205, 216, 203, 0.55)';
+const SIGN_OUT = '#FF8A7A';
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  profileHero: { paddingTop: SPACING.sm },
-  profileHeader: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md },
-  profileAvatar: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderColor: COLORS.goldLine, borderRadius: 44, borderWidth: 1, height: 88, justifyContent: 'center', overflow: 'hidden', width: 88 },
-  profileAvatarImage: { height: 88, width: 88 },
-  profileIdentity: { flex: 1, minWidth: 0 },
-  profilePhotoActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  photoButton: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderColor: COLORS.goldLine, borderRadius: RADII.pill, borderWidth: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.md },
-  photoButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
-  removePhotoButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: RADII.pill, borderWidth: 1, justifyContent: 'center', minHeight: 40, paddingHorizontal: SPACING.md },
-  removePhotoText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
-  accountDetailLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
-  accountDetailValue: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: -8 },
-  disclosureDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
-  signOutSection: { backgroundColor: 'transparent', borderWidth: 0, padding: 0 },
-
-  scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
-  container: { alignSelf: 'center', gap: 0, maxWidth: 640, width: '100%' },
-  loader: { marginVertical: SPACING.xl },
-  section: { borderBottomColor: COLORS.border, borderBottomWidth: 1, gap: SPACING.md, paddingHorizontal: SPACING.xs, paddingVertical: SPACING.lg },
-  recoverySection: { borderColor: COLORS.goldLine, borderTopWidth: 1, paddingTop: SPACING.lg },
-  sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700' },
-  sectionBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, lineHeight: 22 },
-  sectionHeadingRow: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm },
-  sectionHeadingTitle: { flex: 1 },
-  syncStatus: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800' },
-  syncStatusError: { color: '#FF8A8A' },
-  segmentedControl: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', padding: 3 },
-  segment: { alignItems: 'center', borderRadius: 6, flex: 1, justifyContent: 'center', minHeight: 42, paddingHorizontal: SPACING.sm },
-  segmentActive: { backgroundColor: COLORS.gold },
-  segmentText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  segmentTextActive: { color: COLORS.black },
-  googleButton: { alignItems: 'center', borderColor: COLORS.muted, borderRadius: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'center', minHeight: 50, paddingHorizontal: SPACING.md },
-  googleMark: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 18, fontWeight: '900', marginRight: SPACING.sm },
-  googleButtonText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
-  dividerRow: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm },
-  divider: { backgroundColor: COLORS.border, flex: 1, height: 1 },
-  dividerText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12 },
-  field: { gap: 6 },
-  fieldLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
-  input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, minHeight: 48, paddingHorizontal: SPACING.md },
-  passwordField: { alignItems: 'center', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row' },
-  passwordInput: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, minHeight: 46, paddingHorizontal: SPACING.md },
-  showButton: { alignItems: 'center', height: 46, justifyContent: 'center', width: 46 },
-  primaryButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 8, justifyContent: 'center', minHeight: 48, paddingHorizontal: SPACING.md },
-  primaryButtonText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '900' },
-  secondaryButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: SPACING.md },
-  secondaryButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  textButton: { alignItems: 'center', justifyContent: 'center', minHeight: 36 },
-  textButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
-  disabled: { opacity: 0.5 },
-  errorText: { color: '#FF8A8A', fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
-  noticeText: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
-  identityRow: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md },
-  avatar: { alignItems: 'center', backgroundColor: COLORS.green, borderColor: COLORS.goldLine, borderRadius: 32, borderWidth: 1, height: 64, justifyContent: 'center', width: 64 },
-  avatarText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
-  identityText: { flex: 1, minWidth: 0 },
-  identityName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
-  identityEmail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
-  identityMeta: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 5 },
-  shortcutRow: { flexDirection: 'row', gap: SPACING.sm },
-  shortcut: { alignItems: 'center', borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flex: 1, gap: SPACING.sm, justifyContent: 'center', minHeight: 82, padding: SPACING.sm },
-  shortcutText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  disclosureRow: { alignItems: 'center', borderTopColor: COLORS.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 48 },
-  disclosureText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  passwordEditor: { gap: SPACING.md },
-  signOutButton: { alignItems: 'center', borderColor: 'rgba(214,69,69,0.7)', borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 46 },
-  signOutText: { color: '#FF8A8A', fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  languageOptions: { flexDirection: 'row', gap: SPACING.sm },
-  languageButton: { alignItems: 'center', borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flex: 1, flexDirection: 'row', gap: SPACING.sm, minHeight: 58, paddingHorizontal: SPACING.sm },
-  languageButtonActive: { backgroundColor: COLORS.goldSoft, borderColor: COLORS.gold },
-  radioOuter: { alignItems: 'center', borderColor: COLORS.muted, borderRadius: 10, borderWidth: 2, height: 20, justifyContent: 'center', width: 20 },
-  radioOuterActive: { borderColor: COLORS.gold },
-  radioInner: { backgroundColor: COLORS.gold, borderRadius: 5, height: 10, width: 10 },
-  languageTextGroup: { flex: 1 },
-  languageLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '800' },
-  languageArabic: { color: COLORS.muted, fontFamily: TYPOGRAPHY.arabic, fontSize: 12, marginTop: 2, writingDirection: 'rtl' },
-  languageNative: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
-  settingsLink: { alignItems: 'center', borderTopColor: COLORS.border, borderTopWidth: 1, flexDirection: 'row', gap: SPACING.md, minHeight: 64, paddingVertical: SPACING.sm },
-  settingsLinkText: { flex: 1 },
-  settingsLinkLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  settingsLinkDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 17, marginTop: 3 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  arabicText: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  content: { paddingBottom: 28 },
+  contentWide: { paddingHorizontal: 36 },
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
+  column: { flex: 1, minWidth: 0 },
   rowReverse: { flexDirection: 'row-reverse' },
+  loader: { marginVertical: 32 },
+  pressed: { opacity: 0.75 },
+  disabled: { opacity: 0.5 },
+
+  // The crowned card: who is signed in, or the invitation to sign in.
+  framed: { backgroundColor: COLORS.surface, borderColor: 'rgba(227, 181, 59, 0.3)', borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  crown: { alignItems: 'center', left: 8, opacity: 0.85, position: 'absolute', right: 8, top: 8 },
+  framedBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 48 },
+  framedTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', lineHeight: 29, textAlign: 'center' },
+  framedText: { color: '#DFE6EC', fontFamily: TYPOGRAPHY.body, fontSize: 14.5, lineHeight: 22, marginTop: 10, textAlign: 'center' },
+  profileBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 54 },
+  avatar: { alignItems: 'center', backgroundColor: COLORS.greenDeep, borderRadius: 46, boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.5)', height: 92, justifyContent: 'center', overflow: 'hidden', width: 92 },
+  avatarText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 32, fontWeight: '700' },
+  profileName: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: 14, textAlign: 'center' },
+  profileEmail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, marginTop: 4, textAlign: 'center' },
+  verifiedPill: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, flexDirection: 'row', gap: 5, height: 26, marginTop: 10, paddingHorizontal: 11 },
+  verifiedText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, fontWeight: '700' },
+  photoButtons: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 16 },
+  photoButton: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 99, flexDirection: 'row', gap: 6, height: 38, justifyContent: 'center', paddingHorizontal: 16 },
+  photoButtonGold: { backgroundColor: COLORS.gold },
+  photoButtonText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
+  photoButtonTextGold: { color: COLORS.greenDeep },
+
+  sectionBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, lineHeight: 19, marginBottom: 12, marginTop: -4 },
+  formCard: { backgroundColor: COLORS.surface, borderRadius: 20, gap: 16, overflow: 'hidden', padding: 16 },
+  field: { gap: 8 },
+  fieldLabel: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.2 },
+  input: { backgroundColor: 'rgba(0, 0, 0, 0.38)', borderRadius: 14, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, height: 48, paddingHorizontal: 14 },
+  passwordField: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.38)', borderRadius: 14, flexDirection: 'row' },
+  passwordInput: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, height: 48, paddingHorizontal: 14 },
+  showButton: { alignItems: 'center', height: 48, justifyContent: 'center', width: 48 },
+  saveButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 14, height: 46, justifyContent: 'center', marginTop: 2 },
+  saveButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },
+  googleButton: { alignItems: 'center', borderColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 8, height: 48, justifyContent: 'center', paddingHorizontal: 16 },
+  googleMark: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 18, fontWeight: '800' },
+  googleButtonText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
+  dividerRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  divider: { backgroundColor: 'rgba(255, 255, 255, 0.1)', flex: 1, height: 1 },
+  dividerText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12 },
+  textButton: { alignItems: 'center', justifyContent: 'center', minHeight: 32 },
+  textButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '700' },
+  errorText: { color: '#FF8A8A', fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19, marginTop: 10 },
+  noticeText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19, marginTop: 10 },
+
+  sync: { alignItems: 'center', flexDirection: 'row', gap: 5 },
+  syncText: { fontFamily: TYPOGRAPHY.body, fontSize: 12.5, fontWeight: '700' },
+  kicker: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
+  arabicKicker: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  languages: { flexDirection: 'row', gap: 8 },
+  language: { alignItems: 'center', borderRadius: 16, flex: 1, flexDirection: 'row', gap: 10, minWidth: 0, overflow: 'hidden', padding: 12 },
+  radio: { borderColor: 'rgba(205, 216, 203, 0.45)', borderRadius: 9, borderWidth: 2, height: 18, width: 18 },
+  radioActive: { borderColor: COLORS.gold, borderWidth: 5 },
+  languageText: { flex: 1, minWidth: 0 },
+  languageLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, fontWeight: '700' },
+  languageNative: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 1 },
+  languageNativeActive: { color: COLORS.goldBright },
+  rows: { gap: 8 },
+  rowsAfterLanguages: { marginTop: 10 },
+  row: { alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 18, flexDirection: 'row', gap: 14, overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 14 },
+  rowText: { flex: 1, minWidth: 0 },
+  rowLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600' },
+  rowDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  rowValue: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
+  signOut: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.12)', borderRadius: 18, flexDirection: 'row', gap: 8, justifyContent: 'center', paddingVertical: 15 },
+  signOutText: { color: SIGN_OUT, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },
+
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
 });

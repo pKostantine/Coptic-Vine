@@ -33,6 +33,11 @@ export function usePageGutter(): number {
   return useContext(GutterContext);
 }
 
+/** Sets the gutter for a page built outside BookPage (the Music and Learn tabs' wide layouts set none). */
+export function PageGutterProvider({ gutter, children }: { gutter: number; children: ReactNode }) {
+  return <GutterContext.Provider value={gutter}>{children}</GutterContext.Provider>;
+}
+
 export interface BookPageAction {
   icon: IconName;
   label: string;

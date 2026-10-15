@@ -58,8 +58,17 @@ export interface MusicConsumerTrackDetail extends MusicConsumerTrack {
   release: MusicConsumerReleaseSummary | null;
 }
 
+/** One of an artist's links (music.artist_social_links): a known platform, or `custom:<slug>` with its own label. */
+export interface MusicArtistLink {
+  id?: string;
+  platform: string;
+  label?: string | null;
+  url: string;
+}
+
 export interface MusicConsumerArtist extends MusicConsumerArtistSummary {
   releases: MusicConsumerReleaseSummary[];
+  socialLinks?: MusicArtistLink[];
 }
 
 export interface MusicHomePayload {
