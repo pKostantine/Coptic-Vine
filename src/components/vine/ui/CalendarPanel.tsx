@@ -21,6 +21,7 @@ import DayControls from './DayControls';
 import Icon from './Icon';
 import { VineDivider } from './Ornaments';
 import { useLiturgicalDay } from './useLiturgicalDay';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 const WEEKDAY_LETTERS = {
   english: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
@@ -58,6 +59,7 @@ interface CalendarPanelProps {
  * gold dot on a feast. Shared by the Books sheet and the calendar page.
  */
 export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelProps) {
+  const modalOrientations = useModalOrientations();
   const { rawDate, selectDate } = useCalendar();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
@@ -309,7 +311,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
         </View>
       </View>
 
-      <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
+      <Modal supportedOrientations={modalOrientations} visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
         <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} style={[styles.pickerBackdrop, DISABLED_TEXT_SELECTION_STYLE]} onPress={() => setPickerOpen(false)}>
           <Pressable accessible={false} style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
             <View style={[styles.pickerColumns, isArabic && styles.rowReverse]}>

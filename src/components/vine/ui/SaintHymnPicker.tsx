@@ -23,7 +23,6 @@ import DocumentWebView from '@/components/vine/DocumentWebView';
 import { PageGlow } from '@/components/vine/screens/BookPage';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
-import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { fontScaleToPx } from '@/utils/preferencesStorage';
 import {
   getSaintHymnIndex,
@@ -36,6 +35,7 @@ import { DISABLED_TEXT_SELECTION_STYLE, EDITABLE_TEXT_SELECTION_STYLE } from '@/
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { appText, tr } from '../../../utils/appText';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 interface SaintHymnPickerProps {
   visible: boolean;
   onClose: () => void;
@@ -85,6 +85,7 @@ export default function SaintHymnPicker({
   onToggle,
   onClearSaint,
 }: SaintHymnPickerProps) {
+  const modalOrientations = useModalOrientations();
   const [saints, setSaints] = useState<SaintEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -465,7 +466,7 @@ export default function SaintHymnPicker({
       visible={visible}
       animationType="slide"
       onRequestClose={closeTopLayer}
-      supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+      supportedOrientations={modalOrientations}
     >
       <View style={[styles.page, DISABLED_TEXT_SELECTION_STYLE]} {...edgeSwipeHandlers}>
         <PageGlow kind="green" tall={wide} />

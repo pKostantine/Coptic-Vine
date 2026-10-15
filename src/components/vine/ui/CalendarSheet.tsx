@@ -10,6 +10,7 @@ import { useLayoutMode } from '../../../utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import CalendarPanel from './CalendarPanel';
 import { useSheetDragToClose } from './useSheetDragToClose';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 interface CalendarSheetProps {
   visible: boolean;
@@ -32,6 +33,7 @@ interface CalendarSheetProps {
  * a drag down on the handle.
  */
 export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline = false }: CalendarSheetProps) {
+  const modalOrientations = useModalOrientations();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const dialog = useLayoutMode() === 'desktop';
@@ -76,7 +78,7 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
   /** The native modal, or inline a layer over the whole page. A plain function, so the calendar inside keeps its state between renders. */
   const layer = (children: ReactNode) => (inline
     ? <View style={styles.inlineLayer}>{children}</View>
-    : <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>{children}</Modal>);
+    : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>{children}</Modal>);
 
   const panel = (
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>

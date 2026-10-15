@@ -7,6 +7,7 @@ import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 
 import { tr } from '../../utils/appText';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 /**
  * The sheet of actions a row offers — a track's, a lesson's — rising from the
@@ -58,9 +59,10 @@ interface ActionsSheetProps {
 }
 
 export default function ActionsSheet({ visible, onClose, closeLabel, artwork, title, subtitle, isArabic = false, children }: ActionsSheetProps) {
+  const modalOrientations = useModalOrientations();
   if (!visible) return null;
   return (
-    <Modal animationType="fade" transparent visible onRequestClose={onClose}>
+    <Modal supportedOrientations={modalOrientations} animationType="fade" transparent visible onRequestClose={onClose}>
       <View style={styles.modalRoot}>
         <Pressable accessibilityLabel={closeLabel} style={styles.backdrop} onPress={onClose} />
         <SafeAreaView edges={['bottom']} style={styles.sheet}>

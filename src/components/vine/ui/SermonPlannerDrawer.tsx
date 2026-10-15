@@ -23,11 +23,11 @@ import type {
   SermonReadingReference,
 } from '@/types/sermonPlanner';
 import type { SermonPlanSyncStatus } from '@/hooks/useSermonPlanner';
-import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import type { SermonPlannerVisibleLanguages } from '@/utils/preferencesStorage';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 import Icon from './Icon';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 const HIGHLIGHT_COLORS: Record<SermonHighlightColor, string> = {
   gold: '#D7AD2C',
@@ -101,6 +101,7 @@ export default function SermonPlannerDrawer({
   onOpenCalendar,
   onOpenSettings,
 }: SermonPlannerDrawerProps) {
+  const modalOrientations = useModalOrientations();
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const compact = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
@@ -142,7 +143,7 @@ export default function SermonPlannerDrawer({
       animationType="none"
       visible={visible}
       onRequestClose={onClose}
-      supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+      supportedOrientations={modalOrientations}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

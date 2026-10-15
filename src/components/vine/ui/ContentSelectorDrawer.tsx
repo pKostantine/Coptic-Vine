@@ -5,11 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
-import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection, pickDocumentTitle } from '../documentHtml';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import Icon from './Icon';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 interface ContentSelectorDrawerProps {
   visible: boolean;
@@ -77,6 +77,7 @@ export default function ContentSelectorDrawer({
   copticGospelRite = false,
   appLanguage = 'en',
 }: ContentSelectorDrawerProps) {
+  const modalOrientations = useModalOrientations();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isMobileDocument = Platform.OS !== 'web';
@@ -239,7 +240,7 @@ export default function ContentSelectorDrawer({
       animationType="none"
       visible={visible}
       onRequestClose={onClose}
-      supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+      supportedOrientations={modalOrientations}
     >
       <View style={styles.selectorOverlay}>
         <Pressable accessibilityLabel="Close selector" style={styles.selectorBackdrop} onPress={onClose} />

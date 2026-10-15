@@ -21,6 +21,7 @@ import type {
 } from '@/types/learningPlatform';
 
 import { tr } from '../../utils/appText';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 const BUILT_IN_LISTS: { state: LearningProgressState; label: string; labelAr: string; labelFr: string; icon: IconName }[] = [
   { state: 'will_learn', label: 'Will Learn', labelAr: 'سأتعلم', labelFr: 'À apprendre', icon: 'bookmark-outline' },
   { state: 'learning', label: 'Learning', labelAr: 'أتعلّم الآن', labelFr: 'En cours', icon: 'school-outline' },
@@ -38,6 +39,7 @@ export default function LearningPlaylistPicker({
   locale: string;
   isArabic?: boolean;
 }) {
+  const modalOrientations = useModalOrientations();
   const [open, setOpen] = useState(false);
   const [playlists, setPlaylists] = useState<LearningPlaylistSummary[]>([]);
   const [currentState, setCurrentState] = useState<LearningProgressState | null>(null);
@@ -109,7 +111,7 @@ export default function LearningPlaylistPicker({
       <Pressable accessibilityLabel="Add to My Learning" style={styles.trigger} onPress={() => void show()}>
         <Icon name="playlist-add" size={20} color={COLORS.learningBright} />
       </Pressable>
-      <Modal animationType="fade" transparent visible={open} onRequestClose={() => setOpen(false)}>
+      <Modal supportedOrientations={modalOrientations} animationType="fade" transparent visible={open} onRequestClose={() => setOpen(false)}>
         <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} style={styles.backdrop} onPress={() => setOpen(false)}>
           <Pressable accessible={false} style={styles.sheet} onPress={() => undefined}>
             <View style={styles.header}>

@@ -9,6 +9,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicLibraryPlaylist } from '@/types/musicConsumer';
 import type { MusicPlaylistVisibility } from '@/types/mediaPlatform';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 export default function MusicPlaylistPicker({
   trackId,
@@ -27,6 +28,7 @@ export default function MusicPlaylistPicker({
   onOpen?: () => void;
   onDismiss?: () => void;
 }) {
+  const modalOrientations = useModalOrientations();
   const router = useRouter();
   const { user } = useAuth();
   const { preferences } = useReadingPreferences();
@@ -117,7 +119,7 @@ export default function MusicPlaylistPicker({
       </Pressable>
 
       {visible ? (
-      <Modal animationType="slide" transparent visible onRequestClose={dismiss}>
+      <Modal supportedOrientations={modalOrientations} animationType="slide" transparent visible onRequestClose={dismiss}>
         <View style={styles.modalRoot}>
           <Pressable accessibilityLabel="Close playlist picker" style={styles.backdrop} onPress={dismiss} />
           <View style={styles.sheet}>

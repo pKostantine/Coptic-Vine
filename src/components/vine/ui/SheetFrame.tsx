@@ -6,6 +6,7 @@ import { COLORS } from '../../../constants/theme';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import { useSheetDragToClose } from './useSheetDragToClose';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 interface SheetFrameProps {
   visible: boolean;
@@ -38,6 +39,7 @@ interface SheetFrameProps {
 export default function SheetFrame({
   visible, onClose, closeLabel, inline = false, dialogWidth = 440, dialogOnTablet = false, sheetMaxWidth = 560, scroll = true, children,
 }: SheetFrameProps) {
+  const modalOrientations = useModalOrientations();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const layout = useLayoutMode();
@@ -83,7 +85,7 @@ export default function SheetFrame({
 
   const layer = (content: ReactNode) => (inline
     ? <View style={styles.inlineLayer}>{content}</View>
-    : <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>{content}</Modal>);
+    : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>{content}</Modal>);
 
   const body = scroll ? (
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>

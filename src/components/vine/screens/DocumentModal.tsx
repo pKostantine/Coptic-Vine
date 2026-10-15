@@ -6,7 +6,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
-import { MODAL_SUPPORTED_ORIENTATIONS } from '../../../utils/modalOrientations';
 import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
 import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
 import DocumentSurface, { type SlideJumpRequest } from '../DocumentSurface';
@@ -26,6 +25,7 @@ import SeasonSelectorScreen from './SeasonSelectorScreen';
 import { BookSettingsSheet } from './SettingsScreen';
 import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
 import { doxologyPillNames } from '../../../utils/doxologyPillNames';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 interface DocumentModalTarget {
   title: { english: string; arabic: string; french?: string };
@@ -144,6 +144,7 @@ function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwip
  * through and the depth-3 guard hydrateWithFlags applies while prefetching.
  */
 function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, collapseMemoryScope, parentBookmarkId, onClose }: DocumentModalProps) {
+  const modalOrientations = useModalOrientations();
   const { preferences, toggleBishopPresent, isBookmarked, toggleBookmark } = useReadingPreferences();
   const documentTheme = getDocumentTheme(preferences.documentTheme);
   const [nestedModal, setNestedModal] = useState<DocumentModalTarget | null>(null);
@@ -412,7 +413,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   }, [overlayStartsInInset]);
 
   return (
-    <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}>
+    <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={modalOrientations}>
       <SafeAreaView
         // Same split as ServiceDocument: on web the bar below supplies the top
         // inset itself, while the app has no bar and must inset for the notch.
@@ -502,7 +503,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           animationType="slide"
           visible={overlayScreen === 'seasons'}
           onRequestClose={() => setOverlayScreen(null)}
-          supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+          supportedOrientations={modalOrientations}
         >
           <View
             style={[styles.overlayFrame, { backgroundColor: documentTheme.colors.page }]}

@@ -28,7 +28,6 @@ import {
     getDisplayedPsalmPreface,
     PsalmNumbering,
 } from '@/utils/bibleService';
-import { MODAL_SUPPORTED_ORIENTATIONS } from '@/utils/modalOrientations';
 import { goBack } from '@/utils/navigation';
 import { writeRichClipboard } from '@/utils/richClipboard';
 import { appText, type AppText } from '@/utils/appText';
@@ -40,6 +39,7 @@ import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
 import { createBibleHighlight, isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
 import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
+import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
 type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
@@ -187,6 +187,7 @@ function getVersePreviewLanguage(
 }
 
 export default function BibleChapterDocument() {
+  const modalOrientations = useModalOrientations();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -552,7 +553,7 @@ export default function BibleChapterDocument() {
             transparent
             visible={isSelectorOpen}
             onRequestClose={closeVerseSelector}
-            supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
+            supportedOrientations={modalOrientations}
           >
             <View style={styles.selectorOverlay}>
               <Pressable accessibilityLabel={selectorText.closeSelector} style={styles.selectorBackdrop} onPress={closeVerseSelector} />
