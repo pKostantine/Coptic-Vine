@@ -23,6 +23,9 @@ export default function HolyWeekHourDocument() {
       extraContext={hour.extraContext}
       entryId={hour.id}
       appendHyperlinkKey={hour.nextHyperlinkKey}
+      // Holy Week's own services, prayed only in Holy Week: its colours,
+      // whatever day the calendar is on.
+      ornamentSeason="holyweek"
       backHref={(isOnlyService ? '/holy-week' : `/holy-week/${hour.dayId}`) as Href}
     />
   );

@@ -117,4 +117,7 @@ test('the reader draws each ornament once and points to it; the slideshow knows 
   const service = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
   assert.match(service, /withDocumentOrnaments\(hydrated, \{ english: title, arabic, french \}\)/);
   assert.match(service, /ornamentColor=\{documentOrnamentColor\(documentTheme, ornamentSeason\)\}/);
+  // Holy Week's services always wear Holy Week's colours, whatever the calendar's day.
+  assert.match(fs.readFileSync('src/app/holy-week/[dayId]/[hourId].tsx', 'utf8'), /ornamentSeason="holyweek"/);
+  assert.match(service, /fixedOrnamentSeason\n?\s*\? Promise\.resolve\(fixedOrnamentSeason\)/);
 });

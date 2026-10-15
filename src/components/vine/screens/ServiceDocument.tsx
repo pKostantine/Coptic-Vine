@@ -69,6 +69,8 @@ interface ServiceDocumentProps {
   backHref: Href;
   /** A HYPERLINK_TARGETS key to link on to after the document's own content (e.g. each Holy Week hour's next hour), for documents shared by several entries whose next step differs. */
   appendHyperlinkKey?: string;
+  /** The season the document's ornaments always wear, whatever day the calendar is on: Holy Week's own services. Otherwise the season of the day being prayed. */
+  ornamentSeason?: SeasonThemeKey;
 }
 
 /** Appends a hyperlink button to the next service, labelled with that service's own name, after a hydrated document. The same section shape hymnLibrary builds for an order row whose item_type is Hyperlink. */
@@ -114,7 +116,7 @@ interface AntiphonaryModalTarget {
  * native swipe-back gesture of its own to conflict with. The swipe gestures
  * are native-only: web always uses the visible header and never swipe-exits.
  */
-export default function ServiceDocument({ schema, table, title, arabic, french, extraContext, entryId, backHref, appendHyperlinkKey }: ServiceDocumentProps) {
+export default function ServiceDocument({ schema, table, title, arabic, french, extraContext, entryId, backHref, appendHyperlinkKey, ornamentSeason: fixedOrnamentSeason }: ServiceDocumentProps) {
   const router = useRouter();
   const { user } = useAuth();
   const {
@@ -381,9 +383,11 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       (schema === 'liturgy' && table === 'lectionary_liturgy') ||
       (schema === 'liturgy' && table === 'sermon_planner');
     const epistleFlagsPromise = needsEpistleFlags ? getEpistleConditionFlags(effectiveDate) : Promise.resolve({});
-    const seasonPromise = getDayOverview(effectiveDate.toISOString().slice(0, 10))
-      .then((overview) => getDayThemeKey(overview?.indicatorKey, overview?.activeKeys))
-      .catch(() => null);
+    const seasonPromise: Promise<SeasonThemeKey | null> = fixedOrnamentSeason
+      ? Promise.resolve(fixedOrnamentSeason)
+      : getDayOverview(effectiveDate.toISOString().slice(0, 10))
+        .then((overview) => getDayThemeKey(overview?.indicatorKey, overview?.activeKeys))
+        .catch(() => null);
 
     Promise.all([
       epistleFlagsPromise.then((epistleFlags) =>
@@ -462,7 +466,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     return () => {
       cancelled = true;
     };
-  }, [schema, table, title, arabic, french, isSermonPlanner, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, documentPositionKey]);
+  }, [schema, table, title, arabic, french, isSermonPlanner, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, documentPositionKey]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle
