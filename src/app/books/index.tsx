@@ -1,8 +1,8 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useEffect, useState, useSyncExternalStore } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -11,13 +11,13 @@ import CalendarSheet from '@/components/vine/ui/CalendarSheet';
 import DayBlock from '@/components/vine/ui/DayBlock';
 import LibraryBook from '@/components/vine/ui/LibraryBook';
 import PageTitle from '@/components/vine/ui/PageTitle';
+import { PageGlow } from '@/components/vine/screens/BookPage';
 import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
 import { useLiturgicalDay } from '@/components/vine/ui/useLiturgicalDay';
 import { CATEGORIES, HOLY_WEEK_DAYS, holyWeekDayHref, type CategoryDef } from '@/constants/manifest';
+import { SEASON_GLOWS } from '@/constants/seasonAppearance';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { bookDownloadManager } from '@/services/bookDownloadManager';
-import type { BookDownloadProgress } from '@/types/bookDownloads';
 import { formatCopticDayMonth } from '@/utils/localeFormat';
 import { useHolyWeekSchedule } from '@/utils/useHolyWeekSchedule';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
@@ -42,9 +42,10 @@ function chunk<T>(items: T[], size: number): T[][] {
 
 /**
  * The Books tab (Coptic Vine design system, "DayBlock" and "BookShelf"): the
- * liturgical day in its season's colours, then the library. The iPad sets the
- * day beside the library; the desktop pins it in a narrower left column with
- * the library four books across.
+ * liturgical day in its season's colours, then the library, the whole page
+ * under a glow in that season's colours. The iPad sets the day beside the
+ * library; the desktop pins it in a narrower left column with the library
+ * four books across.
  */
 export default function BooksHome() {
   const router = useRouter();
@@ -59,23 +60,13 @@ export default function BooksHome() {
   // Opened straight away for a /book-settings link (see app/book-settings.tsx).
   const { settings: settingsParam } = useLocalSearchParams<{ settings?: string }>();
   const [settingsOpen, setSettingsOpen] = useState(settingsParam === 'open');
-  const downloadRevision = useSyncExternalStore(bookDownloadManager.subscribe, bookDownloadManager.getRevision, bookDownloadManager.getRevision);
-  const [downloads, setDownloads] = useState<BookDownloadProgress[]>([]);
 
-  useEffect(() => {
-    let active = true;
-    void bookDownloadManager.listBooks().then((items) => { if (active) setDownloads(items); });
-    return () => { active = false; };
-  }, [downloadRevision]);
-
-  const downloadAction = (book: BookDownloadProgress) => {
-    const action = book.status === 'downloading' || book.status === 'queued'
-      ? bookDownloadManager.pause(book.bookKey)
-      : book.status === 'installed'
-        ? Promise.resolve(router.push('/downloads'))
-        : bookDownloadManager.install(book.bookKey);
-    void action.catch((error) => Alert.alert('Download', error instanceof Error ? error.message : 'Unable to download this book.'));
-  };
+  // The page glows in the season of the day the block shows, and changes with
+  // it. While a newly chosen day is still being read the block stands in the
+  // annual green for a moment; the glow keeps the season it had instead, so
+  // swiping between two weeks of one fast doesn't flash green behind it.
+  const [glowSeason, setGlowSeason] = useState(day.theme.key);
+  if (day.overview && day.theme.key !== glowSeason) setGlowSeason(day.theme.key);
 
   // While Pascha is being prayed the day block's footer is the way into the
   // day or eve being prayed right now.
@@ -91,20 +82,17 @@ export default function BooksHome() {
     return appText({ english: item.meta, arabic: item.metaArabic, french: item.metaFrench });
   };
 
-  const renderBook = (item: CategoryDef) => {
-    const book = item.downloadKey ? downloads.find((entry) => entry.bookKey === item.downloadKey) : undefined;
-    return (
-      <LibraryBook
-        key={item.id}
-        title={entryLabel(item)}
-        description={description(item)}
-        arabic={arabic}
-        wide={WIDE_BOOKS.has(item.id)}
-        onPress={() => router.push(`/${item.id}`)}
-        {...(book ? { downloadStatus: book.status, downloadProgress: book.progress, onDownloadPress: () => downloadAction(book) } : {})}
-      />
-    );
-  };
+  // Downloads are managed on the Downloads & Storage page alone: the shelf only opens books.
+  const renderBook = (item: CategoryDef) => (
+    <LibraryBook
+      key={item.id}
+      title={entryLabel(item)}
+      description={description(item)}
+      arabic={arabic}
+      wide={WIDE_BOOKS.has(item.id)}
+      onPress={() => router.push(`/${item.id}`)}
+    />
+  );
 
   const tiles = CATEGORIES.filter((item) => !WIDE_BOOKS.has(item.id));
   const rows = CATEGORIES.filter((item) => WIDE_BOOKS.has(item.id));
@@ -163,6 +151,7 @@ export default function BooksHome() {
         contentContainerStyle={[styles.content, layout !== 'phone' && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
         showsVerticalScrollIndicator={false}
       >
+        <PageGlow kind={SEASON_GLOWS[glowSeason]} tall={layout !== 'phone'} />
         {layout === 'phone' ? (
           <View style={styles.column}>
             {title}

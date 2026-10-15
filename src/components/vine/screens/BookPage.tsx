@@ -1,18 +1,20 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Href, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { createContext, forwardRef, useContext, useId, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type ScrollView } from 'react-native';
+import { createContext, forwardRef, useContext, useEffect, useId, useState, type ReactNode } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View, type ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import Icon, { type IconName } from '../ui/Icon';
 import { BuddedCross, VineRule } from '../ui/Ornaments';
+import { CRIMSON_GLOW, VINE_GLOW, type PageGlowPalette } from '../../../constants/seasonAppearance';
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { appText, tr } from '../../../utils/appText';
 import { goBack } from '../../../utils/navigation';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
+import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 
 const MAX_FONT_SCALE = 1.25;
 /** On a phone-width page the content never grows past this; past it, it centres. */
@@ -194,41 +196,69 @@ function RoundButton({ icon, label, onPress }: BookPageAction) {
   );
 }
 
-/** The page's colour falling from the top to black, under its glow. */
-const GREEN_FALL: [string, string][] = [['0', '#1D4424'], ['0.36', '#14301B'], ['1', '#000000']];
-const CRIMSON_FALL: [string, string][] = [['0', '#160203'], ['0.3', '#070101'], ['1', '#000000']];
+/**
+ * The light falling from the top of the page: green for the books, crimson
+ * for Holy Week, or any other glow's colours — the Books tab's follow the
+ * season of the day it shows (SEASON_GLOWS in seasonAppearance.ts). When the
+ * colours change the new glow fades in over the old one, as the day block's
+ * do; with Reduce Motion it simply changes.
+ */
+export function PageGlow({ kind, tall = false }: { kind: 'green' | 'crimson' | PageGlowPalette; tall?: boolean }) {
+  const palette = kind === 'green' ? VINE_GLOW : kind === 'crimson' ? CRIMSON_GLOW : kind;
+  const [layers, setLayers] = useState<{ current: PageGlowPalette; previous: PageGlowPalette | null; turn: number }>({ current: palette, previous: null, turn: 0 });
 
-/** The light falling from the top of the page: green for the books, crimson for Holy Week. */
-export function PageGlow({ kind, tall = false }: { kind: 'green' | 'crimson'; tall?: boolean }) {
-  // Unique per page: on web the pages of a stack share one document.
-  const id = `glow${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
-  const crimson = kind === 'crimson';
+  if (layers.current !== palette) {
+    // Recorded during render so the old glow stays underneath while the new
+    // one fades in over it.
+    setLayers({ current: palette, previous: layers.current, turn: layers.turn + 1 });
+  }
+
   return (
     <View style={[styles.glow, tall && styles.glowTall]} pointerEvents="none">
-      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-        <Defs>
-          <SvgLinearGradient id={`${id}l`} x1="0" y1="0" x2="0" y2="1">
-            {(crimson ? CRIMSON_FALL : GREEN_FALL).map(([offset, color]) => <Stop key={offset} offset={offset} stopColor={color} />)}
-          </SvgLinearGradient>
-          {crimson ? (
-            <RadialGradient id={`${id}r`} cx="50%" cy="4%" rx="90%" ry="55%" fx="50%" fy="4%">
-              <Stop offset="0" stopColor="#5C010F" stopOpacity="0.7" />
-              <Stop offset="0.35" stopColor="#290105" stopOpacity="0.4" />
-              <Stop offset="0.7" stopColor="#000000" stopOpacity="0" />
-            </RadialGradient>
-          ) : (
-            <RadialGradient id={`${id}r`} cx="50%" cy="12%" rx="110%" ry="70%" fx="50%" fy="12%">
-              <Stop offset="0" stopColor="#346E3A" stopOpacity="0.75" />
-              <Stop offset="0.3" stopColor="#224C28" stopOpacity="0.55" />
-              <Stop offset="0.58" stopColor="#14301B" stopOpacity="0.3" />
-              <Stop offset="0.85" stopColor="#000000" stopOpacity="0" />
-            </RadialGradient>
-          )}
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}l)`} />
-        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}r)`} />
-      </Svg>
+      {layers.previous ? <GlowArt palette={layers.previous} /> : null}
+      {/* A glow that never changes is drawn bare; each change mounts a fresh layer that fades itself in. */}
+      {layers.previous ? (
+        <GlowFadeIn key={layers.turn}>
+          <GlowArt palette={layers.current} />
+        </GlowFadeIn>
+      ) : (
+        <GlowArt palette={layers.current} />
+      )}
     </View>
+  );
+}
+
+function GlowFadeIn({ children }: { children: ReactNode }) {
+  const reduced = useReducedMotion();
+  const [opacity] = useState(() => new Animated.Value(reduced ? 1 : 0));
+  useEffect(() => {
+    Animated.timing(opacity, { toValue: 1, duration: motionDuration(220, reduced), useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [opacity, reduced]);
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
+      {children}
+    </Animated.View>
+  );
+}
+
+/** One glow drawn: its fall, and its light over it. */
+function GlowArt({ palette }: { palette: PageGlowPalette }) {
+  // Unique per layer: on web the pages of a stack share one document.
+  const id = `glow${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const { cx, cy, rx, ry } = palette.light;
+  return (
+    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id={`${id}l`} x1="0" y1="0" x2="0" y2="1">
+          {palette.fall.map(([offset, color]) => <Stop key={offset} offset={offset} stopColor={color} />)}
+        </SvgLinearGradient>
+        <RadialGradient id={`${id}r`} cx={cx} cy={cy} rx={rx} ry={ry} fx={cx} fy={cy}>
+          {palette.stops.map(([offset, color, opacity]) => <Stop key={offset} offset={offset} stopColor={color} stopOpacity={opacity} />)}
+        </RadialGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}l)`} />
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}r)`} />
+    </Svg>
   );
 }
 

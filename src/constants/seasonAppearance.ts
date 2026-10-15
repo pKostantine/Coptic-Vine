@@ -3,7 +3,8 @@
  * follow the chosen day, for the liturgical day it shows — the Coptic Vine
  * design system's "Season colours" (Claude Design, "Coptic Vine":
  * season-colours.md). The calendar sheet keeps the vine green: the block
- * above it is the one that changes.
+ * above it is the one that changes, and the Books page's glow behind it
+ * (SEASON_GLOWS, below).
  *
  * The theme follows the day's winning indicator key (getSeasonIndicatorKey in
  * seasonNames.ts), which already settles which season or feast a day is named
@@ -235,5 +236,77 @@ export function getDayTheme(indicatorKey: string | null | undefined, activeKeys:
 /** Where the 160° gradient runs, as expo-linear-gradient's unit-square points. */
 export const DAY_BLOCK_GRADIENT_START = { x: 0.33, y: 0 };
 export const DAY_BLOCK_GRADIENT_END = { x: 0.67, y: 1 };
+
+/**
+ * The light falling from the top of a page (PageGlow in BookPage.tsx): a
+ * colour running down to black, with a radial light laid over it. Offsets and
+ * radii are fractions of the glow's box, as SVG gradients take them.
+ */
+export interface PageGlowPalette {
+  /** The linear fall, top to foot: [offset, colour]. */
+  fall: readonly (readonly [string, string])[];
+  /** Where the radial light sits and how far it reaches. */
+  light: { cx: string; cy: string; rx: string; ry: string };
+  /** The radial light's stops: [offset, colour, opacity]. */
+  stops: readonly (readonly [string, string, string])[];
+}
+
+/**
+ * The vine glow's shape in a season's colours: its brightest light at the
+ * top, a deeper shade under it, the deepest where both fade into black, and
+ * the colour the fall starts from.
+ */
+function seasonGlow(light: string, shade: string, deep: string, top: string): PageGlowPalette {
+  return {
+    fall: [['0', top], ['0.36', deep], ['1', '#000000']],
+    light: { cx: '50%', cy: '12%', rx: '110%', ry: '70%' },
+    stops: [['0', light, '0.75'], ['0.3', shade, '0.55'], ['0.58', deep, '0.3'], ['0.85', '#000000', '0']],
+  };
+}
+
+/** The vine green the tabs and the books open on. */
+export const VINE_GLOW = seasonGlow('#346E3A', '#224C28', '#14301B', '#1D4424');
+
+/** Holy Week's: darker, and drawn closer to the top, so the page stays black. */
+export const CRIMSON_GLOW: PageGlowPalette = {
+  fall: [['0', '#160203'], ['0.3', '#070101'], ['1', '#000000']],
+  light: { cx: '50%', cy: '4%', rx: '90%', ry: '55%' },
+  stops: [['0', '#5C010F', '0.7'], ['0.35', '#290105', '0.4'], ['0.7', '#000000', '0']],
+};
+
+/**
+ * The glow the Books page wears for each season, under the day block's own
+ * colours. Each is the vine glow (oklch 0.485 0.102 146 at its light) turned
+ * to the season's hue, and kept about as dark as the vine is, so white text
+ * reads the same over any of them: the bright blocks (gold, palm, sky blue,
+ * the Resurrection's white) do not make a bright page. The stops are given
+ * light / shade / deep / top, the OKLCH source beside each.
+ */
+export const SEASON_GLOWS: Record<SeasonThemeKey, PageGlowPalette> = {
+  annual: VINE_GLOW,
+  /** Bronze rather than gold: oklch(0.475 0.087 78) → oklch(0.269 0.044 78). */
+  gold: seasonGlow('#775519', '#513A10', '#32230B', '#49330E'),
+  /** Rose: oklch(0.465 0.128 352) → oklch(0.261 0.065 352). */
+  natfast: seasonGlow('#8C3561', '#602341', '#3B1527', '#561E3A'),
+  /** Scarlet, warmer and lighter than Holy Week's crimson: oklch(0.465 0.138 27) → oklch(0.260 0.070 27). */
+  nativity: seasonGlow('#97312C', '#68201C', '#401310', '#5D1C18'),
+  /** A deep sky blue: oklch(0.485 0.097 236) → oklch(0.280 0.049 236). */
+  theophany: seasonGlow('#14668E', '#0E4763', '#0C2C3E', '#0C3F58'),
+  /** The vine, darker and cooler for the fast: oklch(0.435 0.087 155) → oklch(0.230 0.044 155). */
+  lent: seasonGlow('#215F3B', '#123E25', '#092313', '#0F3620'),
+  /** A livelier, yellower green: oklch(0.505 0.117 132) → oklch(0.300 0.060 132). */
+  palm: seasonGlow('#4B7222', '#345019', '#223412', '#2F4816'),
+  holyweek: CRIMSON_GLOW,
+  /**
+   * The white of the Resurrection as a pale, warm light — ivory with the
+   * colour all but taken out, never a wash of white: oklch(0.495 0.041 88) →
+   * oklch(0.290 0.021 88).
+   */
+  resurrection: seasonGlow('#6C6147', '#4B4331', '#302B20', '#433C2C'),
+  /** Navy: oklch(0.425 0.102 253) → oklch(0.220 0.052 253). */
+  apostles: seasonGlow('#1F5084', '#113358', '#071B32', '#0D2C4D'),
+  /** Royal blue: oklch(0.455 0.138 262) → oklch(0.251 0.070 262). */
+  marian: seasonGlow('#2952A2', '#19366F', '#0E2043', '#153063'),
+};
 
 export { THEME_BY_INDICATOR_KEY };
