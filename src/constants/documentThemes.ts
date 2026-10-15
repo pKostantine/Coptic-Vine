@@ -254,7 +254,7 @@ const SEPIA_DOCUMENT_THEME: DocumentTheme = {
   },
 };
 
-const PAPER_SUBDOC = lightButton('#2B5DA8');
+const PAPER_SUBDOC = lightButton('#1B4E7E');
 const PAPER_LINK = lightButton('#24735A');
 
 const PAPER_DOCUMENT_THEME: DocumentTheme = {
@@ -269,7 +269,9 @@ const PAPER_DOCUMENT_THEME: DocumentTheme = {
     strip: '#F4F4F2',
     stripActive: '#ECECE9',
     text: '#1C1C1C',
-    alternate: '#1E4FA3',
+    // A Prussian blue, like a printed book's second ink: deeper and calmer
+    // than a bright cobalt beside the black text and the gold-brown titles.
+    alternate: '#1B4E7E',
     accent: '#8A5A12',
     onAccent: '#FFFFFF',
     accentSoft: rgba('#8A5A12', 0.1),

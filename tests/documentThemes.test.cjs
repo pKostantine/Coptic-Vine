@@ -156,7 +156,7 @@ test('Night is exactly the page the services have always been read on', () => {
   assert.equal(slideshow.colors.peopleText, COLORS.peopleLight);
 });
 
-test('Paper is exactly the white page it has been', () => {
+test('Paper keeps its pinned colours: Night's rubrics deepened for white, and a Prussian blue', () => {
   const { colors } = DOCUMENT_THEMES.paper;
   assert.deepEqual(colors, {
     page: '#FFFFFF',
@@ -165,7 +165,7 @@ test('Paper is exactly the white page it has been', () => {
     strip: '#F4F4F2',
     stripActive: '#ECECE9',
     text: '#1C1C1C',
-    alternate: '#1E4FA3',
+    alternate: '#1B4E7E',
     accent: '#8A5A12',
     onAccent: '#FFFFFF',
     accentSoft: withAlpha('#8A5A12', 0.1),
@@ -178,9 +178,9 @@ test('Paper is exactly the white page it has been', () => {
     silent: '#767676',
     refrain: '#2A6F43',
     metropolitan: '#0B6A75',
-    subdoc: '#2B5DA8',
-    subdocSoft: withAlpha('#2B5DA8', 0.1),
-    subdocLine: withAlpha('#2B5DA8', 0.4),
+    subdoc: '#1B4E7E',
+    subdocSoft: withAlpha('#1B4E7E', 0.1),
+    subdocLine: withAlpha('#1B4E7E', 0.4),
     link: '#24735A',
     linkSoft: withAlpha('#24735A', 0.1),
     linkLine: withAlpha('#24735A', 0.4),
