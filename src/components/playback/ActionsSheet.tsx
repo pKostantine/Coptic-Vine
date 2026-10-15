@@ -39,7 +39,8 @@ export function ActionsMenuTrigger({ label, size, onPress }: ActionsMenuTriggerP
         pressed && styles.triggerPressed,
       ]}
     >
-      <Icon name="ellipsis-vertical" size={Math.max(20, Math.round(size * 0.56))} color={COLORS.muted} />
+      {/* The design's "more": a horizontal ellipsis, 19pt on a row. */}
+      <Icon name="ellipsis-horizontal" size={Math.max(19, Math.round(size * 0.5))} color={COLORS.muted} />
     </Pressable>
   );
 }

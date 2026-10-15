@@ -9,6 +9,7 @@ import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import ReleaseTile from '@/components/music/ReleaseTile';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import BrandIcon from '@/components/vine/ui/BrandIcon';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
@@ -59,8 +60,8 @@ const GRID_GAP = 22;
 /**
  * An artist (Coptic Vine design, "Artist"): their photo glowing out of the
  * page, their name and bio, Follow and Share, the places they publish, then
- * their releases as covers, each with a heart. The iPad and desktop set the
- * photo beside the name.
+ * their releases as covers, each with a heart, over the tab bar. The iPad and
+ * desktop set the photo beside the name.
  */
 export default function MusicArtistScreen() {
   const router = useRouter();
@@ -215,7 +216,7 @@ export default function MusicArtistScreen() {
               <View style={[styles.actions, wide && styles.actionsWide, arabic && styles.rowReverse]}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ selected: followed }}
+                  aria-selected={followed}
                   accessibilityLabel={followed ? tr('Unfollow artist', 'Ne plus suivre l’artiste', 'إلغاء متابعة الفنان') : tr('Follow artist', 'Suivre l’artiste', 'متابعة الفنان')}
                   disabled={followBusy}
                   onPress={() => void toggleFollow()}
@@ -232,7 +233,7 @@ export default function MusicArtistScreen() {
                   onPress={() => void shareArtist()}
                   style={({ pressed }) => [styles.share, pressed && styles.pressed]}
                 >
-                  <Icon name="share-outline" size={19} color={COLORS.white} />
+                  <Icon name="share-outline" size={18} color={COLORS.white} />
                 </Pressable>
               </View>
               {artistLinks.length ? (
@@ -252,7 +253,7 @@ export default function MusicArtistScreen() {
               ) : null}
             </PersonHero>
 
-            <SectionHeading title={tr('Releases', 'Parutions', 'الإصدارات')} arabic={arabic} />
+            <SectionHeading size="page" title={tr('Releases', 'Parutions', 'الإصدارات')} arabic={arabic} />
             {artist.releases.length ? (
               <View style={[styles.grid, { gap, paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
                 {artist.releases.map((release) => {
@@ -289,6 +290,7 @@ export default function MusicArtistScreen() {
       )}
 
       <MusicMiniPlayer />
+      <BottomTabBar active="music" />
     </SafeAreaView>
   );
 }

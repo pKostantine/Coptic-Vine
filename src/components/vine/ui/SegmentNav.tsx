@@ -31,7 +31,8 @@ export default function SegmentNav<Key extends string>({ items, active, onSelect
           <Pressable
             key={item.key}
             accessibilityRole={role === 'tablist' ? 'tab' : 'radio'}
-            accessibilityState={{ selected }}
+            aria-checked={role === 'radiogroup' ? selected : undefined}
+            aria-selected={role === 'tablist' ? selected : undefined}
             onPress={() => onSelect(item.key)}
             style={[styles.option, selected && styles.optionActive]}
           >
@@ -56,7 +57,8 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   rowReverse: { flexDirection: 'row-reverse' },
-  option: { alignItems: 'center', borderRadius: 99, flex: 1, justifyContent: 'center', minHeight: 36, paddingHorizontal: 8 },
+  // 8pt over and under a 14pt label: 33pt, in a 43pt pill.
+  option: { alignItems: 'center', borderRadius: 99, flex: 1, justifyContent: 'center', minHeight: 33, paddingHorizontal: 8, paddingVertical: 8 },
   optionActive: { backgroundColor: COLORS.gold },
   label: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
   labelActive: { color: COLORS.greenDeep },

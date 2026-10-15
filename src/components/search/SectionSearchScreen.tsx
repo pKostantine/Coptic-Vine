@@ -34,6 +34,7 @@ import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
 import SearchResultRow from './SearchResultRow';
+import { countKey, useResultCounts } from './useResultCounts';
 
 type SearchSection = 'music' | 'learning';
 type SearchFilter = 'all' | UnifiedSearchKind;
@@ -178,14 +179,11 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     return () => { active = false; };
   }, [locale, music, user?.id]);
 
+  // An emptied field is cleared as it empties (changeQuery); a search runs
+  // for the rest, a moment after the last keystroke.
   useEffect(() => {
     const value = query.trim();
-    if (!value) {
-      setResults([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+    if (!value) return;
 
     let active = true;
     const timer = setTimeout(() => {
@@ -239,6 +237,8 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     return () => { active = false; };
   }, [artistFallbackArt, music, results]);
 
+  const counts = useResultCounts(results, locale);
+
   const grouped = useMemo(() => {
     const groups = music ? MUSIC_GROUPS : LEARNING_GROUPS;
     return groups
@@ -253,6 +253,10 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   const changeQuery = (value: string) => {
     setQuery(value);
     setError(null);
+    if (!value.trim()) {
+      setResults([]);
+      setLoading(false);
+    }
   };
 
   const toggleTrackLike = async (trackId: string) => {
@@ -365,48 +369,67 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     ? tr('Search Music', 'Rechercher de la musique', 'بحث في الترانيم')
     : tr('Search Learn & Study', 'Rechercher dans Apprendre', 'بحث في التعلّم');
 
-  const renderGroup = (group: SearchGroup & { results: UnifiedSearchResult[] }) => (
-    <View key={group.kind}>
-      <SectionHeading title={tr(group.en, group.fr, group.ar)} arabic={isArabic} />
-      <View style={[styles.rows, !wide && styles.rowsPhone]}>
-        {group.results.map((result) => (
-          <SearchResultRow
-            key={result.kind + ':' + result.entityId}
-            result={result}
-            query={query}
-            arabic={isArabic}
-            active={
-              result.kind === 'music_track'
-                ? musicPlayer.currentItem?.track.id === result.entityId
-                : result.kind === 'learning_lesson'
-                  ? learningPlayer.currentItem?.id === result.entityId
-                  : false
-            }
-            following={result.kind === 'music_artist' && followedArtistIds.has(result.entityId)}
-            fallbackArt={artistFallbackArt[result.entityId] ?? null}
-            saved={
-              result.kind === 'music_track'
-                ? likedTrackIds.has(result.entityId)
-                : result.kind === 'learning_lesson' && savedLessonIds.has(result.entityId)
-            }
-            queueItem={result.kind === 'music_track' ? musicTrackItem(result) : undefined}
-            onPress={() => openResult(result)}
-            onTitlePress={result.kind === 'music_track'
-              ? () => router.push({ pathname: '/music/track/[id]', params: { id: result.entityId } })
-              : undefined}
-            onToggleSaved={result.kind === 'music_track'
-              ? () => void toggleTrackLike(result.entityId)
-              : result.kind === 'learning_lesson'
-                ? () => void saveLesson(result.entityId)
-                : undefined}
-          />
-        ))}
-      </View>
-    </View>
+  const renderRow = (result: UnifiedSearchResult) => (
+    <SearchResultRow
+      key={result.kind + ':' + result.entityId}
+      result={result}
+      query={query}
+      arabic={isArabic}
+      active={
+        result.kind === 'music_track'
+          ? musicPlayer.currentItem?.track.id === result.entityId
+          : result.kind === 'learning_lesson'
+            ? learningPlayer.currentItem?.id === result.entityId
+            : false
+      }
+      following={result.kind === 'music_artist' && followedArtistIds.has(result.entityId)}
+      fallbackArt={artistFallbackArt[result.entityId] ?? null}
+      count={counts[countKey(result)] ?? null}
+      saved={
+        result.kind === 'music_track'
+          ? likedTrackIds.has(result.entityId)
+          : result.kind === 'learning_lesson' && savedLessonIds.has(result.entityId)
+      }
+      queueItem={result.kind === 'music_track' ? musicTrackItem(result) : undefined}
+      onPress={() => openResult(result)}
+      onTitlePress={result.kind === 'music_track'
+        ? () => router.push({ pathname: '/music/track/[id]', params: { id: result.entityId } })
+        : undefined}
+      onToggleSaved={result.kind === 'music_track'
+        ? () => void toggleTrackLike(result.entityId)
+        : result.kind === 'learning_lesson'
+          ? () => void saveLesson(result.entityId)
+          : undefined}
+    />
   );
 
+  const renderGroup = (group: SearchGroup & { results: UnifiedSearchResult[] }, split = false) => {
+    // A lone group on the iPad and desktop runs its rows down two columns rather than across the page.
+    const half = Math.ceil(group.results.length / 2);
+    return (
+      <View key={group.kind}>
+        <SectionHeading title={tr(group.en, group.fr, group.ar)} arabic={isArabic} size="results" />
+        {split ? (
+          <View style={[styles.columns, isArabic && styles.rowReverse]}>
+            <View style={[styles.column, styles.rows]}>{group.results.slice(0, half).map(renderRow)}</View>
+            <View style={[styles.column, styles.rows]}>{group.results.slice(half).map(renderRow)}</View>
+          </View>
+        ) : (
+          <View style={[styles.rows, !wide && styles.rowsPhone]}>{group.results.map(renderRow)}</View>
+        )}
+      </View>
+    );
+  };
+
+  // The iPad's and desktop's two columns: the people and releases left, the
+  // tracks or lessons right; without one side, the first group left and the
+  // rest right. A lone group splits its own rows instead.
   const mainGroups = grouped.filter((group) => !ASIDE_KINDS.has(group.kind));
   const asideGroups = grouped.filter((group) => ASIDE_KINDS.has(group.kind));
+  const columns = !wide ? null
+    : mainGroups.length && asideGroups.length ? [mainGroups, asideGroups]
+      : grouped.length > 1 ? [grouped.slice(0, 1), grouped.slice(1)]
+        : null;
 
   const field = (
     <View style={[styles.field, focused && styles.fieldFocused, isArabic && styles.rowReverse]}>
@@ -553,12 +576,15 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
           ) : null}
 
           {!loading && grouped.length ? (
-            wide && mainGroups.length && asideGroups.length ? (
-              <View style={[styles.columns, isArabic && styles.rowReverse]}>
-                <View style={styles.column}>{mainGroups.map(renderGroup)}</View>
-                <View style={styles.column}>{asideGroups.map(renderGroup)}</View>
+            columns ? (
+              <View style={[styles.columns, styles.resultsWide, isArabic && styles.rowReverse]}>
+                {columns.map((groups) => (
+                  <View key={groups[0].kind} style={styles.column}>{groups.map((group) => renderGroup(group))}</View>
+                ))}
               </View>
-            ) : grouped.map(renderGroup)
+            ) : wide ? (
+              <View style={styles.resultsWide}>{renderGroup(grouped[0], true)}</View>
+            ) : grouped.map((group) => renderGroup(group))
           ) : null}
         </PageGutterProvider>
       </NowPlayingAwareScrollView>
@@ -639,6 +665,9 @@ const styles = StyleSheet.create({
   emptyBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, marginTop: 6, maxWidth: 440, textAlign: 'center' },
 
   columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
+  // The iPad's and desktop's first headings sit 18 under the field (the
+  // design's 14 and 4); the heading brings 26 of its own.
+  resultsWide: { marginTop: -4 },
   column: { flex: 1, minWidth: 0 },
   rows: { gap: 6 },
   rowsPhone: { marginHorizontal: 16 },

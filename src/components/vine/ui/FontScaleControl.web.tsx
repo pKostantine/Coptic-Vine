@@ -109,14 +109,16 @@ const styles = StyleSheet.create({
   label: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
   value: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700', minWidth: 24, textAlign: 'right' },
   row: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  // Tall enough to click, the rail drawn through its middle.
-  track: { flex: 1, height: 28, justifyContent: 'center', minWidth: 0 },
+  // Tall enough to click, the rail drawn through its middle; it reaches 3.5pt
+  // past the row above and below, so the row keeps the large A's 21pt.
+  track: { flex: 1, height: 28, justifyContent: 'center', marginVertical: -3.5, minWidth: 0 },
   rail: { backgroundColor: 'rgba(255, 255, 255, 0.14)', borderRadius: 3, height: 6, overflow: 'hidden' },
   fill: { backgroundColor: COLORS.gold, borderRadius: 3, height: 6 },
   thumb: { backgroundColor: COLORS.white, borderRadius: THUMB / 2, boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.45)', height: THUMB, position: 'absolute', top: 2, width: THUMB },
   endMarker: { color: COLORS.muted, fontFamily: TYPOGRAPHY.title, fontWeight: '700' },
-  endMarkerSmall: { fontSize: 13 },
-  endMarkerLarge: { fontSize: 21 },
+  // Set solid, as the design does: the row is as tall as the large A.
+  endMarkerSmall: { fontSize: 13, lineHeight: 13 },
+  endMarkerLarge: { fontSize: 21, lineHeight: 21 },
   arabicText: {
     fontFamily: TYPOGRAPHY.arabic,
     textAlign: 'right',

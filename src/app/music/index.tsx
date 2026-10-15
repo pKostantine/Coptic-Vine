@@ -60,9 +60,12 @@ export default function MusicHomeScreen() {
 
   useEffect(() => {
     let active = true;
-    setError(null);
     musicService.getHome(locale)
-      .then((payload) => { if (active) setData(payload); })
+      .then((payload) => {
+        if (!active) return;
+        setError(null);
+        setData(payload);
+      })
       .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Unable to load music.'); });
     return () => { active = false; };
   }, [locale, attempt]);
@@ -115,11 +118,11 @@ export default function MusicHomeScreen() {
           <TabHeader title={tr('Hymns & Songs', 'Hymnes et chants', 'الألحان والترانيم')} arabic={arabic} wide={wide} nav={<MusicSectionNav active="home" flush={wide} />} />
 
           {!data && !error ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
-          {error ? <LoadFailure error={error} layout="inline" onRetry={() => setAttempt((count) => count + 1)} /> : null}
+          {error ? <LoadFailure error={error} layout="inline" onRetry={() => { setError(null); setAttempt((count) => count + 1); }} /> : null}
 
           {data ? (
             <>
-              <SectionHeading title={tr('Latest Releases', 'Dernières parutions', 'أحدث الإصدارات')} arabic={arabic} />
+              <SectionHeading size="page" title={tr('Latest Releases', 'Dernières parutions', 'أحدث الإصدارات')} arabic={arabic} />
               {!featured ? (
                 <EmptyState text={tr('No published releases yet.', 'Aucune parution publiée pour l’instant.', 'لا توجد إصدارات منشورة بعد.')} gutter={gutter} />
               ) : wide ? (
@@ -149,7 +152,7 @@ export default function MusicHomeScreen() {
                 </>
               )}
 
-              <SectionHeading title={tr('Artists', 'Artistes', 'الفنانون')} arabic={arabic} />
+              <SectionHeading size="page" title={tr('Artists', 'Artistes', 'الفنانون')} arabic={arabic} />
               {data.artists.length ? (
                 wide ? (
                   <View style={[styles.peopleWide, arabic && styles.rowReverse]}>

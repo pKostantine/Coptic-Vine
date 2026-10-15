@@ -74,8 +74,24 @@ function releaseTypeLabel(type: string): string {
   return tr('Single', 'Single', 'أغنية');
 }
 
+/** "4 releases", "1 album": what an artist, cantor or album holds; nothing while unknown or none. */
+function countLine(result: UnifiedSearchResult, count: number | null): string | null {
+  if (!count) return null;
+  const many = count !== 1;
+  switch (result.kind) {
+    case 'music_artist':
+      return tr(`${count} ${many ? 'releases' : 'release'}`, `${count} ${many ? 'parutions' : 'parution'}`, `${count} إصدار`);
+    case 'learning_cantor':
+      return tr(`${count} ${many ? 'albums' : 'album'}`, `${count} ${many ? 'albums' : 'album'}`, `${count} ألبوم`);
+    case 'learning_album':
+      return tr(`${count} ${many ? 'recordings' : 'recording'}`, `${count} ${many ? 'enregistrements' : 'enregistrement'}`, `${count} تسجيل`);
+    default:
+      return null;
+  }
+}
+
 /** The muted line under a result's name, or null when the result has nothing to add. */
-function resultDetail(result: UnifiedSearchResult): string | null {
+function resultDetail(result: UnifiedSearchResult, count: number | null): string | null {
   switch (result.kind) {
     case 'music_release':
       return [releaseTypeLabel(result.metadata.releaseType), result.metadata.releaseDate?.slice(0, 4), result.metadata.primaryArtist?.displayName ?? result.subtitle]
@@ -84,13 +100,16 @@ function resultDetail(result: UnifiedSearchResult): string | null {
     case 'music_track':
       return formatMusicTrackPerformers({ artists: result.metadata.artists }) || null;
     case 'learning_album':
-      return result.metadata.cantorName || result.subtitle;
+      return [countLine(result, count), result.metadata.cantorName || result.subtitle].filter(Boolean).join(' · ') || null;
     case 'learning_lesson':
       return [result.metadata.lessonSetTitle, result.metadata.cantorName].filter(Boolean).join(' · ') || null;
     case 'learning_hymn':
       return result.subtitle;
     // An artist's or cantor's search body is their biography, too long for a
-    // row; their line is "Following" or nothing. A season is its own name.
+    // row; their line is what they hold. A season is its own name.
+    case 'music_artist':
+    case 'learning_cantor':
+      return countLine(result, count);
     default:
       return null;
   }
@@ -106,6 +125,8 @@ interface SearchResultRowProps {
   following?: boolean;
   /** For an artist without a photo: their latest release's cover. */
   fallbackArt?: MusicConsumerAsset | null;
+  /** For an artist, cantor or album: how many releases, albums or recordings it holds, once known. */
+  count?: number | null;
   /** For a track: in your Liked Tracks. For a lesson: in My Learning. */
   saved?: boolean;
   /** A track's actions-menu item. */
@@ -124,9 +145,10 @@ interface SearchResultRowProps {
  * and its menu, and for a lesson, the bookmark that adds it to Will Learn.
  */
 export default function SearchResultRow({
-  result, query, arabic, active, following = false, fallbackArt = null, saved = false, queueItem, onPress, onTitlePress, onToggleSaved,
+  result, query, arabic, active, following = false, fallbackArt = null, count = null, saved = false, queueItem, onPress, onTitlePress, onToggleSaved,
 }: SearchResultRowProps) {
-  const detail = resultDetail(result);
+  const detail = resultDetail(result, count);
+  const followingLabel = tr('Following', 'Abonné', 'تتابعه');
   const track = result.kind === 'music_track';
   const lesson = result.kind === 'learning_lesson';
   const titleStyle = [styles.title, active && styles.titleActive, arabic && styles.arabic];
@@ -167,7 +189,7 @@ export default function SearchResultRow({
       <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={detail ? `${result.title}, ${detail}` : result.title}
+        accessibilityLabel={[result.title, following ? followingLabel : null, detail].filter(Boolean).join(', ')}
         onPress={onPress}
         style={({ pressed }) => [styles.main, arabic && styles.rowReverse, pressed && styles.pressed]}
       >
@@ -188,9 +210,11 @@ export default function SearchResultRow({
             </Pressable>
           ) : title}
 
+          {/* "Following" leads an artist's line in gold: "Following · 6 releases". */}
           {following ? (
             <Text style={detailStyle} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-              <Text style={styles.following}>{tr('Following', 'Abonné', 'تتابعه')}</Text>
+              <Text style={styles.following}>{followingLabel}</Text>
+              {detail ? ` · ${detail}` : null}
             </Text>
           ) : detail ? (
             <MatchText text={detail} query={query} style={detailStyle} />

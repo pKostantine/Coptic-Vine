@@ -296,7 +296,7 @@ function NativeDownloadsScreen() {
         {wide ? (
           <View style={styles.wideHeader}><PageTitle title={title} arabic={arabic} /></View>
         ) : (
-          <SubPageHeader title={title} arabic={arabic} onBack={() => goBack(router, '/account' as any)} backLabel={tr('Back', 'Retour', 'رجوع')} />
+          <SubPageHeader compact title={title} arabic={arabic} onBack={() => goBack(router, '/account' as any)} backLabel={tr('Back', 'Retour', 'رجوع')} />
         )}
         <NowPlayingAwareScrollView contentContainerStyle={wide ? styles.contentWide : styles.content} showsVerticalScrollIndicator={false}>
           {wide ? (
@@ -332,7 +332,7 @@ function Section({ title, arabic, first = false, children }: { title: string; ar
   return (
     <>
       <View style={first ? styles.firstSection : null}>
-        <SectionHeading title={title} arabic={arabic} />
+        <SectionHeading title={title} arabic={arabic} size="page" />
       </View>
       <View style={styles.rows}>{children}</View>
     </>
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   gutter: { marginHorizontal: 16 },
   rowReverse: { flexDirection: 'row-reverse' },
   pressed: { opacity: 0.82 },
-  firstSection: { marginTop: -22 },
+  firstSection: { marginTop: -24 },
 
   // The space used, on the day block's green (the design's "dl-st").
   storage: { borderRadius: 22, boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.35)', marginTop: 4, overflow: 'hidden', padding: 18 },

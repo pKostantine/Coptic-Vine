@@ -127,7 +127,7 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
   return layer(
     <>
       {backdrop}
-      <Animated.View style={[styles.sheet, { maxHeight: height - insets.top - 60, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]} {...sheetDrag.sheetHandlers}>
+      <Animated.View style={[styles.sheet, { maxHeight: height - insets.top - 60, paddingBottom: Math.max(insets.bottom + 8, 30), transform: [{ translateY }] }]} {...sheetDrag.sheetHandlers}>
         {panel}
       </Animated.View>
     </>,
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     boxShadow: '0px 20px 50px rgba(0, 0, 0, 0.6)',
     overflow: 'hidden',
-    paddingBottom: 22,
+    paddingBottom: 30,
     width: 440,
   },
   grabArea: { alignItems: 'center', marginHorizontal: -16, marginTop: -10, paddingBottom: 16, paddingTop: 10 },

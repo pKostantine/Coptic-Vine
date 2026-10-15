@@ -327,14 +327,15 @@ export default function SaintHymnPicker({
         ) : null}
         {single
           ? eyeButton({ token: item.options[0].token, category: item.options[0].category, label: item.options[0].label, saintName: item.name })
-          : <Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />}
+          // Wrapped so it stacks above the gradient on web, where a bare SVG paints beneath positioned siblings.
+          : <View><Icon name={isArabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} /></View>}
       </Pressable>
     );
   };
 
   /** A saint's hymns to choose from (Coptic Vine design, "Choose hymns"): on a phone straight on its sheet, wider on a pane of its own. */
   const chooser = expanded ? (
-    <View style={wide ? styles.pane : null}>
+    <View style={wide ? styles.pane : styles.chooserSheet}>
       <View style={[styles.chooserHead, rowDirection]}>
         <View style={styles.flex}>
           <Text style={[styles.kicker, isArabic && styles.kickerArabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{isArabic ? expanded.name : expanded.name.toUpperCase()}</Text>
@@ -574,6 +575,8 @@ const styles = StyleSheet.create({
   searchFlush: { marginHorizontal: 0 },
   listContentFlush: { paddingHorizontal: 0 },
 
+  // On its sheet the menu sits 16pt under the grab handle and 26pt over the foot.
+  chooserSheet: { paddingBottom: 4, paddingTop: 4 },
   chooserHead: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginBottom: 14 },
   kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8 },
   kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },

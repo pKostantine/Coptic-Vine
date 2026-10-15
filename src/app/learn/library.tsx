@@ -229,7 +229,7 @@ export default function LearningLibraryScreen() {
             <Pressable
               key={state}
               accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
+              aria-selected={active}
               onPress={() => setActiveState(state)}
               style={[styles.tab, active && styles.tabActive, rowDirection]}
             >
@@ -324,7 +324,7 @@ export default function LearningLibraryScreen() {
 
   const playlists = (
     <>
-      <SectionHeading
+      <SectionHeading size="page"
         title={tr('Custom Playlists', 'Playlists personnelles', 'قوائم مخصّصة')}
         arabic={arabic}
         trailing={(
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   listsColumn: { flex: 1.25, minWidth: 0 },
   column: { flex: 1, minWidth: 0 },
   // Cancels SectionHeading's own top margin.
-  columnHeadFlush: { marginTop: -26 },
+  columnHeadFlush: { marginTop: -28 },
   rowReverse: { flexDirection: 'row-reverse' },
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.42 },
@@ -460,14 +460,15 @@ const styles = StyleSheet.create({
     borderColor: '#0E2416',
     borderRadius: 17,
     borderWidth: 3,
-    bottom: -6,
+    bottom: -9,
     height: 34,
     justifyContent: 'center',
     position: 'absolute',
     width: 34,
   },
-  thumbBadgeRight: { right: -6 },
-  thumbBadgeLeft: { left: -6 },
+  // The 28pt gold disc overhangs the cover by 6pt, its ring by 3 more.
+  thumbBadgeRight: { right: -9 },
+  thumbBadgeLeft: { left: -9 },
   itemCopy: { flex: 1, minWidth: 0 },
   itemTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '700', lineHeight: 21 },
   itemMeta: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 3 },

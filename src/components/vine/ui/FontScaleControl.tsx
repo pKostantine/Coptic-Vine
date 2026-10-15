@@ -106,8 +106,9 @@ const styles = StyleSheet.create({
   track: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   sliderHost: { flex: 1, minWidth: 0 },
   endMarker: { color: COLORS.muted, fontFamily: TYPOGRAPHY.title, fontWeight: '700' },
-  endMarkerSmall: { fontSize: 13 },
-  endMarkerLarge: { fontSize: 21 },
+  // Set solid, as the design does.
+  endMarkerSmall: { fontSize: 13, lineHeight: 13 },
+  endMarkerLarge: { fontSize: 21, lineHeight: 21 },
   arabicText: {
     fontFamily: TYPOGRAPHY.arabic,
     textAlign: 'right',

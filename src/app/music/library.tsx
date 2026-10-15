@@ -2,14 +2,14 @@
 import { type ErrorBoundaryProps, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { LinearGradient } from 'expo-linear-gradient';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/vine/ui/AppHeader';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon, { type IconName } from '@/components/vine/ui/Icon';
-import PageTitle from '@/components/vine/ui/PageTitle';
+import TabHeader from '@/components/vine/ui/TabHeader';
 import MusicSectionNav from '@/components/music/MusicSectionNav';
 import ReleaseTile from '@/components/music/ReleaseTile';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -249,11 +249,7 @@ export default function MusicLibraryScreen() {
   /** A shelf of covers: a rail on a phone, one row of five on the iPad and desktop. */
   const shelf = (children: ReactNode) => (wide ? (
     <View style={[styles.grid, isArabic && styles.rowReverse]}>{children}</View>
-  ) : (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.rail, isArabic && styles.rowReverse]}>
-      {children}
-    </ScrollView>
-  ));
+  ) : <Rail arabic={isArabic}>{children}</Rail>);
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -265,21 +261,7 @@ export default function MusicLibraryScreen() {
       >
         <PageGlow kind="green" tall={wide} />
         <PageGutterProvider gutter={gutter}>
-          {wide ? (
-            <View style={[styles.headerWide, isArabic && styles.rowReverse]}>
-              <Text style={[styles.titleWide, isArabic && styles.arabicFont]} numberOfLines={1} accessibilityRole="header">
-                {tr('Your Library', 'Votre bibliothèque', 'مكتبتك')}
-              </Text>
-              <View style={styles.navWide}>
-                <MusicSectionNav active="library" flush />
-              </View>
-            </View>
-          ) : (
-            <>
-              <PageTitle title={tr('Your Library', 'Votre bibliothèque', 'مكتبتك')} arabic={isArabic} />
-              <MusicSectionNav active="library" />
-            </>
-          )}
+          <TabHeader title={tr('Your Library', 'Votre bibliothèque', 'مكتبتك')} arabic={isArabic} wide={wide} nav={<MusicSectionNav active="library" flush={wide} />} />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -305,7 +287,7 @@ export default function MusicLibraryScreen() {
 
           {library?.authenticated ? (
             <>
-              <SectionHeading title={tr('Recently Played', 'Écoutés récemment', 'المشغّلة مؤخراً')} arabic={isArabic} trailing={seeAll('recent-tracks')} />
+              <SectionHeading title={tr('Recently Played', 'Écoutés récemment', 'المشغّلة مؤخراً')} arabic={isArabic} size="page" trailing={seeAll('recent-tracks')} />
               {recentTracks.length ? shelf(recentTracks.map((recent, index) => (
                 <ReleaseTile
                   key={recent.track.id}
@@ -315,14 +297,14 @@ export default function MusicLibraryScreen() {
                   artworkUri={musicService.resolveAsset(recent.release?.coverAsset)}
                   width={wide ? gridTile : 136}
                   arabic={isArabic}
-                  wrapTitle={wide}
+                  large={wide}
                   onPress={() => playQueue(recentQueue, index)}
                   onPlay={() => playQueue(recentQueue, index)}
                   playLabel={`${tr('Play', 'Lire', 'تشغيل')}: ${recent.track.title}`}
                 />
               ))) : <EmptyLine text={tr('Tracks will appear here after you listen.', 'Les titres apparaîtront ici après votre écoute.', 'ستظهر الترانيم هنا بعد الاستماع.')} arabic={isArabic} gutter={gutter} />}
 
-              <SectionHeading title={tr('Recently Played Releases', 'Parutions écoutées récemment', 'الإصدارات المشغّلة مؤخراً')} arabic={isArabic} trailing={seeAll('recent-releases')} />
+              <SectionHeading title={tr('Recently Played Releases', 'Parutions écoutées récemment', 'الإصدارات المشغّلة مؤخراً')} arabic={isArabic} size="page" trailing={seeAll('recent-releases')} />
               {recentReleases.length ? shelf(recentReleases.map((release) => (
                 <ReleaseTile
                   key={release.id}
@@ -332,7 +314,7 @@ export default function MusicLibraryScreen() {
                   artworkUri={musicService.resolveAsset(release.coverAsset)}
                   width={wide ? gridTile : 136}
                   arabic={isArabic}
-                  wrapTitle={wide}
+                  large={wide}
                   onPress={() => router.push(`/music/release/${release.id}`)}
                 />
               ))) : <EmptyLine text={tr('Releases will appear here after you listen.', 'Les parutions apparaîtront ici après votre écoute.', 'ستظهر الإصدارات هنا بعد الاستماع.')} arabic={isArabic} gutter={gutter} />}
@@ -343,6 +325,22 @@ export default function MusicLibraryScreen() {
 
       <BottomTabBar active="music" />
     </SafeAreaView>
+  );
+}
+
+/** A phone's rail of covers. In Arabic it runs from the right, and opens there, at its first cover. */
+function Rail({ arabic, children }: { arabic: boolean; children: ReactNode }) {
+  const ref = useRef<ScrollView>(null);
+  return (
+    <ScrollView
+      ref={ref}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={[styles.rail, arabic && styles.rowReverse]}
+      onContentSizeChange={arabic ? () => ref.current?.scrollToEnd({ animated: false }) : undefined}
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -363,11 +361,6 @@ const styles = StyleSheet.create({
   loader: { marginVertical: SPACING.xl },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, marginTop: SPACING.md, textAlign: 'center' },
 
-  // The iPad's and desktop's head: the title, and the section pill at the far end.
-  headerWide: { alignItems: 'center', flexDirection: 'row', gap: 24, justifyContent: 'space-between' },
-  titleWide: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 38, fontWeight: '700', lineHeight: 42 },
-  navWide: { width: 440 },
-
   // Liked Tracks over the tiles on a phone; beside them, a column each, on the iPad and desktop.
   top: { gap: 10, marginTop: 18 },
   topWide: { alignItems: 'stretch', flexDirection: 'row', gap: 14, marginTop: 26 },
@@ -383,9 +376,9 @@ const styles = StyleSheet.create({
   heroIconWide: { height: 60, width: 60 },
   heroText: { minWidth: 0 },
   heroTextPhone: { flex: 1 },
-  // On the iPad and desktop the name sits at the card's foot, clear of the play button.
-  heroTextWide: { alignSelf: 'stretch', marginTop: 'auto', paddingRight: 72, paddingTop: 16 },
-  heroTextWideArabic: { alignSelf: 'stretch', marginTop: 'auto', paddingLeft: 72, paddingTop: 16 },
+  // On the iPad and desktop the name sits 14 under the icon, clear of the play button in the corner below.
+  heroTextWide: { alignSelf: 'stretch', paddingRight: 72, paddingTop: 14 },
+  heroTextWideArabic: { alignSelf: 'stretch', paddingLeft: 72, paddingTop: 14 },
   heroTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   heroTitleWide: { fontSize: 30 },
   heroDetail: { color: 'rgba(255, 255, 255, 0.78)', fontFamily: TYPOGRAPHY.body, fontSize: 13.5, marginTop: 2 },
@@ -411,8 +404,9 @@ const styles = StyleSheet.create({
   tileDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
 
   seeAll: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
-  rail: { gap: 12, paddingHorizontal: 16, paddingTop: 4 },
-  grid: { flexDirection: 'row', gap: GRID_GAP, paddingTop: 4 },
+  // A phone's rail sits 14 below its heading, as on Music; the iPad's and desktop's grid 12, with the heading's own 10.
+  rail: { gap: 12, paddingHorizontal: 16, paddingTop: 14 },
+  grid: { flexDirection: 'row', gap: GRID_GAP, paddingTop: 2 },
   emptyText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19 },
 
   authCard: { borderRadius: 18, gap: SPACING.sm, marginTop: 18, overflow: 'hidden', padding: SPACING.md },

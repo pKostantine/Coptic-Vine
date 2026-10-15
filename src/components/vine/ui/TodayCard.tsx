@@ -9,6 +9,27 @@ import Icon, { type IconName } from './Icon';
 import { VineDivider } from './Ornaments';
 
 const MAX_FONT_SCALE = 1.25;
+/** The large heading's size, and the least it may shrink to fit its line. */
+const HEADING_SIZE = 40;
+const HEADING_MIN_SCALE = 0.7;
+
+let measuringContext: CanvasRenderingContext2D | null = null;
+
+/**
+ * The size at which a large heading fits its one line on the web, where
+ * adjustsFontSizeToFit does nothing: "Paremhotep 10" runs wider than a phone's
+ * card at 40pt and would otherwise end in an ellipsis. Measured on a canvas in
+ * the heading's own face; undefined until the width is known, or if it fits.
+ */
+function webFittedHeadingSize(text: string, fontFamily: string, width: number): number | undefined {
+  if (Platform.OS !== 'web' || width <= 0 || typeof document === 'undefined') return undefined;
+  measuringContext ??= document.createElement('canvas').getContext('2d');
+  if (!measuringContext) return undefined;
+  measuringContext.font = `700 ${HEADING_SIZE}px "${fontFamily}"`;
+  const natural = measuringContext.measureText(text).width;
+  if (natural <= width) return undefined;
+  return Math.max(HEADING_SIZE * HEADING_MIN_SCALE, Math.floor((HEADING_SIZE * width) / natural));
+}
 
 export interface TodayCardAction {
   label: string;
@@ -69,19 +90,25 @@ export default function TodayCard({
   strip,
   footer,
 }: TodayCardProps) {
+  const [headingWidth, setHeadingWidth] = useState(0);
+  const fittedSize = headingSize === 'large'
+    ? webFittedHeadingSize(heading, arabic ? TYPOGRAPHY.arabic : TYPOGRAPHY.title, headingWidth)
+    : undefined;
+
   const headingBlock = (
     <>
       <Text
-        style={[headingSize === 'small' ? styles.headingSmall : styles.heading, { color: theme.text }, arabic && styles.arabicHeading]}
+        style={[headingSize === 'small' ? styles.headingSmall : styles.heading, { color: theme.text }, arabic && styles.arabicHeading, fittedSize ? { fontSize: fittedSize } : null]}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         numberOfLines={headingSize === 'small' ? 2 : 1}
         adjustsFontSizeToFit={headingSize === 'large'}
-        minimumFontScale={0.7}
+        minimumFontScale={HEADING_MIN_SCALE}
+        onLayout={Platform.OS === 'web' && headingSize === 'large' ? (event) => setHeadingWidth(event.nativeEvent.layout.width) : undefined}
       >
         {heading}
       </Text>
       {subheading ? (
-        <Text style={[styles.subheading, { color: theme.muted }, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>
+        <Text style={[styles.subheading, headingSize === 'small' && styles.subheadingUnderSmall, { color: theme.muted }, arabic && styles.arabicText]} maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>
           {subheading}
         </Text>
       ) : null}
@@ -264,17 +291,20 @@ function Gradient({ theme }: { theme: DayBlockTheme }) {
 }
 
 const styles = StyleSheet.create({
-  // No outline: depth comes from the season's gradient (Coptic Vine design, "no line").
-  block: { borderRadius: 24, overflow: 'hidden' },
+  // No outline: depth comes from the season's gradient (Coptic Vine design, "no
+  // line"). The design's hairline is only made transparent, so its 1pt stays.
+  block: { borderRadius: 24, overflow: 'hidden', padding: 1 },
   inner: { paddingHorizontal: 16, paddingTop: 16 },
   innerAlone: { paddingBottom: 18 },
   rowReverse: { flexDirection: 'row-reverse' },
   date: { marginTop: 20 },
   // The design sets the date solid (line-height 1) with 8pt under it; two
   // points of that gap move into the line so a descender is never clipped.
-  heading: { fontFamily: TYPOGRAPHY.title, fontSize: 40, fontWeight: '700', lineHeight: 42 },
-  headingSmall: { fontFamily: TYPOGRAPHY.title, fontSize: 30, fontWeight: '700', lineHeight: 34 },
+  heading: { fontFamily: TYPOGRAPHY.title, fontSize: HEADING_SIZE, fontWeight: '700', lineHeight: 42 },
+  // A service's name at 1.1, as it may take two lines.
+  headingSmall: { fontFamily: TYPOGRAPHY.title, fontSize: 30, fontWeight: '700', lineHeight: 33 },
   subheading: { fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 6 },
+  subheadingUnderSmall: { marginTop: 8 },
   strip: { flexDirection: 'row', gap: 4, marginTop: 20 },
   stripItem: { alignItems: 'center', borderRadius: 14, flex: 1, gap: 2, minWidth: 0, paddingBottom: 9, paddingTop: 8 },
   stripItemPressed: { backgroundColor: 'rgba(255, 255, 255, 0.08)' },

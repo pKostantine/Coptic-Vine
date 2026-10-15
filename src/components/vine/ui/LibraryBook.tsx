@@ -114,26 +114,28 @@ export default function LibraryBook({
 }
 
 const styles = StyleSheet.create({
-  // No outline: the card's fade from surfaceDeep gives it its edge (Coptic Vine design, "no line").
-  book: { borderRadius: 20, overflow: 'hidden' },
+  // No outline: the card's fade from surfaceDeep gives it its edge (Coptic Vine
+  // design, "no line"). The design's hairline is only made transparent, so its 1pt stays.
+  book: { borderRadius: 20, overflow: 'hidden', padding: 1 },
   bookTile: { flex: 1 },
   bookWide: { flex: 1 },
   pressed: { backgroundColor: 'rgba(255, 255, 255, 0.05)' },
   rowReverse: { flexDirection: 'row-reverse' },
   content: { alignItems: 'center', paddingBottom: 18, paddingHorizontal: 14, paddingTop: 20 },
-  contentWide: { flexDirection: 'row', gap: 16, paddingHorizontal: 16, paddingVertical: 14 },
+  contentWide: { flexDirection: 'row', gap: 16, paddingBottom: 14, paddingHorizontal: 16, paddingTop: 14 },
   wideText: { flex: 1, minWidth: 0 },
+  // 52pt inside its ring (40 on a row), as the design draws it: 54 across.
   medallion: {
     alignItems: 'center',
     backgroundColor: COLORS.goldSoft,
     borderColor: 'rgba(227, 181, 59, 0.35)',
-    borderRadius: 26,
+    borderRadius: 27,
     borderWidth: 1,
-    height: 52,
+    height: 54,
     justifyContent: 'center',
-    width: 52,
+    width: 54,
   },
-  medallionWide: { borderRadius: 20, height: 40, width: 40 },
+  medallionWide: { borderRadius: 21, height: 42, width: 42 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', marginTop: 14, textAlign: 'center' },
   titleWide: { marginTop: 0, textAlign: 'left' },
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, lineHeight: 17, marginTop: 4 },

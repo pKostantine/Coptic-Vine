@@ -51,8 +51,11 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
     selectDate(next);
   };
 
+  // A standing label alone (the Agpeya's "Now") makes a row only as tall as its words.
+  const statusOnly = Boolean(status) && !(seasonLabel && onOpenSeasons) && trailing === 'none';
+
   return (
-    <View style={[styles.row, arabic && styles.rowReverse]}>
+    <View style={[styles.row, statusOnly && styles.rowStatusOnly, arabic && styles.rowReverse]}>
       {status ? (
         <View style={[styles.live, arabic && styles.rowReverse]}>
           <LiveDot ring={theme.liveRing} />
@@ -159,6 +162,7 @@ function LiveDot({ ring }: { ring: DayBlockTheme['liveRing'] }) {
 
 const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', gap: 8, minHeight: 36 },
+  rowStatusOnly: { minHeight: 0 },
   rowReverse: { flexDirection: 'row-reverse' },
   live: { alignItems: 'center', flexDirection: 'row', gap: 7 },
   setLive: { borderRadius: 99, borderWidth: 1, height: 32, paddingHorizontal: 10 },
@@ -190,13 +194,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 36,
   },
+  // 36pt inside its ring, as the design draws it: 38 across.
   sun: {
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: 19,
     borderWidth: 1,
-    height: 36,
+    height: 38,
     justifyContent: 'center',
-    width: 36,
+    width: 38,
   },
   pressed: { opacity: 0.7 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },

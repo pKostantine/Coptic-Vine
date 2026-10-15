@@ -10,10 +10,12 @@ interface SubPageHeaderProps {
   arabic: boolean;
   onBack: () => void;
   backLabel: string;
+  /** A 25pt title on a phone (Downloads & Storage's board) rather than the 28pt of Seasons and Saint Hymns. */
+  compact?: boolean;
 }
 
-/** A page reached from another (Coptic Vine design, "Seasons"): a round gold back button, then the page's title -- 25pt on a phone, 28pt wider. */
-export default function SubPageHeader({ title, arabic, onBack, backLabel }: SubPageHeaderProps) {
+/** A page reached from another (Coptic Vine design, "Seasons"): a round gold back button, then the page's title. */
+export default function SubPageHeader({ title, arabic, onBack, backLabel, compact = false }: SubPageHeaderProps) {
   const insets = useSafeAreaInsets();
   const phone = useLayoutMode() === 'phone';
   return (
@@ -21,7 +23,7 @@ export default function SubPageHeader({ title, arabic, onBack, backLabel }: SubP
       <Pressable accessibilityRole="button" accessibilityLabel={backLabel} hitSlop={6} onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
         <Icon name={arabic ? 'chevron-forward' : 'chevron-back'} size={22} color={COLORS.gold} />
       </Pressable>
-      <Text style={[styles.title, phone && styles.titlePhone, arabic && styles.arabic]} numberOfLines={1} accessibilityRole="header">
+      <Text style={[styles.title, compact && phone && styles.titlePhone, arabic && styles.arabic]} numberOfLines={1} accessibilityRole="header">
         {title}
       </Text>
     </View>

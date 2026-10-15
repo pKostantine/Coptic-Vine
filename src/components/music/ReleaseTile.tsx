@@ -129,7 +129,7 @@ export default function ReleaseTile({
       {onToggleLike ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ selected: liked }}
+          aria-selected={liked}
           accessibilityLabel={likeLabel ?? title}
           hitSlop={8}
           onPress={onToggleLike}
@@ -176,5 +176,6 @@ const styles = StyleSheet.create({
   titles: { flex: 1, minWidth: 0 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontWeight: '600' },
   subtitle: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, marginTop: 2 },
-  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  // Right-aligned, but in the direction of its own words: a Latin title reads from its start and is cut at its end.
+  arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right' },
 });

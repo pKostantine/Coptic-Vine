@@ -284,7 +284,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
         <View style={[
           styles.yearBar,
           wide ? styles.yearBarWide : null,
-          { bottom: (wide ? 12 : 12 + insets.bottom) + nowPlayingInset },
+          { bottom: (wide ? 28 : Math.max(24, insets.bottom)) + nowPlayingInset },
           isArabic && styles.rowReverse,
         ]}>
           <Pressable
@@ -315,10 +315,10 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
 
 /**
  * Room under the list for the floating year bar: its height and the gap
- * beneath it. There is no tab bar on this screen, so the bar sits close to the
- * window's edge rather than where one would have been.
+ * beneath it. There is no tab bar on this screen, so the bar floats 24pt over
+ * the window's edge (28pt on the iPad and desktop), or the home indicator.
  */
-const YEAR_BAR_CLEARANCE = 60 + 12 + 20;
+const YEAR_BAR_CLEARANCE = 60 + 28 + 20;
 
 /** Each kind of card's fill: single days green, seasons gold, a season's own feasts a quieter green. */
 const CARD_FILLS = {
@@ -389,9 +389,10 @@ function LiveBar({ isArabic }: { isArabic: boolean }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.black },
   frame: { flex: 1 },
-  // The design's 720pt column, with the list's own 16pt gutters either side.
-  frameWide: { alignSelf: 'center', maxWidth: 752, paddingTop: 22, width: '100%' },
-  yearBarWide: { left: '50%', marginLeft: -260, right: undefined, width: 520 },
+  // The design's 720pt column, with the list's own 16pt gutters either side,
+  // 28pt from the top as every iPad and desktop page is.
+  frameWide: { alignSelf: 'center', maxWidth: 752, paddingTop: 28, width: '100%' },
+  yearBarWide: { left: '50%', marginLeft: -270, right: undefined, width: 540 },
   rowReverse: { flexDirection: 'row-reverse' },
   list: { gap: 8, paddingHorizontal: 16, paddingTop: 4 },
   card: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },

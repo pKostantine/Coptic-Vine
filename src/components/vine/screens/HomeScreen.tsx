@@ -442,15 +442,17 @@ const styles = StyleSheet.create({
   heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 8, textAlign: 'center' },
   heroCoptic: { color: COLORS.goldBright, fontWeight: '600' },
   heroDivider: { alignItems: 'center', marginBottom: 22, marginTop: 20 },
-  // No outlines on the cards: depth comes from their fills (Coptic Vine design, "no line").
+  // No outlines on the cards: depth comes from their fills (Coptic Vine design,
+  // "no line"). The design's hairline is only made transparent, so its 1pt stays.
   card: {
     backgroundColor: COLORS.surface,
     borderRadius: 20,
     marginBottom: 14,
     marginHorizontal: 16,
     overflow: 'hidden',
+    padding: 1,
   },
-  pray: { alignItems: 'center', flexDirection: 'row', gap: 14, paddingBottom: 14, paddingLeft: 18, paddingRight: 14, paddingTop: 14 },
+  pray: { alignItems: 'center', flexDirection: 'row', gap: 14, paddingBottom: 15, paddingLeft: 19, paddingRight: 15, paddingTop: 15 },
   prayKicker: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12 },
   prayTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', marginTop: 2 },
   prayButton: {

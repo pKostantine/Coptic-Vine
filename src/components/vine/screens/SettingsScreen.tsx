@@ -243,9 +243,9 @@ const styles = StyleSheet.create({
   chipTextOn: { color: COLORS.greenDeep },
   rows: { gap: 5 },
   rowsPhone: { gap: 4 },
-  linkRow: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, flexDirection: 'row', gap: 10, paddingLeft: 16, paddingRight: 12, paddingVertical: 8 },
+  linkRow: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, flexDirection: 'row', gap: 10, paddingLeft: 16, paddingRight: 14, paddingVertical: 8 },
   linkRowPressed: { backgroundColor: 'rgba(255, 255, 255, 0.09)' },
   linkLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600', minWidth: 0 },
-  linkValue: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
+  linkValue: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
   arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });

@@ -9,6 +9,7 @@ import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import ReleaseTile from '@/components/music/ReleaseTile';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
 import { BuddedCross } from '@/components/vine/ui/Ornaments';
@@ -17,7 +18,7 @@ import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { learningAlbumQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
-import type { LearningCantorDetail } from '@/types/learningPlatform';
+import type { LearningAlbumDetail, LearningCantorDetail } from '@/types/learningPlatform';
 import { goBack } from '@/utils/navigation';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
@@ -30,8 +31,8 @@ const GRID_GAP = 22;
 /**
  * A cantor (Coptic Vine design, "Cantor"): their photo glowing out of the
  * page and their name, then their learning albums (each with a play button)
- * and lesson sets as covers. The iPad and desktop set the photo beside the
- * name and the albums beside the lesson sets.
+ * and lesson sets as covers, over the tab bar. The iPad and desktop set the
+ * photo beside the name and the albums beside the lesson sets.
  */
 export default function LearningCantorScreen() {
   const router = useRouter();
@@ -48,6 +49,8 @@ export default function LearningCantorScreen() {
   const [attempt, setAttempt] = useState(0);
   const { currentItem, playing, playQueue, togglePlayback } = useLearningPlayer();
   const [loadingAlbumId, setLoadingAlbumId] = useState<string | null>(null);
+  // Each album as it loads on its own, for its cover, and for its recordings when it is played.
+  const [albumDetails, setAlbumDetails] = useState<Record<string, LearningAlbumDetail>>({});
 
   useEffect(() => {
     if (!cantorId) return;
@@ -62,6 +65,20 @@ export default function LearningCantorScreen() {
     return () => { active = false; };
   }, [cantorId, locale, attempt]);
 
+  // The covers come from each album until the cantor's payload carries them.
+  useEffect(() => {
+    if (!cantor) return;
+    let active = true;
+    for (const album of cantor.albums) {
+      if (album.coverAsset) continue;
+      learningService.getAlbum(album.id, locale)
+        .then((detail) => { if (active) setAlbumDetails((current) => ({ ...current, [album.id]: detail })); })
+        // An album that cannot load keeps the colours of a cover without artwork.
+        .catch(() => undefined);
+    }
+    return () => { active = false; };
+  }, [cantor, locale]);
+
   // An album's covers play it from its first recording, fetched on the tap; the album playing pauses.
   const albumIsCurrent = (albumId: string) => currentItem?.kind === 'recording' && currentItem.containerId === albumId;
   const playAlbum = (albumId: string) => {
@@ -71,7 +88,8 @@ export default function LearningCantorScreen() {
     }
     if (loadingAlbumId) return;
     setLoadingAlbumId(albumId);
-    learningService.getAlbum(albumId, locale)
+    const loaded = albumDetails[albumId];
+    (loaded ? Promise.resolve(loaded) : learningService.getAlbum(albumId, locale))
       .then((album) => {
         const queue = learningAlbumQueue(album);
         if (queue.length) playQueue(queue, 0);
@@ -86,7 +104,7 @@ export default function LearningCantorScreen() {
   // A phone sets two 140pt covers side by side; the iPad and desktop three in each of two columns.
   const gap = wide ? GRID_GAP : 12;
   const tileWidth = wide ? Math.floor(((available - COLUMN_GAP) / 2 - GRID_GAP * 2) / 3) : 140;
-  const chevron = <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />;
+  const chevron = <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={wide ? 20 : 18} color={COLORS.gold} />;
 
   // In the iPad's and desktop's columns the sections sit flush; the row of columns takes the margins.
   const sectionGutter = wide ? 0 : gutter;
@@ -99,7 +117,9 @@ export default function LearningCantorScreen() {
 
   const albums = cantor ? (
     <>
-      <SectionHeading title={tr('Learning Albums', 'Albums d’apprentissage', 'ألبومات التعلّم')} arabic={arabic} />
+      <View style={!wide && styles.phoneSection}>
+        <SectionHeading size="page" title={tr('Learning Albums', 'Albums d’apprentissage', 'ألبومات التعلّم')} arabic={arabic} />
+      </View>
       <Text style={[styles.sub, { paddingHorizontal: sectionGutter }, arabic && styles.arabic]}>
         {tr('Ordered recordings for listening and review', 'Enregistrements ordonnés pour l’écoute et la révision', 'تسجيلات مرتبة للاستماع والمراجعة')}
       </Text>
@@ -113,10 +133,11 @@ export default function LearningCantorScreen() {
                 id={album.id}
                 title={album.title}
                 subtitle={tr('Learning album', 'Album d’apprentissage', 'ألبوم تعلّم')}
-                artworkUri={learningService.resolveAsset(album.coverAsset)}
+                artworkUri={learningService.resolveAsset(album.coverAsset ?? albumDetails[album.id]?.coverAsset)}
                 width={tileWidth}
                 arabic={arabic}
                 wrapTitle
+                large={wide}
                 onPress={() => router.push({ pathname: '/learn/album/[id]', params: { id: album.id } })}
                 onPlay={() => playAlbum(album.id)}
                 playing={albumPlaying}
@@ -132,7 +153,9 @@ export default function LearningCantorScreen() {
 
   const lessonSets = cantor ? (
     <>
-      <SectionHeading title={tr('Lesson Sets', 'Séries de leçons', 'مجموعات الدروس')} arabic={arabic} />
+      <View style={!wide && styles.phoneSection}>
+        <SectionHeading size="page" title={tr('Lesson Sets', 'Séries de leçons', 'مجموعات الدروس')} arabic={arabic} />
+      </View>
       <Text style={[styles.sub, { paddingHorizontal: sectionGutter }, arabic && styles.arabic]}>
         {tr('Step-by-step study for individual hymns', 'Étude pas à pas de chaque hymne', 'دروس خطوة بخطوة لكل لحن')}
       </Text>
@@ -148,6 +171,7 @@ export default function LearningCantorScreen() {
               width={tileWidth}
               arabic={arabic}
               wrapTitle
+              large={wide}
               onPress={() => router.push({ pathname: '/learn/lesson-set/[id]', params: { id: lessonSet.id } })}
               trailing={chevron}
             />
@@ -203,6 +227,7 @@ export default function LearningCantorScreen() {
         </NowPlayingAwareScrollView>
       )}
       <LearningMiniPlayer />
+      <BottomTabBar active="learn" />
     </SafeAreaView>
   );
 }
@@ -215,6 +240,8 @@ const styles = StyleSheet.create({
   loader: { marginTop: 48 },
   pressed: { opacity: 0.7 },
   rowReverse: { flexDirection: 'row-reverse' },
+  // A phone sets the sections 22pt under what comes before them, not the page's 28.
+  phoneSection: { marginTop: -6 },
   sub: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, lineHeight: 19, marginBottom: 12, marginTop: -4 },
   columns: { alignItems: 'flex-start', flexDirection: 'row', gap: COLUMN_GAP },
   column: { flex: 1, minWidth: 0 },

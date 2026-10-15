@@ -114,7 +114,7 @@ export default function LearningHomeScreen() {
 
           {home ? (
             <>
-              <SectionHeading
+              <SectionHeading size="page"
                 title={tr('By Cantor', 'Par chantre', 'حسب المعلّم')}
                 arabic={arabic}
                 trailing={browseAll(tr('All cantors', 'Tous les chantres', 'كل المعلّمين'), () => router.push('/learn/cantors'))}
@@ -151,7 +151,7 @@ export default function LearningHomeScreen() {
                 <Text style={[styles.empty, { marginHorizontal: gutter }, arabic && styles.arabic]}>{tr('No cantors yet.', 'Aucun chantre pour l’instant.', 'لا يوجد معلّمون بعد.')}</Text>
               )}
 
-              <SectionHeading
+              <SectionHeading size="page"
                 title={tr('By Season', 'Par temps liturgique', 'حسب الموسم')}
                 arabic={arabic}
                 trailing={browseAll(tr('All seasons', 'Tous les temps', 'كل المواسم'), () => router.push('/learn/seasons'))}
@@ -174,7 +174,7 @@ export default function LearningHomeScreen() {
 
               {continueLearning.length ? (
                 <>
-                  <SectionHeading
+                  <SectionHeading size="page"
                     title={tr('Continue Learning', 'Continuer l’apprentissage', 'أكمل التعلّم')}
                     arabic={arabic}
                     trailing={browseAll(tr('Open My Learning', 'Ouvrir Mon apprentissage', 'افتح تعلّمي'), () => router.push('/learn/library'))}

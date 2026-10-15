@@ -68,7 +68,7 @@ export default function AccountScreen() {
             wide ? (
               <View style={columns}>
                 <View style={styles.sideColumn}><SignedOutAccount gutter={gutter} wide /></View>
-                <View style={[styles.column, styles.columnHeadFlush]}><AppSettingsSection gutter={gutter} /></View>
+                <View style={[styles.column, styles.columnHeadFlush]}><AppSettingsSection gutter={gutter} wide /></View>
               </View>
             ) : (
               <>
@@ -189,7 +189,7 @@ function SignedOutAccount({ gutter, wide = false }: { gutter: number; wide?: boo
     <>
       <View style={[styles.framed, { marginHorizontal: gutter }]}>
         <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-        <View style={styles.crown} pointerEvents="none"><CrownOrnament width={300} height={58} /></View>
+        <Crown wide={wide} />
         <View style={[styles.framedBody, wide && styles.framedBodyWide]}>
           <Text style={[styles.framedTitle, arabic && styles.arabicCentered]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Your Coptic Vine account', 'Votre compte Coptic Vine', 'حساب كوبتك فاين الخاص بك')}</Text>
           <Text style={[styles.framedText, arabic && styles.arabicCentered]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
@@ -389,6 +389,9 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
     }
   };
 
+  // The iPad's and desktop's columns set their sections closer than a phone's 28pt over 12.
+  const headingFit = !wide ? null : tablet ? styles.headingTablet : styles.headingDesktop;
+
   const messages = (
     <>
       {error ? <Text accessibilityRole="alert" style={[styles.errorText, { marginHorizontal: gutter }, arabic && styles.arabic]}>{error}</Text> : null}
@@ -400,7 +403,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
   const profileCard = (
     <View style={[styles.framed, { marginHorizontal: gutter }]}>
       <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-      <View style={styles.crown} pointerEvents="none"><CrownOrnament width={300} height={58} /></View>
+      <Crown wide={wide} />
       <View style={[styles.profileBody, tablet && styles.profileBodyTablet]}>
         <View style={[styles.avatar, tablet && styles.avatarTablet]}>
           {avatarUrl ? (
@@ -429,7 +432,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
             style={({ pressed }) => [styles.photoButton, styles.photoButtonGold, arabic && styles.rowReverse, avatarBusy && styles.disabled, pressed && styles.pressed]}
             onPress={() => void changePhoto()}
           >
-            {avatarBusy ? <ActivityIndicator size="small" color={COLORS.greenDeep} /> : <Icon name="camera-outline" size={15} color={COLORS.greenDeep} />}
+            {avatarBusy ? <ActivityIndicator size="small" color={COLORS.greenDeep} /> : <Icon name="camera-outline" size={14} color={COLORS.greenDeep} />}
             <Text style={[styles.photoButtonText, styles.photoButtonTextGold, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
               {avatarUrl ? tr('Change photo', 'Changer la photo', 'تغيير الصورة') : tr('Add photo', 'Ajouter une photo', 'إضافة صورة')}
             </Text>
@@ -446,7 +449,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
 
   const profileForm = (
     <>
-      <SectionHeading title={tr('Profile', 'Profil', 'الملف الشخصي')} arabic={arabic} />
+      <View style={headingFit}><SectionHeading size="page" title={tr('Profile', 'Profil', 'الملف الشخصي')} arabic={arabic} /></View>
       <Text style={[styles.sectionBody, { paddingHorizontal: gutter }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {tr('Choose the name that appears on your Coptic Vine account.', 'Choisissez le nom qui apparaît sur votre compte Coptic Vine.', 'عدّل الاسم الذي يظهر في حساب كوبتك فاين الخاص بك.')}
       </Text>
@@ -467,7 +470,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
 
   const security = (
     <>
-      <SectionHeading title={tr('Security', 'Sécurité', 'الأمان')} arabic={arabic} />
+      <View style={headingFit}><SectionHeading size="page" title={tr('Security', 'Sécurité', 'الأمان')} arabic={arabic} /></View>
       <View style={[styles.rows, { marginHorizontal: gutter }]}>
         <SettingsRow
           icon="mail-outline"
@@ -493,7 +496,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
             <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
           </View>
         ) : null}
-        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.signOut, arabic && styles.rowReverse, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void signOut()}>
+        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.signOut, tablet && styles.signOutCompact, arabic && styles.rowReverse, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void signOut()}>
           {/* The arrow leads out of the door: leftward too in Arabic. */}
           <Icon name="log-out-outline" size={19} color={SIGN_OUT} style={arabic ? styles.mirrored : undefined} />
           <Text style={[styles.signOutText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Sign out', 'Se déconnecter', 'تسجيل الخروج')}</Text>
@@ -504,7 +507,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
 
   const recovery = recoveryMode ? (
     <>
-      <SectionHeading title={tr('Choose a new password', 'Choisissez un nouveau mot de passe', 'اختر كلمة مرور جديدة')} arabic={arabic} />
+      <View style={headingFit}><SectionHeading size="page" title={tr('Choose a new password', 'Choisissez un nouveau mot de passe', 'اختر كلمة مرور جديدة')} arabic={arabic} /></View>
       <Text style={[styles.sectionBody, { paddingHorizontal: gutter }, arabic && styles.arabic]}>{tr('Finish recovering your account by setting a new password.', 'Terminez la récupération de votre compte en définissant un nouveau mot de passe.', 'أكمل استعادة حسابك بتعيين كلمة مرور جديدة.')}</Text>
       <View style={[styles.formCard, { marginHorizontal: gutter }]}>
         <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
@@ -523,7 +526,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
         </View>
         {/* App settings level with the profile card: no section margin over it at the top of its column. */}
         <View style={[styles.column, styles.columnHeadFlush]}>
-          <AppSettingsSection gutter={gutter} compact={tablet} />
+          <AppSettingsSection gutter={gutter} compact={tablet} wide />
           {security}
           {messageAt === 'security' ? messages : null}
         </View>
@@ -567,7 +570,7 @@ function PasswordEditor({ password, confirmation, onPasswordChange, onConfirmati
 }
 
 /** App language, Book settings and (on a phone) Downloads — the settings that follow the account. */
-function AppSettingsSection({ gutter, compact = false }: { gutter: number; compact?: boolean }) {
+function AppSettingsSection({ gutter, compact = false, wide = false }: { gutter: number; compact?: boolean; wide?: boolean }) {
   const router = useRouter();
   const { user } = useAuth();
   // A sheet over Account, as everywhere: Book Settings are never a page.
@@ -584,16 +587,19 @@ function AppSettingsSection({ gutter, compact = false }: { gutter: number; compa
 
   return (
     <>
-      <SectionHeading
-        title={tr('App settings', 'Paramètres de l’application', 'إعدادات التطبيق')}
-        arabic={arabic}
-        trailing={(
-          <View style={[styles.sync, arabic && styles.rowReverse]} accessibilityLabel={sync.label}>
-            <Icon name={sync.icon} size={16} color={sync.color} />
-            <Text style={[styles.syncText, { color: sync.color }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{sync.label}</Text>
-          </View>
-        )}
-      />
+      {/* Level with the profile card at the head of its column, so only its foot is set closer there. */}
+      <View style={wide && styles.headingColumnHead}>
+        <SectionHeading size="page"
+          title={tr('App settings', 'Paramètres de l’application', 'إعدادات التطبيق')}
+          arabic={arabic}
+          trailing={(
+            <View style={[styles.sync, arabic && styles.rowReverse]} accessibilityLabel={sync.label}>
+              <Icon name={sync.icon} size={16} color={sync.color} />
+              <Text style={[styles.syncText, { color: sync.color }, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{sync.label}</Text>
+            </View>
+          )}
+        />
+      </View>
       <Text style={[styles.kicker, { paddingHorizontal: gutter }, arabic && styles.arabicKicker]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {arabic ? tr('App language', 'Langue de l’application', 'لغة التطبيق') : tr('App language', 'Langue de l’application', 'لغة التطبيق').toUpperCase()}
       </Text>
@@ -604,7 +610,7 @@ function AppSettingsSection({ gutter, compact = false }: { gutter: number; compa
             <Pressable
               key={option.key}
               accessibilityRole="radio"
-              accessibilityState={{ checked: active }}
+              aria-checked={active}
               accessibilityLabel={`${option.label}, ${option.native}`}
               style={({ pressed }) => [styles.language, arabic && styles.rowReverse, pressed && styles.pressed]}
               onPress={() => setAppLanguage(option.key)}
@@ -674,12 +680,23 @@ function SettingsRow({ icon, label, description, value, arabic, onPress, expande
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={description ? `${label}. ${description}` : label}
-      accessibilityState={expanded === undefined ? undefined : { expanded }}
+      aria-expanded={expanded}
       onPress={onPress}
       style={({ pressed }) => [styles.row, compact && styles.rowCompact, arabic && styles.rowReverse, pressed && styles.pressed]}
     >
       {body}
     </Pressable>
+  );
+}
+
+/** The crown over the account card: across the card on a phone, 340pt wide and centred in the iPad's and desktop's column. */
+function Crown({ wide }: { wide: boolean }) {
+  const [room, setRoom] = useState(0);
+  const width = wide ? Math.min(CROWN_WIDE, room) : room;
+  return (
+    <View style={styles.crown} pointerEvents="none" onLayout={(event) => setRoom(Math.round(event.nativeEvent.layout.width))}>
+      {width > 0 ? <CrownOrnament width={width} height={Math.round((width * 58) / 300)} /> : null}
+    </View>
   );
 }
 
@@ -695,6 +712,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const PLACEHOLDER = 'rgba(205, 216, 203, 0.55)';
+const CROWN_WIDE = 340;
 const SIGN_OUT = '#FF8A7A';
 
 const styles = StyleSheet.create({
@@ -707,7 +725,11 @@ const styles = StyleSheet.create({
   sideColumn: { maxWidth: 360, width: '42%' },
   column: { flex: 1, minWidth: 0 },
   // Cancels SectionHeading's own top margin, leaving the design's 4pt.
-  columnHeadFlush: { marginTop: -22 },
+  columnHeadFlush: { marginTop: -24 },
+  // The columns' sections: 18pt over 10 on the iPad, 22 over 10 on the desktop, against SectionHeading's 28 over 12.
+  headingTablet: { marginBottom: -2, marginTop: -10 },
+  headingDesktop: { marginBottom: -2, marginTop: -6 },
+  headingColumnHead: { marginBottom: -2 },
   mirrored: { transform: [{ scaleX: -1 }] },
   rowReverse: { flexDirection: 'row-reverse' },
   loader: { marginVertical: 32 },
@@ -715,15 +737,16 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
 
   // The crowned card: who is signed in, or the invitation to sign in.
-  framed: { backgroundColor: COLORS.surface, borderColor: 'rgba(227, 181, 59, 0.3)', borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
-  crown: { alignItems: 'center', left: 8, opacity: 0.85, position: 'absolute', right: 8, top: 8 },
-  framedBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 48 },
+  // No outline: the design's clear 1pt border is in the padding and the crown's inset, the gradient running to the edge.
+  framed: { backgroundColor: COLORS.surface, borderRadius: 20, overflow: 'hidden' },
+  crown: { alignItems: 'center', left: 9, opacity: 0.85, position: 'absolute', right: 9, top: 9 },
+  framedBody: { alignItems: 'center', paddingBottom: 23, paddingHorizontal: 23, paddingTop: 49 },
   // The column's title runs to one line, out under the crown's sprigs: set it below them.
-  framedBodyWide: { paddingTop: 66 },
+  framedBodyWide: { paddingTop: 73 },
   framedTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', lineHeight: 29, textAlign: 'center' },
   framedText: { color: '#DFE6EC', fontFamily: TYPOGRAPHY.body, fontSize: 14.5, lineHeight: 22, marginTop: 10, textAlign: 'center' },
-  profileBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 54 },
-  profileBodyTablet: { paddingBottom: 14, paddingTop: 48 },
+  profileBody: { alignItems: 'center', paddingBottom: 21, paddingHorizontal: 23, paddingTop: 55 },
+  profileBodyTablet: { paddingBottom: 15, paddingTop: 49 },
   avatar: { alignItems: 'center', backgroundColor: COLORS.greenDeep, borderRadius: 46, boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.5)', height: 92, justifyContent: 'center', overflow: 'hidden', width: 92 },
   avatarTablet: { borderRadius: 40, height: 80, width: 80 },
   avatarText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 32, fontWeight: '700' },
@@ -780,9 +803,10 @@ const styles = StyleSheet.create({
   rowCompact: { paddingVertical: 11 },
   rowText: { flex: 1, minWidth: 0 },
   rowLabel: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600' },
-  rowDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  rowDescription: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 16, marginTop: 2 },
   rowValue: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
-  signOut: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.12)', borderRadius: 18, flexDirection: 'row', gap: 8, justifyContent: 'center', paddingVertical: 15 },
+  signOut: { alignItems: 'center', backgroundColor: 'rgba(214, 69, 69, 0.12)', borderRadius: 18, flexDirection: 'row', gap: 8, justifyContent: 'center', paddingVertical: 14 },
+  signOutCompact: { paddingVertical: 11 },
   signOutText: { color: SIGN_OUT, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },
 
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },

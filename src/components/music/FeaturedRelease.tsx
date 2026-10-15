@@ -46,8 +46,8 @@ export default function FeaturedRelease({ release, arabic = false, onOpen, onPla
         </Pressable>
         <View style={styles.text}>
           <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => pressed && styles.pressed}>
-            <Text style={[styles.title, arabic && styles.arabic]} numberOfLines={3} maxFontSizeMultiplier={MAX_FONT_SCALE}>{release.title}</Text>
-            <Text style={[styles.artist, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{artist}</Text>
+            <Text style={[styles.title, arabic && styles.arabicText]} numberOfLines={3} maxFontSizeMultiplier={MAX_FONT_SCALE}>{release.title}</Text>
+            <Text style={[styles.artist, arabic && styles.arabicText]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{artist}</Text>
           </Pressable>
           <View style={[styles.actions, arabic && styles.rowReverse]}>
             <Pressable
@@ -62,7 +62,7 @@ export default function FeaturedRelease({ release, arabic = false, onOpen, onPla
             {onToggleLike ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ selected: liked }}
+                aria-selected={liked}
                 accessibilityLabel={liked ? tr('Unlike release', 'Retirer des favoris', 'إزالة الإعجاب') : tr('Like release', 'Ajouter aux favoris', 'إعجاب')}
                 disabled={likeBusy}
                 onPress={onToggleLike}
@@ -93,5 +93,7 @@ const styles = StyleSheet.create({
   play: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, flexDirection: 'row', gap: 6, height: 38, paddingLeft: 13, paddingRight: 16 },
   playText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
   like: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.13)', borderRadius: 19, height: 38, justifyContent: 'center', width: 38 },
+  // Right-aligned, but in the direction of its own words: a Latin title reads from its start and is cut at its end.
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right' },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });

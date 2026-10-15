@@ -159,7 +159,7 @@ export function formatCopticMonthName(monthName: string, isArabic: boolean) {
 }
 
 export function formatCopticYear(year: number, isArabic: boolean) {
-  return isArabic ? `${toEasternArabicDigits(year)} ش` : isFrench(isArabic) ? `${year} A.M.` : `${year} AM`;
+  return isArabic ? `${toEasternArabicDigits(year)} ش` : `${year} A.M.`;
 }
 
 export function formatCalendarDay(value: number | string, isArabic: boolean) {

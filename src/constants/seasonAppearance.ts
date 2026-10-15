@@ -1,7 +1,9 @@
 /**
- * The colours of the Books day block, and of the calendar sheet's header, for
- * the liturgical day it shows — the Coptic Vine design system's "Season
- * colours" (Claude Design, "Coptic Vine": season-colours.md).
+ * The colours of the Books day block, and of the book pages' day cards that
+ * follow the chosen day, for the liturgical day it shows — the Coptic Vine
+ * design system's "Season colours" (Claude Design, "Coptic Vine":
+ * season-colours.md). The calendar sheet keeps the vine green: the block
+ * above it is the one that changes.
  *
  * The theme follows the day's winning indicator key (getSeasonIndicatorKey in
  * seasonNames.ts), which already settles which season or feast a day is named

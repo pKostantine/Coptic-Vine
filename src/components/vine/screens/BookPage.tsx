@@ -238,10 +238,20 @@ export function PageGutter({ children }: { children: ReactNode }) {
 }
 
 /** A section's name, the vine drawn out from it to the edge of the page. */
-export function SectionHeading({ title, arabic, trailing }: { title: string; arabic: boolean; trailing?: ReactNode }) {
+/**
+ * A section's title with the vine run out beside it. The book pages set it at
+ * 19pt; the tabs' own pages (Music, Learn, the Library, Account, Downloads)
+ * at 21pt with more room around it, and a search's results a little tighter.
+ */
+export function SectionHeading({ title, arabic, trailing, size = 'book' }: {
+  title: string;
+  arabic: boolean;
+  trailing?: ReactNode;
+  size?: 'book' | 'page' | 'results';
+}) {
   return (
-    <View style={[styles.section, { paddingHorizontal: usePageGutter() }, arabic && styles.rowReverse]}>
-      <Text style={[styles.sectionTitle, arabic && styles.arabic]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>
+    <View style={[styles.section, size === 'page' && styles.sectionPage, size === 'results' && styles.sectionResults, { paddingHorizontal: usePageGutter() }, arabic && styles.rowReverse]}>
+      <Text style={[styles.sectionTitle, size !== 'book' && styles.sectionTitlePage, arabic && styles.arabic]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1}>
         {title}
       </Text>
       <VineRule arabic={arabic} />
@@ -393,6 +403,9 @@ const styles = StyleSheet.create({
 
   section: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 10, marginTop: 26 },
   sectionTitle: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700' },
+  sectionPage: { marginBottom: 12, marginTop: 28 },
+  sectionResults: { marginBottom: 10, marginTop: 22 },
+  sectionTitlePage: { fontSize: 21 },
 
   rows: { gap: 8 },
   // A row is 60pt with its name alone, 70 beside an icon. Its hairline is

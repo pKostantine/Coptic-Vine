@@ -44,6 +44,6 @@ const styles = StyleSheet.create({
   rowReverse: { flexDirection: 'row-reverse' },
   title: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 38, fontWeight: '700', lineHeight: 42 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
-  // The pill keeps the design's 440pt where there is room, and gives way on a narrow iPad.
-  nav: { flexShrink: 1, minWidth: 300, width: 440 },
+  // The pill keeps the design's 450pt (440 inside its padding and border) where there is room, and gives way on a narrow iPad.
+  nav: { flexShrink: 1, minWidth: 300, width: 450 },
 });

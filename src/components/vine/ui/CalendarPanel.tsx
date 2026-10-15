@@ -1,9 +1,8 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { DAY_BLOCK_GRADIENT_END, DAY_BLOCK_GRADIENT_START } from '../../../constants/seasonAppearance';
+import { DAY_BLOCK_THEMES } from '../../../constants/seasonAppearance';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useCalendar } from '../../../context/CalendarContext';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
@@ -48,7 +47,7 @@ function gregorianMonthName(month: number): string {
 
 interface CalendarPanelProps {
   onOpenSeasons: () => void;
-  /** The top band — grab handle and controls — wears the day's season colours when the panel sits in the Books sheet. */
+  /** Above the controls: the sheet's grab handle. */
   header?: React.ReactNode;
 }
 
@@ -201,17 +200,12 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
 
   return (
     <View style={DISABLED_TEXT_SELECTION_STYLE}>
-      <View style={styles.band}>
-        <LinearGradient
-          colors={[day.theme.from, day.theme.to]}
-          locations={[0, day.theme.toAt]}
-          start={DAY_BLOCK_GRADIENT_START}
-          end={DAY_BLOCK_GRADIENT_END}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
+      {/* The controls sit on the sheet's own surface, in the vine-green
+          block's colours whatever the season: the day block above the sheet
+          is the one that wears the season. */}
+      <View style={styles.top}>
         {header}
-        <DayControls theme={day.theme} seasonLabel={day.seasonLabel} arabic={isArabic} onOpenSeasons={onOpenSeasons} />
+        <DayControls theme={DAY_BLOCK_THEMES.annual} seasonLabel={day.seasonLabel} arabic={isArabic} onOpenSeasons={onOpenSeasons} />
       </View>
 
       <View style={styles.body}>
@@ -219,6 +213,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr('Choose month and year', 'Choisir le mois et l’année', 'اختر الشهر والسنة')}
+            hitSlop={4}
             style={[styles.monthTitleButton, isArabic && styles.rowReverse]}
             onPress={openDatePicker}
           >
@@ -263,49 +258,54 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
           ))}
         </View>
 
-        {!days ? (
-          <ActivityIndicator color={COLORS.gold} style={styles.loading} />
-        ) : (
-          <View style={[styles.grid, isArabic && styles.rowReverse]}>
-            {Array.from({ length: leadingBlanks }).map((_, i) => (
-              <View key={`blank-${i}`} style={styles.cell} />
-            ))}
-            {days.map((calendarDay) => {
-              const selected = calendarDay.gregorianDate === selectedIso;
-              const small = calendarDay.otherMonthName
-                ? isArabic
-                  ? `${formatCalendarDay(calendarDay.otherDay, true)} ${formatCopticMonthName(calendarDay.otherMonthName, true)}`
-                  : `${calendarDay.otherMonthName} ${calendarDay.otherDay}`
-                : formatCalendarDay(calendarDay.otherDay, isArabic);
-              return (
-                <Pressable
-                  key={calendarDay.gregorianDate}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={calendarDay.gregorianDate}
-                  style={styles.cell}
-                  onPress={() => pickDate(new Date(`${calendarDay.gregorianDate}T00:00:00Z`))}
-                >
-                  <View style={[styles.circle, selected && styles.circleSelected]}>
-                    <Text style={[styles.dayNumber, selected && styles.dayNumberSelected, isArabic && styles.arabicLetter]}>
-                      {formatCalendarDay(calendarDay.displayDay, isArabic)}
-                    </Text>
-                    <Text
-                      style={[styles.otherDay, calendarDay.otherMonthName ? styles.otherDayMonth : null, selected && styles.otherDaySelected, isArabic && styles.arabicLetter]}
-                      numberOfLines={1}
-                    >
-                      {small}
-                    </Text>
-                    {feastDates.has(calendarDay.gregorianDate) && !selected ? <View style={styles.feastDot} /> : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
+        {/* Always six weeks tall, so a five-week month doesn't move the
+            sheet's top edge; the divider follows the last week and the room
+            a sixth would take stays below it. */}
+        <View style={styles.month}>
+          {!days ? (
+            <ActivityIndicator color={COLORS.gold} style={styles.loading} />
+          ) : (
+            <View style={[styles.grid, isArabic && styles.rowReverse]}>
+              {Array.from({ length: leadingBlanks }).map((_, i) => (
+                <View key={`blank-${i}`} style={styles.cell} />
+              ))}
+              {days.map((calendarDay) => {
+                const selected = calendarDay.gregorianDate === selectedIso;
+                const small = calendarDay.otherMonthName
+                  ? isArabic
+                    ? `${formatCalendarDay(calendarDay.otherDay, true)} ${formatCopticMonthName(calendarDay.otherMonthName, true)}`
+                    : `${calendarDay.otherMonthName} ${calendarDay.otherDay}`
+                  : formatCalendarDay(calendarDay.otherDay, isArabic);
+                return (
+                  <Pressable
+                    key={calendarDay.gregorianDate}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={calendarDay.gregorianDate}
+                    style={styles.cell}
+                    onPress={() => pickDate(new Date(`${calendarDay.gregorianDate}T00:00:00Z`))}
+                  >
+                    <View style={[styles.circle, selected && styles.circleSelected]}>
+                      <Text style={[styles.dayNumber, selected && styles.dayNumberSelected, isArabic && styles.arabicLetter]}>
+                        {formatCalendarDay(calendarDay.displayDay, isArabic)}
+                      </Text>
+                      <Text
+                        style={[styles.otherDay, calendarDay.otherMonthName ? styles.otherDayMonth : null, selected && styles.otherDaySelected, isArabic && styles.arabicLetter]}
+                        numberOfLines={1}
+                      >
+                        {small}
+                      </Text>
+                      {feastDates.has(calendarDay.gregorianDate) && !selected ? <View style={styles.feastDot} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
 
-        <View style={styles.divider} pointerEvents="none">
-          <VineDivider width={210} height={26} />
+          <View style={styles.divider} pointerEvents="none">
+            <VineDivider width={210} height={26} />
+          </View>
         </View>
       </View>
 
@@ -377,10 +377,10 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
 
 const styles = StyleSheet.create({
   rowReverse: { flexDirection: 'row-reverse' },
-  band: { overflow: 'hidden', paddingBottom: 14, paddingHorizontal: 16, paddingTop: 10 },
+  top: { paddingHorizontal: 16, paddingTop: 10 },
   body: { paddingHorizontal: 16 },
   monthRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 18 },
-  monthTitleButton: { alignItems: 'center', flexDirection: 'row', flexShrink: 1, gap: 6, minHeight: 40 },
+  monthTitleButton: { alignItems: 'center', flexDirection: 'row', flexShrink: 1, gap: 6, minHeight: 36 },
   monthTitle: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
   arrows: { flexDirection: 'row', gap: 8 },
   arrow: {
@@ -405,12 +405,14 @@ const styles = StyleSheet.create({
   segmentOptionActive: { backgroundColor: COLORS.gold },
   segmentText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
   segmentTextActive: { color: COLORS.greenDeep },
-  gridRow: { flexDirection: 'row', marginTop: 12 },
+  // The letters keep the weeks' 2pt gap under them, as one grid with the days.
+  gridRow: { flexDirection: 'row', marginBottom: 2, marginTop: 12 },
   weekday: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '600', paddingBottom: 6, textAlign: 'center', width: `${100 / 7}%` },
-  loading: { height: 6 * 44 + 5 * 2 },
-  // Always six weeks tall, so a five-week month doesn't move the sheet's top edge.
-  grid: { flexDirection: 'row', flexWrap: 'wrap', minHeight: 6 * 44 + 5 * 2, rowGap: 2 },
-  cell: { alignItems: 'center', height: 44, justifyContent: 'center', width: `${100 / 7}%` },
+  // Six 42pt weeks 2pt apart, then the divider's 14pt and 26pt.
+  month: { minHeight: 6 * 42 + 5 * 2 + 14 + 26 },
+  loading: { height: 6 * 42 + 5 * 2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 2 },
+  cell: { alignItems: 'center', height: 42, justifyContent: 'center', width: `${100 / 7}%` },
   circle: { alignItems: 'center', borderRadius: 21, gap: 1, height: 42, justifyContent: 'center', width: 42 },
   circleSelected: { backgroundColor: COLORS.gold },
   dayNumber: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '500', lineHeight: 19 },
