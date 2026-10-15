@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Coptic Vine",
-    "slug": "Coptic-Hymns-Centre",
+    "slug": "coptic-vine",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/coptic-vine-icon.png",
@@ -22,7 +22,12 @@
         "backgroundImage": "./assets/images/coptic-vine-icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.pkostantine.CopticHymnsCentre"
+      "package": "com.pkostantine.CopticHymnsCentre",
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "web": {
       "output": "single",
@@ -78,8 +83,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "aea4f18c-5f12-4986-abb6-47bf0955ab4a"
+        "projectId": "32a39b3a-6022-4132-962e-e04be1da8af6"
       }
-    }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/aea4f18c-5f12-4986-abb6-47bf0955ab4a"
+    },
+    "owner": "coptic-vine"
   }
 }
