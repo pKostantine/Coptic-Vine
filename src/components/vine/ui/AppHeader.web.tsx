@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
-import { appText, type AppText } from '../../../utils/appText';
+import { appText, tr, type AppText } from '../../../utils/appText';
 import { formatEnglishDisplayText } from '../../../utils/displayText';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { useIsMobileWeb } from '../../../utils/useIsMobileWeb';
@@ -85,7 +85,7 @@ export default function AppHeader({
       <View style={styles.topRow}>
         <View style={[styles.side, { width: sideWidth }]}>
           {canGoBack ? (
-            <Pressable accessibilityLabel="Go back" style={iconButtonStyle} onPress={onBack}>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} style={iconButtonStyle} onPress={onBack}>
               <Icon name="chevron-back" size={isMobileWeb ? 24 : 28} color={COLORS.gold} />
             </Pressable>
           ) : null}

@@ -25,9 +25,16 @@ export default function MusicSectionNav({ active, flush = false }: { active: Mus
     { key: 'library' as const, label: tr('Library', 'Bibliothèque', 'المكتبة') },
   ];
 
+  // The sections replace one another rather than stack, so Search is told
+  // which one it was opened from: its Back returns there, not out of Music.
+  const select = (key: MusicSection) => {
+    if (key === active) return;
+    router.replace(key === 'search' ? { pathname: ROUTES.search, params: { from: active } } : ROUTES[key]);
+  };
+
   return (
     <View style={[styles.row, flush && styles.flush]}>
-      <SegmentNav items={items} active={active} arabic={arabic} onSelect={(key) => { if (key !== active) router.replace(ROUTES[key]); }} />
+      <SegmentNav items={items} active={active} arabic={arabic} onSelect={select} />
     </View>
   );
 }

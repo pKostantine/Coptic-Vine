@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -125,6 +125,8 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   const isArabic = locale === 'ar';
   const music = section === 'music';
   const fallback: '/music' | '/learn' = music ? '/music' : '/learn';
+  const params = useLocalSearchParams<{ from?: string }>();
+  const from = Array.isArray(params.from) ? params.from[0] : params.from;
   const musicPlayer = useMusicPlayer();
   const learningPlayer = useLearningPlayer();
 
@@ -363,6 +365,16 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     }
   };
 
+  // The section pill replaced Home or Library with this page rather than
+  // stacking it, so there is nothing beneath to go back to: Back returns to
+  // the section it names. Reached any other way (a link, the old /search),
+  // Back goes back through the history, or to the tab's first page.
+  const goBackFromSearch = () => {
+    if (from === 'library') router.replace(music ? '/music/library' : '/learn/library');
+    else if (from === 'home') router.replace(fallback);
+    else goBack(router, fallback);
+  };
+
   const hasQuery = Boolean(query.trim());
   const filters = filtersFor(music);
   const searchLabel = music
@@ -430,6 +442,18 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
     : mainGroups.length && asideGroups.length ? [mainGroups, asideGroups]
       : grouped.length > 1 ? [grouped.slice(0, 1), grouped.slice(1)]
         : null;
+
+  const backButton = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={tr('Back', 'Retour', 'رجوع')}
+      hitSlop={4}
+      onPress={goBackFromSearch}
+      style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+    >
+      <Icon name="chevron-back" size={20} color={COLORS.gold} />
+    </Pressable>
+  );
 
   const field = (
     <View style={[styles.field, focused && styles.fieldFocused]}>
@@ -513,21 +537,16 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
 
       {wide ? (
         <View style={[styles.topWide, { paddingTop: insets.top + 28 }]}>
-          {field}
+          <View style={styles.barWide}>
+            {backButton}
+            {field}
+          </View>
           {chips}
         </View>
       ) : (
         <View style={{ paddingTop: insets.top + 4 }}>
           <View style={styles.bar}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={tr('Back', 'Retour', 'رجوع')}
-              hitSlop={4}
-              onPress={() => goBack(router, fallback)}
-              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            >
-              <Icon name="chevron-back" size={20} color={COLORS.gold} />
-            </Pressable>
+            {backButton}
             {field}
           </View>
           {chips}
@@ -610,8 +629,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 42,
   },
-  // The iPad's and desktop's top: the field, the filters beside it.
+  // The iPad's and desktop's top: Back and the field, the filters beside them.
   topWide: { alignItems: 'center', flexDirection: 'row', gap: 18, paddingHorizontal: 36 },
+  barWide: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 10, minWidth: 0 },
   field: {
     alignItems: 'center',
     backgroundColor: COLORS.surface,

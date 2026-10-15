@@ -25,9 +25,16 @@ export default function LearningSectionNav({ active, flush = false }: { active: 
     { key: 'library' as const, label: tr('My Learning', 'Mon apprentissage', 'تعلّمي') },
   ];
 
+  // The sections replace one another rather than stack, so Search is told
+  // which one it was opened from: its Back returns there, not out of Learn.
+  const select = (key: LearningSection) => {
+    if (key === active) return;
+    router.replace(key === 'search' ? { pathname: ROUTES.search, params: { from: active } } : ROUTES[key]);
+  };
+
   return (
     <View style={[styles.row, flush && styles.flush]}>
-      <SegmentNav items={items} active={active} arabic={arabic} onSelect={(key) => { if (key !== active) router.replace(ROUTES[key]); }} />
+      <SegmentNav items={items} active={active} arabic={arabic} onSelect={select} />
     </View>
   );
 }
