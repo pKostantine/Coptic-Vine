@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { COLORS, SPACING } from "../../constants/theme";
+import { SPACING } from "../../constants/theme";
 import { getAlternatingVerseColorIndex } from "../../utils/versePresentation";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
@@ -968,7 +968,7 @@ const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   : null;
 
 /** Gold outlined circle with a minus bar always, plus a vertical bar (making a plus) only when collapsed — matches the old app's collapse-button-icon ::before/::after CSS bars. */
-function CollapseButton({ collapsed, onPress }) {
+function CollapseButton({ collapsed, onPress, color }) {
   return (
     <Pressable
       dataSet={{ slideshowControl: "true" }}
@@ -981,10 +981,10 @@ function CollapseButton({ collapsed, onPress }) {
       style={styles.collapseButton}
       hitSlop={8}
     >
-      <View style={[styles.collapseButtonCircle, { borderColor: COLORS.gold }]}>
-        <View style={[styles.collapseBar, styles.collapseBarHorizontal, { backgroundColor: COLORS.gold }]} />
+      <View style={[styles.collapseButtonCircle, { borderColor: color }]}>
+        <View style={[styles.collapseBar, styles.collapseBarHorizontal, { backgroundColor: color }]} />
         {collapsed ? (
-          <View style={[styles.collapseBar, styles.collapseBarVertical, { backgroundColor: COLORS.gold }]} />
+          <View style={[styles.collapseBar, styles.collapseBarVertical, { backgroundColor: color }]} />
         ) : null}
       </View>
     </Pressable>
@@ -1018,7 +1018,10 @@ const SlideItem = memo(function SlideItem({
       >
         <Pressable
           dataSet={{ slideshowControl: "true" }}
-          style={[styles.gospelRiteToggle, copticGospelRite && styles.gospelRiteToggleOn]}
+          style={[
+            styles.gospelRiteToggle,
+            { backgroundColor: copticGospelRite ? theme.colors.gold : theme.colors.surface, borderColor: theme.colors.gold },
+          ]}
           accessibilityRole="switch"
           accessibilityState={{ checked: Boolean(copticGospelRite) }}
           onPress={(event) => {
@@ -1026,13 +1029,18 @@ const SlideItem = memo(function SlideItem({
             onAction?.({ type: "toggleCopticGospelRite", sectionId: item.sectionId });
           }}
         >
-          <View style={[styles.gospelRiteToggleDot, copticGospelRite && styles.gospelRiteToggleDotOn]} />
+          <View
+            style={[
+              styles.gospelRiteToggleDot,
+              { backgroundColor: copticGospelRite ? theme.colors.onAccent : theme.colors.text, opacity: copticGospelRite ? 1 : 0.4 },
+            ]}
+          />
           <Text
             selectable={false}
             style={[
               styles.gospelRiteToggleText,
               {
-                color: copticGospelRite ? COLORS.black : theme.colors.text,
+                color: copticGospelRite ? theme.colors.onAccent : theme.colors.text,
                 fontSize: chrome.titleFontSize,
                 lineHeight: chrome.titleLineHeight,
               },
@@ -1059,7 +1067,14 @@ const SlideItem = memo(function SlideItem({
           dataSet={{ slideshowControl: "true" }}
           accessibilityRole="button"
           hitSlop={8}
-          style={[styles.openButton, item.isHyperlink && styles.hyperlinkButton]}
+          style={[
+            styles.openButton,
+            item.isHyperlink && styles.hyperlinkButton,
+            {
+              backgroundColor: item.isHyperlink ? theme.colors.linkSoft : theme.colors.subdocSoft,
+              borderColor: item.isHyperlink ? theme.colors.linkLine : theme.colors.subdocLine,
+            },
+          ]}
           onPress={(event) => {
             event.stopPropagation?.();
             onAction?.({ type: item.buttonAction, sectionId: item.sectionId });
@@ -1071,7 +1086,7 @@ const SlideItem = memo(function SlideItem({
               style={[
                 styles.openButtonText,
                 {
-                  color: item.isHyperlink ? COLORS.link : COLORS.subdoc,
+                  color: item.isHyperlink ? theme.colors.link : theme.colors.subdoc,
                   fontSize: item.isHyperlink ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
                   lineHeight: item.isHyperlink ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
                 },
@@ -1087,7 +1102,7 @@ const SlideItem = memo(function SlideItem({
                 styles.openButtonText,
                 styles.openButtonTextArabic,
                 {
-                  color: item.isHyperlink ? COLORS.link : COLORS.subdoc,
+                  color: item.isHyperlink ? theme.colors.link : theme.colors.subdoc,
                   fontSize: item.isHyperlink ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
                   lineHeight: item.isHyperlink ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
                 },
@@ -1097,8 +1112,8 @@ const SlideItem = memo(function SlideItem({
             </Text>
           ) : null}
           {item.isHyperlink ? (
-            <View style={styles.hyperlinkArrow}>
-              <Text selectable={false} style={styles.hyperlinkArrowGlyph}>→</Text>
+            <View style={[styles.hyperlinkArrow, { borderColor: theme.colors.link }]}>
+              <Text selectable={false} style={[styles.hyperlinkArrowGlyph, { color: theme.colors.link }]}>→</Text>
             </View>
           ) : null}
         </Pressable>
@@ -1149,7 +1164,7 @@ const SlideItem = memo(function SlideItem({
                       styles.sectionTitle,
                       language.key === "arabic" && styles.sectionTitleArabic,
                       {
-                        color: isSilentPrayerHymn ? COLORS.silentTitle : theme.colors.gold,
+                        color: isSilentPrayerHymn ? theme.colors.silent : theme.colors.gold,
                         fontStyle: isSilentPrayerHymn ? "italic" : "normal",
                         fontSize: chrome.titleFontSize,
                         lineHeight: chrome.titleLineHeight,
@@ -1168,6 +1183,7 @@ const SlideItem = memo(function SlideItem({
           <CollapseButton
             collapsed={Boolean(item.currentlyCollapsed)}
             onPress={() => onToggleCollapse(item.sectionId)}
+            color={theme.colors.gold}
           />
         ) : null}
       </View>
@@ -1579,8 +1595,6 @@ const styles = StyleSheet.create({
   },
   openButton: {
     alignItems: "center",
-    backgroundColor: COLORS.subdocSoft,
-    borderColor: COLORS.subdocLine,
     borderRadius: DOCUMENT_CONTROL_METRICS.openButtonBorderRadius,
     borderWidth: 1,
     gap: SPACING.sm,
@@ -1594,8 +1608,6 @@ const styles = StyleSheet.create({
   // Shorter and green rather than tall and gold: a Hyperlink is a transition
   // out of this service, not a document to open on top of it.
   hyperlinkButton: {
-    backgroundColor: COLORS.linkSoft,
-    borderColor: COLORS.linkLine,
     borderRadius: DOCUMENT_CONTROL_METRICS.hyperlinkBorderRadius,
     flexDirection: "row",
     gap: SPACING.md,
@@ -1606,7 +1618,6 @@ const styles = StyleSheet.create({
   },
   hyperlinkArrow: {
     alignItems: "center",
-    borderColor: COLORS.link,
     borderRadius: 999,
     borderWidth: 1.5,
     height: 28,
@@ -1614,7 +1625,6 @@ const styles = StyleSheet.create({
     width: 28,
   },
   hyperlinkArrowGlyph: {
-    color: COLORS.link,
     fontSize: 16,
     lineHeight: 18,
   },
@@ -1630,7 +1640,7 @@ const styles = StyleSheet.create({
   },
   // Mirrors documentHtml.ts's .gospel-rite-toggle* CSS classes (the same
   // toggle in scroll mode) — pill button, gold border/dot when off, filled
-  // gold with a black dot when on.
+  // gold with a dark dot when on; the colours are the page's (see render).
   gospelRiteToggleRow: {
     alignItems: "center",
     flexShrink: 0,
@@ -1638,8 +1648,6 @@ const styles = StyleSheet.create({
   },
   gospelRiteToggle: {
     alignItems: "center",
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.gold,
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
@@ -1647,19 +1655,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
   },
-  gospelRiteToggleOn: {
-    backgroundColor: COLORS.gold,
-  },
   gospelRiteToggleDot: {
-    backgroundColor: COLORS.white,
     borderRadius: 999,
     height: 10,
-    opacity: 0.4,
     width: 10,
-  },
-  gospelRiteToggleDotOn: {
-    backgroundColor: COLORS.black,
-    opacity: 1,
   },
   gospelRiteToggleText: {
     fontFamily: "Georgia",

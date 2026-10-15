@@ -11,6 +11,7 @@ import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
 import LoadingScreen from '@/components/vine/ui/LoadingScreen';
+import { getDocumentTheme } from '@/constants/documentThemes';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useBottomChrome } from '@/context/BottomChromeContext';
@@ -337,6 +338,8 @@ export default function BibleChapterDocument() {
     [availableLanguages, visibleLanguageKeys],
   );
   const fontSize = fontScaleToPx(preferences.fontScale);
+  // The page the chapter is read on (constants/documentThemes.ts).
+  const theme = getDocumentTheme(preferences.documentTheme);
   const currentChapterNumber = Number(chapter);
   const headerTitleEnglish = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'en');
   const headerTitleArabic = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'ar');
@@ -354,7 +357,7 @@ export default function BibleChapterDocument() {
   const chapterListLoaded = chapterKeys !== null;
   const chapterCount = chapterKeys?.length || 0;
 
-  const readerId = JSON.stringify([verseRequestKey, effectiveLanguageKeys, fontSize, effectiveSelectText, preferences.slideshowMode, restoreVerse, targetVerse]);
+  const readerId = JSON.stringify([verseRequestKey, effectiveLanguageKeys, fontSize, effectiveSelectText, preferences.slideshowMode, restoreVerse, targetVerse, theme.id]);
   const chapterHtml = useMemo(() => {
     if (!verses || !copticFontDataUri) return null;
     return buildBibleChapterHtml({
@@ -375,8 +378,9 @@ export default function BibleChapterDocument() {
       highlighting: effectiveSelectText,
       highlightLabels: { copy: selectorText.copy, remove: selectorText.removeHighlight },
       copyReference,
+      theme,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText, copyReference]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText, copyReference, theme]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -461,7 +465,7 @@ export default function BibleChapterDocument() {
   }, [goBackALevel, screenWidth, isSelectorOpen, pencilGestureActive]);
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea} {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, { backgroundColor: theme.colors.page }]} {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}>
       <Head>
         <title>{`Coptic Vine ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
@@ -493,6 +497,7 @@ export default function BibleChapterDocument() {
           <BibleWebView
             ref={bibleWebViewRef}
             html={chapterHtml}
+            backgroundColor={theme.colors.page}
             scrollEnabled={!preferences.slideshowMode}
             restoreVerse={restoreVerse}
             selectText={effectiveSelectText}

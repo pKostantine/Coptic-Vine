@@ -1,4 +1,4 @@
-import { COLORS } from '../../constants/theme';
+import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 import { formatCopticNumber, formatGreekNumber } from '../../utils/bibleNumerals';
 import { formatEnglishDisplayText } from '../../utils/displayText';
 import { getLanguageColumnGap } from './documentPresentationMetrics';
@@ -59,6 +59,7 @@ export function buildBibleChapterHtml({
   highlighting = false,
   highlightLabels = { copy: 'Copy', remove: 'Remove' },
   copyReference = null,
+  theme = NIGHT_DOCUMENT_THEME,
 }: {
   verses: BibleDisplayVerse[];
   languageKeys: BibleLanguageKey[];
@@ -83,7 +84,10 @@ export function buildBibleChapterHtml({
   highlightLabels?: { copy: string; remove: string };
   /** The chapter a copy is signed with ("Leviticus 2"), in each language a column can be. */
   copyReference?: Partial<Record<'english' | 'arabic' | 'coptic' | 'greek' | 'french', string>> | null;
+  /** The page the chapter is read on — see constants/documentThemes.ts. */
+  theme?: DocumentTheme;
 }) {
+  const colors = theme.colors;
   const safeFontSize = Math.max(12, Number(fontSize) || 18);
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
   const effectiveLanguages: BibleLanguageKey[] = languageKeys.length ? languageKeys : ['english'];
@@ -163,20 +167,20 @@ export function buildBibleChapterHtml({
         src: url('${copticFontDataUri}') format('truetype');
       }
       :root {
-        color-scheme: dark;
-        --text-color: ${COLORS.white};
-        --border-color: ${COLORS.border};
-        --gold: ${COLORS.gold};
-        --lxx-addition: ${COLORS.priest};
-        --psalm-introduction: ${COLORS.refrain};
-        --preface-red: #d9534f;
+        color-scheme: ${theme.dark ? 'dark' : 'light'};
+        --text-color: ${colors.text};
+        --border-color: ${colors.border};
+        --gold: ${colors.accent};
+        --lxx-addition: ${colors.priest};
+        --psalm-introduction: ${colors.refrain};
+        --preface-red: ${theme.dark ? '#d9534f' : colors.priest};
         --font-size: ${safeFontSize}px;
         --verse-line-height: ${Math.round(safeFontSize * 1.3)}px;
       }
       html, body {
         margin: 0;
         min-height: 100%;
-        background: #000;
+        background: ${colors.page};
         color: var(--text-color);
         font-family: Georgia, 'Times New Roman', serif;
         -webkit-text-size-adjust: none;
@@ -211,9 +215,9 @@ export function buildBibleChapterHtml({
         padding: 15px 0;
       }
       .verse-row.verse-target {
-        background: rgba(212, 175, 55, 0.16);
+        background: ${colors.accentSoft};
         border-radius: 8px;
-        box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.45);
+        box-shadow: 0 0 0 1px ${colors.accentLine};
         transition: background-color 700ms ease, box-shadow 700ms ease;
       }
       .verse-row.verse-target.verse-target-fading {
@@ -294,7 +298,7 @@ export function buildBibleChapterHtml({
         font-style: italic;
       }
       .pager {
-        background: #000;
+        background: ${colors.page};
         height: 100vh;
         height: 100dvh;
         overflow: hidden;
@@ -388,11 +392,11 @@ export function buildBibleChapterHtml({
         var selectingLanguage = null;
         var copyReference = ${JSON.stringify(copyReference || null)};
         var richCopyColors = {
-          background: ${JSON.stringify(COLORS.black)},
-          text: ${JSON.stringify(COLORS.white)},
-          gold: ${JSON.stringify(COLORS.gold)},
-          lxxAddition: ${JSON.stringify(COLORS.priest)},
-          psalmIntroduction: ${JSON.stringify(COLORS.refrain)}
+          background: ${JSON.stringify(colors.page)},
+          text: ${JSON.stringify(colors.text)},
+          gold: ${JSON.stringify(colors.accent)},
+          lxxAddition: ${JSON.stringify(colors.priest)},
+          psalmIntroduction: ${JSON.stringify(colors.refrain)}
         };
         var startX = 0;
         var startY = 0;

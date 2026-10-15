@@ -17,6 +17,7 @@ import {
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import DocumentPillBar from '../ui/DocumentPillBar';
+import { getDocumentTheme } from '../../../constants/documentThemes';
 import DocumentTopBar from '../ui/DocumentTopBar';
 import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
@@ -144,6 +145,7 @@ function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwip
  */
 function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, collapseMemoryScope, parentBookmarkId, onClose }: DocumentModalProps) {
   const { preferences, toggleBishopPresent, isBookmarked, toggleBookmark } = useReadingPreferences();
+  const documentTheme = getDocumentTheme(preferences.documentTheme);
   const [nestedModal, setNestedModal] = useState<DocumentModalTarget | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
   // Calendar/Settings can't be *navigated* to from in here. This whole
@@ -415,7 +417,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         // Same split as ServiceDocument: on web the bar below supplies the top
         // inset itself, while the app has no bar and must inset for the notch.
         edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
-        style={styles.screen}
+        style={[styles.screen, { backgroundColor: documentTheme.colors.page }]}
         {...(isMobileDocument ? swipeGesturePanResponder.panHandlers : {})}
         {...(isMobileDocument ? insetEdgeSwipe.handlers : {})}
       >
@@ -441,12 +443,14 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             pills={ANTIPHONARY_GROUPS}
             activeKey={activePillKey}
             onSelect={(key) => selectAntiphonaryGroup(key as AntiphonaryGroup)}
+            theme={documentTheme}
           />
         ) : sectionPills.length > 1 ? (
           <DocumentPillBar
             pills={sectionPills.map(({ section, label }) => ({ key: section.id, label }))}
             activeKey={activePillKey}
             onSelect={jumpToSection}
+            theme={documentTheme}
           />
         ) : null}
         {!sections ? (
@@ -501,7 +505,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           supportedOrientations={MODAL_SUPPORTED_ORIENTATIONS}
         >
           <View
-            style={styles.overlayFrame}
+            style={[styles.overlayFrame, { backgroundColor: documentTheme.colors.page }]}
             {...(isMobileDocument ? overlaySwipePanResponder.panHandlers : {})}
             {...(isMobileDocument ? overlayInsetEdgeSwipe.handlers : {})}
           >

@@ -4,7 +4,7 @@ import { ActivityIndicator, Platform, useWindowDimensions, View } from 'react-na
 import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
 import { pickDocumentTitle, withRememberedCollapse, type DocumentTitle } from './documentHtml';
-import { SLIDESHOW_THEME, COLORS } from '../../constants/theme';
+import { getDocumentTheme, slideshowThemeFor } from '../../constants/documentThemes';
 import { useBottomChrome } from '../../context/BottomChromeContext';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
@@ -145,6 +145,9 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     const { width: screenWidth } = useWindowDimensions();
     const { nowPlayingInset } = useBottomChrome();
     const fontSize = fontScaleToPx(preferences.fontScale);
+    // The page both renderers draw on (constants/documentThemes.ts).
+    const theme = getDocumentTheme(preferences.documentTheme);
+    const slideshowTheme = useMemo(() => slideshowThemeFor(theme), [theme]);
     const effectiveSlideshowMode = preferences.slideshowMode && !sermonPlannerMode;
     const effectiveSelectText = sermonPlannerMode || (preferences.selectText && !effectiveSlideshowMode);
     // section.id already includes hymn_key + item_order. Combining it with
@@ -315,8 +318,8 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
 
     if (loadedCollapseScope !== collapseMemoryScope) {
       return (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.black }}>
-          <ActivityIndicator color={COLORS.gold} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.page }}>
+          <ActivityIndicator color={theme.colors.accent} />
         </View>
       );
     }
@@ -327,7 +330,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           sections={slideshowSections}
           visibleLanguages={preferences.visibleLanguages}
           fontSize={fontSize}
-          theme={SLIDESHOW_THEME}
+          theme={slideshowTheme}
           tableWidth={screenWidth}
           titleHelpers={titleHelpers}
           selectedSectionId={selectedSectionId}
@@ -367,6 +370,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         bottomContentInset={nowPlayingInset}
         sermonPlannerMode={sermonPlannerMode}
         sermonHighlights={sermonHighlights}
+        theme={theme}
       />
     );
   },

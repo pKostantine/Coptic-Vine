@@ -12,23 +12,30 @@ import type { FontScaleControlProps } from './FontScaleControl';
  * track, and keeping @expo/ui's slider off this path also keeps it out of the
  * web bundle. The native build gets FontScaleControl.tsx.
  */
-export default function FontScaleControl({ fontScale, isArabic, onStep }: FontScaleControlProps) {
+export default function FontScaleControl({ fontScale, isArabic, label, onStep }: FontScaleControlProps) {
   return (
-    <View style={styles.controls}>
-      <Pressable accessibilityLabel="Decrease font size" style={styles.button} onPress={() => onStep(-1)}>
-        <Icon name="remove" size={18} color={COLORS.gold} />
-      </Pressable>
-      <Text style={[styles.value, isArabic && styles.arabicText]}>
-        {isArabic ? toEasternArabicDigits(fontScale) : fontScale}
-      </Text>
-      <Pressable accessibilityLabel="Increase font size" style={styles.button} onPress={() => onStep(1)}>
-        <Icon name="add" size={18} color={COLORS.gold} />
-      </Pressable>
+    <View style={[styles.group, isArabic && styles.groupArabic]}>
+      <Text style={[styles.label, isArabic && styles.arabicText]}>{label}</Text>
+      <View style={styles.controls}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Decrease font size" style={styles.button} onPress={() => onStep(-1)}>
+          <Icon name="remove" size={18} color={COLORS.gold} />
+        </Pressable>
+        <Text style={[styles.value, isArabic && styles.arabicText]}>
+          {isArabic ? toEasternArabicDigits(fontScale) : fontScale}
+        </Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Increase font size" style={styles.button} onPress={() => onStep(1)}>
+          <Icon name="add" size={18} color={COLORS.gold} />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // The name on one side, the stepper on the other, as the native slider's header is laid out.
+  group: { alignItems: 'center', flexDirection: 'row', gap: SPACING.md, justifyContent: 'space-between' },
+  groupArabic: { flexDirection: 'row-reverse' },
+  label: { color: COLORS.white, flexShrink: 1, fontSize: 14, fontWeight: '700' },
   controls: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, justifyContent: 'center' },
   button: {
     alignItems: 'center',

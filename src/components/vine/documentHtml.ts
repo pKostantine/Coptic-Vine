@@ -1,4 +1,5 @@
-import { COLORS, SPACING } from '../../constants/theme';
+import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
+import { SPACING } from '../../constants/theme';
 import type {
   SermonHighlightAnchor,
   SermonHighlightColor,
@@ -138,13 +139,14 @@ const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, french: false, 
 // vertically aligned.
 const BLANK_COPTIC_LABEL = ' ';
 
-const RUBRIC: Record<string, { color: string; english: string; french: string; arabic: string; coptic: string; class: string }> = {
-  priest: { color: COLORS.priest, english: 'Priest:', french: 'Le prêtre :', arabic: 'الكاهن:', coptic: BLANK_COPTIC_LABEL, class: 'priest' },
-  bishop: { color: COLORS.bishop, english: 'Bishop:', french: 'L’évêque :', arabic: 'الأسقف:', coptic: BLANK_COPTIC_LABEL, class: 'bishop' },
-  deacon: { color: COLORS.deacon, english: 'Deacon:', french: 'Le diacre :', arabic: 'الشماس:', coptic: BLANK_COPTIC_LABEL, class: 'deacon' },
-  reader: { color: COLORS.reader, english: 'Reader:', french: 'Le lecteur :', arabic: 'القارئ:', coptic: BLANK_COPTIC_LABEL, class: 'reader' },
-  people: { color: COLORS.people, english: 'People:', french: 'L’assemblée :', arabic: 'الشعب:', coptic: BLANK_COPTIC_LABEL, class: 'people' },
-  refrain: { color: COLORS.refrain, english: 'Refrain:', french: 'Refrain :', arabic: 'قرار:', coptic: BLANK_COPTIC_LABEL, class: 'refrain' },
+// Each label's colour is the page's, set by class in the stylesheet (see buildDocumentHtml).
+const RUBRIC: Record<string, { english: string; french: string; arabic: string; coptic: string; class: string }> = {
+  priest: { english: 'Priest:', french: 'Le prêtre :', arabic: 'الكاهن:', coptic: BLANK_COPTIC_LABEL, class: 'priest' },
+  bishop: { english: 'Bishop:', french: 'L’évêque :', arabic: 'الأسقف:', coptic: BLANK_COPTIC_LABEL, class: 'bishop' },
+  deacon: { english: 'Deacon:', french: 'Le diacre :', arabic: 'الشماس:', coptic: BLANK_COPTIC_LABEL, class: 'deacon' },
+  reader: { english: 'Reader:', french: 'Le lecteur :', arabic: 'القارئ:', coptic: BLANK_COPTIC_LABEL, class: 'reader' },
+  people: { english: 'People:', french: 'L’assemblée :', arabic: 'الشعب:', coptic: BLANK_COPTIC_LABEL, class: 'people' },
+  refrain: { english: 'Refrain:', french: 'Refrain :', arabic: 'قرار:', coptic: BLANK_COPTIC_LABEL, class: 'refrain' },
 };
 
 /**
@@ -189,6 +191,7 @@ export function buildDocumentHtml(
     bottomContentInset = 0,
     sermonPlannerMode = false,
     nativeSwipeNavigation = false,
+    theme = NIGHT_DOCUMENT_THEME,
   }: {
     copticFontDataUri: string;
     fontSize: number;
@@ -209,8 +212,11 @@ export function buildDocumentHtml(
     sermonPlannerMode?: boolean;
     /** Native touch edge navigation only; no swipe-to-exit on any website. */
     nativeSwipeNavigation?: boolean;
+    /** The page the document is read on — see constants/documentThemes.ts. Night, the page the services were always read on, unless told otherwise. */
+    theme?: DocumentTheme;
   },
 ) {
+  const colors = theme.colors;
   const {
     buttonFontSize: openButtonFontSize,
     buttonLineHeight: openButtonLineHeight,
@@ -257,6 +263,7 @@ export function buildDocumentHtml(
         suppressMap,
         suppressAllSpeakerLabels,
         sermonPlannerMode,
+        theme,
       }),
     )
     .join('');
@@ -265,6 +272,7 @@ export function buildDocumentHtml(
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="color-scheme" content="${theme.dark ? 'dark' : 'light'}" />
     <style>
       @font-face {
         font-family: "CopticVine";
@@ -273,8 +281,8 @@ export function buildDocumentHtml(
         font-style: normal;
       }
       html, body {
-        background: ${COLORS.black};
-        color: ${COLORS.white};
+        background: ${colors.page};
+        color: ${colors.text};
         margin: 0;
         padding: 0;
         width: 100%;
@@ -409,20 +417,20 @@ export function buildDocumentHtml(
         line-height: ${arabicVerseLineHeight}px;
       }
       .centered { text-align: center; }
-      .speaker-label.priest { color: ${COLORS.priest}; }
-      .speaker-label.bishop { color: ${COLORS.bishop}; }
-      .speaker-label.people { color: ${COLORS.people}; }
-      .speaker-label.deacon, .speaker-label.reader { color: ${COLORS.deacon}; }
-      .speaker-label.refrain { color: ${COLORS.refrain}; font-style: italic;}
-      .bible-verse-number { color: ${COLORS.gold}; font-weight: 700; }
+      .speaker-label.priest { color: ${colors.priest}; }
+      .speaker-label.bishop { color: ${colors.priest}; }
+      .speaker-label.people { color: ${colors.people}; }
+      .speaker-label.deacon, .speaker-label.reader { color: ${colors.deacon}; }
+      .speaker-label.refrain { color: ${colors.refrain}; font-style: italic;}
+      .bible-verse-number { color: ${colors.accent}; font-weight: 700; }
       .bible-verse-number-gap {
         display: inline-block;
         width: 0.25em;
       }
-      .metropolitan { color: ${COLORS.metropolitanBrackets}; }
+      .metropolitan { color: ${colors.metropolitan}; }
       ${sermonPlannerMode ? sermonPlannerStyles() : ''}
       .section-title {
-        color: ${COLORS.gold};
+        color: ${colors.accent};
         font-family: Georgia, serif;
         font-size: ${sectionTitleFontSize}px;
         font-weight: 700;
@@ -434,15 +442,15 @@ export function buildDocumentHtml(
         text-align: right;
       }
       .section-title.silent-prayer {
-        color: ${COLORS.silentTitle};
+        color: ${colors.silent};
         font-style: italic;
       }
       .open-button {
         align-items: center;
-        background: ${COLORS.subdocSoft};
-        border: 1px solid ${COLORS.subdocLine};
+        background: ${colors.subdocSoft};
+        border: 1px solid ${colors.subdocLine};
         border-radius: ${DOCUMENT_CONTROL_METRICS.openButtonBorderRadius}px;
-        color: ${COLORS.subdoc};
+        color: ${colors.subdoc};
         cursor: pointer;
         display: flex;
         flex-direction: column;
@@ -465,10 +473,10 @@ export function buildDocumentHtml(
       }
       .hyperlink-button {
         align-items: center;
-        background: ${COLORS.linkSoft};
-        border: 1px solid ${COLORS.linkLine};
+        background: ${colors.linkSoft};
+        border: 1px solid ${colors.linkLine};
         border-radius: ${DOCUMENT_CONTROL_METRICS.hyperlinkBorderRadius}px;
-        color: ${COLORS.link};
+        color: ${colors.link};
         cursor: pointer;
         display: flex;
         font-family: Georgia, serif;
@@ -495,7 +503,7 @@ export function buildDocumentHtml(
       }
       .hyperlink-button .hyperlink-arrow {
         align-items: center;
-        border: 1.5px solid ${COLORS.link};
+        border: 1.5px solid ${colors.link};
         border-radius: 999px;
         display: inline-flex;
         flex-shrink: 0;
@@ -514,10 +522,10 @@ export function buildDocumentHtml(
       }
       .gospel-rite-toggle {
         align-items: center;
-        background: ${COLORS.surface};
-        border: 1px solid ${COLORS.gold};
+        background: ${colors.surface};
+        border: 1px solid ${colors.accent};
         border-radius: 999px;
-        color: ${COLORS.white};
+        color: ${colors.text};
         cursor: pointer;
         display: flex;
         font-family: Georgia, serif;
@@ -528,8 +536,8 @@ export function buildDocumentHtml(
         padding: ${SPACING.sm}px ${SPACING.lg}px;
       }
       .gospel-rite-toggle.is-on {
-        background: ${COLORS.gold};
-        color: ${COLORS.black};
+        background: ${colors.accent};
+        color: ${colors.onAccent};
       }
       .gospel-rite-toggle-dot {
         background: currentColor;
@@ -1038,9 +1046,10 @@ function renderSection(
     suppressMap: Map<DocumentVerse, boolean>;
     suppressAllSpeakerLabels: boolean;
     sermonPlannerMode: boolean;
+    theme: DocumentTheme;
   },
 ) {
-  const { appLanguage, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite, suppressMap } = opts;
+  const { appLanguage, displayComments, displaySilentPrayers, bishopPresent, copticGospelRite, suppressMap, theme } = opts;
   const toggleHtml = section.startsGospelRiteToggle ? renderGospelRiteToggle(copticGospelRite, section.id) : '';
 
   if (section.isHyperlinkButton) {
@@ -1052,7 +1061,7 @@ function renderSection(
   }
 
   const isCollapsed = Boolean(section.collapsible && section.defaultCollapsed);
-  const titleHtml = renderSectionTitle(section, appLanguage, isCollapsed);
+  const titleHtml = renderSectionTitle(section, appLanguage, isCollapsed, theme);
 
   const versesHtml = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent, copticGospelRite })
     .map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts))
@@ -1148,7 +1157,7 @@ function renderHyperlinkButtonSection(section: DocumentSection, appLanguage: App
   `;
 }
 
-function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLanguage, isCollapsed: boolean) {
+function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLanguage, isCollapsed: boolean, theme: DocumentTheme) {
   // A title always shows exactly one language, driven by the App Language
   // setting — falling back to whichever language actually has text for this
   // specific section if the selected one doesn't (e.g. Arabic selected but
@@ -1180,9 +1189,9 @@ function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLangu
   const collapseButtonHtml = section.collapsible
     ? `<button class="collapse-button${isCollapsed ? ' is-collapsed' : ''}" data-collapse-button="${escapeAttribute(section.id)}" aria-label="${isCollapsed ? 'Expand section' : 'Collapse section'}">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="${COLORS.gold}" stroke-width="1.5" />
-          <line x1="7" y1="12" x2="17" y2="12" stroke="${COLORS.gold}" stroke-width="1.5" stroke-linecap="round" />
-          <line class="collapse-plus-bar" x1="12" y1="7" x2="12" y2="17" stroke="${COLORS.gold}" stroke-width="1.5" stroke-linecap="round" />
+          <circle cx="12" cy="12" r="10" stroke="${theme.colors.accent}" stroke-width="1.5" />
+          <line x1="7" y1="12" x2="17" y2="12" stroke="${theme.colors.accent}" stroke-width="1.5" stroke-linecap="round" />
+          <line class="collapse-plus-bar" x1="12" y1="7" x2="12" y2="17" stroke="${theme.colors.accent}" stroke-width="1.5" stroke-linecap="round" />
         </svg>
       </button>`
     : '';
@@ -1209,6 +1218,7 @@ function renderVerse(
     copticRecitedPrayers,
     suppressAllSpeakerLabels,
     sermonPlannerMode,
+    theme,
   }: {
     fontSize: number;
     visibleColumns: VisibleColumns;
@@ -1216,9 +1226,10 @@ function renderVerse(
     copticRecitedPrayers: boolean;
     suppressAllSpeakerLabels: boolean;
     sermonPlannerMode: boolean;
+    theme: DocumentTheme;
   },
 ) {
-  const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent, suppressAllSpeakerLabels);
+  const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent, suppressAllSpeakerLabels, theme);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
   const isCentered = verse.type === 'refrainLabel' || verse.type === 'readingReference';
   // "Invincible Coptic" only means "this Coptic must always render" -- some
@@ -1357,29 +1368,29 @@ function sermonPlannerScript() {
   });
 }
 
-function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean) {
-  const resolved = resolveVerseColorBase(verse, index, section, bishopPresent, allSpeakerLabelsSuppressed);
+function resolveVerseColor(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean, theme: DocumentTheme) {
+  const resolved = resolveVerseColorBase(verse, index, section, bishopPresent, allSpeakerLabelsSuppressed, theme.colors);
   // Pre-Refrain lines keep whatever role/color they'd naturally get — this
   // only ever adds italic on top, never changes the color.
   return verse.italic ? { ...resolved, italic: true } : resolved;
 }
 
-function resolveVerseColorBase(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean) {
-  if (verse.type === 'comment' || verse.type === 'silentComment') return { color: COLORS.comment, italic: true };
-  if (verse.type === 'silentPrayer') return { color: COLORS.silent, italic: false };
-  if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: COLORS.refrain, italic: true };
-  if (verse.type === 'readingReference') return { color: COLORS.comment, italic: false };
+function resolveVerseColorBase(verse: DocumentVerse, index: number, section: DocumentSection, bishopPresent: boolean, allSpeakerLabelsSuppressed: boolean, colors: DocumentTheme['colors']) {
+  if (verse.type === 'comment' || verse.type === 'silentComment') return { color: colors.comment, italic: true };
+  if (verse.type === 'silentPrayer') return { color: colors.silent, italic: false };
+  if (verse.type === 'refrain' || verse.type === 'refrainLabel') return { color: colors.refrain, italic: true };
+  if (verse.type === 'readingReference') return { color: colors.comment, italic: false };
   // "White"/"Blue" prayer_type forces that alternating color directly,
   // bypassing the normal alternation computation for this verse entirely —
   // the shared alternating-index helper excludes it from the count so
   // surrounding verses keep alternating exactly as if it weren't there.
-  if (verse.prayerType === 'White' || verse.forceWhiteText) return { color: COLORS.white, italic: false };
-  if (verse.prayerType === 'Blue') return { color: COLORS.rowBlue, italic: false };
+  if (verse.prayerType === 'White' || verse.forceWhiteText) return { color: colors.text, italic: false };
+  if (verse.prayerType === 'Blue') return { color: colors.alternate, italic: false };
   // The People's own responses inside the Agpeya's Litanies — see
   // shouldUsePeopleLineColor for both gates (the book's hide-every-speaker
   // state, and the hymn being a Litanies one).
   //
-  // A lighter orange than COLORS.people, which is what the "People:" rubric
+  // A lighter orange than the "People:" rubric
   // itself is drawn in: that label is two words and carries the saturated
   // orange fine, but a whole verse in it is punishing to read.
   //
@@ -1392,12 +1403,12 @@ function resolveVerseColorBase(verse: DocumentVerse, index: number, section: Doc
   // authored per line and still win, and above the default alternation, which
   // is the plain white/blue this replaces.
   if (shouldUsePeopleLineColor(section, verse, bishopPresent, allSpeakerLabelsSuppressed)) {
-    return { color: COLORS.peopleLight, italic: false };
+    return { color: colors.peopleText, italic: false };
   }
-  if (section.forceWhiteVerses || !section.alternateEvery) return { color: COLORS.white, italic: false };
+  if (section.forceWhiteVerses || !section.alternateEvery) return { color: colors.text, italic: false };
 
   const colorIndex = getAlternatingVerseColorIndex(section, index, bishopPresent);
-  return { color: colorIndex === 0 ? COLORS.white : COLORS.rowBlue, italic: false };
+  return { color: colorIndex === 0 ? colors.text : colors.alternate, italic: false };
 }
 
 const EASTERN_ARABIC_DIGITS: Record<string, string> = {

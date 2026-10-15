@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { Platform } from 'react-native';
 
+import type { DocumentThemeId } from '../constants/documentThemes';
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
 import { markPendingDocumentRestoresDirty } from '../utils/lastDocumentPosition';
 import {
@@ -49,6 +50,8 @@ interface ReadingPreferencesContextValue {
   clearSaintHymns: (base: string) => void;
   toggleInMonastery: () => void;
   toggleKeepScreenAwake: () => void;
+  /** Picks the page a document is read on — see constants/documentThemes.ts. */
+  setDocumentTheme: (theme: DocumentThemeId) => void;
   bookmarks: string[];
   isBookmarked: (id: string) => boolean;
   toggleBookmark: (id: string) => void;
@@ -339,6 +342,10 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => ({ ...prev, keepScreenAwake: !prev.keepScreenAwake }));
   }, []);
 
+  const setDocumentTheme = useCallback((documentTheme: DocumentThemeId) => {
+    setPreferences((prev) => (prev.documentTheme === documentTheme ? prev : { ...prev, documentTheme }));
+  }, []);
+
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks]);
 
   const toggleBookmark = useCallback((id: string) => {
@@ -368,6 +375,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       clearSaintHymns,
       toggleInMonastery,
       toggleKeepScreenAwake,
+      setDocumentTheme,
       bookmarks,
       isBookmarked,
       toggleBookmark,
@@ -394,6 +402,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       clearSaintHymns,
       toggleInMonastery,
       toggleKeepScreenAwake,
+      setDocumentTheme,
       bookmarks,
       isBookmarked,
       toggleBookmark,

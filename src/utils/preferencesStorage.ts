@@ -1,6 +1,7 @@
 import * as Device from 'expo-device';
 import { Dimensions, Platform } from 'react-native';
 
+import { DEFAULT_DOCUMENT_THEME_ID, isDocumentThemeId, type DocumentThemeId } from '../constants/documentThemes';
 import {
   classifyReadingDevice,
   DEFAULT_READING_FONT_LEVEL,
@@ -81,6 +82,12 @@ export interface ReadingPreferences {
    * home may not.
    */
   keepScreenAwake: boolean;
+  /**
+   * The page a document is read on (constants/documentThemes.ts). A device
+   * choice like the text size: a phone at an evening service and an iPad at
+   * a desk are read differently.
+   */
+  documentTheme: DocumentThemeId;
 }
 
 export type SyncedReadingPreferences = Pick<ReadingPreferences,
@@ -133,6 +140,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   selectedSaintHymns: [],
   inMonastery: false,
   keepScreenAwake: true,
+  documentTheme: DEFAULT_DOCUMENT_THEME_ID,
 };
 
 let currentAppLanguage: AppLanguage = DEFAULT_READING_PREFERENCES.appLanguage;
@@ -219,6 +227,7 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
     ? merged.selectedSaintHymns.filter((token): token is string => typeof token === 'string' && token.includes(':'))
     : [];
   merged.keepScreenAwake = booleanValue(stored?.keepScreenAwake, DEFAULT_READING_PREFERENCES.keepScreenAwake);
+  merged.documentTheme = isDocumentThemeId(stored?.documentTheme) ? stored.documentTheme : DEFAULT_DOCUMENT_THEME_ID;
   return merged;
 }
 
