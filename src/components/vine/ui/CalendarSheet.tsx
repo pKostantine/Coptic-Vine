@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '../../../constants/theme';
 import { tr } from '../../../utils/appText';
+import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import CalendarPanel from './CalendarPanel';
@@ -34,9 +35,13 @@ interface CalendarSheetProps {
  */
 export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline = false }: CalendarSheetProps) {
   const modalOrientations = useModalOrientations();
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const dialog = useLayoutMode() === 'desktop';
+  // A phone on its side: the sheet runs almost the whole height and as wide
+  // as the space between the notch and the far edge, the month beside its
+  // controls (CalendarPanel), so nothing hides below the fold.
+  const landscapePhone = useIsCompactLandscape();
   const [mounted, setMounted] = useState(visible);
   const [progress] = useState(() => new Animated.Value(0));
   const [drag] = useState(() => new Animated.Value(0));
@@ -129,7 +134,12 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
   return layer(
     <>
       {backdrop}
-      <Animated.View style={[styles.sheet, { maxHeight: height - insets.top - 60, paddingBottom: Math.max(insets.bottom + 8, 30), transform: [{ translateY }] }]} {...sheetDrag.sheetHandlers}>
+      <Animated.View
+        style={[styles.sheet, landscapePhone
+          ? { maxHeight: height - 12, maxWidth: Math.min(width - insets.left - insets.right, 760), paddingBottom: insets.bottom + 4, transform: [{ translateY }] }
+          : { maxHeight: height - insets.top - 60, paddingBottom: Math.max(insets.bottom + 8, 30), transform: [{ translateY }] }]}
+        {...sheetDrag.sheetHandlers}
+      >
         {panel}
       </Animated.View>
     </>,

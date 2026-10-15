@@ -3,6 +3,7 @@ import { Animated, BackHandler, Modal, Pressable, ScrollView, StyleSheet, View, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '../../../constants/theme';
+import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import { useSheetDragToClose } from './useSheetDragToClose';
@@ -40,10 +41,14 @@ export default function SheetFrame({
   visible, onClose, closeLabel, inline = false, dialogWidth = 440, dialogOnTablet = false, sheetMaxWidth = 560, scroll = true, children,
 }: SheetFrameProps) {
   const modalOrientations = useModalOrientations();
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const layout = useLayoutMode();
-  const dialog = layout === 'desktop' || (dialogOnTablet && layout === 'tablet');
+  // A phone on its side is as wide as an iPad but a postcard's height: a
+  // centred dialog there is a letterbox. It keeps the sheet, drawn almost the
+  // whole height and as wide as the space between the notch and the far edge.
+  const landscapePhone = useIsCompactLandscape();
+  const dialog = !landscapePhone && (layout === 'desktop' || (dialogOnTablet && layout === 'tablet'));
   const [mounted, setMounted] = useState(visible);
   const [progress] = useState(() => new Animated.Value(0));
   const [drag] = useState(() => new Animated.Value(0));
@@ -124,7 +129,9 @@ export default function SheetFrame({
     <>
       {backdrop}
       <Animated.View
-        style={[styles.sheet, { maxHeight: height - insets.top - 60, maxWidth: sheetMaxWidth, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]}
+        style={[styles.sheet, landscapePhone
+          ? { maxHeight: height - 12, maxWidth: Math.min(width - insets.left - insets.right, Math.max(sheetMaxWidth, dialogWidth)), paddingBottom: insets.bottom + 8, transform: [{ translateY }] }
+          : { maxHeight: height - insets.top - 60, maxWidth: sheetMaxWidth, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]}
         {...(scroll ? sheetDrag.sheetHandlers : {})}
       >
         <View style={styles.grabArea} {...sheetDrag.grabHandlers}>

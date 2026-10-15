@@ -17,6 +17,7 @@ import {
 } from '../../../utils/calendarService';
 import { formatCalendarDay, formatCopticMonthName, GREGORIAN_MONTHS_AR, GREGORIAN_MONTHS_EN, GREGORIAN_MONTHS_FR } from '../../../utils/localeFormat';
 import { DISABLED_TEXT_SELECTION_STYLE } from '../../../utils/textSelection';
+import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import DayControls from './DayControls';
 import Icon from './Icon';
 import { VineDivider } from './Ornaments';
@@ -192,116 +193,150 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   const goPreviousMonth = () => void (mode === 'gregorian' ? goPrevGregorian() : goAdjacentCoptic(-1));
   const goNextMonth = () => void (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1));
 
-  return (
-    <View style={DISABLED_TEXT_SELECTION_STYLE}>
-      {/* The controls sit on the sheet's own surface, in the vine-green
-          block's colours whatever the season: the day block above the sheet
-          is the one that wears the season. */}
-      <View style={styles.top}>
-        {header}
-        <DayControls theme={DAY_BLOCK_THEMES.annual} seasonLabel={day.seasonLabel} arabic={isArabic} onOpenSeasons={onOpenSeasons} />
+  // Pieces of the calendar, set one above another, or on a phone on its side
+  // -- a postcard's height -- the controls beside the month so it all shows.
+  const landscape = useIsCompactLandscape();
+  const topBlock = (
+    <View style={styles.top}>
+      {header}
+      <DayControls theme={DAY_BLOCK_THEMES.annual} seasonLabel={day.seasonLabel} arabic={isArabic} onOpenSeasons={onOpenSeasons} />
+    </View>
+  );
+  const monthRow = (
+    <View style={styles.monthRow}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={tr('Choose month and year', 'Choisir le mois et l’année', 'اختر الشهر والسنة')}
+        hitSlop={4}
+        style={styles.monthTitleButton}
+        onPress={openDatePicker}
+      >
+        <Text style={[styles.monthTitle, isArabic && styles.arabicText]} numberOfLines={1}>
+          {displayedMonthName}
+          {displayedYear === null ? '' : ` ${formatCalendarDay(displayedYear, isArabic)}`}
+        </Text>
+        <Icon name="chevron-down" size={16} color={COLORS.gold} />
+      </Pressable>
+      <View style={styles.arrows}>
+        <Pressable accessibilityRole="button" accessibilityLabel={tr('Previous month', 'Mois précédent', 'الشهر السابق')} style={styles.arrow} onPress={goPreviousMonth}>
+          <Icon name="chevron-back" size={17} color={COLORS.gold} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={tr('Next month', 'Mois suivant', 'الشهر التالي')} style={styles.arrow} onPress={goNextMonth}>
+          <Icon name="chevron-forward" size={17} color={COLORS.gold} />
+        </Pressable>
       </View>
-
-      <View style={styles.body}>
-        <View style={styles.monthRow}>
+    </View>
+  );
+  const segment = (
+    <View style={styles.segment}>
+      {(['gregorian', 'coptic'] as Mode[]).map((option) => {
+        const active = mode === option;
+        return (
           <Pressable
+            key={option}
             accessibilityRole="button"
-            accessibilityLabel={tr('Choose month and year', 'Choisir le mois et l’année', 'اختر الشهر والسنة')}
-            hitSlop={4}
-            style={styles.monthTitleButton}
-            onPress={openDatePicker}
+            accessibilityState={{ selected: active }}
+            style={[styles.segmentOption, active && styles.segmentOptionActive]}
+            onPress={() => setMode(option)}
           >
-            <Text style={[styles.monthTitle, isArabic && styles.arabicText]} numberOfLines={1}>
-              {displayedMonthName}
-              {displayedYear === null ? '' : ` ${formatCalendarDay(displayedYear, isArabic)}`}
+            <Text style={[styles.segmentText, active && styles.segmentTextActive, isArabic && styles.arabicText]} numberOfLines={1}>
+              {appText(option === 'gregorian' ? LABELS.gregorian : LABELS.coptic)}
             </Text>
-            <Icon name="chevron-down" size={16} color={COLORS.gold} />
           </Pressable>
-          <View style={styles.arrows}>
-            <Pressable accessibilityRole="button" accessibilityLabel={tr('Previous month', 'Mois précédent', 'الشهر السابق')} style={styles.arrow} onPress={goPreviousMonth}>
-              <Icon name="chevron-back" size={17} color={COLORS.gold} />
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={tr('Next month', 'Mois suivant', 'الشهر التالي')} style={styles.arrow} onPress={goNextMonth}>
-              <Icon name="chevron-forward" size={17} color={COLORS.gold} />
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.segment}>
-          {(['gregorian', 'coptic'] as Mode[]).map((option) => {
-            const active = mode === option;
+        );
+      })}
+    </View>
+  );
+  const weekdays = (
+    <View style={styles.gridRow}>
+      {weekdayLetters.map((letter, index) => (
+        <Text key={index} style={[styles.weekday, isArabic && styles.arabicLetter]}>{letter}</Text>
+      ))}
+    </View>
+  );
+  const vine = (
+    <View style={styles.divider} pointerEvents="none">
+      <VineDivider width={210} height={26} />
+    </View>
+  );
+  // Always six weeks tall, so a five-week month doesn't move the sheet's top
+  // edge; the divider follows the last week and the room a sixth would take
+  // stays below it.
+  const monthGrid = (
+    <View style={landscape ? styles.monthLandscape : styles.month}>
+      {!days ? (
+        <ActivityIndicator color={COLORS.gold} style={landscape ? styles.loadingLandscape : styles.loading} />
+      ) : (
+        <View style={styles.grid}>
+          {Array.from({ length: leadingBlanks }).map((_, i) => (
+            <View key={`blank-${i}`} style={[styles.cell, landscape && styles.cellLandscape]} />
+          ))}
+          {days.map((calendarDay) => {
+            const selected = calendarDay.gregorianDate === selectedIso;
+            const small = calendarDay.otherMonthName
+              ? isArabic
+                ? `${formatCalendarDay(calendarDay.otherDay, true)} ${formatCopticMonthName(calendarDay.otherMonthName, true)}`
+                : `${calendarDay.otherMonthName} ${calendarDay.otherDay}`
+              : formatCalendarDay(calendarDay.otherDay, isArabic);
             return (
               <Pressable
-                key={option}
+                key={calendarDay.gregorianDate}
                 accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[styles.segmentOption, active && styles.segmentOptionActive]}
-                onPress={() => setMode(option)}
+                accessibilityState={{ selected }}
+                accessibilityLabel={calendarDay.gregorianDate}
+                style={[styles.cell, landscape && styles.cellLandscape]}
+                onPress={() => pickDate(new Date(`${calendarDay.gregorianDate}T00:00:00Z`))}
               >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive, isArabic && styles.arabicText]} numberOfLines={1}>
-                  {appText(option === 'gregorian' ? LABELS.gregorian : LABELS.coptic)}
-                </Text>
+                <View style={[styles.circle, landscape && styles.circleLandscape, selected && styles.circleSelected]}>
+                  <Text style={[styles.dayNumber, selected && styles.dayNumberSelected, isArabic && styles.arabicLetter]}>
+                    {formatCalendarDay(calendarDay.displayDay, isArabic)}
+                  </Text>
+                  <Text
+                    style={[styles.otherDay, calendarDay.otherMonthName ? styles.otherDayMonth : null, selected && styles.otherDaySelected, isArabic && styles.arabicLetter]}
+                    numberOfLines={1}
+                  >
+                    {small}
+                  </Text>
+                  {feastDates.has(calendarDay.gregorianDate) && !selected ? <View style={styles.feastDot} /> : null}
+                </View>
               </Pressable>
             );
           })}
         </View>
+      )}
 
-        <View style={styles.gridRow}>
-          {weekdayLetters.map((letter, index) => (
-            <Text key={index} style={[styles.weekday, isArabic && styles.arabicLetter]}>{letter}</Text>
-          ))}
-        </View>
+      {landscape ? null : vine}
+    </View>
+  );
 
-        {/* Always six weeks tall, so a five-week month doesn't move the
-            sheet's top edge; the divider follows the last week and the room
-            a sixth would take stays below it. */}
-        <View style={styles.month}>
-          {!days ? (
-            <ActivityIndicator color={COLORS.gold} style={styles.loading} />
-          ) : (
-            <View style={styles.grid}>
-              {Array.from({ length: leadingBlanks }).map((_, i) => (
-                <View key={`blank-${i}`} style={styles.cell} />
-              ))}
-              {days.map((calendarDay) => {
-                const selected = calendarDay.gregorianDate === selectedIso;
-                const small = calendarDay.otherMonthName
-                  ? isArabic
-                    ? `${formatCalendarDay(calendarDay.otherDay, true)} ${formatCopticMonthName(calendarDay.otherMonthName, true)}`
-                    : `${calendarDay.otherMonthName} ${calendarDay.otherDay}`
-                  : formatCalendarDay(calendarDay.otherDay, isArabic);
-                return (
-                  <Pressable
-                    key={calendarDay.gregorianDate}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={calendarDay.gregorianDate}
-                    style={styles.cell}
-                    onPress={() => pickDate(new Date(`${calendarDay.gregorianDate}T00:00:00Z`))}
-                  >
-                    <View style={[styles.circle, selected && styles.circleSelected]}>
-                      <Text style={[styles.dayNumber, selected && styles.dayNumberSelected, isArabic && styles.arabicLetter]}>
-                        {formatCalendarDay(calendarDay.displayDay, isArabic)}
-                      </Text>
-                      <Text
-                        style={[styles.otherDay, calendarDay.otherMonthName ? styles.otherDayMonth : null, selected && styles.otherDaySelected, isArabic && styles.arabicLetter]}
-                        numberOfLines={1}
-                      >
-                        {small}
-                      </Text>
-                      {feastDates.has(calendarDay.gregorianDate) && !selected ? <View style={styles.feastDot} /> : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
+  return (
+    <View style={DISABLED_TEXT_SELECTION_STYLE}>
+      {landscape ? (
+        <View style={styles.landscape}>
+          <View style={styles.landscapeControls}>
+            {topBlock}
+            <View style={styles.body}>
+              {monthRow}
+              {segment}
+              {vine}
             </View>
-          )}
-
-          <View style={styles.divider} pointerEvents="none">
-            <VineDivider width={210} height={26} />
+          </View>
+          <View style={styles.landscapeMonth}>
+            {weekdays}
+            {monthGrid}
           </View>
         </View>
-      </View>
+      ) : (
+        <>
+          {topBlock}
+          <View style={styles.body}>
+            {monthRow}
+            {segment}
+            {weekdays}
+            {monthGrid}
+          </View>
+        </>
+      )}
 
       <Modal supportedOrientations={modalOrientations} visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
         <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} style={[styles.pickerBackdrop, DISABLED_TEXT_SELECTION_STYLE]} onPress={() => setPickerOpen(false)}>
@@ -403,6 +438,15 @@ const styles = StyleSheet.create({
   weekday: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '600', paddingBottom: 6, textAlign: 'center', width: `${100 / 7}%` },
   // Six 42pt weeks 2pt apart, then the divider's 14pt and 26pt.
   month: { minHeight: 6 * 42 + 5 * 2 + 14 + 26 },
+  // A phone on its side: the controls and the vine on the left, the month on
+  // the right in six 38pt weeks, so the whole month shows without scrolling.
+  landscape: { alignItems: 'flex-start', flexDirection: 'row', gap: 8, paddingBottom: 4 },
+  landscapeControls: { flex: 0.9, minWidth: 0 },
+  landscapeMonth: { flex: 1, minWidth: 0, paddingRight: 16, paddingTop: 10 },
+  monthLandscape: { minHeight: 6 * 38 + 5 * 2 },
+  loadingLandscape: { height: 6 * 38 + 5 * 2 },
+  cellLandscape: { height: 38 },
+  circleLandscape: { borderRadius: 19, height: 38, width: 38 },
   loading: { height: 6 * 42 + 5 * 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 2 },
   cell: { alignItems: 'center', height: 42, justifyContent: 'center', width: `${100 / 7}%` },

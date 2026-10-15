@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NIGHT_DOCUMENT_THEME, withAlpha, type DocumentTheme } from '../../../constants/documentThemes';
 import { RADII, SPACING } from '../../../constants/theme';
@@ -30,6 +31,10 @@ interface DocumentPillBarProps {
  */
 export default function DocumentPillBar({ pills, activeKey, onSelect, theme = NIGHT_DOCUMENT_THEME }: DocumentPillBarProps) {
   const scrollRef = useRef<ScrollView>(null);
+  // The bar sits in a page inset from a phone's notch on its side. Its strip
+  // runs out to the screen's edges -- it is only colour -- while the pills
+  // stay within the inset, where they can be reached.
+  const insets = useSafeAreaInsets();
   const [barWidth, setBarWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
   const [pillLayouts, setPillLayouts] = useState<Record<string, { x: number; width: number }>>({});
@@ -48,7 +53,17 @@ export default function DocumentPillBar({ pills, activeKey, onSelect, theme = NI
   }, [activeKey, pillLayouts, barWidth, contentWidth]);
 
   return (
-    <View style={[styles.bar, { backgroundColor: theme.colors.strip, borderBottomColor: theme.colors.border }]} onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}>
+    <View
+      style={[styles.bar, {
+        backgroundColor: theme.colors.strip,
+        borderBottomColor: theme.colors.border,
+        marginLeft: -insets.left,
+        marginRight: -insets.right,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      }]}
+      onLayout={(event) => setBarWidth(event.nativeEvent.layout.width - insets.left - insets.right)}
+    >
       <ScrollView
         ref={scrollRef}
         horizontal
