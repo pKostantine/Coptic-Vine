@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Head from 'expo-router/head';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -39,7 +39,9 @@ import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
 import { createBibleHighlight, isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
 import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
-import { useModalOrientations } from '@/hooks/useModalOrientations';
+import { ReaderScreenContext, useModalOrientations } from '@/hooks/useModalOrientations';
+import { READING_DEVICE_CLASS } from '@/utils/preferencesStorage';
+import { screenOrientationFor } from '@/utils/screenOrientation';
 
 type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
 type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
@@ -187,7 +189,7 @@ function getVersePreviewLanguage(
 }
 
 export default function BibleChapterDocument() {
-  const modalOrientations = useModalOrientations();
+  const modalOrientations = useModalOrientations(true);
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -477,7 +479,11 @@ export default function BibleChapterDocument() {
   }, [goBackALevel, screenWidth, isSelectorOpen, pencilGestureActive, bookSettingsOpen]);
 
   return (
+    <ReaderScreenContext.Provider value>
     <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, { backgroundColor: theme.colors.page }]} {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}>
+      {/* A reader turns with Book Settings' Orientation, even on a phone,
+          whose other screens stay upright (utils/screenOrientation.ts). */}
+      <Stack.Screen options={{ orientation: screenOrientationFor(preferences.orientationMode, { phone: READING_DEVICE_CLASS === 'phone', reader: true }) }} />
       <Head>
         <title>{`Coptic Vine ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
@@ -676,6 +682,7 @@ export default function BibleChapterDocument() {
       )}
       <BookSettingsSheet inDocument visible={bookSettingsOpen} onClose={() => showBookSettings(false)} />
     </SafeAreaView>
+    </ReaderScreenContext.Provider>
   );
 }
 

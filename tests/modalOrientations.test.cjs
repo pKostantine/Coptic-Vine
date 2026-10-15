@@ -48,3 +48,28 @@ test('a Modal keeps to the orientation lock the screens follow', () => {
   const all = fs.readFileSync('src/utils/modalOrientations.ts', 'utf8');
   assert.match(all, /\['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right'\]/);
 });
+
+test('a phone keeps its pages upright and turns only its readers; a tablet turns everything', () => {
+  const ts = require('typescript');
+  const js = ts.transpileModule(fs.readFileSync('src/utils/screenOrientation.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const module = { exports: {} };
+  new Function('exports', 'require', 'module', js)(module.exports, require, module);
+  const { screenOrientationFor } = module.exports;
+  assert.equal(screenOrientationFor('auto', { phone: true, reader: false }), 'portrait_up');
+  assert.equal(screenOrientationFor('landscape', { phone: true, reader: false }), 'portrait_up');
+  assert.equal(screenOrientationFor('auto', { phone: true, reader: true }), 'default');
+  assert.equal(screenOrientationFor('landscape', { phone: true, reader: true }), 'landscape_right');
+  assert.equal(screenOrientationFor('auto', { phone: false, reader: false }), 'default');
+  assert.equal(screenOrientationFor('portrait', { phone: false, reader: false }), 'portrait_up');
+
+  // The stack holds every screen to the page rule; the two readers set their own.
+  assert.match(fs.readFileSync('src/app/_layout.tsx', 'utf8'), /screenOrientationFor\(preferences\.orientationMode, \{ phone: READING_DEVICE_CLASS === 'phone', reader: false \}\)/);
+  for (const reader of ['src/components/vine/screens/ServiceDocument.tsx', 'src/app/bible/[bookKey]/[chapter].tsx']) {
+    const source = fs.readFileSync(reader, 'utf8');
+    assert.match(source, /orientation: screenOrientationFor\(preferences\.orientationMode, \{ phone: READING_DEVICE_CLASS === 'phone', reader: true \}\)/, reader);
+    assert.match(source, /<ReaderScreenContext\.Provider value>/, reader);
+  }
+  // A sheet over a phone's upright page stays upright; a phone keeps the phone layout on its side.
+  assert.match(fs.readFileSync('src/hooks/useModalOrientations.ts', 'utf8'), /if \(READING_DEVICE_CLASS === 'phone' && !reader\) return PORTRAIT;/);
+  assert.match(fs.readFileSync('src/utils/useLayoutMode.ts', 'utf8'), /if \(Platform\.OS !== 'web' && READING_DEVICE_CLASS === 'phone'\) return 'phone';/);
+});
