@@ -1,6 +1,7 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 import { usePlayback } from '@/context/PlaybackContext';
+import { describeQueue, isLearningQueueItem, type QueueEntryView } from '@/context/queueEntries';
 import { learningService } from '@/services/learningService';
 import type {
   LearningAlbumDetail,
@@ -25,9 +26,11 @@ export interface LearningQueueItem {
 }
 
 interface LearningPlayerContextValue {
-  queue: LearningQueueItem[];
-  queueKeys: string[];
+  /** The whole queue as the engine holds it — Learn & Study items and Music tracks alike, in order (see queueEntries.ts). */
+  entries: QueueEntryView[];
+  /** The engine's index of what is playing, whichever kind it is. */
   currentIndex: number;
+  /** The item playing, or null while a Music track plays. */
   currentItem: LearningQueueItem | null;
   playing: boolean;
   buffering: boolean;
@@ -38,6 +41,9 @@ interface LearningPlayerContextValue {
   playbackError: string | null;
   playQueue: (items: LearningQueueItem[], startIndex?: number) => void;
   playItem: (item: LearningQueueItem) => void;
+  /** Queues an item after what is playing — a Music track as much as a lesson. */
+  addNext: (item: LearningQueueItem) => void;
+  addToEnd: (item: LearningQueueItem) => void;
   togglePlayback: () => void;
   next: () => void;
   previous: () => void;
@@ -83,15 +89,6 @@ export function learningLessonSetAudioQueue(lessonSet: LearningLessonSetDetail):
     }));
 }
 
-function isLearningQueueItem(value: unknown): value is LearningQueueItem {
-  if (!value || typeof value !== 'object') return false;
-  const item = value as Partial<LearningQueueItem>;
-  return (item.kind === 'recording' || item.kind === 'lesson')
-    && typeof item.id === 'string'
-    && typeof item.title === 'string'
-    && Boolean(item.mediaAsset);
-}
-
 function toPlaybackEntry(item: LearningQueueItem, occurrence: number): PlaybackQueueEntry<LearningQueueItem> {
   return {
     key: ['learning', item.kind, item.id, occurrence].join(':'),
@@ -112,18 +109,18 @@ function toPlaybackEntry(item: LearningQueueItem, occurrence: number): PlaybackQ
   };
 }
 
+/**
+ * The Learn & Study adapter over the one player in PlaybackContext, which
+ * Music shares: the queue it reports is the whole queue, so a lesson queued
+ * after a song shows where it will play.
+ */
 export function useLearningPlayer(): LearningPlayerContextValue {
   const playback = usePlayback();
   const playPlaybackQueue = playback.playQueue;
   const playPlaybackItem = playback.playItem;
-  const queue = useMemo(
-    () => playback.queue.map((entry) => entry.payload).filter(isLearningQueueItem),
-    [playback.queue],
-  );
-  const queueKeys = useMemo(
-    () => playback.queue.filter((entry) => isLearningQueueItem(entry.payload)).map((entry) => entry.key),
-    [playback.queue],
-  );
+  const addPlaybackNext = playback.addNext;
+  const addPlaybackToEnd = playback.addToEnd;
+  const entries = useMemo(() => describeQueue(playback.queue), [playback.queue]);
   const currentItem = playback.currentItem?.playable.kind === 'learning_audio'
     && isLearningQueueItem(playback.currentItem.payload)
     ? playback.currentItem.payload
@@ -137,10 +134,24 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     playPlaybackItem(toPlaybackEntry(item, 0));
   }, [playPlaybackItem]);
 
+  // The same item can be queued twice; each time under a key of its own.
+  const queuedOccurrence = useRef(0);
+  const nextQueuedEntry = useCallback((item: LearningQueueItem) => {
+    queuedOccurrence.current += 1;
+    return toPlaybackEntry(item, Date.now() + queuedOccurrence.current);
+  }, []);
+
+  const addNext = useCallback((item: LearningQueueItem) => {
+    addPlaybackNext(nextQueuedEntry(item));
+  }, [addPlaybackNext, nextQueuedEntry]);
+
+  const addToEnd = useCallback((item: LearningQueueItem) => {
+    addPlaybackToEnd(nextQueuedEntry(item));
+  }, [addPlaybackToEnd, nextQueuedEntry]);
+
   return {
-    queue,
-    queueKeys,
-    currentIndex: currentItem ? playback.currentIndex : -1,
+    entries,
+    currentIndex: playback.currentIndex,
     currentItem,
     playing: currentItem ? playback.playing : false,
     buffering: currentItem ? playback.buffering || playback.loadingSource : false,
@@ -151,6 +162,8 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     playbackError: playback.playbackError,
     playQueue,
     playItem,
+    addNext,
+    addToEnd,
     togglePlayback: playback.togglePlayback,
     next: playback.next,
     previous: playback.previous,

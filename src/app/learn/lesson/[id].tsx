@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
+import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
 import LearningVideoPlayer, { type LearningVideoPlayerHandle } from '@/components/learning/LearningVideoPlayer';
@@ -37,6 +38,8 @@ export default function LearningLessonScreen() {
   const { playQueue, currentItem, playing } = useLearningPlayer();
   const globalPlayback = usePlayback();
   const audioQueue = useMemo(() => data ? learningLessonSetAudioQueue(data.lessonSet) : [], [data]);
+  // This lesson as the queue holds it, for queueing it after whatever is playing.
+  const audioItem = data ? audioQueue.find((entry) => entry.id === data.lesson.id) ?? null : null;
   const linkIncomplete = !lessonId || !lessonSetId;
   const downloadRequest = useMemo(
     () => data ? learningLessonDownloadRequest(data.lessonSet, data.lesson, locale) : null,
@@ -121,9 +124,12 @@ export default function LearningLessonScreen() {
               ) : (
                 <View style={styles.audioHero}>
                   <View style={styles.audioIcon}><Text style={styles.audioGlyph}>♪</Text></View>
-                  <Pressable accessibilityRole="button" style={styles.audioButton} onPress={playAudio}>
-                    <Text style={styles.audioButtonText}>{currentItem?.id === data.lesson.id && playing ? 'Now Playing' : 'Play audio-only lesson'}</Text>
-                  </Pressable>
+                  <View style={styles.audioActions}>
+                    <Pressable accessibilityRole="button" style={styles.audioButton} onPress={playAudio}>
+                      <Text style={styles.audioButtonText}>{currentItem?.id === data.lesson.id && playing ? 'Now Playing' : 'Play audio-only lesson'}</Text>
+                    </Pressable>
+                    {audioItem ? <LearningItemActionsMenu item={audioItem} isArabic={isArabic} size={40} /> : null}
+                  </View>
                   <Text style={styles.dataNote}>Uses the smaller audio rendition instead of streaming video.</Text>
                 </View>
               )}
@@ -131,13 +137,16 @@ export default function LearningLessonScreen() {
           ) : (
             <View style={styles.audioHero}>
               <View style={styles.audioIcon}><Text style={styles.audioGlyph}>♪</Text></View>
-              <Pressable accessibilityRole="button" style={styles.audioButton} onPress={playAudio}>
-                <Text style={styles.audioButtonText}>
-                  {currentItem?.id === data.lesson.id && playing
-                    ? (tr('Now Playing', 'En cours de lecture', 'قيد التشغيل'))
-                    : (tr('Play Lesson', 'Lire la leçon', 'تشغيل الدرس'))}
-                </Text>
-              </Pressable>
+              <View style={styles.audioActions}>
+                <Pressable accessibilityRole="button" style={styles.audioButton} onPress={playAudio}>
+                  <Text style={styles.audioButtonText}>
+                    {currentItem?.id === data.lesson.id && playing
+                      ? (tr('Now Playing', 'En cours de lecture', 'قيد التشغيل'))
+                      : (tr('Play Lesson', 'Lire la leçon', 'تشغيل الدرس'))}
+                  </Text>
+                </Pressable>
+                {audioItem ? <LearningItemActionsMenu item={audioItem} isArabic={isArabic} size={40} /> : null}
+              </View>
             </View>
           )}
 
@@ -194,6 +203,7 @@ const styles = StyleSheet.create({
   },
   audioIcon: { width: 86, height: 86, borderRadius: 43, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.learningSoft },
   audioGlyph: { color: COLORS.learningBright, fontSize: 42, fontWeight: '700' },
+  audioActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   audioButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SPACING.xl, borderRadius: RADII.pill, backgroundColor: COLORS.learning },
   audioButtonText: { color: COLORS.learningDeep, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '900' },
   dataNote: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, textAlign: 'center', paddingHorizontal: SPACING.lg },

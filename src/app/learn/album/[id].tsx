@@ -9,6 +9,7 @@ import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAware
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
+import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
@@ -109,6 +110,7 @@ export default function LearningAlbumScreen() {
                   onPress={() => playQueue(queue, index)}
                   trailing={(
                     <View style={styles.rowActions}>
+                      <LearningItemActionsMenu item={queue[index]} isArabic={isArabic} size={32} />
                       <LearningDownloadButton
                         packageKey={recordingDownload.packageKey}
                         request={recordingDownload}

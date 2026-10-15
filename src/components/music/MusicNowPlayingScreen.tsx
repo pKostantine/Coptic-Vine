@@ -22,8 +22,8 @@ import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import MusicArtwork from '@/components/music/MusicArtwork';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import MusicLyricsView, { lyricSetShortLabel } from '@/components/music/MusicLyricsView';
-import MusicQueueList from '@/components/music/MusicQueueList';
 import SeekBar from '@/components/music/SeekBar';
+import PlaybackQueueList from '@/components/playback/PlaybackQueueList';
 import PlayerSheet from '@/components/playback/PlayerSheet';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { useOverlayTransition } from '@/components/playback/useOverlayTransition';
@@ -101,8 +101,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   const isArabic = preferences.appLanguage === 'ar';
   const {
     currentItem,
-    queue,
-    queueKeys,
+    entries,
     currentIndex,
     playing,
     buffering,
@@ -355,8 +354,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   };
 
   const queueProps = {
-    queue,
-    queueKeys,
+    entries,
     currentIndex,
     playing,
     isArabic,
@@ -368,7 +366,8 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     onToggleShuffle: toggleShuffle,
     onCycleRepeat: cycleRepeatMode,
     likedTrackIds,
-    onToggleLike: (trackId: string) => void toggleTrackLike(trackId),
+    onToggleLikeTrack: (trackId: string) => void toggleTrackLike(trackId),
+    tone: 'music' as const,
     compact: isLandscapePhone,
   };
 
@@ -504,7 +503,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
           <PullUpButton
             icon="list-outline"
             label={tr('Queue', 'File d’attente', 'قائمة الانتظار')}
-            count={queue.length}
+            count={entries.length}
             onPress={() => setOpenSheet('queue')}
             compact
           />
@@ -532,7 +531,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
             <View style={[styles.panel, styles.playerPanel, { width: centerWidth }]}>
               {player}
             </View>
-            <MusicQueueList {...queueProps} scrollable style={styles.sidePanel} />
+            <PlaybackQueueList {...queueProps} scrollable style={styles.sidePanel} />
           </View>
         ) : isLandscapePhone ? (
           landscapePlayer
@@ -549,7 +548,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
               <PullUpButton
                 icon="list-outline"
                 label={tr('Queue', 'File d’attente', 'قائمة الانتظار')}
-                count={queue.length}
+                count={entries.length}
                 onPress={() => setOpenSheet('queue')}
               />
             </View>
@@ -575,7 +574,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
             onClose={() => setOpenSheet(null)}
             accessibilityLabel={tr('Queue', 'File d’attente', 'قائمة الانتظار')}
           >
-            <MusicQueueList {...queueProps} scrollable style={styles.sheetQueue} />
+            <PlaybackQueueList {...queueProps} scrollable style={styles.sheetQueue} />
           </PlayerSheet>
         </>
       ) : null}

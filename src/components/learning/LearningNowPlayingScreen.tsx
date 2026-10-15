@@ -16,6 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Icon from '@/components/vine/ui/Icon';
 import MusicLyricsView from '@/components/music/MusicLyricsView';
 import SeekBar from '@/components/music/SeekBar';
+import PlaybackQueueList from '@/components/playback/PlaybackQueueList';
 import PlayerSheet from '@/components/playback/PlayerSheet';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -28,7 +29,6 @@ import { publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 import LearningArtwork from './LearningArtwork';
 import LearningPlaylistPicker from './LearningPlaylistPicker';
-import LearningQueueList from './LearningQueueList';
 
 import { tr } from '../../utils/appText';
 const WIDE_MIN_WIDTH = 1024;
@@ -58,8 +58,7 @@ export default function LearningNowPlayingScreen({
   const player = useLearningPlayer();
   const {
     currentItem,
-    queue,
-    queueKeys,
+    entries,
     currentIndex,
     playing,
     buffering,
@@ -201,8 +200,7 @@ export default function LearningNowPlayingScreen({
     forceCompact: landscapePhone,
   };
   const queueProps = {
-    queue,
-    queueKeys,
+    entries,
     currentIndex,
     playing,
     isArabic,
@@ -213,8 +211,9 @@ export default function LearningNowPlayingScreen({
     repeatMode,
     onToggleShuffle: player.toggleShuffle,
     onCycleRepeat: player.cycleRepeatMode,
-    likedItemIds,
-    onToggleLike: (item: LearningQueueItem) => void toggleLike(item),
+    likedLearningIds: likedItemIds,
+    onToggleLikeLearning: (item: LearningQueueItem) => void toggleLike(item),
+    tone: 'learning' as const,
   };
 
   const handleShare = async () => {
@@ -260,7 +259,7 @@ export default function LearningNowPlayingScreen({
             <MusicLyricsView {...lyricsProps} />
           </View>
           <View style={styles.playerColumn}>{playerCard}</View>
-          <LearningQueueList {...queueProps} />
+          <PlaybackQueueList {...queueProps} scrollable />
         </View>
       ) : landscapePhone ? (
         <View style={styles.landscapeBody}>
@@ -288,13 +287,13 @@ export default function LearningNowPlayingScreen({
               onShare={() => void handleShare()}
               compact
             />
-            <SheetButtons onLyrics={() => setOpenSheet('lyrics')} onQueue={() => setOpenSheet('queue')} count={queue.length} isArabic={isArabic} />
+            <SheetButtons onLyrics={() => setOpenSheet('lyrics')} onQueue={() => setOpenSheet('queue')} count={entries.length} isArabic={isArabic} />
           </View>
         </View>
       ) : (
         <View style={[styles.narrowBody, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
           <View style={styles.narrowPlayer}>{playerCard}</View>
-          <SheetButtons onLyrics={() => setOpenSheet('lyrics')} onQueue={() => setOpenSheet('queue')} count={queue.length} isArabic={isArabic} />
+          <SheetButtons onLyrics={() => setOpenSheet('lyrics')} onQueue={() => setOpenSheet('queue')} count={entries.length} isArabic={isArabic} />
         </View>
       )}
 
@@ -307,7 +306,7 @@ export default function LearningNowPlayingScreen({
             </View>
           </PlayerSheet>
           <PlayerSheet visible={openSheet === 'queue'} onClose={() => setOpenSheet(null)} accessibilityLabel="Queue">
-            <View style={styles.sheetContent}><LearningQueueList {...queueProps} /></View>
+            <View style={styles.sheetContent}><PlaybackQueueList {...queueProps} scrollable /></View>
           </PlayerSheet>
         </>
       ) : null}
