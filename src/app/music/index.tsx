@@ -21,6 +21,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerReleaseSummary, MusicHomePayload } from '@/types/musicConsumer';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
+import { useSidePadding } from '@/utils/useSidePadding';
 
 import { tr } from '../../utils/appText';
 
@@ -105,12 +106,15 @@ export default function MusicHomeScreen() {
     );
   };
 
+  // The page runs to both edges; its content keeps clear of the notch.
+  const sidePadding = useSidePadding(wide ? 36 : 0);
+
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head><title>{tr('Music — Coptic Vine', 'Musique — Coptic Vine', 'الترانيم — كوبتك فاين')}</title></Head>
 
       <NowPlayingAwareScrollView
-        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         showsVerticalScrollIndicator={false}
       >
         <PageGlow kind="green" tall={wide} />

@@ -41,8 +41,10 @@ export default function TabHeader({ title, arabic, wide, nav }: TabHeaderProps) 
 
 const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', gap: 24, justifyContent: 'space-between' },
-  title: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 38, fontWeight: '700', lineHeight: 42 },
+  // The title is never cut short; the pill beside it gives way instead.
+  title: { color: COLORS.white, flexShrink: 0, fontFamily: TYPOGRAPHY.title, fontSize: 38, fontWeight: '700', lineHeight: 42 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
-  // The pill keeps the design's 450pt (440 inside its padding and border) where there is room, and gives way on a narrow iPad.
-  nav: { flexShrink: 1, minWidth: 300, width: 450 },
+  // The pill keeps the design's 450pt (440 inside its padding and border)
+  // where there is room, and gives way on a narrow iPad or a phone on its side.
+  nav: { flexShrink: 1, minWidth: 260, width: 450 },
 });

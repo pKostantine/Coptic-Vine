@@ -20,6 +20,7 @@ import { SEASON_GLOWS } from '@/constants/seasonAppearance';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { formatCopticDayMonth } from '@/utils/localeFormat';
+import { useSidePadding } from '@/utils/useSidePadding';
 import { useHolyWeekSchedule } from '@/utils/useHolyWeekSchedule';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
@@ -153,14 +154,17 @@ export default function BooksHome() {
     </>
   );
 
+  // The page runs to both edges; its content keeps clear of the notch.
+  const sidePadding = useSidePadding(layout !== 'phone' ? 36 : 0);
+
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head>
         <title>{tr('Books', 'Livres', 'الكتب')}</title>
       </Head>
 
       <NowPlayingAwareScrollView
-        contentContainerStyle={[styles.content, layout !== 'phone' && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        contentContainerStyle={[styles.content, layout !== 'phone' && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         showsVerticalScrollIndicator={false}
       >
         <PageGlow kind={glow} tall={layout !== 'phone'} />

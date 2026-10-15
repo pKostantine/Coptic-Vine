@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { pickAndUploadProfileAvatar, removeProfileAvatar } from '@/services/profileAvatarService';
 import { authMessage } from '@/utils/authMessages';
+import { useSidePadding } from '@/utils/useSidePadding';
 import { getCurrentAppLanguage, type AppLanguage } from '@/utils/preferencesStorage';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
@@ -51,11 +52,14 @@ export default function AccountScreen() {
   const gutter = wide ? 0 : 16;
   const columns = [styles.columns, layout === 'tablet' && styles.columnsTablet];
 
+  // The page runs to both edges; its content keeps clear of the notch.
+  const sidePadding = useSidePadding(wide ? 36 : 0);
+
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head><title>{`${tr('Account', 'Compte', 'الحساب')} — Coptic Vine`}</title></Head>
       <NowPlayingAwareScrollView
-        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >

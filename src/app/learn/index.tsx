@@ -21,6 +21,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningHomePayload, LearningItemLibraryPayload } from '@/types/learningPlatform';
 import { learningSeasonLook } from '@/utils/learningSeasonLook';
+import { useSidePadding } from '@/utils/useSidePadding';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
@@ -86,14 +87,17 @@ export default function LearningHomeScreen() {
     </Pressable>
   );
 
+  // The page runs to both edges; its content keeps clear of the notch.
+  const sidePadding = useSidePadding(wide ? 36 : 0);
+
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head>
         <title>{tr('Learn & Study — Coptic Vine', 'Apprendre — Coptic Vine', 'تعلّم وادرس — كوبتك فاين')}</title>
       </Head>
 
       <NowPlayingAwareScrollView
-        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         showsVerticalScrollIndicator={false}
       >
         <PageGlow kind="green" tall={wide} />

@@ -16,12 +16,14 @@ import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type HomeSynaxariumEvent } from '@/services/homeService';
 import { getCopticDate, type CopticDate } from '@/utils/calendarService';
+import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
+import { useSidePadding } from '../../../utils/useSidePadding';
 import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 import { formatCopticDayMonth, formatDayMonthDate } from '@/utils/localeFormat';
 import { agpeyaHourAt } from '@/utils/agpeyaHours';
 import { LECTIONARY_ROUTE_IDS, LECTIONARY_SERVICES, lectionaryHref, readingLinesFor, withPropheciesAsOneLine } from '@/utils/lectionaryOutline';
 import { getServiceReadingCitations, type LectionaryService, type ReadingCitation } from '@/utils/readingsService';
-import { useLayoutMode } from '@/utils/useLayoutMode';
+import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { appText, entryLabel, tr } from '../../../utils/appText';
 
@@ -334,18 +336,38 @@ export default function HomeScreen() {
     </View>
   );
 
+  // The page runs to both edges; its content keeps clear of the notch.
+  const sidePadding = useSidePadding(wideLayout ? 36 : 0);
+  // Three columns want 1000pt: a phone on its side and an upright iPad set
+  // the readings over the Synaxarium beside the seal instead.
+  const contentWidth = useContentWidth();
+  const twoColumns = useIsCompactLandscape() || contentWidth < 1000;
+
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head>
         <title>{tr('Coptic Vine', 'Coptic Vine', 'كوبتك فاين')}</title>
       </Head>
 
       <NowPlayingAwareScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, wideLayout && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        contentContainerStyle={[styles.content, wideLayout && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
       >
         <HeroGlow />
-        {wideLayout ? (
+        {wideLayout && twoColumns ? (
+          // Too narrow for three columns: the seal and the prayer beside the
+          // readings and the Synaxarium.
+          <View style={styles.columns}>
+            <View style={styles.columnNarrow}>
+              {heroBlock}
+              {prayCard}
+            </View>
+            <View style={[styles.columnWide, styles.stack]}>
+              {readingsCard}
+              {synaxCard}
+            </View>
+          </View>
+        ) : wideLayout ? (
           // iPad and desktop: the seal and the prayer, the readings, the Synaxarium.
           <View style={styles.columns}>
             <View style={styles.columnNarrow}>
@@ -419,6 +441,7 @@ const styles = StyleSheet.create({
   // The seal's column a little narrower than the two cards' (0.9 : 1 : 1).
   columnNarrow: { flex: 0.9, minWidth: 0 },
   columnWide: { flex: 1, minWidth: 0 },
+  stack: { gap: 28 },
   cardWide: { marginHorizontal: 0 },
   flex: { flex: 1, minWidth: 0 },
   glow: { height: 560, left: 0, position: 'absolute', right: 0, top: 0 },

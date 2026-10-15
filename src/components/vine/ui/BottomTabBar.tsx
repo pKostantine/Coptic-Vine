@@ -23,9 +23,11 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
   const isCompactLandscape = useIsCompactLandscape();
-  // The iPad sets the tabs as a centred row; a desktop browser has the sidebar instead.
+  // The iPad sets the tabs as a centred row; a desktop browser has the sidebar
+  // instead. A phone on its side is as wide as an iPad but keeps a phone's
+  // short bar -- each tab's name beside its glyph -- so the page keeps its height.
   const layout = useLayoutMode();
-  const tablet = layout === 'tablet';
+  const tablet = layout === 'tablet' && !isCompactLandscape;
   const isArabic = preferences.appLanguage === 'ar';
   // The same five names the desktop sidebar shows (SideBar.tsx).
   const labels = {
@@ -88,7 +90,7 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
           own bottom edge, so this is the only place it is made room for. */}
       <View
         accessibilityRole="tablist"
-        style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet ? insets.bottom + 14 : Math.max(insets.bottom - 8, 0) }]}
+        style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet ? insets.bottom + 14 : Math.max(insets.bottom - 8, 0), paddingLeft: insets.left, paddingRight: insets.right }]}
       >
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'home' }} accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
         <Icon name="home-outline" size={iconSize} color={active === 'home' ? COLORS.gold : COLORS.muted} />
