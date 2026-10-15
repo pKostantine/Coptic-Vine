@@ -125,11 +125,15 @@ test('native packages stage content before one transactional activation', () => 
 });
 
 test('Bible updates use deterministic content-addressed chunks', () => {
+  // Packages are built by the publishing script; the Worker only stores and serves them.
+  const publisher = fs.readFileSync('scripts/publish-content-packages.mjs', 'utf8');
   const worker = fs.readFileSync('workers/content-packages/src/index.ts', 'utf8');
   const manager = fs.readFileSync('src/services/bookDownloadManager.ts', 'utf8');
-  assert.match(worker, /function bibleBucket/);
-  assert.match(worker, /stableChunkId/);
-  assert.match(worker, /reusable\?\.url/);
+  assert.match(publisher, /\$\{row\.book_key \?\? 'unknown'\}:\$\{row\.chapter_number \?\? 'metadata'\}/);
+  assert.match(publisher, /sha256\(encoder\.encode\(bucket\)\)\.slice\(0, 20\)/);
+  assert.match(publisher, /url: `\/packages\/\$\{resource\.id\}\/\$\{digest\}\.json`/);
+  assert.match(publisher, /if \(await exists\(key\)\) \{ reused \+= 1; return; \}/);
+  assert.match(worker, /const PACKAGE_KEY = \/\^packages/);
   assert.match(manager, /fileKey: `content:\$\{resource\.id\}:\$\{chunk\.sha256\}`/);
   assert.doesNotMatch(manager, /fileKey: `content:\$\{resource\.id\}:\$\{resource\.version\}/);
 });
@@ -153,14 +157,16 @@ test('web variants do not initialize SQLite or expose download UI', () => {
   const bootstrap = fs.readFileSync('src/components/BookSyncBootstrap.web.tsx', 'utf8');
   const route = fs.readFileSync('src/app/downloads.web.tsx', 'utf8');
   const nativeRoute = fs.readFileSync('src/app/downloads.tsx', 'utf8');
-  // The Books screen is shared with web; it only draws a download control for a
-  // book the manager lists, and the web manager never lists any.
+  // The Books screen draws no download control on any platform: downloads are
+  // managed on the Downloads & Storage page alone.
   const books = fs.readFileSync('src/app/books/index.tsx', 'utf8');
+  const shelf = fs.readFileSync('src/components/vine/ui/LibraryBook.tsx', 'utf8');
   const webManager = fs.readFileSync('src/services/bookDownloadManager.web.ts', 'utf8');
   assert.doesNotMatch(provider, /sqlite|bookDownloadManager/i);
   assert.match(bootstrap, /return null/);
   assert.match(route, /Redirect href=.*\/account/);
   assert.match(nativeRoute, /Platform\.OS === 'web'.*Redirect/s);
   assert.match(webManager, /listBooks\(\): Promise<BookDownloadProgress\[\]> \{ return Promise\.resolve\(\[\]\); \}/);
-  assert.match(books, /const book = item\.downloadKey \? downloads\.find[\s\S]*?\.\.\.\(book \? \{ downloadStatus/);
+  assert.doesNotMatch(books, /bookDownloadManager|downloadStatus|downloadProgress|onDownloadPress/);
+  assert.doesNotMatch(shelf, /downloadStatus|downloadProgress|onDownloadPress/);
 });

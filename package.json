@@ -61,6 +61,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
+    "publish:content": "node scripts/publish-content-packages.mjs",
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "npm run test:slideshow && npm run test:reading && npm run test:conditions && npm run test:lyrics && npm run test:offline && npm run test:playback && npm run test:music-ui && npm run test:share",
