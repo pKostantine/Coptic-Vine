@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -15,7 +15,10 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
+import { documentSelectorColors } from '@/constants/documentSelectorColors';
+import { NIGHT_DOCUMENT_THEME, withAlpha, type DocumentTheme } from '@/constants/documentThemes';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import type {
   SermonHighlight,
@@ -63,6 +66,117 @@ interface SermonPlannerDrawerProps {
   onToggleBookmark?: () => void;
   onOpenCalendar?: () => void;
   onOpenSettings?: () => void;
+  /** The page the planner is read on (constants/documentThemes.ts): the drawer is drawn in its colours. */
+  theme?: DocumentTheme;
+}
+
+/**
+ * The planner's colours. On Night it keeps the cool slate it has always had,
+ * which is how it tells itself apart from the content list over the same
+ * black page. On every other page it takes the content list's colours from
+ * that page -- its strip for the bars and cards, its gold, its ink -- so the
+ * notes open as part of the page they are written beside.
+ */
+interface PlannerColors {
+  panel: string;
+  panelEdge: string;
+  bar: string;
+  barEdge: string;
+  footEdge: string;
+  rule: string;
+  divider: string;
+  /** The title, the counts, a highlight's reference: Night's brighter gold. */
+  heading: string;
+  text: string;
+  muted: string;
+  line: string;
+  field: string;
+  fieldEdge: string;
+  note: string;
+  noteEdge: string;
+  placeholder: string;
+  card: string;
+  cardEdge: string;
+  cardActive: string;
+  cardActiveEdge: string;
+  accent: string;
+  onAccent: string;
+  chip: string;
+  chipEdge: string;
+  iconButton: string;
+  iconButtonEdge: string;
+  remove: string;
+  swatchRing: string;
+}
+
+const NIGHT_PLANNER_COLORS: PlannerColors = {
+  panel: '#080A0C',
+  panelEdge: 'rgba(227, 181, 59, 0.4)',
+  bar: '#101316',
+  barEdge: 'rgba(227, 181, 59, 0.28)',
+  footEdge: 'rgba(227, 181, 59, 0.32)',
+  rule: 'rgba(227, 181, 59, 0.18)',
+  divider: 'rgba(227, 181, 59, 0.25)',
+  heading: COLORS.goldBright,
+  text: COLORS.white,
+  muted: COLORS.muted,
+  line: COLORS.border,
+  field: '#11161A',
+  fieldEdge: '#2D353C',
+  note: '#090C0E',
+  noteEdge: '#283038',
+  placeholder: '#75818C',
+  card: '#101418',
+  cardEdge: '#293139',
+  cardActive: '#171713',
+  cardActiveEdge: COLORS.gold,
+  accent: COLORS.gold,
+  onAccent: COLORS.black,
+  chip: COLORS.surface,
+  chipEdge: COLORS.border,
+  iconButton: 'rgba(227, 181, 59, 0.06)',
+  iconButtonEdge: 'rgba(227, 181, 59, 0.24)',
+  remove: '#E88484',
+  swatchRing: COLORS.white,
+};
+
+function plannerColorsFor(theme: DocumentTheme): PlannerColors {
+  if (theme.id === 'night') return NIGHT_PLANNER_COLORS;
+  const { colors } = theme;
+  const drawer = documentSelectorColors(theme);
+  return {
+    panel: drawer.panel,
+    panelEdge: withAlpha(colors.accent, 0.4),
+    bar: colors.strip,
+    barEdge: withAlpha(colors.accent, 0.28),
+    footEdge: withAlpha(colors.accent, 0.32),
+    rule: withAlpha(colors.accent, 0.18),
+    divider: withAlpha(colors.accent, 0.25),
+    heading: colors.accent,
+    text: colors.text,
+    muted: drawer.quiet,
+    line: colors.border,
+    // The outline is written on a field raised like a card; a highlight's
+    // note sits back in the drawer's own colour inside its card.
+    field: colors.strip,
+    fieldEdge: colors.border,
+    note: drawer.panel,
+    noteEdge: colors.border,
+    placeholder: drawer.quiet,
+    card: colors.strip,
+    cardEdge: colors.border,
+    cardActive: colors.stripActive,
+    cardActiveEdge: colors.accent,
+    accent: colors.accent,
+    onAccent: colors.onAccent,
+    chip: colors.surface,
+    chipEdge: colors.border,
+    iconButton: withAlpha(colors.accent, 0.06),
+    iconButtonEdge: withAlpha(colors.accent, 0.24),
+    // The page's own red, as Night's planner uses a soft red to delete.
+    remove: colors.priest,
+    swatchRing: colors.text,
+  };
 }
 
 function syncLabel(status: SermonPlanSyncStatus, signedIn: boolean) {
@@ -100,8 +214,11 @@ export default function SermonPlannerDrawer({
   onToggleBookmark,
   onOpenCalendar,
   onOpenSettings,
+  theme = NIGHT_DOCUMENT_THEME,
 }: SermonPlannerDrawerProps) {
   const modalOrientations = useModalOrientations();
+  const palette = useMemo(() => plannerColorsFor(theme), [theme]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const compact = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
@@ -145,6 +262,9 @@ export default function SermonPlannerDrawer({
       onRequestClose={onClose}
       supportedOrientations={modalOrientations}
     >
+      {/* The drawer runs up under the status bar, so on a light page the
+          clock and battery over it turn dark to stay readable. */}
+      <StatusBar style={theme.dark ? 'light' : 'dark'} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
@@ -166,7 +286,7 @@ export default function SermonPlannerDrawer({
               <Text style={styles.saveStatus}>{syncLabel(syncStatus, signedIn)}</Text>
             </View>
             <Pressable accessibilityLabel="Close sermon notes" style={styles.closeButton} onPress={onClose}>
-              <Icon name="close" size={22} color={COLORS.muted} />
+              <Icon name="close" size={22} color={palette.muted} />
             </Pressable>
           </View>
 
@@ -217,7 +337,7 @@ export default function SermonPlannerDrawer({
                 >
                   <Text style={styles.referenceNumber}>{index + 1}</Text>
                   <Text style={styles.referenceLabel}>{reference.label}</Text>
-                  <Icon name="chevron-forward" size={14} color={COLORS.goldBright} />
+                  <Icon name="chevron-forward" size={14} color={palette.heading} />
                 </Pressable>
               ))}
             </View>
@@ -230,8 +350,8 @@ export default function SermonPlannerDrawer({
               multiline
               onChangeText={onChangeGeneralNotes}
               placeholder="Theme, opening, main points, applications, and closing..."
-              placeholderTextColor="#75818C"
-              selectionColor={COLORS.gold}
+              placeholderTextColor={palette.placeholder}
+              selectionColor={palette.accent}
               style={styles.outlineInput}
               textAlignVertical="top"
               value={generalNotes}
@@ -268,7 +388,7 @@ export default function SermonPlannerDrawer({
                         style={styles.iconButton}
                         onPress={() => onDeleteHighlight(highlight.id)}
                       >
-                        <Icon name="trash-outline" size={17} color="#E88484" />
+                        <Icon name="trash-outline" size={17} color={palette.remove} />
                       </Pressable>
                     </View>
                   </View>
@@ -306,8 +426,8 @@ export default function SermonPlannerDrawer({
                     multiline
                     onChangeText={(value) => onChangeHighlightNote(highlight.id, value)}
                     placeholder="Add context, interpretation, or a preaching note..."
-                    placeholderTextColor="#75818C"
-                    selectionColor={COLORS.gold}
+                    placeholderTextColor={palette.placeholder}
+                    selectionColor={palette.accent}
                     style={styles.highlightNoteInput}
                     textAlignVertical="top"
                     value={highlight.note}
@@ -320,17 +440,17 @@ export default function SermonPlannerDrawer({
           <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, SPACING.sm) }]}>
             {onToggleBookmark ? (
               <Pressable accessibilityLabel="Bookmark sermon planner" style={styles.actionButton} onPress={onToggleBookmark}>
-                <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={COLORS.gold} />
+                <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={palette.accent} />
               </Pressable>
             ) : null}
             {onOpenCalendar ? (
               <Pressable accessibilityLabel="Open calendar" style={styles.actionButton} onPress={() => openDestination(onOpenCalendar)}>
-                <Icon name="calendar-outline" size={26} color={COLORS.gold} />
+                <Icon name="calendar-outline" size={26} color={palette.accent} />
               </Pressable>
             ) : null}
             {onOpenSettings ? (
               <Pressable accessibilityLabel="Open settings" style={styles.actionButton} onPress={() => openDestination(onOpenSettings)}>
-                <Icon name="settings-outline" size={26} color={COLORS.gold} />
+                <Icon name="settings-outline" size={26} color={palette.accent} />
               </Pressable>
             ) : null}
           </View>
@@ -340,137 +460,138 @@ export default function SermonPlannerDrawer({
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
-  backdrop: { flex: 1 },
-  panel: {
-    backgroundColor: '#080A0C',
-    borderLeftColor: 'rgba(227, 181, 59, 0.4)',
-    borderLeftWidth: 1,
-  },
-  header: {
-    alignItems: 'center',
-    backgroundColor: '#101316',
-    borderBottomColor: 'rgba(227, 181, 59, 0.28)',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 68,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  headerTitle: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
-  saveStatus: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
-  closeButton: { alignItems: 'center', height: 40, justifyContent: 'center', width: 40 },
-  scroll: { flex: 1 },
-  scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
-  languageBar: {
-    borderBottomColor: 'rgba(227, 181, 59, 0.18)',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  languageButton: {
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: SPACING.sm,
-  },
-  languageButtonSelected: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
-  languageButtonUnselected: { backgroundColor: COLORS.surface, borderColor: COLORS.border },
-  languageText: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
-  languageTextSelected: { color: COLORS.black },
-  sectionHeadingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  sectionHeading: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '800' },
-  sectionCount: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
-  references: { borderTopColor: COLORS.border, borderTopWidth: 1, marginTop: SPACING.sm },
-  referenceRow: {
-    alignItems: 'center',
-    borderBottomColor: COLORS.border,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    minHeight: 45,
-    paddingVertical: SPACING.sm,
-  },
-  referenceNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800', width: 20 },
-  referenceLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 15, lineHeight: 20 },
-  pressed: { opacity: 0.68 },
-  divider: { backgroundColor: 'rgba(227, 181, 59, 0.25)', height: 1, marginVertical: SPACING.lg },
-  outlineInput: {
-    backgroundColor: '#11161A',
-    borderColor: '#2D353C',
-    borderRadius: 6,
-    borderWidth: 1,
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 15,
-    lineHeight: 21,
-    marginTop: SPACING.sm,
-    minHeight: 132,
-    padding: SPACING.md,
-  },
-  highlightsHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.lg },
-  emptyState: { alignItems: 'center', borderTopColor: COLORS.border, borderTopWidth: 1, marginTop: SPACING.sm, padding: SPACING.xl },
-  emptyMarker: { backgroundColor: HIGHLIGHT_COLORS.gold, borderRadius: 3, height: 8, marginBottom: SPACING.md, opacity: 0.7, width: 68 },
-  emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '800' },
-  emptyBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, marginTop: SPACING.sm, textAlign: 'center' },
-  highlightCard: {
-    backgroundColor: '#101418',
-    borderColor: '#293139',
-    borderRadius: 7,
-    borderWidth: 1,
-    marginTop: SPACING.md,
-    padding: SPACING.md,
-  },
-  highlightCardActive: { borderColor: COLORS.gold, backgroundColor: '#171713' },
-  highlightMetaRow: { alignItems: 'center', flexDirection: 'row' },
-  highlightMarker: { borderRadius: 3, height: 8, marginRight: SPACING.sm, width: 38 },
-  highlightLanguage: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  highlightActions: { flexDirection: 'row', gap: SPACING.xs },
-  iconButton: { alignItems: 'center', height: 34, justifyContent: 'center', width: 34 },
-  highlightReference: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700', marginTop: SPACING.sm },
-  quote: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 15, lineHeight: 22, marginTop: SPACING.sm },
-  colorRow: { flexDirection: 'row', gap: 10, marginTop: SPACING.md },
-  colorSwatch: { borderColor: 'transparent', borderRadius: 999, borderWidth: 2, height: 24, width: 24 },
-  colorSwatchSelected: { borderColor: COLORS.white },
-  highlightNoteInput: {
-    backgroundColor: '#090C0E',
-    borderColor: '#283038',
-    borderRadius: 5,
-    borderWidth: 1,
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: SPACING.md,
-    minHeight: 76,
-    padding: SPACING.sm,
-  },
-  actionRow: {
-    alignItems: 'center',
-    backgroundColor: '#101316',
-    borderTopColor: 'rgba(227, 181, 59, 0.32)',
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.sm,
-  },
-  actionButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(227, 181, 59, 0.06)',
-    borderColor: 'rgba(227, 181, 59, 0.24)',
-    borderRadius: 20,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-});
-
+function createStyles(colors: PlannerColors) {
+  return StyleSheet.create({
+    overlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
+    backdrop: { flex: 1 },
+    panel: {
+      backgroundColor: colors.panel,
+      borderLeftColor: colors.panelEdge,
+      borderLeftWidth: 1,
+    },
+    header: {
+      alignItems: 'center',
+      backgroundColor: colors.bar,
+      borderBottomColor: colors.barEdge,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      minHeight: 68,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+    },
+    headerTitle: { color: colors.heading, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
+    saveStatus: { color: colors.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 2 },
+    closeButton: { alignItems: 'center', height: 40, justifyContent: 'center', width: 40 },
+    scroll: { flex: 1 },
+    scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
+    languageBar: {
+      borderBottomColor: colors.rule,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: SPACING.xs,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+    },
+    languageButton: {
+      alignItems: 'center',
+      borderRadius: 8,
+      borderWidth: 1,
+      flex: 1,
+      justifyContent: 'center',
+      minHeight: 40,
+      paddingHorizontal: SPACING.sm,
+    },
+    languageButtonSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
+    languageButtonUnselected: { backgroundColor: colors.chip, borderColor: colors.chipEdge },
+    languageText: { color: colors.text, fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
+    languageTextSelected: { color: colors.onAccent },
+    sectionHeadingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+    sectionHeading: { color: colors.text, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '800' },
+    sectionCount: { color: colors.heading, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
+    references: { borderTopColor: colors.line, borderTopWidth: 1, marginTop: SPACING.sm },
+    referenceRow: {
+      alignItems: 'center',
+      borderBottomColor: colors.line,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      minHeight: 45,
+      paddingVertical: SPACING.sm,
+    },
+    referenceNumber: { color: colors.accent, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800', width: 20 },
+    referenceLabel: { color: colors.text, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 15, lineHeight: 20 },
+    pressed: { opacity: 0.68 },
+    divider: { backgroundColor: colors.divider, height: 1, marginVertical: SPACING.lg },
+    outlineInput: {
+      backgroundColor: colors.field,
+      borderColor: colors.fieldEdge,
+      borderRadius: 6,
+      borderWidth: 1,
+      color: colors.text,
+      fontFamily: TYPOGRAPHY.body,
+      fontSize: 15,
+      lineHeight: 21,
+      marginTop: SPACING.sm,
+      minHeight: 132,
+      padding: SPACING.md,
+    },
+    highlightsHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.lg },
+    emptyState: { alignItems: 'center', borderTopColor: colors.line, borderTopWidth: 1, marginTop: SPACING.sm, padding: SPACING.xl },
+    emptyMarker: { backgroundColor: HIGHLIGHT_COLORS.gold, borderRadius: 3, height: 8, marginBottom: SPACING.md, opacity: 0.7, width: 68 },
+    emptyTitle: { color: colors.text, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '800' },
+    emptyBody: { color: colors.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, marginTop: SPACING.sm, textAlign: 'center' },
+    highlightCard: {
+      backgroundColor: colors.card,
+      borderColor: colors.cardEdge,
+      borderRadius: 7,
+      borderWidth: 1,
+      marginTop: SPACING.md,
+      padding: SPACING.md,
+    },
+    highlightCardActive: { borderColor: colors.cardActiveEdge, backgroundColor: colors.cardActive },
+    highlightMetaRow: { alignItems: 'center', flexDirection: 'row' },
+    highlightMarker: { borderRadius: 3, height: 8, marginRight: SPACING.sm, width: 38 },
+    highlightLanguage: { color: colors.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+    highlightActions: { flexDirection: 'row', gap: SPACING.xs },
+    iconButton: { alignItems: 'center', height: 34, justifyContent: 'center', width: 34 },
+    highlightReference: { color: colors.heading, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700', marginTop: SPACING.sm },
+    quote: { color: colors.text, fontFamily: TYPOGRAPHY.title, fontSize: 15, lineHeight: 22, marginTop: SPACING.sm },
+    colorRow: { flexDirection: 'row', gap: 10, marginTop: SPACING.md },
+    colorSwatch: { borderColor: 'transparent', borderRadius: 999, borderWidth: 2, height: 24, width: 24 },
+    colorSwatchSelected: { borderColor: colors.swatchRing },
+    highlightNoteInput: {
+      backgroundColor: colors.note,
+      borderColor: colors.noteEdge,
+      borderRadius: 5,
+      borderWidth: 1,
+      color: colors.text,
+      fontFamily: TYPOGRAPHY.body,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: SPACING.md,
+      minHeight: 76,
+      padding: SPACING.sm,
+    },
+    actionRow: {
+      alignItems: 'center',
+      backgroundColor: colors.bar,
+      borderTopColor: colors.footEdge,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingHorizontal: SPACING.xl,
+      paddingTop: SPACING.sm,
+    },
+    actionButton: {
+      alignItems: 'center',
+      backgroundColor: colors.iconButton,
+      borderColor: colors.iconButtonEdge,
+      borderRadius: 20,
+      borderWidth: 1,
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+  });
+}

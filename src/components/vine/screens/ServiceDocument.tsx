@@ -1047,6 +1047,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               onToggleBookmark={() => toggleBookmark(bookmarkId)}
               onOpenCalendar={openCalendar}
               onOpenSettings={openSettings}
+              theme={documentTheme}
             />
           ) : (
           <ContentSelectorDrawer
@@ -1074,6 +1075,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             displaySilentPrayers={preferences.displaySilentPrayers}
             copticGospelRite={copticGospelRite}
             appLanguage={preferences.appLanguage}
+            theme={documentTheme}
           />
           )}
         </>

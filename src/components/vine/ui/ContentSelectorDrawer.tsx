@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, type LayoutChangeEvent, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
+import { documentSelectorColors } from '../../../constants/documentSelectorColors';
+import { NIGHT_DOCUMENT_THEME, withAlpha, type DocumentTheme } from '../../../constants/documentThemes';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
@@ -32,6 +35,8 @@ interface ContentSelectorDrawerProps {
   copticGospelRite?: boolean;
   /** Drives which single language each list entry's title shows — falls back to whichever language has text when the selected one is missing. */
   appLanguage?: AppLanguage;
+  /** The page the document is read on (constants/documentThemes.ts): the drawer is drawn in its colours, so it opens as part of that page. */
+  theme?: DocumentTheme;
 }
 
 /**
@@ -77,8 +82,10 @@ export default function ContentSelectorDrawer({
   displaySilentPrayers = false,
   copticGospelRite = false,
   appLanguage = 'en',
+  theme = NIGHT_DOCUMENT_THEME,
 }: ContentSelectorDrawerProps) {
   const modalOrientations = useModalOrientations();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isMobileDocument = Platform.OS !== 'web';
@@ -245,6 +252,9 @@ export default function ContentSelectorDrawer({
       onRequestClose={onClose}
       supportedOrientations={modalOrientations}
     >
+      {/* The drawer runs up under the status bar, so on a light page the
+          clock and battery over it turn dark to stay readable. */}
+      <StatusBar style={theme.dark ? 'light' : 'dark'} />
       <View style={styles.selectorOverlay}>
         <Pressable accessibilityLabel="Close selector" style={styles.selectorBackdrop} onPress={onClose} />
         <Animated.View
@@ -359,7 +369,7 @@ export default function ContentSelectorDrawer({
                           {pickedTitle.text}
                         </Text>
                         {foldableDividerId ? (
-                          <Icon name={isFolded ? 'chevron-forward' : 'chevron-down'} size={14} color={COLORS.gold} />
+                          <Icon name={isFolded ? 'chevron-forward' : 'chevron-down'} size={14} color={theme.colors.accent} />
                         ) : null}
                       </View>
                       <View style={styles.dividerRule} />
@@ -416,7 +426,7 @@ export default function ContentSelectorDrawer({
             <View style={styles.selectorActionRow}>
               {onToggleBookmark ? (
                 <Pressable accessibilityLabel="Bookmark hymn" style={styles.selectorIconButton} onPress={onToggleBookmark}>
-                  <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={COLORS.gold} />
+                  <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={theme.colors.accent} />
                 </Pressable>
               ) : null}
               {onOpenCalendar ? (
@@ -428,7 +438,7 @@ export default function ContentSelectorDrawer({
                     onOpenCalendar();
                   }}
                 >
-                  <Icon name="calendar-outline" size={26} color={COLORS.gold} />
+                  <Icon name="calendar-outline" size={26} color={theme.colors.accent} />
                 </Pressable>
               ) : null}
               {onOpenSettings ? (
@@ -440,7 +450,7 @@ export default function ContentSelectorDrawer({
                     onOpenSettings();
                   }}
                 >
-                  <Icon name="settings-outline" size={26} color={COLORS.gold} />
+                  <Icon name="settings-outline" size={26} color={theme.colors.accent} />
                 </Pressable>
               ) : null}
             </View>
@@ -451,243 +461,255 @@ export default function ContentSelectorDrawer({
   );
 }
 
-const styles = StyleSheet.create({
-  selectorOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  selectorBackdrop: {
-    flex: 1,
-  },
-  selectorPanel: {
-    backgroundColor: '#050505',
-    borderColor: 'rgba(227, 181, 59, 0.35)',
-    borderLeftWidth: 1,
-    paddingHorizontal: SPACING.md,
-  },
-  selectorHeader: {
-    alignItems: 'center',
-    backgroundColor: '#111111',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(227, 181, 59, 0.28)',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginHorizontal: -SPACING.md,
-    minHeight: 62,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  actionLabel: {
-    color: COLORS.gold,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 21,
-    fontWeight: '800',
-    letterSpacing: 0,
-  },
-  selectorList: {
-    flex: 1,
-    paddingTop: SPACING.md,
-  },
-  selectorItem: {
-    backgroundColor: '#111111',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    flexDirection: 'row',
-    minHeight: 78,
-    marginBottom: SPACING.sm,
-    overflow: 'hidden',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  selectorItemSubdocument: {
-    backgroundColor: COLORS.subdocSoft,
-    borderColor: COLORS.subdocLine,
-  },
-  selectorTitleSubdocument: {
-    color: COLORS.subdoc,
-  },
-  selectorItemHyperlink: {
-    alignItems: 'center',
-    backgroundColor: COLORS.linkSoft,
-    borderColor: COLORS.linkLine,
-    minHeight: 48,
-    paddingVertical: SPACING.sm,
-  },
-  selectorTitleHyperlink: {
-    color: COLORS.link,
-  },
-  selectorHyperlinkArrow: {
-    color: COLORS.link,
-    fontSize: 16,
-    marginLeft: SPACING.sm,
-  },
-  nestedSegment: {
-    borderLeftColor: COLORS.goldLine,
-    borderLeftWidth: 3,
-    paddingBottom: SPACING.sm,
-    paddingLeft: SPACING.md,
-  },
-  // Keep the group's gold rail ending flush with its final card, then restore
-  // the normal inter-card gap outside the nested wrapper before the next
-  // unnested hymn.
-  nestedSegmentLast: { marginBottom: SPACING.sm, paddingBottom: 0 },
-  // The gap moves onto the wrapper's padding so the rule can run through it.
-  selectorItemNested: { marginBottom: 0 },
-  selectorItemDivider: {
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    borderWidth: 0,
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.md,
-    minHeight: 0,
-    paddingHorizontal: 0,
-    paddingVertical: SPACING.xs,
-  },
-  dividerRow: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  dividerRule: {
-    backgroundColor: COLORS.goldLine,
-    flex: 1,
-    height: 1,
-  },
-  dividerLabelGroup: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.xs,
-  },
-  dividerLabel: {
-    color: COLORS.gold,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 13,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  dividerLabelArabic: {
-    fontFamily: TYPOGRAPHY.arabic,
-    fontSize: 15,
-    // Arabic has no upper case for textTransform to reach.
-    textTransform: 'none',
-  },
-  selectorItemActive: {
-    backgroundColor: '#171513',
-    borderColor: 'rgba(227, 181, 59, 0.72)',
-  },
-  selectorTitleRow: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  selectorTitleRowLandscape: {
-    flexDirection: 'column',
-  },
-  selectorTitle: {
-    flex: 1,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 22,
-    flexShrink: 1,
-    color: COLORS.white,
-  },
-  selectorTitleSilentPrayer: {
-    color: COLORS.silentTitle,
-    fontStyle: 'italic',
-  },
-  selectorTitleArabic: {
-    writingDirection: 'rtl',
-  },
-  centeredTitle: {
-    textAlign: 'center',
-  },
-  selectorToggleRow: {
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderColor: 'rgba(227, 181, 59, 0.28)',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'center',
-    marginHorizontal: -SPACING.md,
-    minHeight: 56,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  selectorToggleTextGroup: {
-    alignItems: 'center',
-    flex: 0,
-    gap: 2,
-    minWidth: 136,
-  },
-  selectorToggleText: {
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 18,
-    textAlign: 'center',
-    color: COLORS.white,
-  },
-  selectorToggleArabicText: {
-    fontFamily: 'Arial',
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-    writingDirection: 'rtl',
-  },
-  selectorSwitch: {
-    borderRadius: 15,
-    borderWidth: 1,
-    height: 30,
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-    width: 52,
-  },
-  selectorSwitchOn: {
-    backgroundColor: COLORS.gold,
-    borderColor: COLORS.gold,
-  },
-  selectorSwitchOff: {
-    backgroundColor: '#2A2A2A',
-    borderColor: 'rgba(255, 255, 255, 0.28)',
-  },
-  selectorSwitchThumb: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    height: 24,
-    width: 24,
-  },
-  selectorSwitchThumbOn: {
-    alignSelf: 'flex-end',
-  },
-  selectorActionRow: {
-    alignItems: 'center',
-    backgroundColor: '#101010',
-    borderColor: 'rgba(227, 181, 59, 0.32)',
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginHorizontal: -SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.sm,
-  },
-  selectorIconButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(227, 181, 59, 0.06)',
-    borderColor: 'rgba(227, 181, 59, 0.24)',
-    borderRadius: 20,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-});
+/**
+ * The drawer in the colours of the page it opens over. Night's are the
+ * drawer's own black and gold from before there were other pages: its strip
+ * is the old #111111 header and rows (the foot's #101010, one step darker,
+ * now matches them), its lit strip the old #171513 row for where the reader is.
+ */
+function createStyles(theme: DocumentTheme) {
+  const { colors } = theme;
+  const drawer = documentSelectorColors(theme);
+  return StyleSheet.create({
+    selectorOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      flex: 1,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
+    selectorBackdrop: {
+      flex: 1,
+    },
+    selectorPanel: {
+      backgroundColor: drawer.panel,
+      borderColor: withAlpha(colors.accent, 0.35),
+      borderLeftWidth: 1,
+      paddingHorizontal: SPACING.md,
+    },
+    selectorHeader: {
+      alignItems: 'center',
+      backgroundColor: colors.strip,
+      borderBottomWidth: 1,
+      borderBottomColor: withAlpha(colors.accent, 0.28),
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginHorizontal: -SPACING.md,
+      minHeight: 62,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+    },
+    actionLabel: {
+      color: colors.accent,
+      fontFamily: TYPOGRAPHY.title,
+      fontSize: 21,
+      fontWeight: '800',
+      letterSpacing: 0,
+    },
+    selectorList: {
+      flex: 1,
+      paddingTop: SPACING.md,
+    },
+    selectorItem: {
+      backgroundColor: colors.strip,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: 'row',
+      minHeight: 78,
+      marginBottom: SPACING.sm,
+      overflow: 'hidden',
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+    },
+    selectorItemSubdocument: {
+      backgroundColor: colors.subdocSoft,
+      borderColor: colors.subdocLine,
+    },
+    selectorTitleSubdocument: {
+      color: colors.subdoc,
+    },
+    selectorItemHyperlink: {
+      alignItems: 'center',
+      backgroundColor: colors.linkSoft,
+      borderColor: colors.linkLine,
+      minHeight: 48,
+      paddingVertical: SPACING.sm,
+    },
+    selectorTitleHyperlink: {
+      color: colors.link,
+    },
+    selectorHyperlinkArrow: {
+      color: colors.link,
+      fontSize: 16,
+      marginLeft: SPACING.sm,
+    },
+    nestedSegment: {
+      borderLeftColor: colors.accentLine,
+      borderLeftWidth: 3,
+      paddingBottom: SPACING.sm,
+      paddingLeft: SPACING.md,
+    },
+    // Keep the group's gold rail ending flush with its final card, then restore
+    // the normal inter-card gap outside the nested wrapper before the next
+    // unnested hymn.
+    nestedSegmentLast: { marginBottom: SPACING.sm, paddingBottom: 0 },
+    // The gap moves onto the wrapper's padding so the rule can run through it.
+    selectorItemNested: { marginBottom: 0 },
+    selectorItemDivider: {
+      backgroundColor: 'transparent',
+      borderRadius: 0,
+      borderWidth: 0,
+      marginBottom: SPACING.sm,
+      marginTop: SPACING.md,
+      minHeight: 0,
+      paddingHorizontal: 0,
+      paddingVertical: SPACING.xs,
+    },
+    dividerRow: {
+      alignItems: 'center',
+      flex: 1,
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    dividerRule: {
+      backgroundColor: colors.accentLine,
+      flex: 1,
+      height: 1,
+    },
+    dividerLabelGroup: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: SPACING.xs,
+    },
+    dividerLabel: {
+      color: colors.accent,
+      fontFamily: TYPOGRAPHY.title,
+      fontSize: 13,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+    },
+    dividerLabelArabic: {
+      fontFamily: TYPOGRAPHY.arabic,
+      fontSize: 15,
+      // Arabic has no upper case for textTransform to reach.
+      textTransform: 'none',
+    },
+    selectorItemActive: {
+      backgroundColor: colors.stripActive,
+      borderColor: withAlpha(colors.accent, 0.72),
+    },
+    selectorTitleRow: {
+      alignItems: 'center',
+      flex: 1,
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    selectorTitleRowLandscape: {
+      flexDirection: 'column',
+    },
+    selectorTitle: {
+      flex: 1,
+      fontFamily: TYPOGRAPHY.title,
+      fontSize: 16,
+      fontWeight: '700',
+      lineHeight: 22,
+      flexShrink: 1,
+      color: colors.text,
+    },
+    selectorTitleSilentPrayer: {
+      color: drawer.quiet,
+      fontStyle: 'italic',
+    },
+    selectorTitleArabic: {
+      writingDirection: 'rtl',
+    },
+    centeredTitle: {
+      textAlign: 'center',
+    },
+    selectorToggleRow: {
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderColor: withAlpha(colors.accent, 0.28),
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      justifyContent: 'center',
+      marginHorizontal: -SPACING.md,
+      minHeight: 56,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+    },
+    selectorToggleTextGroup: {
+      alignItems: 'center',
+      flex: 0,
+      gap: 2,
+      minWidth: 136,
+    },
+    selectorToggleText: {
+      fontFamily: TYPOGRAPHY.title,
+      fontSize: 14,
+      fontWeight: '800',
+      lineHeight: 18,
+      textAlign: 'center',
+      color: colors.text,
+    },
+    selectorToggleArabicText: {
+      fontFamily: 'Arial',
+      fontSize: 13,
+      lineHeight: 18,
+      textAlign: 'center',
+      writingDirection: 'rtl',
+    },
+    selectorSwitch: {
+      borderRadius: 15,
+      borderWidth: 1,
+      height: 30,
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+      width: 52,
+    },
+    selectorSwitchOn: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    selectorSwitchOff: {
+      backgroundColor: drawer.switchTrack,
+      borderColor: withAlpha(colors.text, 0.28),
+    },
+    // White on every page, as a switch's thumb is: it reads on the gold when
+    // on and on the track when off, light page or dark.
+    selectorSwitchThumb: {
+      backgroundColor: COLORS.white,
+      borderRadius: 12,
+      height: 24,
+      width: 24,
+    },
+    selectorSwitchThumbOn: {
+      alignSelf: 'flex-end',
+    },
+    selectorActionRow: {
+      alignItems: 'center',
+      backgroundColor: colors.strip,
+      borderColor: withAlpha(colors.accent, 0.32),
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginHorizontal: -SPACING.md,
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.sm,
+    },
+    selectorIconButton: {
+      alignItems: 'center',
+      backgroundColor: withAlpha(colors.accent, 0.06),
+      borderColor: withAlpha(colors.accent, 0.24),
+      borderRadius: 20,
+      borderWidth: 1,
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+  });
+}

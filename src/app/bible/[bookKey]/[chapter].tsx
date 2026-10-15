@@ -1,6 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Head from 'expo-router/head';
+import { StatusBar } from 'expo-status-bar';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,7 +12,8 @@ import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
 import LoadingScreen from '@/components/vine/ui/LoadingScreen';
-import { getDocumentTheme } from '@/constants/documentThemes';
+import { documentSelectorColors } from '@/constants/documentSelectorColors';
+import { getDocumentTheme, withAlpha, type DocumentTheme } from '@/constants/documentThemes';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useBottomChrome } from '@/context/BottomChromeContext';
@@ -350,8 +352,10 @@ export default function BibleChapterDocument() {
     [availableLanguages, visibleLanguageKeys],
   );
   const fontSize = fontScaleToPx(preferences.fontScale);
-  // The page the chapter is read on (constants/documentThemes.ts).
+  // The page the chapter is read on (constants/documentThemes.ts). The verse
+  // selector is drawn in its colours too, so it opens as part of the page.
   const theme = getDocumentTheme(preferences.documentTheme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const currentChapterNumber = Number(chapter);
   const headerTitleEnglish = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'en');
   const headerTitleArabic = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'ar');
@@ -555,6 +559,9 @@ export default function BibleChapterDocument() {
             onRequestClose={closeVerseSelector}
             supportedOrientations={modalOrientations}
           >
+            {/* The drawer runs up under the status bar, so on a light page
+                the clock and battery over it turn dark to stay readable. */}
+            <StatusBar style={theme.dark ? 'light' : 'dark'} />
             <View style={styles.selectorOverlay}>
               <Pressable accessibilityLabel={selectorText.closeSelector} style={styles.selectorBackdrop} onPress={closeVerseSelector} />
               <Animated.View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top, transform: [{ translateX: selectorSlide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }] }]}>
@@ -574,6 +581,8 @@ export default function BibleChapterDocument() {
                     icon="chevron-back"
                     label={selectorText.previous}
                     onPress={() => goToChapter(previousChapter)}
+                    styles={styles}
+                    theme={theme}
                   />
                   <ChapterNavButton
                     accessibilityLabel={selectorText.nextChapter}
@@ -582,6 +591,8 @@ export default function BibleChapterDocument() {
                     icon="chevron-forward"
                     label={selectorText.next}
                     onPress={() => goToChapter(nextChapter)}
+                    styles={styles}
+                    theme={theme}
                   />
                 </View>
 
@@ -594,11 +605,11 @@ export default function BibleChapterDocument() {
                         key={option.key}
                         style={[
                           styles.languageButton,
-                          { backgroundColor: enabledLanguages[option.key] ? COLORS.gold : COLORS.surface, borderColor: enabledLanguages[option.key] ? COLORS.gold : COLORS.border },
+                          { backgroundColor: enabledLanguages[option.key] ? theme.colors.accent : theme.colors.surface, borderColor: enabledLanguages[option.key] ? theme.colors.accent : theme.colors.border },
                         ]}
                         onPress={() => toggleLanguage(option.key)}
                       >
-                        <Text style={[styles.languageText, preferences.appLanguage === 'ar' && styles.languageTextArabic, { color: enabledLanguages[option.key] ? COLORS.black : COLORS.white }]}>
+                        <Text style={[styles.languageText, preferences.appLanguage === 'ar' && styles.languageTextArabic, { color: enabledLanguages[option.key] ? theme.colors.onAccent : theme.colors.text }]}>
                           {languageLabel}
                         </Text>
                       </Pressable>
@@ -654,7 +665,7 @@ export default function BibleChapterDocument() {
 
                 <View style={styles.selectorActionRow}>
                   <Pressable accessibilityLabel={selectorText.bookmarkChapter} style={styles.selectorIconButton} onPress={() => toggleBookmark(bookmarkId)}>
-                    <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={COLORS.gold} />
+                    <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={theme.colors.accent} />
                   </Pressable>
                   <Pressable
                     accessibilityLabel={selectorText.openBibleSettings}
@@ -666,7 +677,7 @@ export default function BibleChapterDocument() {
                       showBookSettings(true);
                     }}
                   >
-                    <Icon name="settings-outline" size={25} color={COLORS.gold} />
+                    <Icon name="settings-outline" size={25} color={theme.colors.accent} />
                   </Pressable>
                 </View>
               </Animated.View>
@@ -686,6 +697,8 @@ function ChapterNavButton({
   icon,
   label,
   onPress,
+  styles,
+  theme,
 }: {
   accessibilityLabel: string;
   appLanguage: AppLanguage;
@@ -693,7 +706,10 @@ function ChapterNavButton({
   icon: 'chevron-back' | 'chevron-forward';
   label: string;
   onPress: () => void;
+  styles: ChapterStyles;
+  theme: DocumentTheme;
 }) {
+  const disabledColor = documentSelectorColors(theme).disabled;
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
@@ -701,108 +717,116 @@ function ChapterNavButton({
       style={[styles.chapterNavButton, disabled && styles.chapterNavButtonDisabled]}
       onPress={onPress}
     >
-      <Icon name={icon} size={20} color={disabled ? '#6E6E6E' : COLORS.gold} />
-      <Text style={[styles.chapterNavText, appLanguage === 'ar' && styles.chapterNavTextArabic, { color: disabled ? '#6E6E6E' : COLORS.white }]}>{label}</Text>
+      <Icon name={icon} size={20} color={disabled ? disabledColor : theme.colors.accent} />
+      <Text style={[styles.chapterNavText, appLanguage === 'ar' && styles.chapterNavTextArabic, { color: disabled ? disabledColor : theme.colors.text }]}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.black },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
-  error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17 },
-  verseScreen: { flex: 1 },
-  selectorOverlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.48)' },
-  selectorBackdrop: { flex: 1 },
-  // Visual language matched to ContentSelectorDrawer (the normal document
-  // reader's content selector) — same panel background/border, header
-  // pattern (back button left, centered bilingual title), and card-style
-  // list items, per the request to make the two selectors feel consistent.
-  selectorPanel: {
-    backgroundColor: '#050505',
-    borderColor: 'rgba(227, 181, 59, 0.35)',
-    borderLeftWidth: 1,
-    paddingHorizontal: SPACING.md,
-  },
-  selectorHeader: {
-    alignItems: 'center',
-    backgroundColor: '#111111',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(227, 181, 59, 0.28)',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginHorizontal: -SPACING.md,
-    minHeight: 62,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  selectorHeaderTitle: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
-  selectorHeaderArabic: { fontFamily: 'Arial', textAlign: 'left', writingDirection: 'rtl' },
-  chapterNavRow: { borderBottomColor: 'rgba(227, 181, 59, 0.18)', borderBottomWidth: 1, flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.sm },
-  chapterNavButton: {
-    alignItems: 'center',
-    borderColor: 'rgba(227, 181, 59, 0.42)',
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    justifyContent: 'center',
-    minHeight: 42,
-  },
-  chapterNavButtonDisabled: { borderColor: 'rgba(110, 110, 110, 0.4)', opacity: 0.72 },
-  chapterNavText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '800' },
-  chapterNavTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
-  selectorLanguageBar: { borderBottomColor: 'rgba(227, 181, 59, 0.18)', borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingVertical: SPACING.sm },
-  languageButton: { borderRadius: 8, borderWidth: 1, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
-  languageText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
-  languageTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
-  selectorList: { flex: 1, paddingTop: SPACING.md },
-  psalmStanzaDivider: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
-  psalmStanzaLine: { backgroundColor: 'rgba(227, 181, 59, 0.38)', flex: 1, height: 1 },
-  psalmStanzaLabel: { alignItems: 'center', flexDirection: 'row', gap: SPACING.xs },
-  psalmStanzaLetter: { color: COLORS.gold, fontFamily: 'Arial', fontSize: 21, fontWeight: '700', lineHeight: 28, textAlign: 'center' },
-  psalmStanzaNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700', textAlign: 'left', writingDirection: 'ltr' },
-  psalmStanzaNumberArabic: { fontFamily: TYPOGRAPHY.arabic },
-  selectorItem: {
-    alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    minHeight: 56,
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-  },
-  selectorVerseNumber: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', minWidth: 28 },
-  selectorVerseNumberLxx: { color: COLORS.priest },
-  selectorVerseNumberIntro: { color: COLORS.refrain },
-  selectorVersePreview: { flex: 1, fontFamily: 'Georgia', fontSize: 13, lineHeight: 18, color: COLORS.white },
-  selectorVersePreviewArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-  selectorVersePreviewCoptic: { fontFamily: TYPOGRAPHY.coptic },
-  selectorVersePreviewIntro: { color: COLORS.refrain, fontStyle: 'italic' },
-  selectorActionRow: {
-    alignItems: 'center',
-    backgroundColor: '#101010',
-    borderColor: 'rgba(227, 181, 59, 0.32)',
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginHorizontal: -SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.sm,
-  },
-  selectorIconButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(227, 181, 59, 0.06)',
-    borderColor: 'rgba(227, 181, 59, 0.24)',
-    borderRadius: 20,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-});
+type ChapterStyles = ReturnType<typeof createStyles>;
+
+function createStyles(theme: DocumentTheme) {
+  const { colors } = theme;
+  const drawer = documentSelectorColors(theme);
+  return StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: COLORS.black },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
+    error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17 },
+    verseScreen: { flex: 1 },
+    selectorOverlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: drawer.scrim },
+    selectorBackdrop: { flex: 1 },
+    // Visual language matched to ContentSelectorDrawer (the normal document
+    // reader's content selector) — same panel background/border, header
+    // pattern (back button left, centered bilingual title), and card-style
+    // list items, per the request to make the two selectors feel consistent.
+    // Its colours are the page's in the same way (constants/documentSelectorColors.ts).
+    selectorPanel: {
+      backgroundColor: drawer.panel,
+      borderColor: withAlpha(colors.accent, 0.35),
+      borderLeftWidth: 1,
+      paddingHorizontal: SPACING.md,
+    },
+    selectorHeader: {
+      alignItems: 'center',
+      backgroundColor: colors.strip,
+      borderBottomWidth: 1,
+      borderBottomColor: withAlpha(colors.accent, 0.28),
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginHorizontal: -SPACING.md,
+      minHeight: 62,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+    },
+    selectorHeaderTitle: { color: colors.accent, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
+    selectorHeaderArabic: { fontFamily: 'Arial', textAlign: 'left', writingDirection: 'rtl' },
+    chapterNavRow: { borderBottomColor: withAlpha(colors.accent, 0.18), borderBottomWidth: 1, flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.sm },
+    chapterNavButton: {
+      alignItems: 'center',
+      borderColor: withAlpha(colors.accent, 0.42),
+      borderRadius: 8,
+      borderWidth: 1,
+      flex: 1,
+      flexDirection: 'row',
+      gap: SPACING.xs,
+      justifyContent: 'center',
+      minHeight: 42,
+    },
+    chapterNavButtonDisabled: { borderColor: withAlpha(drawer.disabled, 0.4), opacity: 0.72 },
+    chapterNavText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '800' },
+    chapterNavTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+    selectorLanguageBar: { borderBottomColor: withAlpha(colors.accent, 0.18), borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingVertical: SPACING.sm },
+    languageButton: { borderRadius: 8, borderWidth: 1, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+    languageText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
+    languageTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+    selectorList: { flex: 1, paddingTop: SPACING.md },
+    psalmStanzaDivider: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
+    psalmStanzaLine: { backgroundColor: withAlpha(colors.accent, 0.38), flex: 1, height: 1 },
+    psalmStanzaLabel: { alignItems: 'center', flexDirection: 'row', gap: SPACING.xs },
+    psalmStanzaLetter: { color: colors.accent, fontFamily: 'Arial', fontSize: 21, fontWeight: '700', lineHeight: 28, textAlign: 'center' },
+    psalmStanzaNumber: { color: colors.accent, fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700', textAlign: 'left', writingDirection: 'ltr' },
+    psalmStanzaNumberArabic: { fontFamily: TYPOGRAPHY.arabic },
+    selectorItem: {
+      alignItems: 'center',
+      backgroundColor: colors.strip,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      minHeight: 56,
+      marginBottom: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+    },
+    selectorVerseNumber: { color: colors.accent, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', minWidth: 28 },
+    // The same colours the chapter itself marks these verses in.
+    selectorVerseNumberLxx: { color: colors.priest },
+    selectorVerseNumberIntro: { color: colors.refrain },
+    selectorVersePreview: { flex: 1, fontFamily: 'Georgia', fontSize: 13, lineHeight: 18, color: colors.text },
+    selectorVersePreviewArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+    selectorVersePreviewCoptic: { fontFamily: TYPOGRAPHY.coptic },
+    selectorVersePreviewIntro: { color: colors.refrain, fontStyle: 'italic' },
+    selectorActionRow: {
+      alignItems: 'center',
+      backgroundColor: colors.strip,
+      borderColor: withAlpha(colors.accent, 0.32),
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginHorizontal: -SPACING.md,
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.sm,
+    },
+    selectorIconButton: {
+      alignItems: 'center',
+      backgroundColor: withAlpha(colors.accent, 0.06),
+      borderColor: withAlpha(colors.accent, 0.24),
+      borderRadius: 20,
+      borderWidth: 1,
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+  });
+}

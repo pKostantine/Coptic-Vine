@@ -491,6 +491,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
               onToggleBishopPresent={toggleBishopPresent}
               displaySilentPrayers={preferences.displaySilentPrayers}
               appLanguage={preferences.appLanguage}
+              theme={documentTheme}
             />
           </>
         )}
