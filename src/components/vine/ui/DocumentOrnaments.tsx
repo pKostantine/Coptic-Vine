@@ -5,9 +5,6 @@ import { SvgXml } from 'react-native-svg';
 import { HEADPIECES, MEDALLION, type HeadpieceOrnament } from '../../../constants/documentOrnaments';
 import type { OrnamentArt } from '../../../constants/ornamentArt';
 
-/** The widest a headpiece is drawn, as in the reader: past this it would only grow taller, not finer. */
-export const HEADPIECE_MAX_WIDTH = 720;
-
 function ornamentXml(art: OrnamentArt, color: string): string {
   // Drawn in currentColor; set to the colour here rather than through
   // SvgXml's color prop, so every platform's renderer agrees.
@@ -16,7 +13,8 @@ function ornamentXml(art: OrnamentArt, color: string): string {
 
 export function headpieceSize(kind: HeadpieceOrnament, availableWidth: number) {
   const art = HEADPIECES[kind].art;
-  const width = Math.max(1, Math.min(availableWidth, HEADPIECE_MAX_WIDTH));
+  // The full width of the page, its height following the art's proportions.
+  const width = Math.max(1, availableWidth);
   return { width, height: (width * art.height) / art.width };
 }
 

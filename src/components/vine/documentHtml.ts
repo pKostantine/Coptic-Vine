@@ -469,8 +469,6 @@ export function buildDocumentHtml(
       .headpiece {
         color: ${ornamentColor};
         container-type: inline-size;
-        margin: 0 auto;
-        max-width: 720px;
         position: relative;
         width: 100%;
       }

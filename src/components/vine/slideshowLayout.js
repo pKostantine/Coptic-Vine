@@ -580,15 +580,15 @@ export function getVerseLineSegmentHeight(segment, fontSize, visibleLanguages) {
 /**
  * The ornaments' proportions (constants/documentOrnaments.ts, kept here as
  * plain numbers so this file stays importable on its own): each headpiece's
- * height over its width, drawn no wider than 720pt, and the Medallion's size.
+ * height over its width, drawn the full width of the page, and the
+ * Medallion's size.
  */
 const HEADPIECE_ASPECT = { lintel: 230 / 1200, stepped: 400 / 1200, interlace: 460 / 1200 };
-const HEADPIECE_MAX_WIDTH = 720;
 
 export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
   const chrome = getSlideshowChromeMetrics(fontSize);
   if (item.type === "title" && HEADPIECE_ASPECT[item.ornament]) {
-    return Math.min(Math.max(tableWidth, 1), HEADPIECE_MAX_WIDTH) * HEADPIECE_ASPECT[item.ornament] + SPACING_SM * 2;
+    return Math.max(tableWidth, 1) * HEADPIECE_ASPECT[item.ornament] + SPACING_SM * 2;
   }
   if (item.type === "ornament") return Math.min(Math.max(tableWidth * 0.28, 96), 150) + SPACING_SM * 6;
   if (item.type === "title") return chrome.titleLineHeight + SPACING_SM * 2;
