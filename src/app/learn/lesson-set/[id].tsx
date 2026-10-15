@@ -9,6 +9,7 @@ import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAware
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
+import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
@@ -107,6 +108,7 @@ export default function LearningLessonSetScreen() {
           <View style={styles.mediaList}>
             {lessonSet.lessons.map((lesson, index) => {
               const lessonDownload = learningLessonDownloadRequest(lessonSet, lesson, locale);
+              const audioItem = audioQueue.find((entry) => entry.id === lesson.id);
               return (
                 <LearningMediaRow
                   key={lesson.id}
@@ -120,6 +122,7 @@ export default function LearningLessonSetScreen() {
                   onPress={() => openLesson(lesson.id, lesson.mediaType)}
                   trailing={(
                     <View style={styles.rowActions}>
+                      {audioItem ? <LearningItemActionsMenu item={audioItem} isArabic={isArabic} size={32} /> : null}
                       <LearningDownloadButton
                         packageKey={lessonDownload.packageKey}
                         request={lessonDownload}

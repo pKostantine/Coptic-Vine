@@ -18,6 +18,7 @@ import AppHeader from '@/components/vine/ui/AppHeader';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
+import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -258,6 +259,7 @@ export default function LearningLibraryScreen() {
           {stateItems.map((item) => {
             const stateIndex = STATE_ORDER.indexOf(item.state);
             const busy = movingId === item.itemId;
+            const audioItem = audioQueue.find((entry) => entry.id === item.itemId);
             return (
               <View key={item.itemKind + ':' + item.itemId} style={styles.itemRow}>
                 <Pressable accessibilityRole="button" style={styles.itemMain} onPress={() => openItem(item)}>
@@ -271,6 +273,7 @@ export default function LearningLibraryScreen() {
                   </View>
                   <Icon name={item.mediaType === 'video' ? 'eye-outline' : currentItem?.id === item.itemId ? 'pause' : 'play'} size={19} color={COLORS.learningBright} />
                 </Pressable>
+                {audioItem ? <LearningItemActionsMenu item={audioItem} isArabic={isArabic} size={34} /> : null}
                 <View style={styles.moveActions}>
                   {stateIndex > 0 ? (
                     <Pressable

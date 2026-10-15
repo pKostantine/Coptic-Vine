@@ -2,6 +2,7 @@ import { ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { PlaybackProvider, usePlayback } from '@/context/PlaybackContext';
 import { useAuth } from '@/context/AuthContext';
+import { describeQueue, isMusicQueueItem, type QueueEntryView } from '@/context/queueEntries';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerAsset, MusicConsumerRelease, MusicConsumerTrack } from '@/types/musicConsumer';
 import type { PlaybackQueueEntry, PlaybackRepeatMode } from '@/types/playback';
@@ -20,10 +21,11 @@ export interface MusicQueueItem {
 }
 
 interface MusicPlayerContextValue {
-  queue: MusicQueueItem[];
-  /** Stable per-entry keys, parallel to `queue`, for list rendering. */
-  queueKeys: string[];
+  /** The whole queue as the engine holds it — Music tracks and Learn & Study items alike, in order (see queueEntries.ts). */
+  entries: QueueEntryView[];
+  /** The engine's index of what is playing, whichever kind it is. */
   currentIndex: number;
+  /** The track playing, or null while a Learn & Study item plays. */
   currentItem: MusicQueueItem | null;
   playing: boolean;
   buffering: boolean;
@@ -46,12 +48,6 @@ interface MusicPlayerContextValue {
   clearQueue: () => void;
   cycleRepeatMode: () => void;
   toggleShuffle: () => void;
-}
-
-function isMusicQueueItem(value: unknown): value is MusicQueueItem {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<MusicQueueItem>;
-  return Boolean(candidate.track && typeof candidate.track === 'object' && typeof candidate.track.id === 'string');
 }
 
 function toPlaybackEntry(item: MusicQueueItem, occurrence: number): PlaybackQueueEntry<MusicQueueItem> {
@@ -175,18 +171,14 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Compatibility/product adapter for the Phase 8 Music UI. The actual player
- * is product-agnostic in PlaybackContext so Learn & Study can share it later.
+ * The Music adapter over the one player in PlaybackContext, which Learn &
+ * Study shares: the queue it reports is the whole queue, so a track queued
+ * after a lesson shows where it will play.
  */
 export function useMusicPlayer(): MusicPlayerContextValue {
   const playback = usePlayback();
 
-  const musicEntries = useMemo(
-    () => playback.queue.filter((entry) => isMusicQueueItem(entry.payload)),
-    [playback.queue],
-  );
-  const queue = useMemo(() => musicEntries.map((entry) => entry.payload as MusicQueueItem), [musicEntries]);
-  const queueKeys = useMemo(() => musicEntries.map((entry) => entry.key), [musicEntries]);
+  const entries = useMemo(() => describeQueue(playback.queue), [playback.queue]);
   const currentItem = playback.currentItem?.playable.kind === 'music_track'
     && isMusicQueueItem(playback.currentItem.payload)
     ? playback.currentItem.payload
@@ -215,9 +207,8 @@ export function useMusicPlayer(): MusicPlayerContextValue {
   }, [nextQueuedEntry, playback.addToEnd]);
 
   return {
-    queue,
-    queueKeys,
-    currentIndex: currentItem ? playback.currentIndex : -1,
+    entries,
+    currentIndex: playback.currentIndex,
     currentItem,
     playing: currentItem ? playback.playing : false,
     buffering: currentItem ? playback.buffering || playback.loadingSource : false,
