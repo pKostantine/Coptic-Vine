@@ -3,19 +3,19 @@ import { COLORS } from './theme';
 /**
  * The pages a service, a subdocument or a Bible chapter can be read on — the
  * way a book app offers a dark page, a paper page, a sepia one. Night is the
- * page the app has always had, and Paper its plain white counterpart. Ink,
- * Vine and Sepia are each set as a palette of their own rather than Night's
- * colours carried over: what every page keeps is the roles — the two voices
+ * page the app has always had, and Paper its plain white counterpart. Walnut,
+ * Vine and Sepia are each set in colours of their own page's family rather
+ * than Night's carried over: what every page keeps is the roles — the two voices
  * of an alternating hymn told apart by hue, the refrain distinct from both,
  * the priest, deacon and people each in their own colour, the comments and
  * silent prayers quieter than the text. tests/documentThemes.test.cjs holds
  * every page to those roles and to WCAG contrast against its page.
  */
 
-export type DocumentThemeId = 'night' | 'ink' | 'vine' | 'sepia' | 'paper';
+export type DocumentThemeId = 'night' | 'walnut' | 'vine' | 'sepia' | 'paper';
 
 /** Darkest to lightest, as the picker shows them. */
-export const DOCUMENT_THEME_IDS: DocumentThemeId[] = ['night', 'ink', 'vine', 'sepia', 'paper'];
+export const DOCUMENT_THEME_IDS: DocumentThemeId[] = ['night', 'walnut', 'vine', 'sepia', 'paper'];
 
 export const DEFAULT_DOCUMENT_THEME_ID: DocumentThemeId = 'night';
 
@@ -124,86 +124,84 @@ export const NIGHT_DOCUMENT_THEME: DocumentTheme = {
   },
 };
 
-const INK_SUBDOC = darkButton('#9DC9FF');
-const INK_LINK = darkButton('#6ED3A0');
+const WALNUT_SUBDOC = darkButton('#EBC383');
+const WALNUT_LINK = darkButton('#DFA08A');
 
-const INK_DOCUMENT_THEME: DocumentTheme = {
-  id: 'ink',
-  name: { english: 'Ink', french: 'Encre', arabic: 'حبر' },
+const WALNUT_DOCUMENT_THEME: DocumentTheme = {
+  id: 'walnut',
+  name: { english: 'Walnut', french: 'Noyer', arabic: 'جوزي' },
   dark: true,
   colors: {
-    // A deep navy, like blue-black ink: softer than black at night and cooler
-    // than a brown, with a moonlit ivory for the text and a clear sky blue for
-    // the second voice — the one hue the navy holds without either glaring.
-    // The gold of the titles sits on it the way gilt sits on a navy binding.
-    page: '#0F1A2C',
-    surface: '#18263B',
-    border: '#26364F',
-    strip: '#132034',
-    stripActive: '#1E2E46',
-    text: '#EEE8DA',
-    alternate: '#9DC9FF',
+    // A warm dark brown, like a lamp-lit page, set wholly in warm colours —
+    // nothing cool against the wood: a cream for the text, honey for the
+    // second voice, a clay rose for the refrain, gold for the titles.
+    page: '#1F1914',
+    surface: '#2B231C',
+    border: '#3A2F25',
+    strip: '#251E18',
+    stripActive: '#30271F',
+    text: '#F3E7D3',
+    alternate: '#EBC383',
     accent: COLORS.gold,
-    onAccent: '#0F1A2C',
+    onAccent: '#1F1914',
     accentSoft: COLORS.goldSoft,
     accentLine: COLORS.goldLine,
-    // The rubrics softened from Night's: a coral red, a butter yellow and an
-    // apricot read as red, yellow and orange on the blue without buzzing.
-    priest: '#FF7A70',
-    deacon: '#F6DE6B',
-    people: '#F5A25A',
-    peopleText: '#F4BC86',
-    // A slate for comments, a pale grey for silent prayers: both of the
-    // page's own blue-grey, so they step back from the text.
-    comment: '#7F8EA8',
-    silent: '#A3A9B5',
-    refrain: '#8EDAAB',
-    metropolitan: '#8FE6EC',
-    subdoc: INK_SUBDOC.color,
-    subdocSoft: INK_SUBDOC.soft,
-    subdocLine: INK_SUBDOC.line,
-    link: INK_LINK.color,
-    linkSoft: INK_LINK.soft,
-    linkLine: INK_LINK.line,
+    // A brick red, a lemon yellow and a copper: the rubrics in the wood's own warmth.
+    priest: '#E8604A',
+    deacon: '#F4DE66',
+    people: '#F0A04E',
+    // The people's copper for their own words too: Night's pale orange would
+    // vanish into the honey.
+    peopleText: '#F0A04E',
+    // Comments in a taupe and silent prayers in a warm grey, both of the wood.
+    comment: '#A08B74',
+    silent: '#B5A895',
+    refrain: '#DFA08A',
+    metropolitan: '#C9C08A',
+    // The nested-document button wears the honey of the second voice, as
+    // Night's wears its blue; the button to another service, the clay.
+    subdoc: WALNUT_SUBDOC.color,
+    subdocSoft: WALNUT_SUBDOC.soft,
+    subdocLine: WALNUT_SUBDOC.line,
+    link: WALNUT_LINK.color,
+    linkSoft: WALNUT_LINK.soft,
+    linkLine: WALNUT_LINK.line,
   },
 };
 
-const VINE_SUBDOC = darkButton('#CDBDF7');
-const VINE_LINK = darkButton('#7FD6A3');
+const VINE_SUBDOC = darkButton('#B3DDB4');
+const VINE_LINK = darkButton('#E5C97E');
 
 const VINE_DOCUMENT_THEME: DocumentTheme = {
   id: 'vine',
   name: { english: 'Vine', french: 'Vigne', arabic: 'الكرمة' },
   dark: true,
   colors: {
-    // A deep vine-leaf green, darker and richer than the app's chrome, so a
-    // long service is easy on the eye. The vine's own colours set it: a warm
-    // ivory for the text, a grape lavender for the second voice (blue would
-    // only echo the green; lavender stands clear of it and of the ivory), and
-    // the app's gold for the titles.
+    // A deep vine-leaf green, darker than the app's chrome, set in the
+    // vineyard's own colours: a cream for the text, a pale leaf celadon for
+    // the second voice, ripe wheat for the refrain, gold for the titles.
     page: '#02180E',
     surface: '#0B2516',
     border: '#163522',
     strip: '#071F12',
     stripActive: '#102D1C',
-    text: '#F2EDDD',
-    alternate: '#CDBDF7',
+    text: '#F1EAD6',
+    alternate: '#B3DDB4',
     accent: COLORS.gold,
     onAccent: '#02180E',
     accentSoft: COLORS.goldSoft,
     accentLine: COLORS.goldLine,
-    priest: '#F2766B',
-    deacon: '#F2E266',
-    people: '#F0A050',
-    peopleText: '#F4BC86',
+    // A coral, a lemon and an apricot: warm against the green without buzzing.
+    priest: '#F07C64',
+    deacon: '#F3E26C',
+    people: '#F2A45C',
+    peopleText: '#F5C08E',
     // A sage for comments and a green-grey for silent prayers: quiet because
     // they lean into the page.
-    comment: '#7D9585',
-    silent: '#A8B0AA',
-    refrain: '#8EDAAB',
-    metropolitan: '#8EE6E6',
-    // The nested-document button wears the second voice's lavender, as
-    // Night's wears its blue.
+    comment: '#7F9A86',
+    silent: '#A9B4AA',
+    refrain: '#E5C97E',
+    metropolitan: '#EAD9A0',
     subdoc: VINE_SUBDOC.color,
     subdocSoft: VINE_SUBDOC.soft,
     subdocLine: VINE_SUBDOC.line,
@@ -213,42 +211,40 @@ const VINE_DOCUMENT_THEME: DocumentTheme = {
   },
 };
 
-const SEPIA_ACCENT = '#80500A';
-const SEPIA_SUBDOC = lightButton('#2A4F8A');
-const SEPIA_LINK = lightButton('#22604A');
+const SEPIA_ACCENT = '#7E4E0A';
+const SEPIA_SUBDOC = lightButton('#7C2318');
+const SEPIA_LINK = lightButton('#485C1F');
 
 const SEPIA_DOCUMENT_THEME: DocumentTheme = {
   id: 'sepia',
   name: { english: 'Sepia', french: 'Sépia', arabic: 'سيبيا' },
   dark: false,
   colors: {
-    // A warm parchment: golden rather than grey, darker than paper so it
-    // doesn't glare, set like an old service book — a brown-black iron-gall
-    // ink, a lapis blue for the second voice, rubrics in crimson, and titles
-    // in a burnished gold.
-    page: '#EFDCB4',
-    surface: '#E5CFA4',
-    border: '#D4BC8E',
-    strip: '#E9D5AB',
-    stripActive: '#DDC699',
-    text: '#30251C',
-    alternate: '#24497E',
+    // A warm golden parchment, easy on the eye, set like an old service book
+    // in black and red: a brown-black ink for the text, an oxblood for the
+    // second voice, an olive for the refrain, burnished gold for the titles.
+    page: '#EBD3A7',
+    surface: '#E1C798',
+    border: '#CDB287',
+    strip: '#E6CC9F',
+    stripActive: '#D9BE8E',
+    text: '#2F2219',
+    alternate: '#7C2318',
     accent: SEPIA_ACCENT,
     onAccent: '#FFF8E7',
     accentSoft: rgba(SEPIA_ACCENT, 0.12),
     accentLine: rgba(SEPIA_ACCENT, 0.45),
-    // A crimson, an olive gold and a rust: red, yellow and orange as far
-    // apart as ink on parchment can hold them.
-    priest: '#A31C2C',
-    deacon: '#6C5D00',
-    people: '#984B0E',
-    peopleText: '#8A4520',
+    // A crimson, a dark ochre and a burnt orange.
+    priest: '#A3152E',
+    deacon: '#6E5800',
+    people: '#8C4A0E',
+    peopleText: '#7E431A',
     // Comments in a faded brown, like a note in the margin; silent prayers in
     // a plain grey.
     comment: '#7A6650',
-    silent: '#6E6C66',
-    refrain: '#33633A',
-    metropolitan: '#0F5F66',
+    silent: '#6F6A60',
+    refrain: '#485C1F',
+    metropolitan: '#485C1F',
     subdoc: SEPIA_SUBDOC.color,
     subdocSoft: SEPIA_SUBDOC.soft,
     subdocLine: SEPIA_SUBDOC.line,
@@ -297,7 +293,7 @@ const PAPER_DOCUMENT_THEME: DocumentTheme = {
 
 export const DOCUMENT_THEMES: Record<DocumentThemeId, DocumentTheme> = {
   night: NIGHT_DOCUMENT_THEME,
-  ink: INK_DOCUMENT_THEME,
+  walnut: WALNUT_DOCUMENT_THEME,
   vine: VINE_DOCUMENT_THEME,
   sepia: SEPIA_DOCUMENT_THEME,
   paper: PAPER_DOCUMENT_THEME,

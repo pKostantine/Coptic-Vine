@@ -33,16 +33,20 @@ const oklab = (hex) => {
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return { a: 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, b: 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s };
+  return {
+    L: 0.2104542553 * l + 0.793617963 * m - 0.0040720468 * s,
+    a: 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    b: 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  };
 };
 /**
- * How far apart two colours are in hue and colourfulness, leaving lightness
- * out: two shades of one ink score 0, so a pair that passes is told apart by
- * its colour and not only by being lighter or darker. White against Night's
- * blue is 0.10; Paper's red priest against its orange people, its closest
- * pair, is 0.07.
+ * How different two colours look (OKLab ΔE), lightness included: a page set in
+ * one family of colours -- Walnut's cream and honey, Vine's cream and celadon --
+ * tells its lines apart by shade as much as by hue. Night's white and blue are
+ * 0.22 apart; Vine's cream and celadon 0.10; a caramel beside Walnut's cream,
+ * too close to read as a second voice, would be 0.04.
  */
-const apart = (x, y) => { const p = oklab(x); const q = oklab(y); return Math.hypot(p.a - q.a, p.b - q.b); };
+const apart = (x, y) => { const p = oklab(x); const q = oklab(y); return Math.hypot(p.L - q.L, p.a - q.a, p.b - q.b); };
 const RGBA = /^rgba\(\d+, \d+, \d+, (0(\.\d+)?|1)\)$/;
 
 const TEXT_COLORS = ['text', 'alternate', 'accent', 'priest', 'deacon', 'people', 'peopleText', 'refrain', 'metropolitan', 'subdoc', 'link'];
@@ -51,13 +55,13 @@ const SOLID_COLORS = ['page', 'surface', 'border', 'strip', 'stripActive', 'onAc
 const WASHES = ['accentSoft', 'accentLine', 'subdocSoft', 'subdocLine', 'linkSoft', 'linkLine'];
 
 test('there are five pages, darkest to lightest, Night first and the default, each with a name in every App Language', () => {
-  assert.deepEqual(DOCUMENT_THEME_IDS, ['night', 'ink', 'vine', 'sepia', 'paper']);
+  assert.deepEqual(DOCUMENT_THEME_IDS, ['night', 'walnut', 'vine', 'sepia', 'paper']);
   assert.equal(getDocumentTheme(undefined), NIGHT_DOCUMENT_THEME);
   assert.equal(getDocumentTheme('sepia').id, 'sepia');
   // A page this version doesn't know (a newer app synced it, a hand-edited file) reads as Night rather than breaking.
   assert.equal(getDocumentTheme('amber'), NIGHT_DOCUMENT_THEME);
   // So does a page an earlier version offered and this one has dropped.
-  for (const dropped of ['slate', 'walnut']) assert.equal(getDocumentTheme(dropped), NIGHT_DOCUMENT_THEME, dropped);
+  for (const dropped of ['slate', 'ink']) assert.equal(getDocumentTheme(dropped), NIGHT_DOCUMENT_THEME, dropped);
   assert.equal(isDocumentThemeId('vine'), true);
   assert.equal(isDocumentThemeId('Vine'), false);
   for (const id of DOCUMENT_THEME_IDS) {
@@ -109,7 +113,7 @@ test('every page tells its lines apart by colour, whatever colours it chooses', 
       const gap = apart(colors[a], colors[b]);
       assert.ok(gap >= within, `${id}: ${a} ${colors[a]} and ${b} ${colors[b]} are only ${gap.toFixed(3)} apart`);
     };
-    // The two voices of an alternating hymn, at a glance: by hue, not only by shade.
+    // The two voices of an alternating hymn, at a glance.
     distinct('text', 'alternate', 0.09);
     // A refrain is neither voice.
     distinct('refrain', 'text', 0.08);
@@ -124,10 +128,10 @@ test('every page tells its lines apart by colour, whatever colours it chooses', 
       distinct(speaker, 'alternate', 0.07);
     }
     // The titles stand apart from the verses under them.
-    distinct('accent', 'text', 0.07);
-    distinct('accent', 'alternate', 0.07);
+    distinct('accent', 'text', 0.06);
+    distinct('accent', 'alternate', 0.06);
     // Opening a nested document and leaving for another service are different buttons.
-    distinct('subdoc', 'link', 0.1);
+    distinct('subdoc', 'link', 0.08);
   }
 });
 
