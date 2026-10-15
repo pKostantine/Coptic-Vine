@@ -12,16 +12,15 @@ import Icon from '@/components/vine/ui/Icon';
 import { CrownOrnament, VineDivider } from '@/components/vine/ui/Ornaments';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { SERVICES_BY_CATEGORY } from '@/constants/manifest';
-import { getSeasonIndicatorFullName } from '@/constants/seasonNames';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type HomeSynaxariumEvent } from '@/services/homeService';
-import { getCopticDate, getDayOverview, type CopticDate } from '@/utils/calendarService';
+import { getCopticDate, type CopticDate } from '@/utils/calendarService';
 import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 import { formatCopticDayMonth, formatDayMonthDate } from '@/utils/localeFormat';
 import { agpeyaHourAt } from '@/utils/agpeyaHours';
 import { LECTIONARY_ROUTE_IDS, LECTIONARY_SERVICES, lectionaryHref, readingLinesFor, withPropheciesAsOneLine } from '@/utils/lectionaryOutline';
-import { getServiceReadingCitations, getSundayMessageForDate, type LectionaryService, type ReadingCitation } from '@/utils/readingsService';
+import { getServiceReadingCitations, type LectionaryService, type ReadingCitation } from '@/utils/readingsService';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { appText, entryLabel, tr } from '../../../utils/appText';
@@ -36,12 +35,15 @@ function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** This Sunday's message on a Sunday morning and from Saturday evening; otherwise last Sunday's. */
-function sundayForHome(rawDate: Date, period: 'morning' | 'evening') {
-  const weekday = rawDate.getUTCDay();
-  if (weekday === 6 && period === 'evening') return { date: addUtcDays(rawDate, 1), relation: 'this' as const };
-  if (weekday === 0) return { date: rawDate, relation: period === 'morning' ? 'this' as const : 'last' as const };
-  return { date: addUtcDays(rawDate, -weekday), relation: 'last' as const };
+/**
+ * The service whose readings are being prayed at this hour, and so the one
+ * the readings card opens on: Vespers in the evening, Matins early in the
+ * morning, otherwise the Liturgy.
+ */
+export function readingsServiceAt(hours: number): LectionaryService {
+  if (hours >= 17) return 'Vespers';
+  if (hours < 9) return 'Matins';
+  return 'Liturgy';
 }
 
 /**
@@ -56,10 +58,11 @@ function splitSaintTitle(title: string): { main: string; detail: string | null }
 }
 
 /**
- * Home (Coptic Vine design system, "HomeHero"): the seal on a green glow with the day beneath it,
- * the Agpeya hour to pray now, the Sunday message under a gold crown, and the
- * saints of today and tomorrow. Home always shows the live day, whatever date
- * the Books screen has been moved to.
+ * Home (Coptic Vine design system, "HomeHero"): the seal on a green glow with
+ * "Pray. Read. Learn." and the day beneath it, the Agpeya hour to pray now,
+ * then two framed cards under a gold crown — the day's readings, one service
+ * at a time, and the saints of today and tomorrow. Home always shows the
+ * live day, whatever date the Books screen has been moved to.
  */
 export default function HomeScreen() {
   const router = useRouter();
@@ -78,18 +81,16 @@ export default function HomeScreen() {
   const liveIso = isoDate(localDateAtUtcMidnight(now));
   const liveDate = useMemo(() => new Date(`${liveIso}T00:00:00Z`), [liveIso]);
   const livePeriod = now.getHours() >= 17 ? 'evening' as const : 'morning' as const;
-  const sunday = useMemo(() => sundayForHome(liveDate, livePeriod), [liveDate, livePeriod]);
-  const sundayIso = isoDate(sunday.date);
   const tomorrow = useMemo(() => addUtcDays(liveDate, 1), [liveDate]);
+  const tomorrowIso = isoDate(tomorrow);
   const hour = agpeyaHourAt(now.getHours());
   // The readings are the rite's: from the evening, the next morning's.
   const readingsDate = livePeriod === 'evening' ? tomorrow : liveDate;
   const readingsIso = isoDate(readingsDate);
 
-  const [coptic, setCoptic] = useState<CopticDate | null>(null);
-  const [sundayMessage, setSundayMessage] = useState<string | null>(null);
-  const [sundayName, setSundayName] = useState<string | null>(null);
-  const [sundayLoading, setSundayLoading] = useState(true);
+  // Today's and tomorrow's Coptic dates, by their Gregorian day.
+  const [coptic, setCoptic] = useState<Record<string, CopticDate>>({});
+  const [readingsService, setReadingsService] = useState<LectionaryService>(() => readingsServiceAt(new Date().getHours()));
   const [synaxDay, setSynaxDay] = useState<'today' | 'tomorrow'>('today');
   const [todayEvents, setTodayEvents] = useState<HomeSynaxariumEvent[]>([]);
   const [tomorrowEvents, setTomorrowEvents] = useState<HomeSynaxariumEvent[]>([]);
@@ -100,23 +101,15 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let active = true;
-    void getCopticDate(liveDate).then((value) => { if (active) setCoptic(value); });
-    return () => { active = false; };
-  }, [liveDate]);
-
-  useEffect(() => {
-    let active = true;
-    setSundayLoading(true);
-    getSundayMessageForDate(sunday.date)
-      .then((message) => { if (active) setSundayMessage(message); })
-      .catch(() => { if (active) setSundayMessage(null); })
-      .finally(() => { if (active) setSundayLoading(false); });
-    void getDayOverview(sundayIso).then((overview) => {
-      if (active) setSundayName(overview?.indicatorKey ? getSeasonIndicatorFullName(overview.indicatorKey) : null);
+    void Promise.all([getCopticDate(liveDate), getCopticDate(tomorrow)]).then(([today, next]) => {
+      if (!active) return;
+      const dates: Record<string, CopticDate> = {};
+      if (today) dates[liveIso] = today;
+      if (next) dates[tomorrowIso] = next;
+      setCoptic(dates);
     });
     return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the Sunday's date, not the Date instance
-  }, [sundayIso]);
+  }, [liveDate, liveIso, tomorrow, tomorrowIso]);
 
   useEffect(() => {
     let active = true;
@@ -129,7 +122,7 @@ export default function HomeScreen() {
   useEffect(() => {
     let active = true;
     setSynaxLoading(true);
-    Promise.all([homeService.getSynaxariumEvents(liveIso), homeService.getSynaxariumEvents(isoDate(tomorrow))])
+    Promise.all([homeService.getSynaxariumEvents(liveIso), homeService.getSynaxariumEvents(tomorrowIso)])
       .then(([today, next]) => {
         if (!active) return;
         setTodayEvents(today);
@@ -142,13 +135,10 @@ export default function HomeScreen() {
       })
       .finally(() => { if (active) setSynaxLoading(false); });
     return () => { active = false; };
-  }, [liveIso, tomorrow]);
+  }, [liveIso, tomorrowIso]);
 
-  const sundayTitle = sunday.relation === 'this'
-    ? tr("This Sunday's Message", 'Message de ce dimanche', 'رسالة هذا الأحد')
-    : tr("Last Sunday's Message", 'Message de dimanche dernier', 'رسالة الأحد الماضي');
-  const sundayDate = formatDayMonthDate(sunday.date, arabic);
   const events = synaxDay === 'today' ? todayEvents : tomorrowEvents;
+  const synaxDate = synaxDay === 'today' ? liveDate : tomorrow;
   const dayReadings = readings?.key === readingsIso ? readings : null;
   const readingsTitle = livePeriod === 'evening'
     ? tr('Tomorrow’s Readings', 'Lectures de demain', 'قراءات الغد')
@@ -165,11 +155,23 @@ export default function HomeScreen() {
         .map((line) => ({ ...line, label: appText(line.label), value: line.value ?? (dayReadings ? null : '…') })),
     };
   });
+  const shownReadings = serviceReadings.find((entry) => entry.service === readingsService) ?? serviceReadings[0];
   // "CATHOLIQUE", "ÉVANGILE" and "PROPHECIES" run wider than the English kinds; the column makes room for them.
-  const readingKindWidth = serviceReadings.some(({ lines }) => lines.some((line) => line.label.length > 8)) ? 100 : 74;
-  // The iPad sets Home in two columns, the desktop in three (Coptic Vine, "Layout and spacing").
+  const readingKindWidth = serviceReadings.some(({ lines }) => lines.some((line) => line.label.length > 8)) ? 104 : 84;
+  // The iPad and the desktop set Home in three columns (Coptic Vine, "Layout and spacing").
   const wideLayout = layout !== 'phone';
   const card = [styles.card, wideLayout && styles.cardWide];
+
+  /** "Wednesday, 30 September · Tout 20" — the Coptic day after the Gregorian, once it is known. */
+  const dayLine = (date: Date, copticStyle?: object) => {
+    const day = coptic[isoDate(date)];
+    return (
+      <>
+        {formatDayMonthDate(date, arabic)}
+        {day ? <Text style={copticStyle}>{` · ${formatCopticDayMonth(day.monthName, day.day, arabic)}`}</Text> : null}
+      </>
+    );
+  };
 
   const heroBlock = (
     <>
@@ -186,9 +188,11 @@ export default function HomeScreen() {
             style={styles.logo}
           />
         </View>
-        <Text style={[styles.heroDate, arabic && styles.arabic]} maxFontSizeMultiplier={1.3}>
-          {formatDayMonthDate(liveDate, arabic)}
-          {coptic ? <Text style={styles.heroCoptic}>{` · ${formatCopticDayMonth(coptic.monthName, coptic.day, arabic)}`}</Text> : null}
+        <Text style={[styles.heroTag, arabic && styles.arabicCentered]} maxFontSizeMultiplier={1.3} accessibilityRole="header">
+          {tr('Pray. Read. Learn.', 'Prier. Lire. Apprendre.', 'صلِّ. اقرأ. تعلَّم.')}
+        </Text>
+        <Text style={[styles.heroDate, arabic && styles.arabicCentered]} maxFontSizeMultiplier={1.3}>
+          {dayLine(liveDate, styles.heroCoptic)}
         </Text>
       </View>
 
@@ -202,7 +206,7 @@ export default function HomeScreen() {
       <View style={[card, styles.pray, arabic && styles.rowReverse]}>
         <View style={styles.flex}>
           <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Pray now · Agpeya', 'Prier maintenant · Agpia', 'صلِّ الآن · الأجبية')}</Text>
-          <Text style={[styles.prayTitle, arabic && styles.arabic]} numberOfLines={1}>{tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}</Text>
+          <Text style={[styles.prayTitle, arabic && styles.arabic]} numberOfLines={2}>{tr(hour.prayer.english, hour.prayer.french, hour.prayer.arabic)}</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -216,130 +220,122 @@ export default function HomeScreen() {
       </View>
     </>
   );
-  // Each reading opens its service at that reading (lectionaryHref); the
-  // service's name opens the service, the card's title the Lectionary.
+
+  /** The crown and gradient both framed cards share. */
+  const frame = (
+    <>
+      <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <View style={styles.crown} pointerEvents="none">
+        <CrownOrnament width={300} height={58} />
+      </View>
+    </>
+  );
+  /** A pill of options across a framed card: the services, today and tomorrow. */
+  const segment = <T extends string>(options: { key: T; label: string }[], selected: T, onSelect: (key: T) => void) => (
+    <View style={[styles.segment, arabic && styles.rowReverse]}>
+      {options.map((option) => {
+        const active = selected === option.key;
+        return (
+          <Pressable
+            key={option.key}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            onPress={() => onSelect(option.key)}
+            style={[styles.segmentOption, active && styles.segmentOptionActive]}
+          >
+            <Text style={[styles.segmentText, active && styles.segmentTextActive, arabic && styles.arabicTight]} numberOfLines={1}>
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  // The card's head opens the Lectionary; each reading opens its service at
+  // that reading (lectionaryHref).
   const readingsCard = (
-    <View style={[card, styles.readings]}>
+    <View style={[card, styles.framed]}>
+      {frame}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${readingsTitle}. ${tr('Open the Lectionary', 'Ouvrir le lectionnaire', 'افتح القطمارس')}`}
         onPress={() => router.push('/lectionary' as never)}
-        style={({ pressed }) => [styles.readingsHeader, arabic && styles.rowReverse, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.framedHead, pressed && styles.pressed]}
       >
-        <View style={styles.flex}>
-          <Text style={[styles.prayKicker, arabic && styles.arabic]}>{tr('Lectionary', 'Lectionnaire', 'القطمارس')}</Text>
-          <Text style={[styles.readingsTitle, arabic && styles.arabic]} numberOfLines={1}>{readingsTitle}</Text>
-          <Text style={[styles.readingsDate, arabic && styles.arabic]}>{formatDayMonthDate(readingsDate, arabic)}</Text>
-        </View>
-        <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />
+        <Text style={[styles.framedKicker, arabic && styles.arabicTight]}>{tr('Lectionary', 'Lectionnaire', 'القطمارس')}</Text>
+        <Text style={[styles.framedTitle, arabic && styles.arabicCentered]}>{readingsTitle}</Text>
+        <Text style={[styles.framedDate, arabic && styles.arabicCentered]}>{dayLine(readingsDate)}</Text>
       </Pressable>
-      {serviceReadings.map(({ service, title, lines }) => (
-        <View key={service} style={styles.readingService}>
+      <View style={[styles.segmentRow, arabic && styles.rowReverse]}>
+        {segment(serviceReadings.map(({ service, title }) => ({ key: service, label: title })), shownReadings.service, setReadingsService)}
+      </View>
+      <View style={styles.readingRows}>
+        {shownReadings.lines.map((line, index) => (
           <Pressable
+            key={line.key}
             accessibilityRole="button"
-            accessibilityLabel={`${tr('Open', 'Ouvrir', 'افتح')} ${title}`}
-            onPress={() => router.push(lectionaryHref(service) as never)}
-            style={({ pressed }) => [styles.readingServiceHeader, arabic && styles.rowReverse, pressed && styles.pressed]}
+            accessibilityLabel={`${shownReadings.title}: ${line.label}${line.value ? `, ${line.value}` : ''}`}
+            onPress={() => router.push(lectionaryHref(shownReadings.service, line) as never)}
+            style={({ pressed }) => [styles.readingRow, index === 0 && styles.readingRowFirst, arabic && styles.rowReverse, pressed && styles.pressed]}
           >
-            <Text style={[styles.readingServiceTitle, arabic && styles.arabic]} numberOfLines={1}>{title}</Text>
-            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={14} color={COLORS.gold} />
+            <Text style={[styles.readingKind, { width: readingKindWidth }, arabic && styles.readingKindArabic]} numberOfLines={1}>{arabic ? line.label : line.label.toUpperCase()}</Text>
+            <Text style={[styles.readingValue, !line.value && styles.readingMissing, arabic && styles.arabic]}>{line.value ?? '—'}</Text>
           </Pressable>
-          {lines.map((line, index) => (
-            <Pressable
-              key={line.key}
-              accessibilityRole="button"
-              accessibilityLabel={`${title}: ${line.label}${line.value ? `, ${line.value}` : ''}`}
-              onPress={() => router.push(lectionaryHref(service, line) as never)}
-              style={({ pressed }) => [styles.readingRow, index === lines.length - 1 && styles.readingRowLast, arabic && styles.rowReverse, pressed && styles.pressed]}
-            >
-              <Text style={[styles.readingKind, { width: readingKindWidth }, arabic && styles.readingKindArabic]} numberOfLines={1}>{arabic ? line.label : line.label.toUpperCase()}</Text>
-              <Text style={[styles.readingValue, !line.value && styles.readingMissing, arabic && styles.arabic]} numberOfLines={1}>{line.value ?? '—'}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   );
-  const messageCard = (
-    <>
-      <View style={[card, styles.message]}>
-        <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-        <View style={styles.crown} pointerEvents="none">
-          <CrownOrnament width={300} height={58} />
-        </View>
-        <View style={styles.messageBody}>
-          <Text style={[styles.messageKicker, arabic && styles.arabicTight]}>{sundayTitle}</Text>
-          <Text style={[styles.messageTitle, arabic && styles.arabicCentered]}>{sundayName ?? sundayDate}</Text>
-          {sundayName ? <Text style={[styles.messageDate, arabic && styles.arabicCentered]}>{sundayDate}</Text> : null}
-          <Text style={[styles.messageText, arabic && styles.arabicCentered]}>
-            {sundayLoading
-              ? tr('Loading message…', 'Chargement du message…', 'جارٍ تحميل الرسالة…')
-              : sundayMessage ?? tr('A message has not been added for this Sunday yet.', 'Aucun message n’a encore été ajouté pour ce dimanche.', 'لم تتم إضافة رسالة لهذا الأحد بعد.')}
-          </Text>
-        </View>
-      </View>
-    </>
-  );
+
   const synaxCard = (
-    <>
-      <View style={card}>
-        <View style={[styles.synaxHeader, arabic && styles.rowReverse]}>
-          <View style={styles.flex}>
-            <Text style={[styles.synaxTitle, arabic && styles.arabic]}>{tr('Synaxarium', 'Synaxaire', 'السنكسار')}</Text>
-            <Text style={[styles.synaxSubtitle, arabic && styles.arabic]}>{tr('Saints commemorated', 'Saints commémorés', 'تذكارات القديسين')}</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={tr('Search the Synaxarium', 'Rechercher dans le Synaxaire', 'ابحث في السنكسار')}
-            onPress={() => router.push('/synaxarium')}
-            style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
-          >
-            <Icon name="search-outline" size={20} color={COLORS.gold} />
-          </Pressable>
-        </View>
-
-        <View style={[styles.segment, arabic && styles.rowReverse]}>
-          {(['today', 'tomorrow'] as const).map((option) => {
-            const active = synaxDay === option;
-            return (
-              <Pressable
-                key={option}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => setSynaxDay(option)}
-                style={[styles.segmentOption, active && styles.segmentOptionActive]}
-              >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive, arabic && styles.arabicTight]}>
-                  {option === 'today' ? tr('Today', 'Aujourd’hui', 'اليوم') : tr('Tomorrow', 'Demain', 'غدًا')}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.saints}>
-          {synaxLoading ? (
-            <Text style={[styles.empty, arabic && styles.arabic]}>{tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}</Text>
-          ) : events.length ? (
-            events.map((event, index) => {
-              const title = arabic ? event.titleArabic || event.titleEnglish || '' : event.titleEnglish || event.titleArabic || '';
-              const { main, detail } = arabic || preferences.appLanguage === 'fr' ? { main: title, detail: null } : splitSaintTitle(title);
-              return (
-                <View key={event.entryKey} style={[styles.saint, index === events.length - 1 && styles.saintLast, arabic && styles.rowReverse]}>
-                  <View style={styles.saintDot} />
-                  <View style={styles.flex}>
-                    <Text style={[styles.saintName, arabic && styles.arabic]}>{main}</Text>
-                    {detail ? <Text style={styles.saintDetail}>{detail}</Text> : null}
-                  </View>
-                </View>
-              );
-            })
-          ) : (
-            <Text style={[styles.empty, arabic && styles.arabic]}>{tr('No saints listed.', 'Aucun saint indiqué.', 'لا توجد تذكارات مدرجة.')}</Text>
-          )}
-        </View>
+    <View style={[card, styles.framed]}>
+      {frame}
+      <View style={styles.framedHead}>
+        <Text style={[styles.framedKicker, arabic && styles.arabicTight]}>{tr('Synaxarium', 'Synaxaire', 'السنكسار')}</Text>
+        <Text style={[styles.framedTitle, arabic && styles.arabicCentered]} accessibilityRole="header">{tr('Saints Commemorated', 'Saints commémorés', 'تذكارات القديسين')}</Text>
+        <Text style={[styles.framedDate, arabic && styles.arabicCentered]}>{dayLine(synaxDate)}</Text>
       </View>
-    </>
+      <View style={[styles.segmentRow, arabic && styles.rowReverse]}>
+        {segment(
+          [
+            { key: 'today' as const, label: tr('Today', 'Aujourd’hui', 'اليوم') },
+            { key: 'tomorrow' as const, label: tr('Tomorrow', 'Demain', 'غدًا') },
+          ],
+          synaxDay,
+          setSynaxDay,
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={tr('Search the Synaxarium', 'Rechercher dans le Synaxaire', 'ابحث في السنكسار')}
+          onPress={() => router.push('/synaxarium')}
+          style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
+        >
+          <Icon name="search-outline" size={20} color={COLORS.gold} />
+        </Pressable>
+      </View>
+
+      <View style={styles.saints}>
+        {synaxLoading ? (
+          <Text style={[styles.empty, arabic && styles.arabic]}>{tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}</Text>
+        ) : events.length ? (
+          events.map((event, index) => {
+            const title = arabic ? event.titleArabic || event.titleEnglish || '' : event.titleEnglish || event.titleArabic || '';
+            const { main, detail } = arabic || preferences.appLanguage === 'fr' ? { main: title, detail: null } : splitSaintTitle(title);
+            return (
+              <View key={event.entryKey} style={[styles.saint, index === events.length - 1 && styles.saintLast, arabic && styles.rowReverse]}>
+                <View style={styles.saintDot} />
+                <View style={styles.flex}>
+                  <Text style={[styles.saintName, arabic && styles.arabic]}>{main}</Text>
+                  {detail ? <Text style={styles.saintDetail}>{detail}</Text> : null}
+                </View>
+              </View>
+            );
+          })
+        ) : (
+          <Text style={[styles.empty, arabic && styles.arabic]}>{tr('No saints listed.', 'Aucun saint indiqué.', 'لا توجد تذكارات مدرجة.')}</Text>
+        )}
+      </View>
+    </View>
   );
 
   return (
@@ -353,36 +349,21 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.content, wideLayout && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
       >
         <HeroGlow />
-        {layout === 'desktop' ? (
-          // Desktop: the seal and the prayer, the message, the Synaxarium.
+        {wideLayout ? (
+          // iPad and desktop: the seal and the prayer, the readings, the Synaxarium.
           <View style={[styles.columns, arabic && styles.rowReverse]}>
             <View style={styles.columnNarrow}>
               {heroBlock}
               {prayCard}
-              {readingsCard}
             </View>
-            <View style={styles.columnWide}>{messageCard}</View>
+            <View style={styles.columnWide}>{readingsCard}</View>
             <View style={styles.columnWide}>{synaxCard}</View>
-          </View>
-        ) : layout === 'tablet' ? (
-          // iPad: the seal and the prayer on the left, the message and the Synaxarium on the right.
-          <View style={[styles.columns, arabic && styles.rowReverse]}>
-            <View style={styles.columnWide}>
-              {heroBlock}
-              {prayCard}
-              {readingsCard}
-            </View>
-            <View style={styles.columnWide}>
-              {messageCard}
-              {synaxCard}
-            </View>
           </View>
         ) : (
           <View style={styles.column}>
             {heroBlock}
             {prayCard}
             {readingsCard}
-            {messageCard}
             {synaxCard}
           </View>
         )}
@@ -419,7 +400,7 @@ const styles = StyleSheet.create({
   column: { alignSelf: 'center', maxWidth: 640, width: '100%' },
   contentWide: { paddingHorizontal: 36 },
   columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
-  columnNarrow: { flex: 0.9, minWidth: 0 },
+  columnNarrow: { flex: 1, minWidth: 0 },
   columnWide: { flex: 1, minWidth: 0 },
   cardWide: { marginHorizontal: 0 },
   flex: { flex: 1, minWidth: 0 },
@@ -438,7 +419,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 184,
   },
-  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 24, textAlign: 'center' },
+  heroTag: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: 26, textAlign: 'center' },
+  heroDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, marginTop: 8, textAlign: 'center' },
   heroCoptic: { color: COLORS.goldBright, fontWeight: '600' },
   heroDivider: { alignItems: 'center', marginBottom: 22, marginTop: 20 },
   card: {
@@ -464,47 +446,40 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   prayButtonText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '700' },
-  readings: { paddingBottom: 10 },
-  readingsHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingBottom: 4, paddingHorizontal: 18, paddingTop: 14 },
-  readingsTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 19, fontWeight: '700', marginTop: 2 },
-  readingsDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
-  readingService: { paddingHorizontal: 18, paddingTop: 8 },
-  readingServiceHeader: { alignItems: 'center', flexDirection: 'row', gap: 8, paddingBottom: 2, paddingTop: 4 },
-  readingServiceTitle: { color: COLORS.gold, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 14.5, fontWeight: '700' },
-  readingRow: { alignItems: 'center', borderBottomColor: 'rgba(255, 255, 255, 0.07)', borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 8 },
-  readingRowLast: { borderBottomWidth: 0 },
-  readingKind: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 },
-  readingKindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
-  readingValue: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600' },
-  readingMissing: { color: 'rgba(255, 255, 255, 0.35)' },
-  message: { borderColor: 'rgba(227, 181, 59, 0.3)' },
+
+  // The framed cards: a gold-edged card under the vine crown, its head centred.
+  framed: { borderColor: 'rgba(227, 181, 59, 0.3)' },
   crown: { alignItems: 'center', left: 8, opacity: 0.85, position: 'absolute', right: 8, top: 8 },
-  messageBody: { alignItems: 'center', paddingBottom: 22, paddingHorizontal: 22, paddingTop: 44 },
-  messageKicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 1.7, textAlign: 'center', textTransform: 'uppercase' },
-  messageTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 25, fontWeight: '700', lineHeight: 30, marginTop: 10, textAlign: 'center' },
-  messageDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 6, textAlign: 'center' },
-  messageText: { color: '#DFE6EC', fontFamily: TYPOGRAPHY.body, fontSize: 15, lineHeight: 24, marginTop: 14, textAlign: 'center' },
-  synaxHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 18 },
-  synaxTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
-  synaxSubtitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
-  roundButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
+  framedHead: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 44 },
+  framedKicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 1.7, textAlign: 'center', textTransform: 'uppercase' },
+  framedTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 25, fontWeight: '700', lineHeight: 30, marginTop: 10, textAlign: 'center' },
+  framedDate: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 6, textAlign: 'center' },
+  segmentRow: { alignItems: 'center', flexDirection: 'row', gap: 8, marginBottom: 6, marginHorizontal: 18, marginTop: 16 },
   segment: {
     backgroundColor: COLORS.black,
     borderColor: COLORS.border,
     borderRadius: 99,
     borderWidth: 1,
+    flex: 1,
     flexDirection: 'row',
     gap: 4,
-    marginBottom: 4,
-    marginHorizontal: 18,
-    marginTop: 14,
     padding: 4,
   },
-  segmentOption: { alignItems: 'center', borderRadius: 99, flex: 1, paddingVertical: 8 },
+  segmentOption: { alignItems: 'center', borderRadius: 99, flex: 1, paddingHorizontal: 6, paddingVertical: 8 },
   segmentOptionActive: { backgroundColor: COLORS.gold },
   segmentText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
   segmentTextActive: { color: COLORS.greenDeep },
-  saints: { paddingBottom: 8, paddingHorizontal: 18, paddingTop: 2 },
+  roundButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
+
+  readingRows: { paddingBottom: 12, paddingHorizontal: 18, paddingTop: 2 },
+  readingRow: { alignItems: 'baseline', borderTopColor: 'rgba(255, 255, 255, 0.07)', borderTopWidth: 1, flexDirection: 'row', gap: 10, paddingVertical: 9 },
+  readingRowFirst: { borderTopWidth: 0 },
+  readingKind: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 10.5, fontWeight: '700', letterSpacing: 1.7 },
+  readingKindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  readingValue: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
+  readingMissing: { color: 'rgba(255, 255, 255, 0.35)' },
+
+  saints: { paddingBottom: 12, paddingHorizontal: 18, paddingTop: 2 },
   saint: { borderBottomColor: 'rgba(255, 255, 255, 0.07)', borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 13 },
   saintLast: { borderBottomWidth: 0 },
   saintDot: { backgroundColor: COLORS.gold, borderRadius: 3, height: 6, marginTop: 8, width: 6 },

@@ -5,18 +5,20 @@ import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/vine/ui/AppHeader';
 import FontScaleControl from '@/components/vine/ui/FontScaleControl';
 import Icon from '@/components/vine/ui/Icon';
 import SaintHymnPicker from '@/components/vine/ui/SaintHymnPicker';
+import SheetFrame from '@/components/vine/ui/SheetFrame';
+import SubPageHeader from '@/components/vine/ui/SubPageHeader';
 import ToggleRow from '@/components/vine/ui/ToggleRow';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { goBack } from '@/utils/navigation';
 import { OrientationMode, VisibleLanguages } from '@/utils/preferencesStorage';
 import { DISABLED_TEXT_SELECTION_STYLE } from '@/utils/textSelection';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
-import { appText } from '../../../utils/appText';
+import { appText, tr } from '../../../utils/appText';
 const LANGUAGE_OPTIONS: { key: keyof VisibleLanguages; label: string; arabic: string; french: string }[] = [
   { key: 'english', label: 'English', arabic: 'الإنجليزية', french: 'Anglais' }, { key: 'french', label: 'French', arabic: 'الفرنسية', french: 'Français' },
   { key: 'coptic', label: 'Coptic', arabic: 'القبطية', french: 'Copte' },
@@ -32,28 +34,209 @@ const SETTINGS_LABELS = {
   displayComments: { english: 'Display Comments', arabic: 'عرض التعليقات', french: 'Afficher les commentaires' }, displaySilentPrayers: { english: 'Display Silent Prayers', arabic: 'عرض الصلوات السرية', french: 'Afficher les prières secrètes' }, displayNowPlayingBar: { english: 'Display Now Playing Bar', arabic: 'عرض شريط التشغيل الحالي', french: 'Afficher la barre de lecture' },
   keepScreenAwake: { english: 'Keep Screen On While Reading', arabic: 'إبقاء الشاشة مضاءة أثناء القراءة', french: 'Garder l’écran allumé pendant la lecture' },
   content: { english: 'Content', arabic: 'المحتوى', french: 'Contenu' }, saintHymns: { english: 'Saint Hymns', arabic: 'ألحان القديسين', french: 'Hymnes des saints' }, inMonastery: { english: 'In Monastery', arabic: 'في الدير', french: 'Au monastère' },
-  textSize: { english: 'Text Size', arabic: 'حجم النص', french: 'Taille du texte' }, downloads: { english: 'Downloads & Storage', arabic: 'التنزيلات والتخزين', french: 'Téléchargements et stockage' },
+  textSize: { english: 'Text size', arabic: 'حجم النص', french: 'Taille du texte' }, downloads: { english: 'Downloads & Storage', arabic: 'التنزيلات والتخزين', french: 'Téléchargements et stockage' },
 };
-interface SettingsScreenProps { onClose?: () => void; }
-export default function SettingsScreen({ onClose }: SettingsScreenProps) {
-  const router = useRouter(); const isHosted = Boolean(onClose); const closeScreen = () => (onClose ? onClose() : goBack(router, '/books'));
-  const { preferences, toggleLanguage, setFontScale, setFontScaleValue, setOrientationMode, toggleSelectText, toggleSlideshowMode, toggleDisplayComments, toggleDisplaySilentPrayers, toggleDisplayNowPlayingBar, toggleSaintHymn, clearSaintHymns, toggleInMonastery, toggleKeepScreenAwake } = useReadingPreferences();
-  const [saintPickerOpen, setSaintPickerOpen] = useState(false); const chosenSaintHymns = preferences.selectedSaintHymns || []; const isArabicChrome = preferences.appLanguage === 'ar';
-  const labelText = (label: { english?: string; label?: string; arabic: string; french?: string }) => appText({ english: label.english || label.label || '', arabic: label.arabic, french: label.french }); const localizedTextStyle = isArabicChrome && styles.arabicText;
-  return <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, DISABLED_TEXT_SELECTION_STYLE]}>
-    {isHosted ? null : <Head><title>Coptic Vine Book Settings</title></Head>}
-    <AppHeader title={SETTINGS_LABELS.settings} canGoBack onBack={closeScreen} visibleLanguages={{ english: !isArabicChrome, arabic: isArabicChrome }} />
-    <ScrollView contentContainerStyle={styles.scrollContent}><View style={styles.container}>
-      <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.languages)}</Text><View style={styles.languageList}>{LANGUAGE_OPTIONS.map((item) => <ToggleRow key={item.key} label={labelText(item)} isArabic={isArabicChrome} active={preferences.visibleLanguages[item.key]} onPress={() => toggleLanguage(item.key)} />)}</View>
-      {Platform.OS !== 'web' ? <View style={styles.orientationGroup}><Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.orientation)}</Text><View style={styles.orientationRow}>{ORIENTATION_OPTIONS.map((item) => { const isActive = preferences.orientationMode === item.key; const label = labelText(item); return <Pressable key={item.key} accessibilityLabel={isArabicChrome ? label : `Use ${item.label} orientation`} style={[styles.orientationButton, isActive && styles.toggleActive, { borderColor: isActive ? COLORS.gold : COLORS.border }]} onPress={() => setOrientationMode(item.key)}><Text style={[styles.toggleText, localizedTextStyle]}>{label}</Text></Pressable>; })}</View></View> : null}
-      <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.display)}</Text><FontScaleControl fontScale={preferences.fontScale} isArabic={isArabicChrome} label={labelText(SETTINGS_LABELS.textSize)} onStep={setFontScale} onSetValue={setFontScaleValue} />
-      <ToggleRow label={labelText(SETTINGS_LABELS.slideshowMode)} isArabic={isArabicChrome} active={preferences.slideshowMode} onPress={toggleSlideshowMode} /><ToggleRow label={labelText(SETTINGS_LABELS.selectText)} isArabic={isArabicChrome} active={preferences.selectText} disabled={preferences.slideshowMode} onPress={toggleSelectText} /><ToggleRow label={labelText(SETTINGS_LABELS.displayComments)} isArabic={isArabicChrome} active={preferences.displayComments} onPress={toggleDisplayComments} /><ToggleRow label={labelText(SETTINGS_LABELS.displaySilentPrayers)} isArabic={isArabicChrome} active={preferences.displaySilentPrayers} onPress={toggleDisplaySilentPrayers} /><ToggleRow label={labelText(SETTINGS_LABELS.displayNowPlayingBar)} isArabic={isArabicChrome} active={preferences.displayNowPlayingBar} onPress={toggleDisplayNowPlayingBar} /><ToggleRow label={labelText(SETTINGS_LABELS.keepScreenAwake)} isArabic={isArabicChrome} active={preferences.keepScreenAwake} onPress={toggleKeepScreenAwake} />
-      <Text style={[styles.groupLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.content)}</Text>
-      <Pressable accessibilityLabel="Choose saint hymns" style={styles.contentRow} onPress={() => setSaintPickerOpen(true)}><Text style={[styles.contentRowLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.saintHymns)}</Text><Icon name="chevron-forward" size={18} color={COLORS.muted} /></Pressable>
-      <ToggleRow label={labelText(SETTINGS_LABELS.inMonastery)} isArabic={isArabicChrome} active={preferences.inMonastery} onPress={toggleInMonastery} />
-      {!isHosted && Platform.OS !== 'web' ? <Pressable accessibilityLabel={labelText(SETTINGS_LABELS.downloads)} style={styles.contentRow} onPress={() => router.push('/downloads')}><Text style={[styles.contentRowLabel, localizedTextStyle]}>{labelText(SETTINGS_LABELS.downloads)}</Text><Icon name="chevron-forward" size={18} color={COLORS.muted} /></Pressable> : null}
-    </View></ScrollView>
-    <SaintHymnPicker visible={saintPickerOpen} onClose={() => setSaintPickerOpen(false)} isArabic={isArabicChrome} selected={chosenSaintHymns} onToggle={toggleSaintHymn} onClearSaint={clearSaintHymns} />
-  </SafeAreaView>;
+
+type Label = { english?: string; label?: string; arabic: string; french?: string };
+const labelText = (label: Label) => appText({ english: label.english || label.label || '', arabic: label.arabic, french: label.french });
+
+interface BookSettingsPanelProps {
+  /** Two columns — Languages and Content beside Display — on the iPad and desktop. */
+  wide?: boolean;
+  /** Inside a document's own settings modal: no Downloads row (it would open a route under the modal). */
+  hosted?: boolean;
+  onOpenSaintHymns: () => void;
 }
-const styles = StyleSheet.create({ safeArea: { flex: 1, backgroundColor: COLORS.black }, scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl }, container: { borderBottomWidth: 1, borderTopWidth: 1, borderColor: COLORS.border, gap: SPACING.md, padding: SPACING.md }, groupLabel: { fontSize: 15, fontWeight: '800', color: COLORS.white }, contentRow: { alignItems: 'center', backgroundColor: '#111111', borderColor: COLORS.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm }, contentRowLabel: { color: COLORS.white, flex: 1, fontSize: 15, fontWeight: '700' }, languageList: { gap: SPACING.sm }, orientationGroup: { gap: SPACING.sm }, orientationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm }, orientationButton: { alignItems: 'center', borderRadius: 8, borderWidth: 1, flexGrow: 1, justifyContent: 'center', minHeight: 40, minWidth: 128, paddingHorizontal: SPACING.sm }, toggleActive: { backgroundColor: COLORS.green }, toggleText: { fontSize: 13, fontWeight: '800', color: COLORS.white }, arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' } });
+
+/**
+ * The reading settings (Coptic Vine design, "Book settings"): the languages
+ * as chips, the display settings as switches under a text-size slider, and
+ * the content — the saints' hymns and the monastery — each group under a
+ * small gold heading. Shown in a sheet over Books, as a page of its own, and
+ * inside a document's settings.
+ */
+export function BookSettingsPanel({ wide = false, hosted = false, onOpenSaintHymns }: BookSettingsPanelProps) {
+  const router = useRouter();
+  const { preferences, toggleLanguage, setFontScale, setFontScaleValue, setOrientationMode, toggleSelectText, toggleSlideshowMode, toggleDisplayComments, toggleDisplaySilentPrayers, toggleDisplayNowPlayingBar, toggleInMonastery, toggleKeepScreenAwake } = useReadingPreferences();
+  const arabic = preferences.appLanguage === 'ar';
+  const chosen = (preferences.selectedSaintHymns || []).length;
+  const selectedCount = chosen === 1
+    ? tr('1 selected', '1 sélectionné', 'واحد مختار')
+    : tr(`${chosen} selected`, `${chosen} sélectionnés`, `${chosen} مختارة`);
+
+  const kicker = (label: Label) => (
+    <Text style={[styles.kicker, arabic && styles.kickerArabic]} maxFontSizeMultiplier={1.3}>
+      {arabic ? labelText(label) : labelText(label).toUpperCase()}
+    </Text>
+  );
+  const chips = <Key extends string>(options: { key: Key; label: string; arabic: string; french: string }[], isOn: (key: Key) => boolean, onPress: (key: Key) => void, role: 'checkbox' | 'radio') => (
+    <View style={[styles.chips, arabic && styles.rowReverse]}>
+      {options.map((item) => {
+        const on = isOn(item.key);
+        return (
+          <Pressable
+            key={item.key}
+            accessibilityRole={role}
+            accessibilityState={{ checked: on }}
+            accessibilityLabel={labelText(item)}
+            onPress={() => onPress(item.key)}
+            style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && styles.pressed]}
+          >
+            <Text style={[styles.chipText, on && styles.chipTextOn, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{labelText(item)}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const languages = (
+    <>
+      {kicker(SETTINGS_LABELS.languages)}
+      {chips(LANGUAGE_OPTIONS, (key) => preferences.visibleLanguages[key], toggleLanguage, 'checkbox')}
+      {Platform.OS !== 'web' ? (
+        <>
+          {kicker(SETTINGS_LABELS.orientation)}
+          {chips(ORIENTATION_OPTIONS, (key) => preferences.orientationMode === key, setOrientationMode, 'radio')}
+        </>
+      ) : null}
+    </>
+  );
+  const display = (
+    <>
+      {kicker(SETTINGS_LABELS.display)}
+      <View style={styles.rows}>
+        <FontScaleControl fontScale={preferences.fontScale} isArabic={arabic} label={labelText(SETTINGS_LABELS.textSize)} onStep={setFontScale} onSetValue={setFontScaleValue} />
+        <ToggleRow label={labelText(SETTINGS_LABELS.slideshowMode)} isArabic={arabic} active={preferences.slideshowMode} onPress={toggleSlideshowMode} />
+        <ToggleRow label={labelText(SETTINGS_LABELS.selectText)} isArabic={arabic} active={preferences.selectText} disabled={preferences.slideshowMode} onPress={toggleSelectText} />
+        <ToggleRow label={labelText(SETTINGS_LABELS.displayComments)} isArabic={arabic} active={preferences.displayComments} onPress={toggleDisplayComments} />
+        <ToggleRow label={labelText(SETTINGS_LABELS.displaySilentPrayers)} isArabic={arabic} active={preferences.displaySilentPrayers} onPress={toggleDisplaySilentPrayers} />
+        <ToggleRow label={labelText(SETTINGS_LABELS.displayNowPlayingBar)} isArabic={arabic} active={preferences.displayNowPlayingBar} onPress={toggleDisplayNowPlayingBar} />
+        <ToggleRow label={labelText(SETTINGS_LABELS.keepScreenAwake)} isArabic={arabic} active={preferences.keepScreenAwake} onPress={toggleKeepScreenAwake} />
+      </View>
+    </>
+  );
+  const content = (
+    <>
+      {kicker(SETTINGS_LABELS.content)}
+      <View style={styles.rows}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${labelText(SETTINGS_LABELS.saintHymns)}, ${selectedCount}`}
+          onPress={onOpenSaintHymns}
+          style={({ pressed }) => [styles.linkRow, arabic && styles.rowReverse, pressed && styles.linkRowPressed]}
+        >
+          <Text style={[styles.linkLabel, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{labelText(SETTINGS_LABELS.saintHymns)}</Text>
+          <Text style={[styles.linkValue, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{selectedCount}</Text>
+          <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+        </Pressable>
+        <ToggleRow label={labelText(SETTINGS_LABELS.inMonastery)} isArabic={arabic} active={preferences.inMonastery} onPress={toggleInMonastery} />
+        {!hosted && Platform.OS !== 'web' ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={labelText(SETTINGS_LABELS.downloads)}
+            onPress={() => router.push('/downloads')}
+            style={({ pressed }) => [styles.linkRow, arabic && styles.rowReverse, pressed && styles.linkRowPressed]}
+          >
+            <Text style={[styles.linkLabel, arabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{labelText(SETTINGS_LABELS.downloads)}</Text>
+            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+          </Pressable>
+        ) : null}
+      </View>
+    </>
+  );
+
+  if (wide) {
+    return (
+      <View style={[styles.columns, arabic && styles.rowReverse]}>
+        <View style={styles.column}>
+          {languages}
+          {content}
+        </View>
+        <View style={styles.column}>{display}</View>
+      </View>
+    );
+  }
+  return (
+    <View>
+      {languages}
+      {display}
+      {content}
+    </View>
+  );
+}
+
+interface SettingsScreenProps { onClose?: () => void; }
+
+/** The Book Settings as a page of its own (the /book-settings route, and a document's settings modal). */
+export default function SettingsScreen({ onClose }: SettingsScreenProps) {
+  const router = useRouter();
+  const layout = useLayoutMode();
+  const wide = layout !== 'phone';
+  const isHosted = Boolean(onClose);
+  const closeScreen = () => (onClose ? onClose() : goBack(router, '/books'));
+  const { preferences, toggleSaintHymn, clearSaintHymns } = useReadingPreferences();
+  const [saintPickerOpen, setSaintPickerOpen] = useState(false);
+  const arabic = preferences.appLanguage === 'ar';
+
+  return (
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, DISABLED_TEXT_SELECTION_STYLE]}>
+      {isHosted ? null : <Head><title>Coptic Vine Book Settings</title></Head>}
+      <SubPageHeader title={labelText(SETTINGS_LABELS.settings)} arabic={arabic} onBack={closeScreen} backLabel={tr('Back', 'Retour', 'رجوع')} />
+      <ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
+        <View style={[styles.pageCard, wide && styles.pageCardWide]}>
+          <BookSettingsPanel wide={wide} hosted={isHosted} onOpenSaintHymns={() => setSaintPickerOpen(true)} />
+        </View>
+      </ScrollView>
+      <SaintHymnPicker visible={saintPickerOpen} onClose={() => setSaintPickerOpen(false)} isArabic={arabic} selected={preferences.selectedSaintHymns || []} onToggle={toggleSaintHymn} onClearSaint={clearSaintHymns} />
+    </SafeAreaView>
+  );
+}
+
+/** The Book Settings over the Books page: a sheet on a phone, a centred dialog on the iPad and desktop. */
+export function BookSettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const layout = useLayoutMode();
+  const wide = layout !== 'phone';
+  const { preferences, toggleSaintHymn, clearSaintHymns } = useReadingPreferences();
+  const [saintPickerOpen, setSaintPickerOpen] = useState(false);
+  const arabic = preferences.appLanguage === 'ar';
+  return (
+    <SheetFrame
+      visible={visible}
+      onClose={onClose}
+      closeLabel={tr('Close the settings', 'Fermer les réglages', 'أغلق الإعدادات')}
+      dialogOnTablet
+      dialogWidth={layout === 'desktop' ? 780 : 740}
+    >
+      <View style={wide ? styles.dialogBody : null}>
+        <BookSettingsPanel wide={wide} onOpenSaintHymns={() => setSaintPickerOpen(true)} />
+      </View>
+      {/* Inside the sheet's own modal, so iOS presents it over the sheet. */}
+      <SaintHymnPicker visible={saintPickerOpen} onClose={() => setSaintPickerOpen(false)} isArabic={arabic} selected={preferences.selectedSaintHymns || []} onToggle={toggleSaintHymn} onClearSaint={clearSaintHymns} />
+    </SheetFrame>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: COLORS.black },
+  pageContent: { paddingBottom: 32, paddingHorizontal: 16 },
+  pageCard: { backgroundColor: COLORS.surface, borderColor: COLORS.goldLine, borderRadius: 28, borderTopWidth: 1, paddingBottom: 22, paddingHorizontal: 16, paddingTop: 4 },
+  pageCardWide: { alignSelf: 'center', maxWidth: 780, paddingHorizontal: 24, width: '100%' },
+  dialogBody: { paddingHorizontal: 8 },
+  columns: { flexDirection: 'row', gap: 28 },
+  column: { flex: 1, minWidth: 0 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  pressed: { opacity: 0.75 },
+  kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.8, marginBottom: 9, marginHorizontal: 2, marginTop: 16 },
+  kickerArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'right', writingDirection: 'rtl' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 99, height: 38, justifyContent: 'center', paddingHorizontal: 15 },
+  chipOn: { backgroundColor: COLORS.gold },
+  chipText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, fontWeight: '600' },
+  chipTextOn: { color: COLORS.greenDeep },
+  rows: { gap: 5 },
+  linkRow: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, flexDirection: 'row', gap: 10, minHeight: 48, paddingLeft: 16, paddingRight: 12, paddingVertical: 8 },
+  linkRowPressed: { backgroundColor: 'rgba(255, 255, 255, 0.09)' },
+  linkLabel: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600', minWidth: 0 },
+  linkValue: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
+  arabicText: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+});

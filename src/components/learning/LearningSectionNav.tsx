@@ -1,78 +1,38 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import SegmentNav from '@/components/vine/ui/SegmentNav';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 
 import { tr } from '../../utils/appText';
 export type LearningSection = 'home' | 'search' | 'library';
 
-export default function LearningSectionNav({ active }: { active: LearningSection }) {
+const ROUTES: Record<LearningSection, '/learn' | '/learn/search' | '/learn/library'> = {
+  home: '/learn',
+  search: '/learn/search',
+  library: '/learn/library',
+};
+
+/** Learn & Study's sections — Discover, Search, My Learning — on the gold pill (Coptic Vine design, "Learn"). */
+export default function LearningSectionNav({ active, flush = false }: { active: LearningSection; flush?: boolean }) {
   const router = useRouter();
   const { preferences } = useReadingPreferences();
-  const isArabic = preferences.appLanguage === 'ar';
-  const items: {
-    id: LearningSection;
-    label: string;
-    route: '/learn' | '/learn/search' | '/learn/library';
-  }[] = [
-    { id: 'home', label: tr('Discover', 'Découvrir', 'الرئيسية'), route: '/learn' },
-    { id: 'search', label: tr('Search', 'Rechercher', 'بحث'), route: '/learn/search' },
-    { id: 'library', label: tr('My Learning', 'Mon apprentissage', 'تعلّمي'), route: '/learn/library' },
+  const arabic = preferences.appLanguage === 'ar';
+  const items = [
+    { key: 'home' as const, label: tr('Discover', 'Découvrir', 'اكتشف') },
+    { key: 'search' as const, label: tr('Search', 'Rechercher', 'بحث') },
+    { key: 'library' as const, label: tr('My Learning', 'Mon apprentissage', 'تعلّمي') },
   ];
 
   return (
-    <View style={styles.container}>
-      {items.map((item) => (
-        <Pressable accessibilityRole="button"
-          key={item.id}
-          onPress={() => router.replace(item.route)}
-          style={[styles.item, active === item.id && styles.itemActive]}
-        >
-          <Text style={[
-            styles.label,
-            isArabic && styles.arabic,
-            active === item.id && styles.labelActive,
-          ]}>
-            {item.label}
-          </Text>
-        </Pressable>
-      ))}
+    <View style={[styles.row, flush && styles.flush]}>
+      <SegmentNav items={items} active={active} arabic={arabic} onSelect={(key) => { if (key !== active) router.replace(ROUTES[key]); }} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.sm,
-    padding: 4,
-    borderRadius: RADII.pill,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  item: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 36,
-    borderRadius: RADII.pill,
-  },
-  itemActive: { backgroundColor: COLORS.learningSoft },
-  label: {
-    color: COLORS.muted,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  labelActive: { color: COLORS.learningBright },
-  arabic: {
-    fontFamily: TYPOGRAPHY.arabic,
-    textAlign: 'center',
-    writingDirection: 'rtl',
-  },
+  row: { paddingHorizontal: 16 },
+  flush: { paddingHorizontal: 0 },
 });

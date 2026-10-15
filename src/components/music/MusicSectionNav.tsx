@@ -1,53 +1,38 @@
+'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import SegmentNav from '@/components/vine/ui/SegmentNav';
+import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 
+import { tr } from '../../utils/appText';
 export type MusicSection = 'home' | 'search' | 'library';
 
-export default function MusicSectionNav({ active }: { active: MusicSection }) {
+const ROUTES: Record<MusicSection, '/music' | '/music/search' | '/music/library'> = {
+  home: '/music',
+  search: '/music/search',
+  library: '/music/library',
+};
+
+/** Music's sections — Home, Search, Library — on the gold pill (Coptic Vine design, "Music"). */
+export default function MusicSectionNav({ active, flush = false }: { active: MusicSection; flush?: boolean }) {
   const router = useRouter();
-  const items: { id: MusicSection; label: string; route: '/music' | '/music/search' | '/music/library' }[] = [
-    { id: 'home', label: 'Home', route: '/music' },
-    { id: 'search', label: 'Search', route: '/music/search' },
-    { id: 'library', label: 'Library', route: '/music/library' },
+  const { preferences } = useReadingPreferences();
+  const arabic = preferences.appLanguage === 'ar';
+  const items = [
+    { key: 'home' as const, label: tr('Home', 'Accueil', 'الرئيسية') },
+    { key: 'search' as const, label: tr('Search', 'Rechercher', 'بحث') },
+    { key: 'library' as const, label: tr('Library', 'Bibliothèque', 'المكتبة') },
   ];
 
   return (
-    <View style={styles.container}>
-      {items.map((item) => (
-        <Pressable accessibilityRole="button"
-          key={item.id}
-          onPress={() => router.replace(item.route)}
-          style={[styles.item, active === item.id && styles.itemActive]}
-        >
-          <Text style={[styles.label, active === item.id && styles.labelActive]}>{item.label}</Text>
-        </Pressable>
-      ))}
+    <View style={[styles.row, flush && styles.flush]}>
+      <SegmentNav items={items} active={active} arabic={arabic} onSelect={(key) => { if (key !== active) router.replace(ROUTES[key]); }} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.sm,
-    padding: 4,
-    borderRadius: RADII.pill,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  item: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 36,
-    borderRadius: RADII.pill,
-  },
-  itemActive: { backgroundColor: COLORS.goldSoft },
-  label: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
-  labelActive: { color: COLORS.goldBright },
+  row: { paddingHorizontal: 16 },
+  flush: { paddingHorizontal: 0 },
 });

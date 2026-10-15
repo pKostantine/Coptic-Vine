@@ -84,7 +84,7 @@ export default function SideBar({ pathname }: { pathname: string }) {
 
       {SECTIONS.map((section) => {
         const on = section.key === active;
-        const accent = section.key === 'learn' ? COLORS.learning : COLORS.gold;
+        const accent = COLORS.gold;
         const label = tr(section.label.english, section.label.french, section.label.arabic);
         return (
           <Pressable
@@ -96,12 +96,12 @@ export default function SideBar({ pathname }: { pathname: string }) {
             style={(state) => [
               styles.item,
               arabic && styles.rowReverse,
-              on && { backgroundColor: section.key === 'learn' ? COLORS.learningSoft : COLORS.goldSoft },
+              on && { backgroundColor: COLORS.goldSoft },
               !on && (isHovered(state) || state.pressed) && styles.itemHover,
             ]}
           >
             <Icon name={section.icon} size={21} color={on ? accent : COLORS.muted} />
-            <Text style={[styles.itemLabel, on && { color: section.key === 'learn' ? COLORS.learningBright : COLORS.gold }, arabic && styles.arabic]} numberOfLines={1}>
+            <Text style={[styles.itemLabel, on && { color: COLORS.gold }, arabic && styles.arabic]} numberOfLines={1}>
               {label}
             </Text>
           </Pressable>

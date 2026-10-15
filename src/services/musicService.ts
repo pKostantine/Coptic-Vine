@@ -1,6 +1,7 @@
 import { mediaService } from '@/services/mediaService';
 import { getOfflineSnapshot } from '@/services/offlineSnapshotStore';
 import type {
+  MusicArtistLink,
   MusicConsumerArtist,
   MusicConsumerAsset,
   MusicConsumerRelease,
@@ -74,6 +75,26 @@ export async function getMusicTrack(trackId: string, locale = 'en'): Promise<Mus
     p_locale: locale,
   });
   return assertRpcData(data as MusicConsumerTrackDetail | null, error, 'Load track');
+}
+
+/**
+ * An artist's links, read straight from the published table (public to read):
+ * the artist's own payload does not carry them yet. A table this client cannot
+ * reach yields none, and the page shows none.
+ */
+export async function getMusicArtistLinks(artistId: string): Promise<MusicArtistLink[]> {
+  const { data, error } = await supabase
+    .schema('music')
+    .from('artist_social_links')
+    .select('id, platform, label, url, sort_order')
+    .eq('artist_id', artistId)
+    .order('sort_order', { ascending: true });
+  if (error || !Array.isArray(data)) return [];
+  return data.flatMap((row) => {
+    const platform = typeof row.platform === 'string' ? row.platform : null;
+    const url = typeof row.url === 'string' ? row.url : null;
+    return platform && url ? [{ id: String(row.id), platform, label: typeof row.label === 'string' ? row.label : null, url }] : [];
+  });
 }
 
 export async function getMusicArtistSearchArt(artistId: string): Promise<MusicConsumerAsset | null> {
@@ -258,6 +279,7 @@ export const musicService = {
   getArtist: getMusicArtist,
   getTrack: getMusicTrack,
   getArtistSearchArt: getMusicArtistSearchArt,
+  getArtistLinks: getMusicArtistLinks,
   search: searchMusic,
   getLibrary: getMusicLibrary,
   getPlaylist: getMusicPlaylist,

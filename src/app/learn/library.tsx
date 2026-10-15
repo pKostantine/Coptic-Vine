@@ -12,16 +12,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import AppHeader from '@/components/vine/ui/AppHeader';
-import BottomTabBar from '@/components/vine/ui/BottomTabBar';
-import Icon from '@/components/vine/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import Icon from '@/components/vine/ui/Icon';
+import PageTitle from '@/components/vine/ui/PageTitle';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
@@ -31,12 +32,14 @@ import type {
   LearningPlaylistLibraryPayload,
   LearningProgressState,
 } from '@/types/learningPlatform';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
 const EMPTY_LIBRARY: LearningItemLibraryPayload = { authenticated: false, likedItemIds: [], items: [] };
 const EMPTY_PLAYLISTS: LearningPlaylistLibraryPayload = { authenticated: false, playlists: [] };
 
 const STATE_ORDER: LearningProgressState[] = ['will_learn', 'learning', 'finished'];
+const MAX_FONT_SCALE = 1.3;
 
 function toQueueItem(item: LearningLibraryItem): LearningQueueItem {
   return {
@@ -54,18 +57,21 @@ function toQueueItem(item: LearningLibraryItem): LearningQueueItem {
   };
 }
 
-function formatDuration(durationMs: number | null): string {
-  if (!durationMs || durationMs < 0) return '';
-  const totalSeconds = Math.round(durationMs / 1000);
-  return Math.floor(totalSeconds / 60) + ':' + String(totalSeconds % 60).padStart(2, '0');
-}
-
+/**
+ * My Learning (Coptic Vine design, "My Learning"): the three lists as tabs
+ * with their counts, each recording or lesson on a card with the way to move
+ * it forward, then the custom playlists. The iPad and desktop set the lists
+ * beside the playlists.
+ */
 export default function LearningLibraryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const layout = useLayoutMode();
   const { preferences } = useReadingPreferences();
   const { currentItem, playQueue } = useLearningPlayer();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
-  const isArabic = locale === 'ar';
+  const arabic = locale === 'ar';
+  const wide = layout !== 'phone';
   const [library, setLibrary] = useState(EMPTY_LIBRARY);
   const [playlistLibrary, setPlaylistLibrary] = useState(EMPTY_PLAYLISTS);
   const [activeState, setActiveState] = useState<LearningProgressState>('will_learn');
@@ -108,17 +114,11 @@ export default function LearningLibraryScreen() {
     [stateItems],
   );
 
-  const labels: Record<LearningProgressState, { title: string; short: string; empty: string }> = isArabic
-    ? {
-        will_learn: { title: 'سأتعلم', short: 'سأتعلم', empty: 'أضف درساً أو تسجيلاً تريد تعلّمه.' },
-        learning: { title: 'أتعلّم الآن', short: 'أتعلّم', empty: 'ابدأ عنصراً من قائمة «سأتعلم».' },
-        finished: { title: 'أكملت التعلّم', short: 'أكملت', empty: 'ستظهر الدروس التي أكملتها هنا.' },
-      }
-    : {
-        will_learn: { title: 'Will Learn', short: 'Will Learn', empty: 'Add a recording or lesson you want to learn.' },
-        learning: { title: 'Learning', short: 'Learning', empty: 'Start an item from your Will Learn list.' },
-        finished: { title: 'Finished Learning', short: 'Finished', empty: 'Completed lessons and recordings will appear here.' },
-      };
+  const labels: Record<LearningProgressState, { title: string; empty: string }> = {
+    will_learn: { title: tr('Will Learn', 'À apprendre', 'سأتعلم'), empty: tr('Add a recording or lesson you want to learn.', 'Ajoutez un enregistrement ou une leçon à apprendre.', 'أضف درساً أو تسجيلاً تريد تعلّمه.') },
+    learning: { title: tr('Learning', 'En cours', 'أتعلّم'), empty: tr('Start an item from your Will Learn list.', 'Commencez un élément de votre liste À apprendre.', 'ابدأ عنصراً من قائمة «سأتعلم».') },
+    finished: { title: tr('Finished', 'Terminé', 'أكملت'), empty: tr('Completed lessons and recordings will appear here.', 'Les leçons et enregistrements terminés apparaîtront ici.', 'ستظهر الدروس التي أكملتها هنا.') },
+  };
 
   const openItem = (item: LearningLibraryItem) => {
     if (item.mediaType === 'video') {
@@ -179,185 +179,218 @@ export default function LearningLibraryScreen() {
   };
 
   const authenticated = library.authenticated || playlistLibrary.authenticated;
+  const gutter = wide ? 0 : 16;
+  const inGutter = { paddingHorizontal: gutter };
+  const rowDirection = arabic && styles.rowReverse;
+
+  const lists = (
+    <>
+      <View style={[styles.introRow, inGutter, rowDirection]}>
+        <Text style={[styles.intro, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          {tr('Move each recording or lesson forward as you learn it.', 'Faites avancer chaque enregistrement ou leçon à mesure que vous l’apprenez.', 'نظّم ما ستتعلّمه، وما تدرسه الآن، وما أكملته.')}
+        </Text>
+        {audioQueue.length ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={tr('Play this list', 'Lire cette liste', 'تشغيل هذه القائمة')} style={({ pressed }) => [styles.playAll, pressed && styles.pressed]} onPress={() => playQueue(audioQueue, 0)}>
+            <Icon name="play" size={16} color={COLORS.greenDeep} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {loading ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
+      {error ? <Text style={[styles.error, inGutter]}>{error}</Text> : null}
+
+      {!loading && !authenticated ? (
+        <View style={[styles.authCard, { marginHorizontal: gutter }, rowDirection]}>
+          <Icon name="person-circle-outline" size={30} color={COLORS.gold} />
+          <View style={styles.authCopy}>
+            <Text style={[styles.authTitle, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Keep your learning across devices', 'Gardez votre apprentissage sur tous vos appareils', 'احفظ تعلّمك على كل أجهزتك')}</Text>
+            <Text style={[styles.authBody, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+              {tr('All lessons remain available. Sign in to save progress and playlists.', 'Toutes les leçons restent accessibles. Connectez-vous pour enregistrer votre progression et vos playlists.', 'المحتوى متاح للجميع. سجّل الدخول لحفظ القوائم والتقدّم.')}
+            </Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel={tr('Open account', 'Ouvrir le compte', 'افتح الحساب')} style={({ pressed }) => [styles.authButton, pressed && styles.pressed]} onPress={() => router.push('/account')}>
+            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.greenDeep} />
+          </Pressable>
+        </View>
+      ) : null}
+
+      <View accessibilityRole="tablist" style={[styles.tabs, { marginHorizontal: gutter }, rowDirection]}>
+        {STATE_ORDER.map((state) => {
+          const count = library.items.filter((item) => item.state === state).length;
+          const active = state === activeState;
+          return (
+            <Pressable
+              key={state}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              onPress={() => setActiveState(state)}
+              style={[styles.tab, active && styles.tabActive, rowDirection]}
+            >
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{labels[state].title}</Text>
+              <View style={[styles.tabCount, active && styles.tabCountActive]}>
+                <Text style={[styles.tabCountText, active && styles.tabCountTextActive]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{count}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={[styles.items, inGutter]}>
+        {stateItems.map((item) => {
+          const stateIndex = STATE_ORDER.indexOf(item.state);
+          const busy = movingId === item.itemId;
+          const isPlaying = currentItem?.id === item.itemId;
+          const forward = stateIndex < STATE_ORDER.length - 1
+            ? { state: STATE_ORDER[stateIndex + 1], label: stateIndex === 0 ? tr('Start', 'Commencer', 'ابدأ') : tr('Finish', 'Terminer', 'أكملت'), icon: stateIndex === 0 ? (arabic ? 'chevron-back' as const : 'chevron-forward' as const) : 'checkmark' as const }
+            : null;
+          const back = stateIndex > 0
+            ? { state: STATE_ORDER[stateIndex - 1], label: stateIndex === 2 ? tr('Revisit', 'Revoir', 'أعد التعلّم') : tr('Later', 'Plus tard', 'لاحقاً') }
+            : null;
+          return (
+            <View key={item.itemKind + ':' + item.itemId} style={styles.itemCard}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${item.title}, ${item.cantorName}`} style={({ pressed }) => [styles.itemTop, rowDirection, pressed && styles.pressed]} onPress={() => openItem(item)}>
+                <View style={styles.thumb}>
+                  <LearningArtwork asset={item.coverAsset} size={68} radius={14} label={item.containerTitle} />
+                  <View style={[styles.thumbBadge, arabic ? styles.thumbBadgeLeft : styles.thumbBadgeRight]}>
+                    <Icon name={item.mediaType === 'video' ? 'eye-outline' : isPlaying ? 'pause' : 'play'} size={13} color={COLORS.greenDeep} />
+                  </View>
+                </View>
+                <View style={styles.itemCopy}>
+                  <Text numberOfLines={2} style={[styles.itemTitle, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{item.title}</Text>
+                  <Text numberOfLines={1} style={[styles.itemMeta, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{item.cantorName}</Text>
+                </View>
+              </Pressable>
+              <View style={[styles.itemFoot, rowDirection]}>
+                <View style={[styles.tag, rowDirection]}>
+                  <View style={styles.tagDot} />
+                  <Text numberOfLines={1} style={[styles.tagText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{item.containerTitle}</Text>
+                </View>
+                <View style={[styles.moves, rowDirection]}>
+                  {back ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${back.label}: ${item.title}`}
+                      disabled={busy}
+                      onPress={() => void moveItem(item, back.state)}
+                      style={({ pressed }) => [styles.moveQuiet, pressed && styles.pressed]}
+                    >
+                      <Text style={[styles.moveQuietText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{back.label}</Text>
+                    </Pressable>
+                  ) : null}
+                  {forward ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${forward.label}: ${item.title}`}
+                      disabled={busy}
+                      onPress={() => void moveItem(item, forward.state)}
+                      style={({ pressed }) => [styles.move, rowDirection, busy && styles.disabled, pressed && styles.pressed]}
+                    >
+                      <Text style={[styles.moveText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{forward.label}</Text>
+                      <Icon name={forward.icon} size={15} color={COLORS.greenDeep} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+          );
+        })}
+        {!loading && !stateItems.length ? (
+          <View style={styles.emptyState}>
+            <Icon name="school-outline" size={30} color={COLORS.gold} />
+            <Text style={[styles.emptyTitle, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{labels[activeState].empty}</Text>
+            {!authenticated ? (
+              <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={({ pressed }) => pressed && styles.pressed}>
+                <Text style={styles.emptyAction}>{tr('Sign in', 'Se connecter', 'تسجيل الدخول')}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    </>
+  );
+
+  const playlists = (
+    <>
+      <SectionHeading
+        title={tr('Custom Playlists', 'Playlists personnelles', 'قوائم مخصّصة')}
+        arabic={arabic}
+        trailing={(
+          <View style={styles.count}>
+            <Text style={styles.countText} maxFontSizeMultiplier={MAX_FONT_SCALE}>{playlistLibrary.playlists.length}</Text>
+          </View>
+        )}
+      />
+      <Text style={[styles.sectionBody, inGutter, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        {tr('Group any lessons and recordings your way.', 'Regroupez leçons et enregistrements à votre façon.', 'اجمع الدروس والتسجيلات في قوائمك الخاصة.')}
+      </Text>
+      <View style={[styles.createRow, inGutter, rowDirection]}>
+        <TextInput
+          accessibilityLabel={tr('New playlist name', 'Nom de la nouvelle playlist', 'اسم قائمة جديدة')}
+          editable={!creating}
+          onChangeText={setPlaylistName}
+          onSubmitEditing={() => void createPlaylist()}
+          placeholder={tr('New playlist name', 'Nom de la nouvelle playlist', 'اسم قائمة جديدة')}
+          placeholderTextColor="rgba(205, 216, 203, 0.55)"
+          returnKeyType="done"
+          style={[styles.createInput, arabic && styles.arabic]}
+          value={playlistName}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={tr('Create playlist', 'Créer la playlist', 'إنشاء القائمة')}
+          disabled={!playlistName.trim() || creating}
+          onPress={() => void createPlaylist()}
+          style={({ pressed }) => [styles.createButton, (!playlistName.trim() || creating) && styles.disabled, pressed && styles.pressed]}
+        >
+          {creating ? <ActivityIndicator color={COLORS.greenDeep} /> : <Icon name="add" size={24} color={COLORS.greenDeep} />}
+        </Pressable>
+      </View>
+      <View style={[styles.playlists, inGutter]}>
+        {playlistLibrary.playlists.map((playlist) => (
+          <Pressable
+            accessibilityRole="button"
+            key={playlist.id}
+            style={({ pressed }) => [styles.playlistRow, rowDirection, pressed && styles.pressed]}
+            onPress={() => router.push({ pathname: '/learn/playlist/[id]', params: { id: playlist.id } })}
+          >
+            <View style={styles.playlistIcon}><Icon name="list-outline" size={22} color={COLORS.gold} /></View>
+            <View style={styles.playlistCopy}>
+              <Text numberOfLines={1} style={[styles.playlistName, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{playlist.name}</Text>
+              <Text style={[styles.playlistMeta, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                {playlist.itemCount === 1 ? tr('1 item', '1 élément', 'عنصر واحد') : tr(`${playlist.itemCount} items`, `${playlist.itemCount} éléments`, `${playlist.itemCount} عناصر`)}
+              </Text>
+            </View>
+            <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head><title>{tr('My Learning - Coptic Vine', 'Mon apprentissage - Coptic Vine', 'تعلّمي - كوبتك فاين')}</title></Head>
-      <AppHeader title={{ english: 'Learn & Study', arabic: 'التعلّم والدراسة', french: 'Apprendre' }} />
-      <LearningSectionNav active="library" />
       <NowPlayingAwareScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.titleRow}>
-          <View style={styles.titleCopy}>
-            <Text style={[styles.pageTitle, isArabic && styles.arabic]}>{tr('My Learning', 'Mon apprentissage', 'تعلّمي')}</Text>
-            <Text style={[styles.pageBody, isArabic && styles.arabic]}>
-              {tr('Move each recording or lesson forward as you learn it.', 'Faites avancer chaque enregistrement ou leçon à mesure que vous l’apprenez.', 'نظّم ما ستتعلّمه، وما تدرسه الآن، وما أكملته.')}
-            </Text>
-          </View>
-          {audioQueue.length ? (
-            <Pressable accessibilityLabel="Play this list" style={styles.playListButton} onPress={() => playQueue(audioQueue, 0)}>
-              <Icon name="play" size={18} color={COLORS.learningDeep} />
-            </Pressable>
-          ) : null}
-        </View>
-
-        {loading ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        {!loading && !authenticated ? (
-          <View style={styles.authCard}>
-            <Icon name="person-circle-outline" size={32} color={COLORS.learningBright} />
-            <View style={styles.authCopy}>
-              <Text style={[styles.authTitle, isArabic && styles.arabic]}>{tr('Keep your learning across devices', 'Gardez votre apprentissage sur tous vos appareils', 'احفظ تعلّمك على كل أجهزتك')}</Text>
-              <Text style={[styles.authBody, isArabic && styles.arabic]}>
-                {tr('All lessons remain available. Sign in to save progress and playlists.', 'Toutes les leçons restent accessibles. Connectez-vous pour enregistrer votre progression et vos playlists.', 'المحتوى متاح للجميع. سجّل الدخول لحفظ القوائم والتقدّم.')}
-              </Text>
+        <PageGlow kind="green" tall={wide} />
+        <PageGutterProvider gutter={gutter}>
+          <PageTitle title={tr('Learn & Study', 'Apprendre', 'تعلّم وادرس')} arabic={arabic} flush={wide} />
+          <LearningSectionNav active="library" flush={wide} />
+          {wide ? (
+            <View style={[styles.columns, rowDirection]}>
+              <View style={styles.column}>{lists}</View>
+              <View style={styles.column}>{playlists}</View>
             </View>
-            <Pressable accessibilityLabel="Open account" style={styles.authButton} onPress={() => router.push('/account')}>
-              <Icon name="chevron-forward" size={18} color={COLORS.learningDeep} />
-            </Pressable>
-          </View>
-        ) : null}
-
-        <View style={styles.defaultPlaylists}>
-          {STATE_ORDER.map((state) => {
-            const count = library.items.filter((item) => item.state === state).length;
-            const active = state === activeState;
-            return (
-              <Pressable
-                key={state}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                onPress={() => setActiveState(state)}
-                style={[styles.defaultPlaylist, active && styles.defaultPlaylistActive]}
-              >
-                <View style={[styles.stateIcon, active && styles.stateIconActive]}>
-                  <Icon
-                    name={state === 'will_learn' ? 'bookmark-outline' : state === 'learning' ? 'school-outline' : 'checkmark'}
-                    size={22}
-                    color={active ? COLORS.learningBright : COLORS.muted}
-                  />
-                </View>
-                <Text style={[styles.stateCount, active && styles.stateCountActive]}>{count}</Text>
-                <Text numberOfLines={2} style={[styles.stateLabel, isArabic && styles.arabic, active && styles.stateLabelActive]}>
-                  {labels[state].short}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.listHeader}>
-          <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{labels[activeState].title}</Text>
-          <Text style={styles.itemCount}>{stateItems.length}</Text>
-        </View>
-        <View style={styles.itemList}>
-          {stateItems.map((item) => {
-            const stateIndex = STATE_ORDER.indexOf(item.state);
-            const busy = movingId === item.itemId;
-            return (
-              <View key={item.itemKind + ':' + item.itemId} style={styles.itemRow}>
-                <Pressable accessibilityRole="button" style={styles.itemMain} onPress={() => openItem(item)}>
-                  <LearningArtwork asset={item.coverAsset} size={54} radius={7} label={item.containerTitle} />
-                  <View style={styles.itemCopy}>
-                    <Text numberOfLines={1} style={[styles.itemTitle, isArabic && styles.arabic]}>{item.title}</Text>
-                    <Text numberOfLines={1} style={[styles.itemMeta, isArabic && styles.arabic]}>{item.cantorName}</Text>
-                    <Text numberOfLines={1} style={[styles.itemContext, isArabic && styles.arabic]}>
-                      {item.containerTitle}{formatDuration(item.durationMs) ? '  ·  ' + formatDuration(item.durationMs) : ''}
-                    </Text>
-                  </View>
-                  <Icon name={item.mediaType === 'video' ? 'eye-outline' : currentItem?.id === item.itemId ? 'pause' : 'play'} size={19} color={COLORS.learningBright} />
-                </Pressable>
-                <View style={styles.moveActions}>
-                  {stateIndex > 0 ? (
-                    <Pressable
-                      accessibilityLabel={stateIndex === 2 ? 'Move back to Learning' : 'Move back to Will Learn'}
-                      disabled={busy}
-                      onPress={() => void moveItem(item, STATE_ORDER[stateIndex - 1])}
-                      style={styles.moveButton}
-                    >
-                      <Icon name="chevron-back" size={16} color={COLORS.muted} />
-                      <Text style={styles.moveText}>{stateIndex === 2 ? (tr('Revisit', 'Revoir', 'أعد التعلّم')) : (tr('Later', 'Plus tard', 'لاحقاً'))}</Text>
-                    </Pressable>
-                  ) : null}
-                  {stateIndex < STATE_ORDER.length - 1 ? (
-                    <Pressable
-                      accessibilityLabel={stateIndex === 0 ? 'Start learning' : 'Finish learning'}
-                      disabled={busy}
-                      onPress={() => void moveItem(item, STATE_ORDER[stateIndex + 1])}
-                      style={[styles.moveButton, styles.moveButtonPrimary]}
-                    >
-                      <Text style={[styles.moveText, styles.moveTextPrimary]}>{stateIndex === 0 ? (tr('Start', 'Commencer', 'ابدأ')) : (tr('Finish', 'Terminer', 'أكملت'))}</Text>
-                      <Icon name={stateIndex === 1 ? 'checkmark' : 'chevron-forward'} size={16} color={COLORS.learningDeep} />
-                    </Pressable>
-                  ) : null}
-                </View>
-              </View>
-            );
-          })}
-          {!loading && !stateItems.length ? (
-            <View style={styles.emptyState}>
-              <Icon name="school-outline" size={32} color={COLORS.learning} />
-              <Text style={[styles.emptyTitle, isArabic && styles.arabic]}>{labels[activeState].empty}</Text>
-              {!authenticated ? (
-                <Pressable accessibilityRole="button" onPress={() => router.push('/account')}>
-                  <Text style={styles.emptyAction}>{tr('Sign in', 'Se connecter', 'تسجيل الدخول')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.customHeader}>
-          <View style={styles.customTitleRow}>
-            <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Custom Playlists', 'Playlists personnelles', 'قوائم مخصّصة')}</Text>
-            <Text style={styles.itemCount}>{playlistLibrary.playlists.length}</Text>
-          </View>
-          <Text style={[styles.sectionBody, isArabic && styles.arabic]}>
-            {tr('Group any lessons and recordings your way.', 'Regroupez leçons et enregistrements à votre façon.', 'اجمع الدروس والتسجيلات في قوائمك الخاصة.')}
-          </Text>
-        </View>
-        <View style={styles.createRow}>
-          <TextInput
-            editable={!creating}
-            onChangeText={setPlaylistName}
-            onSubmitEditing={() => void createPlaylist()}
-            placeholder={tr('New playlist name', 'Nom de la nouvelle playlist', 'اسم قائمة جديدة')}
-            placeholderTextColor={COLORS.muted}
-            returnKeyType="done"
-            style={[styles.createInput, isArabic && styles.arabic]}
-            value={playlistName}
-          />
-          <Pressable
-            accessibilityLabel="Create playlist"
-            disabled={!playlistName.trim() || creating}
-            onPress={() => void createPlaylist()}
-            style={[styles.createButton, (!playlistName.trim() || creating) && styles.disabled]}
-          >
-            {creating ? <ActivityIndicator color={COLORS.learningDeep} /> : <Icon name="add" size={22} color={COLORS.learningDeep} />}
-          </Pressable>
-        </View>
-        <View style={styles.playlistList}>
-          {playlistLibrary.playlists.map((playlist) => (
-            <Pressable accessibilityRole="button"
-              key={playlist.id}
-              style={styles.playlistRow}
-              onPress={() => router.push({ pathname: '/learn/playlist/[id]', params: { id: playlist.id } })}
-            >
-              <View style={styles.playlistIcon}><Icon name="list-outline" size={24} color={COLORS.learningBright} /></View>
-              <View style={styles.playlistCopy}>
-                <Text numberOfLines={1} style={[styles.playlistName, isArabic && styles.arabic]}>{playlist.name}</Text>
-                <Text style={[styles.playlistMeta, isArabic && styles.arabic]}>
-                  {playlist.itemCount + (playlist.itemCount === 1 ? ' item' : ' items') + '  ·  ' + playlist.visibility}
-                </Text>
-              </View>
-              <Icon name="chevron-forward" size={18} color={COLORS.learning} />
-            </Pressable>
-          ))}
-        </View>
+          ) : (
+            <>
+              {lists}
+              {playlists}
+            </>
+          )}
+        </PageGutterProvider>
       </NowPlayingAwareScrollView>
       <LearningMiniPlayer />
       <BottomTabBar active="learn" />
@@ -367,58 +400,82 @@ export default function LearningLibraryScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  content: { padding: SPACING.md, paddingBottom: SPACING.xl },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.md },
-  titleCopy: { flex: 1, minWidth: 0 },
-  pageTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 28, fontWeight: '700' },
-  pageBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19, marginTop: 4 },
-  playListButton: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.learning },
-  loader: { marginVertical: SPACING.lg },
-  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 12, textAlign: 'center', marginBottom: SPACING.md },
-  authCard: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, padding: SPACING.md, borderRadius: RADII.md, backgroundColor: COLORS.learningDeep, borderWidth: 1, borderColor: COLORS.learningLine },
-  authCopy: { flex: 1, minWidth: 0 },
-  authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, lineHeight: 16, marginTop: 3 },
-  authButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.learning },
-  defaultPlaylists: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.lg },
-  defaultPlaylist: { flex: 1, minHeight: 118, padding: SPACING.sm, borderRadius: RADII.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  defaultPlaylistActive: { backgroundColor: COLORS.learningDeep, borderColor: COLORS.learning },
-  stateIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surfaceSoft },
-  stateIconActive: { backgroundColor: COLORS.learningSoft },
-  stateCount: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', marginTop: SPACING.sm },
-  stateCountActive: { color: COLORS.learningBright },
-  stateLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', lineHeight: 15, marginTop: 2 },
-  stateLabelActive: { color: COLORS.white },
-  listHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.xl, marginBottom: SPACING.sm },
-  sectionTitle: { flex: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
-  itemCount: { minWidth: 28, color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '900', textAlign: 'center', paddingVertical: 4, paddingHorizontal: 8, borderRadius: RADII.pill, backgroundColor: COLORS.learningSoft },
-  itemList: { overflow: 'hidden', borderRadius: RADII.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  itemRow: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
-  itemMain: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, padding: SPACING.sm },
-  itemCopy: { flex: 1, minWidth: 0 },
-  itemTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  itemMeta: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '700', marginTop: 3 },
-  itemContext: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 10, marginTop: 2 },
-  moveActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: SPACING.sm, paddingHorizontal: SPACING.sm, paddingBottom: SPACING.sm },
-  moveButton: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, justifyContent: 'center', paddingHorizontal: SPACING.sm, borderRadius: RADII.pill, backgroundColor: COLORS.surfaceSoft, borderWidth: 1, borderColor: COLORS.border },
-  moveButtonPrimary: { backgroundColor: COLORS.learning, borderColor: COLORS.learning },
-  moveText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '800' },
-  moveTextPrimary: { color: COLORS.learningDeep },
-  emptyState: { alignItems: 'center', padding: SPACING.xl },
-  emptyTitle: { maxWidth: 360, color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: SPACING.sm },
-  emptyAction: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '900', marginTop: SPACING.md },
-  customHeader: { marginTop: SPACING.xl },
-  customTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  sectionBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
-  createRow: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.md },
-  createInput: { flex: 1, minHeight: 46, color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, paddingHorizontal: SPACING.md, borderRadius: RADII.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  createButton: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.learning },
+  content: { paddingBottom: 28 },
+  contentWide: { paddingHorizontal: 36 },
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: 28 },
+  column: { flex: 1, minWidth: 0 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  pressed: { opacity: 0.7 },
   disabled: { opacity: 0.42 },
-  playlistList: { gap: SPACING.sm, marginTop: SPACING.md },
-  playlistRow: { minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: SPACING.md, padding: SPACING.sm, borderRadius: RADII.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  playlistIcon: { width: 44, height: 44, borderRadius: RADII.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.learningDeep },
+  loader: { marginVertical: 24 },
+  error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 12 },
+
+  introRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginTop: 18 },
+  intro: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20 },
+  playAll: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 19, height: 38, justifyContent: 'center', width: 38 },
+
+  authCard: { alignItems: 'center', backgroundColor: COLORS.surface, borderColor: COLORS.goldLine, borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 12, marginTop: 16, padding: 14 },
+  authCopy: { flex: 1, minWidth: 0 },
+  authTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  authBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  authButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
+
+  tabs: { borderBottomColor: 'rgba(255, 255, 255, 0.08)', borderBottomWidth: 1, flexDirection: 'row', gap: 22, marginTop: 18 },
+  tab: { alignItems: 'center', borderBottomColor: 'transparent', borderBottomWidth: 2, flexDirection: 'row', gap: 7, marginBottom: -1, paddingBottom: 12 },
+  tabActive: { borderBottomColor: COLORS.gold },
+  tabLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
+  tabLabelActive: { color: COLORS.gold },
+  tabCount: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 99, height: 22, justifyContent: 'center', minWidth: 22, paddingHorizontal: 6 },
+  tabCountActive: { backgroundColor: COLORS.gold },
+  tabCountText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700' },
+  tabCountTextActive: { color: COLORS.greenDeep },
+
+  items: { gap: 10, marginTop: 14 },
+  itemCard: { backgroundColor: COLORS.surface, borderRadius: 20, padding: 12 },
+  itemTop: { alignItems: 'center', flexDirection: 'row', gap: 14 },
+  thumb: { position: 'relative' },
+  thumbBadge: {
+    alignItems: 'center',
+    backgroundColor: COLORS.gold,
+    borderColor: '#0E2416',
+    borderRadius: 17,
+    borderWidth: 3,
+    bottom: -6,
+    height: 34,
+    justifyContent: 'center',
+    position: 'absolute',
+    width: 34,
+  },
+  thumbBadgeRight: { right: -6 },
+  thumbBadgeLeft: { left: -6 },
+  itemCopy: { flex: 1, minWidth: 0 },
+  itemTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '700', lineHeight: 21 },
+  itemMeta: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 3 },
+  itemFoot: { alignItems: 'center', borderTopColor: 'rgba(255, 255, 255, 0.07)', borderTopWidth: 1, flexDirection: 'row', gap: 10, justifyContent: 'space-between', marginTop: 12, paddingTop: 12 },
+  tag: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 99, flexDirection: 'row', flexShrink: 1, gap: 7, height: 26, paddingHorizontal: 11 },
+  tagDot: { backgroundColor: COLORS.gold, borderRadius: 4, height: 7, width: 7 },
+  tagText: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '600' },
+  moves: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  move: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, flexDirection: 'row', gap: 2, height: 34, paddingLeft: 15, paddingRight: 10 },
+  moveText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+  moveQuiet: { alignItems: 'center', borderColor: 'rgba(255, 255, 255, 0.18)', borderRadius: 99, borderWidth: 1, height: 34, justifyContent: 'center', paddingHorizontal: 13 },
+  moveQuietText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '600' },
+  emptyState: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, gap: 10, paddingHorizontal: 16, paddingVertical: 24 },
+  emptyTitle: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, maxWidth: 360, textAlign: 'center' },
+  emptyAction: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
+
+  count: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, height: 26, justifyContent: 'center', minWidth: 26, paddingHorizontal: 8 },
+  countText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
+  sectionBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, lineHeight: 19, marginBottom: 12, marginTop: -4 },
+  createRow: { flexDirection: 'row', gap: 8 },
+  createInput: { backgroundColor: COLORS.surface, borderRadius: 16, color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, height: 50, minWidth: 0, paddingHorizontal: 16 },
+  createButton: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 16, height: 50, justifyContent: 'center', width: 50 },
+  playlists: { gap: 8, marginTop: 12 },
+  playlistRow: { alignItems: 'center', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 14, minHeight: 64, paddingHorizontal: 14, paddingVertical: 10 },
+  playlistIcon: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 12, height: 44, justifyContent: 'center', width: 44 },
   playlistCopy: { flex: 1, minWidth: 0 },
-  playlistName: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  playlistMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 10, marginTop: 4, textTransform: 'capitalize' },
+  playlistName: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
+  playlistMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
+  arabicTight: { fontFamily: TYPOGRAPHY.arabic },
 });

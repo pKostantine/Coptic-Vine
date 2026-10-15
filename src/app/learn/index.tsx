@@ -3,26 +3,52 @@ import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import AppHeader from '@/components/vine/ui/AppHeader';
-import BottomTabBar from '@/components/vine/ui/BottomTabBar';
-import LoadFailure from '@/components/vine/ui/LoadFailure';
+import LearningSeasonTile from '@/components/learning/LearningSeasonTile';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
+import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
+import Icon from '@/components/vine/ui/Icon';
+import LoadFailure from '@/components/vine/ui/LoadFailure';
+import PageTitle from '@/components/vine/ui/PageTitle';
+import PersonMedallion from '@/components/vine/ui/PersonMedallion';
+import { useLiturgicalDay } from '@/components/vine/ui/useLiturgicalDay';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { LearningHomePayload, LearningItemLibraryPayload } from '@/types/learningPlatform';
+import { learningSeasonLook } from '@/utils/learningSeasonLook';
+import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
+
+/** How many season tiles sit side by side: two on a phone, more as the page widens. */
+function tileColumnsFor(width: number): number {
+  if (width >= 1100) return 4;
+  if (width >= 700) return 3;
+  return 2;
+}
+
+/**
+ * Learn & Study's Discover page (Coptic Vine design, "Learn"): the cantors as
+ * medallions, then the seasons as tiles in their own colours, the Church's
+ * present season marked "Now"; and, for someone part-way through, what they
+ * were learning.
+ */
 export default function LearningHomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const layout = useLayoutMode();
+  const width = useContentWidth();
   const { user } = useAuth();
   const { preferences } = useReadingPreferences();
+  const day = useLiturgicalDay();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
-  const isArabic = locale === 'ar';
+  const arabic = locale === 'ar';
+  const wide = layout !== 'phone';
   const [home, setHome] = useState<LearningHomePayload | null>(null);
   const [library, setLibrary] = useState<LearningItemLibraryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,88 +71,124 @@ export default function LearningHomeScreen() {
   }, [locale, user?.id, attempt]);
 
   const continueLearning = library?.items.filter((item) => item.state === 'learning').slice(0, 4) ?? [];
+  const gutter = wide ? 0 : 16;
+  const available = width - (wide ? 72 : 32);
+  const columns = tileColumnsFor(available);
+  const tileWidth = Math.floor((available - 10 * (columns - 1)) / columns);
+  // The season the Church is in wears the "Now" badge: the first tile in the day's colours.
+  const seasons = (home?.seasons ?? []).map((season) => ({ season, look: learningSeasonLook(season) }));
+  const nowId = seasons.find(({ look }) => look.theme === day.theme.key)?.season.id ?? null;
+
+  const browseAll = (label: string, onPress: () => void) => (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={8} onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
+      <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} />
+    </Pressable>
+  );
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <Head>
         <title>{tr('Learn & Study — Coptic Vine', 'Apprendre — Coptic Vine', 'تعلّم وادرس — كوبتك فاين')}</title>
       </Head>
-      <AppHeader
-        title={{ english: 'Learn & Study', arabic: 'تعلّم وادرس', french: 'Apprendre' }}
-        visibleLanguages={{ english: !isArabic, arabic: isArabic }}
-      />
-      <LearningSectionNav active="home" />
 
-      <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.discoveryGrid}>
-          <Pressable accessibilityRole="button" style={styles.discoveryCard} onPress={() => router.push('/learn/cantors')}>
-            <View style={styles.discoveryIcon}><Text style={styles.discoveryGlyph}>♬</Text></View>
-            <View style={styles.discoveryText}>
-              <Text style={[styles.discoveryTitle, isArabic && styles.arabic]}>
-                {tr('Cantors', 'Chantres', 'المعلّمون')}
-              </Text>
-              <Text style={[styles.discoveryBody, isArabic && styles.arabic]}>
-                {tr('Learn with a familiar voice', 'Apprenez avec une voix familière', 'تعلّم مع معلّمك المفضّل')}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" style={styles.discoveryCard} onPress={() => router.push('/learn/seasons')}>
-            <View style={styles.discoveryIcon}><Text style={styles.discoveryGlyph}>✦</Text></View>
-            <View style={styles.discoveryText}>
-              <Text style={[styles.discoveryTitle, isArabic && styles.arabic]}>
-                {tr('Seasons', 'Temps liturgiques', 'المواسم')}
-              </Text>
-              <Text style={[styles.discoveryBody, isArabic && styles.arabic]}>
-                {tr('Study the hymns for the season', 'Étudiez les hymnes du temps', 'ادرس ألحان الموسم')}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
-        </View>
+      <NowPlayingAwareScrollView
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        showsVerticalScrollIndicator={false}
+      >
+        <PageGlow kind="green" tall={wide} />
+        <PageGutterProvider gutter={gutter}>
+          <PageTitle title={tr('Learn & Study', 'Apprendre', 'تعلّم وادرس')} arabic={arabic} flush={wide} />
+          <LearningSectionNav active="home" flush={wide} />
 
-        {!home && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}
-        {error ? (
-          <LoadFailure
-            error={error}
-            layout="inline"
-            onRetry={() => {
-              setError(null);
-              setAttempt((count) => count + 1);
-            }}
-          />
-        ) : null}
-
-        {continueLearning.length ? (
-          <>
-            <SectionHeading
-              title={tr('Continue Learning', 'Continuer l’apprentissage', 'أكمل التعلّم')}
-              action={tr('View all', 'Tout voir', 'عرض الكل')}
-              onAction={() => router.push('/learn/library')}
-              isArabic={isArabic}
+          {!home && !error ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
+          {error ? (
+            <LoadFailure
+              error={error}
+              layout="inline"
+              onRetry={() => {
+                setError(null);
+                setAttempt((count) => count + 1);
+              }}
             />
-            <View style={styles.continueList}>
-              {continueLearning.map((item, index) => (
-                <Pressable accessibilityRole="button"
-                  key={item.itemKind + ':' + item.itemId}
-                  style={styles.continueCard}
-                  onPress={() => item.itemKind === 'lesson'
-                    ? router.push({ pathname: '/learn/lesson/[id]', params: { id: item.itemId, setId: item.containerId } })
-                    : router.push({ pathname: '/learn/album/[id]', params: { id: item.containerId } })}
-                >
-                  <View style={styles.continueNumber}><Text style={styles.continueNumberText}>{index + 1}</Text></View>
-                  <View style={styles.continueInfo}>
-                    <Text numberOfLines={1} style={[styles.continueTitle, isArabic && styles.arabic]}>{item.title}</Text>
-                    <Text numberOfLines={1} style={[styles.continueMeta, isArabic && styles.arabic]}>
-                      {item.subtitle || (tr('Currently learning', 'En cours d’apprentissage', 'قيد التعلّم'))}
-                    </Text>
+          ) : null}
+
+          {home ? (
+            <>
+              <SectionHeading
+                title={tr('By Cantor', 'Par chantre', 'حسب المعلّم')}
+                arabic={arabic}
+                trailing={browseAll(tr('All cantors', 'Tous les chantres', 'كل المعلّمين'), () => router.push('/learn/cantors'))}
+              />
+              {home.cantors.length ? (
+                <NowPlayingAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.people, { paddingHorizontal: gutter }]}>
+                  {home.cantors.map((cantor) => (
+                    <PersonMedallion
+                      key={cantor.id}
+                      name={cantor.displayName}
+                      imageUri={learningService.resolveAsset(cantor.profileImageAsset)}
+                      size={92}
+                      arabic={arabic}
+                      onPress={() => router.push({ pathname: '/learn/cantor/[id]', params: { id: cantor.id } })}
+                    />
+                  ))}
+                </NowPlayingAwareScrollView>
+              ) : (
+                <Text style={[styles.empty, { marginHorizontal: gutter }, arabic && styles.arabic]}>{tr('No cantors yet.', 'Aucun chantre pour l’instant.', 'لا يوجد معلّمون بعد.')}</Text>
+              )}
+
+              <SectionHeading
+                title={tr('By Season', 'Par temps liturgique', 'حسب الموسم')}
+                arabic={arabic}
+                trailing={browseAll(tr('All seasons', 'Tous les temps', 'كل المواسم'), () => router.push('/learn/seasons'))}
+              />
+              <View style={[styles.tiles, { paddingHorizontal: gutter }, arabic && styles.rowReverse]}>
+                {seasons.map(({ season, look }) => (
+                  <View key={season.id} style={{ width: tileWidth }}>
+                    <LearningSeasonTile
+                      title={season.title}
+                      look={look}
+                      now={season.id === nowId}
+                      nowLabel={tr('Now', 'Maintenant', 'الآن')}
+                      arabic={arabic}
+                      onPress={() => router.push({ pathname: '/learn/season/[id]', params: { id: season.id } })}
+                    />
                   </View>
-                  <View style={styles.resume}><Text style={styles.resumeText}>▶</Text></View>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : null}
+                ))}
+              </View>
+
+              {continueLearning.length ? (
+                <>
+                  <SectionHeading
+                    title={tr('Continue Learning', 'Continuer l’apprentissage', 'أكمل التعلّم')}
+                    arabic={arabic}
+                    trailing={browseAll(tr('Open My Learning', 'Ouvrir Mon apprentissage', 'افتح تعلّمي'), () => router.push('/learn/library'))}
+                  />
+                  <View style={[styles.continueList, { paddingHorizontal: gutter }]}>
+                    {continueLearning.map((item, index) => (
+                      <Pressable
+                        accessibilityRole="button"
+                        key={item.itemKind + ':' + item.itemId}
+                        style={({ pressed }) => [styles.continueCard, arabic && styles.rowReverse, pressed && styles.pressed]}
+                        onPress={() => item.itemKind === 'lesson'
+                          ? router.push({ pathname: '/learn/lesson/[id]', params: { id: item.itemId, setId: item.containerId } })
+                          : router.push({ pathname: '/learn/album/[id]', params: { id: item.containerId } })}
+                      >
+                        <View style={styles.continueNumber}><Text style={styles.continueNumberText}>{index + 1}</Text></View>
+                        <View style={styles.continueInfo}>
+                          <Text numberOfLines={1} style={[styles.continueTitle, arabic && styles.arabic]}>{item.title}</Text>
+                          <Text numberOfLines={1} style={[styles.continueMeta, arabic && styles.arabic]}>
+                            {item.subtitle || item.cantorName}
+                          </Text>
+                        </View>
+                        <View style={styles.resume}><Icon name="play" size={14} color={COLORS.greenDeep} /></View>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </PageGutterProvider>
       </NowPlayingAwareScrollView>
 
       <BottomTabBar active="learn" />
@@ -134,87 +196,33 @@ export default function LearningHomeScreen() {
   );
 }
 
-function SectionHeading({
-  title,
-  action,
-  onAction,
-  isArabic,
-}: {
-  title: string;
-  action: string;
-  onAction: () => void;
-  isArabic: boolean;
-}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionHeading, isArabic && styles.arabic]}>{title}</Text>
-      <Pressable accessibilityRole="button" onPress={onAction}><Text style={[styles.sectionAction, isArabic && styles.arabic]}>{action}</Text></Pressable>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
-  content: { paddingBottom: SPACING.xl },
-  discoveryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, padding: SPACING.md },
-  discoveryCard: {
-    flexGrow: 1,
-    flexBasis: 280,
-    minHeight: 124,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: RADII.lg,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  discoveryIcon: {
-    width: 62,
-    height: 62,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: RADII.md,
-    backgroundColor: COLORS.learningSoft,
-    borderWidth: 1,
-    borderColor: COLORS.learningLine,
-  },
-  discoveryGlyph: { color: COLORS.learningBright, fontSize: 29 },
-  discoveryText: { flex: 1, minWidth: 0 },
-  discoveryTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 22, fontWeight: '700' },
-  discoveryBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 5 },
-  chevron: { color: COLORS.learning, fontSize: 28 },
-  loader: { marginVertical: SPACING.xl },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: SPACING.md,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.md,
-  },
-  sectionHeading: { flex: 1, color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
-  sectionAction: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
-  continueList: { gap: SPACING.sm, paddingHorizontal: SPACING.md },
+  content: { paddingBottom: 28 },
+  contentWide: { paddingHorizontal: 36 },
+  loader: { marginVertical: 32 },
+  pressed: { opacity: 0.7 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  people: { gap: 16 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14 },
+  continueList: { gap: 8 },
   continueCard: {
-    minHeight: 66,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADII.md,
-    backgroundColor: COLORS.learningDeep,
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.learningLine,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 66,
+    paddingHorizontal: 14,
   },
-  continueNumber: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.learningSoft },
-  continueNumberText: { color: COLORS.learningBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
+  continueNumber: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
+  continueNumberText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 14, fontWeight: '700' },
   continueInfo: { flex: 1, minWidth: 0 },
-  continueTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '800' },
-  continueMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, marginTop: 3 },
-  resume: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.learning },
-  resumeText: { color: COLORS.learningDeep, fontSize: 12, fontWeight: '900' },
+  continueTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
+  continueMeta: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
+  resume: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
 });
