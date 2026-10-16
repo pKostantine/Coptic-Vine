@@ -26,6 +26,7 @@ import {
   getSlidePadding,
   getSlideRenderLayers,
   getSlideshowChromeMetrics,
+  getTitlePairedVerseCount,
   hashSlideshowText,
   isSlideSettled,
   isSlideshowItemMeasured,
@@ -1557,6 +1558,9 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         sectionId: section.id,
         type: "title",
         title: section.title,
+        // The verses the title keeps on its slide: its first, or for a few
+        // hymns its first two (TITLE_PAIRED_VERSE_COUNTS, slideshowLayout.js).
+        pairedVerseCount: getTitlePairedVerseCount(section.hymnKey),
         titlePrayerType: section.titlePrayerType || null,
         collapsible: Boolean(section.collapsible),
         currentlyCollapsed: Boolean(section.currentlyCollapsed),

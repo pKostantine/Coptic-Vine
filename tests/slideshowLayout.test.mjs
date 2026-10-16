@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 
 import {
@@ -19,6 +20,7 @@ import {
   getSlideshowChromeMetrics,
   getSlideshowLanguageFontSize,
   getSlideshowLanguageLineHeight,
+  getTitlePairedVerseCount,
   getVerseLineSegmentHeight,
   getVisibleVerseLanguages,
   hasRenderableSlideshowLanguageBody,
@@ -26,6 +28,7 @@ import {
   isKeyKeptByFocusedControl,
   joinRenderedLines,
   paginateItems,
+  TITLE_PAIRED_VERSE_COUNTS,
 } from "../src/components/vine/slideshowLayout.js";
 import {
   getAlternatingVerseColorIndex,
@@ -947,6 +950,62 @@ test("a title never ends a slide: it goes over the page with what follows it", (
   // With room for both, they share the slide.
   const roomy = paginateItems(items, heights, {}, 1000, 18, ALL_LANGUAGES, 1024);
   assert.deepEqual(roomy.map((slide) => slide.map((entry) => entry.id)), [["a-title", "a-0", "a-1"], ["b-title", "b-0"]]);
+});
+
+test("a title that keeps its first two verses shows as much of the second as fits beneath the first", () => {
+  const title = (count) => ({ id: "h-title", sectionId: "h", type: "title", title: { english: "Hoos" }, pairedVerseCount: count });
+  const verse = (index) => verseItem({ id: `h-${index}`, sectionId: "h" });
+  const metric = { english: { lines: metricLines("English", 6) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 6) }, arabic: { lines: metricLines("عربي", 6) } };
+  const lineHeight = getSlideshowLanguageLineHeight("arabic", verse(1), 18);
+  const tall = lineHeight * 6 + 40;
+  // The title and the short first verse leave room for some lines of the second, not all of it.
+  const budget = 40 + 100 + lineHeight * 3 + 40;
+  const heights = { "h-title": 40, "h-0": 100, "h-1": tall, "h-2": 200 };
+  const items = (count) => [title(count), verse(0), verse(1), verse(2)];
+  const ids = (slides) => slides.map((slide) => slide.map((entry) => entry.sourceItemId || entry.id));
+  const kept = paginateItems(items(2), heights, { "h-1": metric }, budget, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(ids(kept), [["h-title", "h-0", "h-1"], ["h-1"], ["h-2"]]);
+  const firstPiece = kept[0][2].slideshowLineCounts.english;
+  assert.ok(firstPiece > 0 && firstPiece < 6, `first piece shows ${firstPiece} lines`);
+  // Any other title keeps its first verse only: the second moves on whole.
+  const plain = paginateItems(items(1), heights, { "h-1": metric }, budget, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(ids(plain), [["h-title", "h-0"], ["h-1"], ["h-2"]]);
+  assert.equal(plain[1][0].slideshowLineCounts.english, 6);
+  // A break at the second verse from its top is a break at the title: the three share a slide again.
+  const fromSecond = paginateItems(items(2), heights, { "h-1": metric }, budget, 18, ALL_LANGUAGES, 1024, { itemId: "h-1", offsets: {} });
+  assert.deepEqual(ids(fromSecond), ids(kept));
+  // Turned back from the second verse's continuation, the page is the title's, with the first piece again.
+  const continuation = kept[1][0];
+  const lineAbove = Object.fromEntries(Object.entries(continuation.slideshowLineRanges).filter(([, range]) => range.start > 0).map(([language, range]) => [language, range.start - 1]));
+  const back = paginateItems(items(2), heights, { "h-1": metric }, budget, 18, ALL_LANGUAGES, 1024, { itemId: "h-1", offsets: lineAbove, direction: "backward" });
+  assert.deepEqual(ids(back), ids(kept));
+  assert.deepEqual(back[0][2].slideshowLineRanges, kept[0][2].slideshowLineRanges);
+  // Turned back from the verse after, the page ends at the second verse's last piece.
+  const toEnd = paginateItems(items(2), heights, { "h-1": metric }, budget, 18, ALL_LANGUAGES, 1024, { itemId: "h-1", offsets: {}, direction: "backward" });
+  const landing = findSlideIndexForAnchor(toEnd, { sourceItemId: "h-1", direction: "backward", offsets: {} });
+  assert.deepEqual(ids(toEnd), ids(kept));
+  assert.equal(landing, 1);
+  // When the first verse itself turns the page, the title's slide is full: the second keeps the whole-verse rule.
+  const longer = { english: { lines: metricLines("English", 10) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 10) }, arabic: { lines: metricLines("عربي", 10) } };
+  const tallFirst = { "h-title": 40, "h-0": lineHeight * 10 + 40, "h-1": tall, "h-2": 100 };
+  const turned = paginateItems(items(2), tallFirst, { "h-0": longer, "h-1": metric }, budget, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(ids(turned), [["h-title", "h-0"], ["h-0"], ["h-1"], ["h-2"]]);
+  assert.deepEqual(turned[2][0].slideshowLineRanges.english, { start: 0, end: 6 });
+  // With room for all three, they share the slide, and the third verse is not the title's to keep.
+  const roomy = paginateItems(items(2), { "h-title": 40, "h-0": 100, "h-1": 100, "h-2": tall }, { "h-2": metric }, budget, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(ids(roomy), [["h-title", "h-0", "h-1"], ["h-2"]]);
+});
+
+test("the titles that keep two verses are named by hymn key, and the slideshow sets the count from the section", () => {
+  assert.deepEqual(Object.keys(TITLE_PAIRED_VERSE_COUNTS).sort(), [
+    "agiosAgiosAgiosStBasil", "agiosAgiosAgiosStCyril", "agiosAgiosAgiosStGregory",
+    "theKiahkHoos", "theLentenHoos", "theNativityHoos", "thePalmSundayHoos", "theResurrectionHoos", "theTheophanyHoos",
+  ]);
+  assert.equal(getTitlePairedVerseCount("theKiahkHoos"), 2);
+  assert.equal(getTitlePairedVerseCount("theFirstHoos"), 1);
+  assert.equal(getTitlePairedVerseCount(undefined), 1);
+  const container = fs.readFileSync("src/components/vine/SlideshowContainer.js", "utf8");
+  assert.match(container, /pairedVerseCount: getTitlePairedVerseCount\(section\.hymnKey\)/);
 });
 
 test("a column shown whole on the page before never starts again on the reader's page", () => {

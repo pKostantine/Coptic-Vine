@@ -215,6 +215,48 @@ function buildPaginationUnits(items) {
 }
 
 /**
+ * Hymns whose title keeps its first TWO verses on its slide rather than one:
+ * their first verse is a short opening line, so the title's slide also gives
+ * as much of the second verse as fits beneath it. Every other title keeps
+ * its first verse only. Keyed by the order table's hymn_key.
+ */
+export const TITLE_PAIRED_VERSE_COUNTS = Object.freeze({
+  theKiahkHoos: 2,
+  theNativityHoos: 2,
+  theTheophanyHoos: 2,
+  theLentenHoos: 2,
+  thePalmSundayHoos: 2,
+  theResurrectionHoos: 2,
+  agiosAgiosAgiosStBasil: 2,
+  agiosAgiosAgiosStGregory: 2,
+  agiosAgiosAgiosStCyril: 2,
+});
+const MAX_TITLE_PAIRED_VERSES = 2;
+
+/** How many of its first verses a hymn's title keeps on its slide. */
+export function getTitlePairedVerseCount(hymnKey) {
+  return TITLE_PAIRED_VERSE_COUNTS[hymnKey] || 1;
+}
+
+/**
+ * The index of the title the verse at `index` is kept with, else -1: a title
+ * is before the verse, with nothing but the Coptic Gospel toggle and fewer
+ * verses than the title keeps between them.
+ */
+function pairedTitleIndex(items, index) {
+  let versesBetween = 0;
+  let start = index - 1;
+  while (start >= 0 && items[start].type !== "title") {
+    if (items[start].type === "verse") versesBetween += 1;
+    else if (items[start].type !== "gospelRiteToggle") return -1;
+    if (versesBetween >= MAX_TITLE_PAIRED_VERSES) return -1;
+    start -= 1;
+  }
+  if (start < 0) return -1;
+  return versesBetween < (items[start].pairedVerseCount || 1) ? start : -1;
+}
+
+/**
  * Lays the items out on slides. `breakAt` is where the reader is -- the
  * item, and for a verse the line of each language, at the top of the slide
  * they are looking at -- and a slide always begins exactly there: the lines
@@ -294,15 +336,16 @@ export function paginateItems(
   // always share a slide. The first verse gives as much of itself as fits
   // beneath the title, turned over the page if it must be, rather than
   // leave the title on a slide of its own. Every later verse keeps to the
-  // rule above. A verse is the title's first when the title (or the Coptic
-  // Gospel toggle set after it) comes right before it and is on the slide.
-  const titleChainStart = (index) => {
-    let start = index - 1;
-    while (start >= 0 && items[start].type === "gospelRiteToggle") start -= 1;
-    return start >= 0 && items[start].type === "title" ? start : -1;
+  // rule above -- except beneath the few titles that keep their first two
+  // (TITLE_PAIRED_VERSE_COUNTS): there the second verse does the same
+  // beneath the first, while the title is still on the slide. A verse is
+  // kept with its title when the title (or the Coptic Gospel toggle set
+  // after it) is before it with no more than those verses between, and the
+  // title is on the slide being filled.
+  const pairedWithTitleHere = (index) => {
+    const titleIndex = pairedTitleIndex(items, index);
+    return titleIndex >= 0 && currentSlide.includes(items[titleIndex]);
   };
-  const pairedWithTitleHere = (index) =>
-    titleChainStart(index) >= 0 && currentSlide.length > 0 && currentSlide[currentSlide.length - 1] === items[index - 1];
 
   const placeVerse = (verseItem, index) => {
     const verseHeight = Math.ceil((heights[verseItem.id] ?? 0) + 2);
@@ -385,13 +428,13 @@ export function paginateItems(
     return currentHeight + chainHeight + Math.max(after, 1) > safeAvailableHeight;
   };
 
-  // A break at a title's first verse, from its top, is a break at the title:
-  // the two share a slide.
+  // A break at a verse its title keeps, from its top, is a break at the
+  // title: they share a slide.
   const breakIndex = breakAt ? items.findIndex((item) => item.id === breakAt.itemId) : -1;
-  const breakStartsAtId = breakIndex >= 0 && items[breakIndex].type === "verse" &&
-    !readerLineOffsets(items[breakIndex]) && titleChainStart(breakIndex) >= 0
-    ? items[titleChainStart(breakIndex)].id
-    : breakAt?.itemId;
+  const breakTitleIndex = breakIndex >= 0 && items[breakIndex].type === "verse" && !readerLineOffsets(items[breakIndex])
+    ? pairedTitleIndex(items, breakIndex)
+    : -1;
+  const breakStartsAtId = breakTitleIndex >= 0 ? items[breakTitleIndex].id : breakAt?.itemId;
 
   units.forEach((unit, index) => {
     const item = unit.items[0];
@@ -430,30 +473,36 @@ function packBackwardFromItem(items, units, heights, languageHeights, availableH
   const heightOf = (index) => Math.ceil((heights[items[index].id] ?? 0) + 2);
   const measured = (item) => item.type === "verse" && hasEveryMeasuredColumn(item, languageHeights[item.id], visibleLanguages);
   const keepsWithNext = (item) => item?.type === "title" || item?.type === "gospelRiteToggle";
-  // The title (and toggle) a verse is the first of, if it is one: divided
-  // beneath its title, its pieces are not those of a fresh slide.
-  let chainStart = last;
-  while (chainStart > 0 && keepsWithNext(items[chainStart - 1])) chainStart -= 1;
-  const underTitle = chainStart < last && items[chainStart].type === "title";
-  const dividedHere = underTitle ? heightOf(last) > availableHeight - heightOf(chainStart) : heightOf(last) > availableHeight;
-  if (measured(items[last]) && dividedHere) {
-    // The verse's pieces, as they are divided: the page ending at the line
-    // asked for is the piece holding that line, else the last.
-    const pieces = paginateItems(items.slice(underTitle ? chainStart : last, last + 1), heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0)
-      .flat().filter((piece) => (piece.sourceItemId || piece.id) === itemId && piece.slideshowLineRanges);
+  // A verse its title keeps on its slide, or one taller than a slide, is
+  // laid out as a forward turn lays it out -- from the title, or from a
+  // fresh slide -- and the page ending at the line asked for (else at the
+  // verse's last piece) is the one of those pages holding it. A verse
+  // divided beneath its title is not divided as a fresh slide would divide
+  // it, and its page is then the title's, or the one its earlier pieces
+  // leave it on.
+  const titleIndex = pairedTitleIndex(items, last);
+  const underTitle = titleIndex >= 0;
+  if (measured(items[last]) && (underTitle || heightOf(last) > availableHeight)) {
+    const pages = paginateItems(items.slice(underTitle ? titleIndex : last, last + 1), heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0);
+    const pieceOf = (page) => page.find((entry) => (entry.sourceItemId || entry.id) === itemId && Object.keys(entry.slideshowLineRanges || {}).length > 0);
+    const holding = pages.map((page, index) => (pieceOf(page) ? index : -1)).filter((index) => index >= 0);
     const wanted = lineOffsets && Object.entries(lineOffsets).find(([, line]) => Number.isFinite(line) && line >= 0);
-    const piece = (wanted && pieces.find((candidate) => {
-      const range = candidate.slideshowLineRanges[wanted[0]];
+    const wantedPage = wanted ? holding.find((index) => {
+      const range = pieceOf(pages[index]).slideshowLineRanges[wanted[0]];
       return range && wanted[1] >= range.start && wanted[1] < range.end;
-    })) || pieces[pieces.length - 1];
-    const offsets = Object.fromEntries(Object.entries(piece?.slideshowLineRanges || {}).map(([language, range]) => [language, range.start]));
-    const firstPiece = !Object.values(offsets).some((line) => line > 0);
-    // The page ends at the verse's end only when it holds its last piece;
-    // any other piece fills its page on its own.
-    const endsBeforeItemId = piece === pieces[pieces.length - 1] ? items[last + 1]?.id : undefined;
-    return firstPiece && underTitle
-      ? { itemId: items[chainStart].id, offsets: {}, endsBeforeItemId }
-      : { itemId, offsets, endsBeforeItemId };
+    }) : undefined;
+    const lastHolding = holding[holding.length - 1];
+    const pageIndex = wantedPage ?? lastHolding;
+    const first = pageIndex != null ? pages[pageIndex][0] : null;
+    // Whole beneath its title, the verse is packed back like any other (below).
+    const wholeBeneathTitle = underTitle && holding.length === 1 && first === items[titleIndex];
+    if (first && !wholeBeneathTitle) {
+      // The page ends at the verse's end only when it holds its last piece;
+      // any other piece fills its page on its own.
+      const endsBeforeItemId = pageIndex === lastHolding ? items[last + 1]?.id : undefined;
+      const offsets = Object.fromEntries(Object.entries(first.slideshowLineRanges || {}).map(([language, range]) => [language, range.start]));
+      return { itemId: first.sourceItemId || first.id, offsets, endsBeforeItemId };
+    }
   }
   let first = last;
   let total = heightOf(last);

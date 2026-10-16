@@ -145,6 +145,18 @@ Items are placed in order; a slide holds whole items:
   `keepWithSlide`). A break at such a verse, from its top, is a break at
   its title, and a page turned back into it is the title with the first
   piece again.
+- **A few titles keep their first two verses** (`TITLE_PAIRED_VERSE_COUNTS`:
+  the Kiahk, Nativity, Theophany, Lenten, Palm Sunday and Resurrection
+  Hooses, and the three Agios Agios Agios; `flattenSections` sets the title
+  item's `pairedVerseCount` from the section's hymn key). Their first verse
+  is a short opening line, so while the title is still on the slide the
+  second verse does as the first does beneath it: whole if it fits, else as
+  much of it as fits, the rest over the page. If the first verse itself
+  turned the page, the title's slide is full, and the second verse keeps
+  the whole-verse rule. Breaks and turns back treat it as they treat the
+  first verse: a break at it from its top is a break at the title, and a
+  page turned back into it is the page a forward turn from the title gives
+  it (`pairedTitleIndex`, `packBackwardFromItem`).
 
 ### A verse taller than a slide
 
