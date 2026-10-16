@@ -48,6 +48,7 @@ export function buildBibleChapterHtml({
   languageKeys,
   fontSize,
   copticFontDataUri,
+  copticItalicFontDataUri = null,
   selectText = false,
   isSlideshow = false,
   nativeSwipeNavigation = false,
@@ -65,6 +66,8 @@ export function buildBibleChapterHtml({
   languageKeys: BibleLanguageKey[];
   fontSize: number;
   copticFontDataUri: string;
+  /** The Coptic face's italic, for Coptic set in italic; without it the browser fakes one. */
+  copticItalicFontDataUri?: string | null;
   selectText?: boolean;
   isSlideshow?: boolean;
   /** Browser and PWA readers must not swipe back out of a chapter. */
@@ -165,7 +168,13 @@ export function buildBibleChapterHtml({
       @font-face {
         font-family: 'CopticVine';
         src: url('${copticFontDataUri}') format('truetype');
+        font-style: normal;
       }
+      ${copticItalicFontDataUri ? `@font-face {
+        font-family: 'CopticVine';
+        src: url('${copticItalicFontDataUri}') format('truetype');
+        font-style: italic;
+      }` : ''}
       :root {
         color-scheme: ${theme.dark ? 'dark' : 'light'};
         --text-color: ${colors.text};

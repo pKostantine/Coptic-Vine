@@ -38,7 +38,7 @@ import { appText, type AppText } from '@/utils/appText';
 import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useReadingKeepAwake } from '@/utils/useReadingKeepAwake';
-import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
+import { useCopticFontDataUri, useCopticItalicFontDataUri } from '@/utils/useCopticFontDataUri';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
 import { isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
@@ -215,6 +215,7 @@ export default function BibleChapterDocument() {
   const [pencilGestureActive, setPencilGestureActive] = useState(false);
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const copticFontDataUri = useCopticFontDataUri();
+  const copticItalicFontDataUri = useCopticItalicFontDataUri();
   const bibleWebViewRef = useRef<BibleWebViewHandle>(null);
 
   const [book, setBook] = useState<BibleBook | null>(null);
@@ -377,12 +378,13 @@ export default function BibleChapterDocument() {
 
   const readerId = JSON.stringify([verseRequestKey, effectiveLanguageKeys, fontSize, effectiveSelectText, preferences.slideshowMode, restoreVerse, targetVerse, theme.id]);
   const chapterHtml = useMemo(() => {
-    if (!verses || !copticFontDataUri) return null;
+    if (!verses || !copticFontDataUri || !copticItalicFontDataUri) return null;
     return buildBibleChapterHtml({
       verses,
       languageKeys: effectiveLanguageKeys,
       fontSize,
       copticFontDataUri,
+      copticItalicFontDataUri,
       selectText: effectiveSelectText,
       isSlideshow: preferences.slideshowMode,
       nativeSwipeNavigation: Platform.OS !== 'web',
@@ -398,7 +400,7 @@ export default function BibleChapterDocument() {
       copyReference,
       theme,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText, copyReference, theme]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, copticItalicFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText, copyReference, theme]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -672,6 +674,8 @@ export default function BibleChapterDocument() {
                               isPsalmIntroduction && styles.selectorVersePreviewIntro,
                               // Arabic in italic, slanted as Chrome slants it (utils/arabicItalic.ts).
                               isPsalmIntroduction && isArabicBibleLanguage(previewLanguage) && arabicItalicStyle(),
+                              // Coptic in italic is its own face, drawn upright.
+                              isPsalmIntroduction && previewLanguage === 'coptic' && styles.selectorVersePreviewCopticItalic,
                             ]}
                           >
                             {verse[previewLanguage]}
@@ -825,6 +829,7 @@ function createStyles(theme: DocumentTheme) {
     selectorVersePreview: { flex: 1, fontFamily: 'Georgia', fontSize: 13, lineHeight: 18, color: colors.text },
     selectorVersePreviewArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
     selectorVersePreviewCoptic: { fontFamily: TYPOGRAPHY.coptic },
+    selectorVersePreviewCopticItalic: { fontFamily: TYPOGRAPHY.copticItalic, fontStyle: 'normal' },
     selectorVersePreviewIntro: { color: colors.refrain, fontStyle: 'italic' },
     selectorActionRow: {
       alignItems: 'center',

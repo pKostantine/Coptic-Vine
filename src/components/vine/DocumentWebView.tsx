@@ -4,7 +4,7 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 import { COLORS } from '../../constants/theme';
 import { sectionRestoreCandidates, type DocumentRestoreRequest } from '../../utils/sectionRestore';
-import { useCopticFontDataUri } from '../../utils/useCopticFontDataUri';
+import { useCopticFontDataUri, useCopticItalicFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
 import type { SermonHighlight } from '../../types/sermonPlanner';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
@@ -97,6 +97,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     ref,
   ) => {
     const copticFontDataUri = useCopticFontDataUri();
+    const copticItalicFontDataUri = useCopticItalicFontDataUri();
     const webviewRef = useRef<WebView>(null);
     // Whatever section the "currentSection" scroll-tracking script (see
     // documentHtml.ts) most recently reported. A settings change (font size,
@@ -292,9 +293,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     const html = useMemo(
       () =>
-        copticFontDataUri
+        copticFontDataUri && copticItalicFontDataUri
           ? buildDocumentHtml(withRememberedCollapse(sections, collapsedSectionIdsRef.current ?? {}), {
               copticFontDataUri,
+              copticItalicFontDataUri,
               fontSize,
               visibleColumns,
               appLanguage,
@@ -316,6 +318,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       [
         sections,
         copticFontDataUri,
+        copticItalicFontDataUri,
         fontSize,
         visibleColumns,
         appLanguage,

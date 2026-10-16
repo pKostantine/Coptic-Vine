@@ -195,6 +195,7 @@ export function buildDocumentHtml(
   sections: DocumentSection[],
   {
     copticFontDataUri,
+    copticItalicFontDataUri = null,
     fontSize,
     visibleColumns = DEFAULT_VISIBLE_COLUMNS,
     appLanguage = 'en',
@@ -212,6 +213,8 @@ export function buildDocumentHtml(
     ornamentColor = theme.colors.accent,
   }: {
     copticFontDataUri: string;
+    /** The Coptic face's italic, for Coptic set in italic; without it the browser fakes one. */
+    copticItalicFontDataUri?: string | null;
     fontSize: number;
     visibleColumns?: VisibleColumns;
     /** Drives ALL titles (section titles + Subdocument/Antiphonary open-button labels) — falls back to whichever language has text when the selected one is missing for a given section. Independent of visibleColumns, which governs verse body text only. */
@@ -309,6 +312,12 @@ export function buildDocumentHtml(
         font-weight: 400;
         font-style: normal;
       }
+      ${copticItalicFontDataUri ? `@font-face {
+        font-family: "CopticVine";
+        src: url("${copticItalicFontDataUri}") format("truetype");
+        font-weight: 400;
+        font-style: italic;
+      }` : ''}
       html, body {
         background: ${colors.page};
         color: ${colors.text};

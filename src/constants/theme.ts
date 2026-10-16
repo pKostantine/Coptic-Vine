@@ -147,6 +147,8 @@ export const TYPOGRAPHY = {
   title: 'Georgia',
   body: 'System',
   coptic: 'CopticVine-Regular',
+  /** Coptic set in italic: its own face, registered beside the upright one. */
+  copticItalic: 'CopticVine-Italic',
   musicCoptic: 'Athanasius',
   arabic: 'Arial',
 } as const;

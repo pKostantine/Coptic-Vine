@@ -105,6 +105,8 @@ export default function RootLayout() {
   // Coptic Vine custom face, while Music synchronized lyrics use Athanasius.
   const [copticLoaded] = useLocalFonts({
     'CopticVine-Regular': require('../../assets/fonts/CopticVine-Regular-v4.1.ttf'),
+    // Coptic set in italic (comments, refrains) is drawn in its own italic face.
+    'CopticVine-Italic': require('../../assets/fonts/CopticVine-Italic-v4.1.ttf'),
     Athanasius: require('../../assets/fonts/CopticVine-Athanasius-v1.0.ttf'),
   });
 

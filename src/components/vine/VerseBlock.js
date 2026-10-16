@@ -144,7 +144,8 @@ export default function VerseBlock({
         ? verse.seasonalHoosVersePrefix
         : "",
       fontSize: getSlideshowLanguageFontSize("coptic", { verse }, fontSize),
-      fontFamily: TYPOGRAPHY.coptic,
+      // Coptic set in italic has its own face (CopticVine-Italic), drawn upright.
+      fontFamily: bodyFontStyle === "italic" ? TYPOGRAPHY.copticItalic : TYPOGRAPHY.coptic,
       lineHeight: getSlideshowLanguageLineHeight("coptic", { verse }, fontSize),
       styles: [styles.coptic],
       textAlign: alignmentFor("coptic"),
@@ -232,7 +233,9 @@ export default function VerseBlock({
     // Arabic in italic is drawn upright and skewed 14 degrees on iOS and
     // Android, as Chrome slants it (utils/arabicItalic.ts); laid out upright.
     const slantsArabic = language.key === "arabic" && bodyFontStyle === "italic";
-    const languageFontStyle = slantsArabic ? arabicFontStyle(true) : bodyFontStyle;
+    // Coptic in italic is already its italic face: asking for italic again
+    // would have the system slant that a second time.
+    const languageFontStyle = slantsArabic ? arabicFontStyle(true) : language.key === "coptic" ? "normal" : bodyFontStyle;
     const textStyle = [
       styles.text,
       ...language.styles,
