@@ -4,7 +4,7 @@ const test = require('node:test');
 
 test('native line probe contributes its full height to slideshow measurement', () => {
   const source = fs.readFileSync('src/components/vine/JustifiedText.js', 'utf8');
-  const probe = source.match(/const measuringNode = isMeasuring \? \(([\s\S]*?)\n\s*\) : null;/)?.[1] || '';
+  const probe = source.match(/const measuringNode = isMeasuring \|\| measureOnly \? \(([\s\S]*?)\n\s*\) : null;/)?.[1] || '';
 
   assert.match(probe, /opacity:\s*0/);
   assert.doesNotMatch(probe, /position:\s*["']absolute["']/);
@@ -88,11 +88,14 @@ test('no guessed line breaks reach the page, and the deck shows only settled sli
   assert.doesNotMatch(layout, /createEstimatedVerseMetric/);
   assert.doesNotMatch(container, /createEstimatedVerseMetric|createEstimatedTextLines/);
   const placeVerse = layout.match(/const placeVerse = \(verseItem\) => \{([\s\S]*?)\n  \};/)?.[1] || '';
-  assert.match(placeVerse, /if \(!hasMeasuredVerseLines\(languageMetric\)\)/);
-  assert.match(container, /isSlideSettled\(items, slides, resolvedSlideIndex, isItemMeasured, itemIndexById\)/);
+  assert.match(placeVerse, /if \(!isMeasuredVerse\(verseItem\)\)/);
+  assert.match(layout, /const isMeasuredVerse = \(verseItem\) =>\s*hasEveryMeasuredColumn\(verseItem, languageHeights\[verseItem\.id\], visibleLanguages\)/);
+  assert.match(container, /isSlideSettled\(items, slides, resolvedSlideIndex, isItemMeasured, itemIndexById, anchorBreakIndex\)/);
   assert.match(container, /getMeasurementBatch\(\s*items,\s*isItemMeasured,/);
   assert.match(container, /\{deckHidden \? null : \(\s*<SlideDeck\s+slides=\{shownDeck\.slides\}/);
-  assert.match(container, /const shownDeck = settled \|\| settleTimedOut \|\| !settledDeck \? liveDeck : settledDeck;/);
+  assert.match(container, /const shownDeck = settled \|\| !settledDeckFits \? liveDeck : settledDeck;/);
+  // A deck laid out for another width, font or languages is never shown in this one.
+  assert.match(container, /settledDeck\.tableWidth === slideTableWidth &&\s*settledDeck\.fontSize === fontSize &&\s*settledDeck\.visibleLanguages === visibleLanguages/);
 });
 
 // A paragraph turned over the page is rendered from exactly the lines that
@@ -103,7 +106,10 @@ test('forced lines render line for line on every platform', () => {
   const justified = fs.readFileSync('src/components/vine/JustifiedText.js', 'utf8');
   assert.match(verseBlock, /Platform\.OS === "web" && !language\.forceLines \? \(\s*<CssJustifiedVerseBody/);
   assert.match(verseBlock, /textAlign: alignmentFor\("coptic"\)/);
-  assert.match(verseBlock, /annotateNativeLines\(event\.nativeEvent\.lines \|\| \[\], getPlainRenderedText\(language\)\)/);
+  assert.match(verseBlock, /annotateNativeLines\(event\.nativeEvent\.lines \|\| \[\], renderedText\)/);
+  // A centered column measures its lines on web too, and a page's share of it renders line by line.
+  assert.match(verseBlock, /measureJustifiedLinesWeb\(renderedText, language\.fontSize, language\.fontFamily, columnWidth, fontWeight, fontStyle\)/);
+  assert.match(verseBlock, /language\.forceLines\.map\(\(line, index\) => \(\s*<Text key=\{index\} allowFontScaling=\{false\}/);
   assert.match(justified, /const isLastLine = forceLines \? Boolean\(line\.isParagraphEnd\) : index === lastIndex \|\| line\.isParagraphEnd;/);
   assert.match(justified, /import \{ annotateNativeLines, splitParagraphs, splitWords \} from "\.\/textLines";/);
   // Text with no words never waits on a layout event that cannot come.

@@ -152,10 +152,15 @@ function splitOverwidthWord(word, maxWidth, fontSize, fontFamily, fontWeight, fo
   return chunks;
 }
 
-function computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth) {
+function computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWordWeight = fontWeight) {
   const widths = new Map();
   for (const word of words) {
     if (!widths.has(word)) widths.set(word, measureWidthWeb(word, fontSize, fontFamily, fontWeight, fontStyle));
+  }
+  // The first word is set in its own weight (a Bible verse number, bold and
+  // gold), and bold is wider: measured regular, a row could overflow its column.
+  if (words.length && firstWordWeight !== fontWeight) {
+    widths.set(words[0], measureWidthWeb(words[0], fontSize, fontFamily, firstWordWeight, fontStyle));
   }
 
   const expandedWords = words.flatMap((word) => {
@@ -173,13 +178,13 @@ function computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontS
   return wrapWordsIntoLines(expandedWords, widths, spaceWidth, maxWidth);
 }
 
-function computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth) {
-  return splitParagraphs(text).flatMap((paragraph) => {
+function computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWordWeight = fontWeight) {
+  return splitParagraphs(text).flatMap((paragraph, paragraphIndex) => {
     const words = splitWords(paragraph);
     if (!words.length) {
       return [{ words: [], isBlank: true, isParagraphEnd: true }];
     }
-    const lines = computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth);
+    const lines = computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, paragraphIndex === 0 ? firstWordWeight : fontWeight);
     return lines.map((lineWords, index) => ({
       words: lineWords,
       isParagraphEnd: index === lines.length - 1,
@@ -198,10 +203,10 @@ function computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxW
 // always falls back to rough character-count estimation for every tall-verse
 // split -- this reuses the same canvas measurement this component's own web
 // path already relies on, just exposed standalone.
-export function measureJustifiedLinesWeb(text, fontSize, fontFamily, maxWidth, fontWeight = "400", fontStyle = "normal") {
+export function measureJustifiedLinesWeb(text, fontSize, fontFamily, maxWidth, fontWeight = "400", fontStyle = "normal", firstWordWeight = fontWeight) {
   if (!IS_WEB) return null;
   if (!String(text || "").length) return [];
-  return computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth).map((line) => ({
+  return computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWordWeight).map((line) => ({
     text: line.words.join(" "),
     isBlank: Boolean(line.isBlank),
     isParagraphEnd: Boolean(line.isParagraphEnd),
@@ -232,12 +237,15 @@ function nativeLineCacheKey(text, fontSize, fontFamily, fontWeight, fontStyle, w
 // a probe for it would be waited on for ever.
 const NO_LINES = Object.freeze([]);
 
-function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width) {
-  const cacheKey = nativeLineCacheKey(text, fontSize, fontFamily, fontWeight, fontStyle, width);
+function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordStyle, measureOnly) {
+  const firstWordWeight = firstWordStyle?.fontWeight || fontWeight;
+  const cacheKey = nativeLineCacheKey(text, fontSize, fontFamily, `${fontWeight}/${firstWordWeight}`, fontStyle, width);
   const [state, setState] = useState(null); // { forKey, lines }
   const cached = splitWords(text).length ? nativeLineCache.get(cacheKey) : NO_LINES;
   const lines = cached ?? (state && state.forKey === cacheKey ? state.lines : null);
 
+  // Bound to the probe it was made for: an event from a probe that has since
+  // been replaced says nothing about the text now being measured.
   function handleTextLayout(event) {
     const nativeLines = event.nativeEvent.lines || [];
     const computed = annotateNativeLines(nativeLines, text);
@@ -249,17 +257,28 @@ function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle
   }
 
   const isMeasuring = lines == null;
-  const measuringNode = isMeasuring ? (
+  // The probe is laid out exactly as the rows will be, first word's own
+  // weight included. Keep it invisible but in normal layout flow: the
+  // slideshow's outer measurement wrapper also receives this first layout
+  // pass, and an absolutely positioned probe made that wrapper report only
+  // its cell padding, so long verses were cached as a few pixels tall and
+  // then clipped when their real text replaced the probe. In the
+  // measurement layer (measureOnly) the probe is all that is ever rendered:
+  // the rows would only cost the layout of a few hundred more words.
+  const [firstWord, ...restWords] = splitWords(text);
+  const measuringNode = isMeasuring || measureOnly ? (
     <Text
-      // Keep the probe invisible but in normal layout flow. The slideshow's
-      // outer measurement wrapper also receives this first layout pass; an
-      // absolutely positioned probe made that wrapper report only its cell
-      // padding, so long verses were cached as a few pixels tall and then
-      // clipped when their real text replaced the probe.
+      key={cacheKey}
+      allowFontScaling={false}
       style={[style, { opacity: 0, width }]}
-      onTextLayout={handleTextLayout}
+      onTextLayout={isMeasuring ? handleTextLayout : undefined}
     >
-      {text}
+      {firstWordStyle && firstWord ? (
+        <>
+          <Text allowFontScaling={false} style={firstWordStyle}>{firstWord}</Text>
+          {restWords.length ? ` ${splitParagraphs(text.slice(text.indexOf(firstWord) + firstWord.length)).join("\n").trim()}` : ""}
+        </>
+      ) : text}
     </Text>
   ) : null;
 
@@ -315,21 +334,24 @@ export default function JustifiedText({
   forceLines,
   minWordsToJustify = 5,
   selectable = false,
+  // Off-screen, for measurement only: the lines are reported, no rows drawn.
+  measureOnly = false,
 }) {
   const fallbackAlign = rtl ? "right" : "left";
   const reportedLinesForRef = useRef(null);
+  const firstWordWeight = firstWordStyle?.fontWeight || fontWeight;
 
   const webLines = useMemo(
     () => (IS_WEB && !forceLines
-      ? computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width)
+      ? computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordWeight)
       : null),
-    [text, fontSize, fontFamily, fontWeight, fontStyle, width, forceLines],
+    [text, fontSize, fontFamily, fontWeight, fontStyle, width, forceLines, firstWordWeight],
   );
   // Always called (never skipped), even when its result goes unused (web,
   // or forceLines supplied) -- calling a hook conditionally is a
   // Rules-of-Hooks violation regardless of whether the branch it feeds ever
   // actually runs.
-  const native = useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width);
+  const native = useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordStyle, measureOnly && !forceLines);
 
   const forcedLines = useMemo(
     () => (forceLines ? forceLines.map((line) => ({
@@ -342,7 +364,7 @@ export default function JustifiedText({
   const lines = forcedLines ?? (IS_WEB ? webLines : native.lines);
   const lineWordOffsets = useMemo(() => getLineWordOffsets(lines), [lines]);
 
-  const reportKey = `${fontFamily}|${fontSize}|${fontWeight}|${fontStyle}|${width}|${text}`;
+  const reportKey = `${fontFamily}|${fontSize}|${fontWeight}/${firstWordWeight}|${fontStyle}|${width}|${text}`;
   const reportableLines = useMemo(
     () => lines?.map((line) => ({
       text: line.words.join(" "),
@@ -358,14 +380,14 @@ export default function JustifiedText({
     onLines(reportableLines);
   }, [forceLines, onLines, reportKey, reportableLines]);
 
-  if (!forceLines && !IS_WEB && native.isMeasuring) {
+  if (!forceLines && !IS_WEB && (native.isMeasuring || measureOnly)) {
     // The invisible measuring Text stays in flow so its parent reports the
     // real paragraph height on this first pass. We still wait for
     // onTextLayout before reporting language lines; that second metric gives
     // pagination exact split boundaries without ever caching a zero-height
     // verse first.
     return (
-      <View style={{ width }}>
+      <View style={{ width }} onLayout={native.isMeasuring ? undefined : onLayout}>
         {native.measuringNode}
       </View>
     );
@@ -388,21 +410,26 @@ export default function JustifiedText({
 
         if (line.isBlank) {
           return (
-            <Text key={index} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
+            <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
               {"\u00a0"}
             </Text>
           );
         }
 
-        if (isLastLine || lineWords.length < minWordsToJustify) {
+        // A right-to-left line with a run of Latin inside it (a name, a
+        // reference) keeps that run left-to-right only as one piece of text:
+        // word by word, the row would turn the run round.
+        const mixesDirections = rtl && lineWords.some((word) => /[A-Za-z]/.test(word));
+        if (isLastLine || mixesDirections || lineWords.length < minWordsToJustify) {
           const needsRichWords = Boolean(firstWordStyle && isFirstLine) || Boolean(wordStyles);
           return (
-            <Text key={index} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
+            <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
               {needsRichWords ? lineWords.map((word, wordIndex) => {
                 const globalWordIndex = lineWordOffsets[index] + wordIndex;
                 return (
                   <Text
                     key={wordIndex}
+                    allowFontScaling={false}
                     selectable={selectable}
                     style={[
                       isFirstLine && wordIndex === 0 ? firstWordStyle : null,
@@ -429,6 +456,7 @@ export default function JustifiedText({
             {lineWords.map((word, wordIndex) => (
               <Text
                 key={wordIndex}
+                allowFontScaling={false}
                 selectable={selectable}
                 style={
                   [

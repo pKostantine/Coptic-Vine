@@ -209,6 +209,14 @@ function buildPaginationUnits(items) {
   });
 }
 
+/**
+ * Lays the items out on slides. `breakAt` is where the reader is -- the
+ * item, and for a verse the line of each language, at the top of the slide
+ * they are looking at -- and a slide always begins exactly there: the lines
+ * before it fill the slides before. So the slide on screen depends on
+ * nothing before it, and can be shown as soon as its own items are
+ * measured, however long the hymn or psalm before them is.
+ */
 export function paginateItems(
   items,
   heights,
@@ -217,6 +225,7 @@ export function paginateItems(
   fontSize,
   visibleLanguages,
   tableWidth,
+  breakAt = null,
 ) {
   const safeAvailableHeight = Math.max(Number(availableHeight) || 0, 1);
   const units = buildPaginationUnits(items);
@@ -230,11 +239,75 @@ export function paginateItems(
     currentHeight = 0;
   };
 
+  const isMeasuredVerse = (verseItem) =>
+    hasEveryMeasuredColumn(verseItem, languageHeights[verseItem.id], visibleLanguages);
+
+  // The reader's own line inside a verse: the lines before it belong to the
+  // slide before, and the verse carries on from it at the top of theirs.
+  const readerLineOffsets = (verseItem) => {
+    if (!breakAt || breakAt.itemId !== verseItem.id || !isMeasuredVerse(verseItem)) return null;
+    const state = createVerseLineState(languageHeights[verseItem.id], fontSize, verseItem);
+    const offsets = {};
+    let any = false;
+    state.languages.forEach((entry) => {
+      const offset = clamp(Math.floor(Number(breakAt.offsets?.[entry.language]) || 0), 0, entry.lines.length);
+      offsets[entry.language] = offset;
+      if (offset > 0) any = true;
+    });
+    return any ? offsets : null;
+  };
+
+  const appendSegments = (verseItem, state, firstSegmentIndex = 0, labelSegment) => {
+    const result = appendTallVerseSegments({
+      item: verseItem,
+      state,
+      slides,
+      currentSlide,
+      currentHeight,
+      availableHeight: safeAvailableHeight,
+      fontSize,
+      visibleLanguages,
+      firstSegmentIndex,
+      labelSegment,
+    });
+    currentSlide = result.currentSlide;
+    currentHeight = result.currentHeight;
+    return result.nextSegmentIndex;
+  };
+
   const placeVerse = (verseItem) => {
     const verseHeight = Math.ceil((heights[verseItem.id] ?? 0) + 2);
+    const languageMetric = languageHeights[verseItem.id];
 
-    if (currentHeight + verseHeight <= safeAvailableHeight) {
+    // Only lines the platform's own text engine laid out are ever turned
+    // over the page, or shown line by line: a split is rendered exactly as
+    // decided here. A verse whose lines are not all measured yet -- every
+    // column that could be split, not just one, since the languages report
+    // separately and a split made from the English alone would blank the
+    // Coptic and Arabic beside it -- goes on whole and wraps as it will; its
+    // real lines settle the page before it is shown (see isSlideSettled).
+    if (!isMeasuredVerse(verseItem)) {
+      if (currentHeight + verseHeight > safeAvailableHeight && currentSlide.length) flushSlide();
       currentSlide.push(verseItem);
+      currentHeight += verseHeight;
+      return;
+    }
+
+    const offsets = readerLineOffsets(verseItem);
+    if (offsets) {
+      // The pieces before the reader's line are labelled apart, so the piece
+      // the reader is on keeps the same identity however many they are.
+      const placed = appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem, { end: offsets }), 0, (index) => `before-${index}`);
+      flushSlide();
+      // What follows is a continuation (no speaker label again), numbered on from the pieces before.
+      appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem, { start: offsets }), Math.max(1, placed), (index, order) => `segment-${1 + order}`);
+      return;
+    }
+
+    // A measured verse that fits is still rendered from its measured lines,
+    // so what the page shows is what the page was laid out for, to the line.
+    if (currentHeight + verseHeight <= safeAvailableHeight) {
+      currentSlide.push(createWholeVerseItem(verseItem, languageMetric, fontSize));
       currentHeight += verseHeight;
       return;
     }
@@ -243,40 +316,15 @@ export function paginateItems(
     // many of its lines as fit and carries on over the page, rather than
     // moving on whole and leaving the foot of the slide empty -- never in a
     // piece of fewer than two lines, either side of the turn.
-    //
-    // Only lines the platform's own text engine laid out can be turned over
-    // like this: a split is rendered line for line exactly as decided here.
-    // A verse whose lines are not measured yet moves on whole instead -- a
-    // guessed line break on the page reads as words flung across the column
-    // -- and its real lines settle the page before it is shown (see
-    // isSlideSettled).
-    const languageMetric = languageHeights[verseItem.id];
-
-    if (!hasMeasuredVerseLines(languageMetric)) {
-      if (currentSlide.length) flushSlide();
-      currentSlide.push(verseItem);
-      currentHeight += verseHeight;
-      return;
-    }
-
-    const result = appendTallVerseSegments({
-      item: verseItem,
-      languageMetric,
-      slides,
-      currentSlide,
-      currentHeight,
-      availableHeight: safeAvailableHeight,
-      fontSize,
-      visibleLanguages,
-    });
-    currentSlide = result.currentSlide;
-    currentHeight = result.currentHeight;
+    appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem));
   };
 
   for (const unit of units) {
-    if (currentSlide.length && unit.breakBefore) flushSlide();
-
     const item = unit.items[0];
+    const readerStartsHere = Boolean(breakAt && breakAt.itemId === item.id) &&
+      !(item.type === "verse" && readerLineOffsets(item));
+    if (currentSlide.length && (unit.breakBefore || readerStartsHere)) flushSlide();
+
     if (item.type === "verse") {
       placeVerse(item);
       continue;
@@ -292,31 +340,47 @@ export function paginateItems(
   return slides.length ? slides : [[]];
 }
 
+// A measured verse placed whole, carrying its lines: built once per verse
+// and metric, so a page laid out again hands the renderer the same object.
+const wholeVerseItems = new WeakMap();
+
+function createWholeVerseItem(item, languageMetric, fontSize) {
+  const cached = wholeVerseItems.get(item);
+  if (cached && cached.languageMetric === languageMetric && cached.fontSize === fontSize) return cached.whole;
+  const state = createVerseLineState(languageMetric, fontSize, item);
+  const everything = Object.fromEntries(state.languages.map((entry) => [entry.language, entry.end]));
+  const whole = createVerseLineSegment(item, state, everything, 0).item;
+  wholeVerseItems.set(item, { languageMetric, fontSize, whole });
+  return whole;
+}
+
 function appendTallVerseSegments({
   item,
-  languageMetric,
+  state,
   slides,
   currentSlide,
   currentHeight,
   availableHeight,
   fontSize,
   visibleLanguages,
+  firstSegmentIndex = 0,
+  labelSegment,
 }) {
-  const state = createVerseLineState(languageMetric, fontSize, item);
-  let segmentIndex = 0;
+  let segmentIndex = firstSegmentIndex;
+  let placedCount = 0;
 
   while (hasRemainingVerseLines(state)) {
     const capacityItem = segmentIndex > 0
-      ? createContinuationCapacityItem(item)
+      ? createContinuationCapacityItem(item, state)
       : item;
     const remainingHeight = availableHeight - currentHeight;
-    let lineCapacities = withoutWidowLines(state, coordinateLineCapacities(state, getIndependentLineCapacities(
+    let lineCapacities = coordinateLineCapacities(state, getIndependentLineCapacities(
       state,
       remainingHeight,
       fontSize,
       capacityItem,
       visibleLanguages,
-    )));
+    ));
 
     if (currentSlide.length && shouldAvoidTinyFragment(
       state,
@@ -361,7 +425,8 @@ function appendTallVerseSegments({
       lineCapacities = getMinimumLineCapacities(state);
     }
 
-    const segment = createVerseLineSegment(item, state, lineCapacities, segmentIndex);
+    const segment = createVerseLineSegment(item, state, lineCapacities, segmentIndex, labelSegment?.(segmentIndex, placedCount));
+    placedCount += 1;
     const segmentHeight = getVerseLineSegmentHeight(
       segment,
       fontSize,
@@ -379,27 +444,28 @@ function appendTallVerseSegments({
     }
   }
 
-  return { currentSlide, currentHeight };
+  return { currentSlide, currentHeight, nextSegmentIndex: segmentIndex };
 }
 
 /**
  * Keeps the columns of a split verse in step. Each language's capacity says
  * how many of its own remaining lines would fit; taken independently, the
  * English could finish on this slide while the Coptic carried on alone over
- * the page. Instead every column takes the same share of its remaining lines
- * as the most constrained one (the smallest capacity over remaining lines),
- * so the slide shows the same stretch of the verse in every language, give
- * or take a line, and the remainders turn the page together. Never a single
- * line either side of the turn; and a short column (three lines or fewer) is
- * not chopped: it goes whole on this slide when the limiting column keeps at
- * least half of its lines here, otherwise whole on the next.
+ * the page. Instead the most constrained column (the smallest capacity over
+ * remaining lines) decides what share of the verse this slide shows, and
+ * every other column takes the same share of its own remaining lines, so
+ * the slide shows the same stretch of the verse in every language, give or
+ * take a line, and the remainders turn the page together. Never a single
+ * line either side of the turn. A short column (three lines or fewer) is
+ * not chopped: it goes whole on this slide when it fits, otherwise whole on
+ * the next.
  */
 export function coordinateLineCapacities(state, capacities) {
   const entries = state.languages
-    .filter((entry) => entry.offset < entry.lines.length)
+    .filter((entry) => entry.offset < entry.end)
     .map((entry) => ({
       language: entry.language,
-      remaining: entry.lines.length - entry.offset,
+      remaining: entry.end - entry.offset,
       capacity: Math.max(0, capacities[entry.language] ?? 0),
     }));
   if (!entries.length) return {};
@@ -407,48 +473,47 @@ export function coordinateLineCapacities(state, capacities) {
 
   const limiting = entries.reduce((best, entry) =>
     (entry.capacity * best.remaining < best.capacity * entry.remaining ? entry : best));
+  const limitingTake = takeWithoutStrays(limiting, Math.min(limiting.capacity, limiting.remaining));
   const coordinated = {};
   entries.forEach((entry) => {
-    let take;
-    if (entry.remaining <= 3) {
-      const limitingKeepsHalf = limiting.capacity * 2 >= limiting.remaining;
-      take = limitingKeepsHalf && entry.capacity >= entry.remaining ? entry.remaining : 0;
-    } else {
-      take = Math.floor((entry.remaining * limiting.capacity) / limiting.remaining);
-      if (entry.remaining - take === 1) take = entry.remaining - 2;
-      if (take === 1) take = entry.capacity >= 2 ? 2 : 0;
-    }
-    coordinated[entry.language] = Math.max(0, Math.min(take, entry.capacity, entry.remaining));
+    const share = limitingTake === 0
+      ? 0
+      : Math.floor((entry.remaining * limitingTake) / limiting.remaining);
+    coordinated[entry.language] = takeWithoutStrays(entry, entry === limiting ? limitingTake : share);
   });
   return coordinated;
 }
 
-/**
- * Holds back enough of a column's lines that the turn of the page never
- * leaves it a single line on the next slide.
- */
-function withoutWidowLines(state, capacities) {
-  const adjusted = { ...capacities };
-  for (const entry of state.languages) {
-    const remaining = entry.lines.length - entry.offset;
-    const capacity = adjusted[entry.language] ?? 0;
-    if (capacity > 0 && capacity < remaining && remaining - capacity < MIN_USEFUL_FRAGMENT_LINES) {
-      adjusted[entry.language] = Math.max(0, remaining - MIN_USEFUL_FRAGMENT_LINES);
-    }
-  }
-  return adjusted;
+/** A column's take with no stray single line on either side of the turn, and no chopped short column. */
+function takeWithoutStrays(entry, wanted) {
+  let take = Math.max(0, Math.min(wanted, entry.capacity, entry.remaining));
+  if (entry.remaining <= 3) return entry.capacity >= entry.remaining ? entry.remaining : 0;
+  if (take > 0 && entry.remaining - take === 1) take = entry.remaining - 2;
+  if (take === 1) take = entry.capacity >= 2 ? 2 : 0;
+  return Math.max(0, Math.min(take, entry.capacity, entry.remaining));
 }
 
-function createContinuationCapacityItem(item) {
+// What a continuation segment still carries: no speaker label, and the
+// seasonal prefix line only for a column that has yet to show its first line.
+function createContinuationCapacityItem(item, state) {
   return {
     ...item,
     suppressSpeakerLabel: true,
     verse: {
       ...item.verse,
       bibleVerseNumber: "",
-      slideshowSeasonalPrefixVisible: false,
+      slideshowSeasonalPrefixVisible: hasPendingPrefixColumn(item, state),
     },
   };
+}
+
+function hasPendingPrefixColumn(item, state) {
+  if (state.prefixShownOnOwnPage || !hasSeasonalPrefixLine(item.verse)) return false;
+  const prefix = String(item.verse?.seasonalHoosVersePrefix || "").trim();
+  return state.languages.some((entry) =>
+    (entry.language === "english" || entry.language === "arabic") &&
+    entry.offset === 0 && entry.end > 0 &&
+    String(item.verse?.[entry.language] || "").trimStart().startsWith(prefix));
 }
 
 function shouldAvoidTinyFragment(
@@ -460,7 +525,7 @@ function shouldAvoidTinyFragment(
   visibleLanguages,
 ) {
   const remainingLineCount = state.languages.reduce(
-    (largest, entry) => Math.max(largest, entry.lines.length - entry.offset),
+    (largest, entry) => Math.max(largest, entry.end - entry.offset),
     0,
   );
   const currentCapacity = Math.max(0, ...Object.values(currentCapacities));
@@ -478,27 +543,44 @@ function shouldAvoidTinyFragment(
   return desired > 0 && currentCapacity < desired;
 }
 
+function hasEveryMeasuredColumn(item, metric = {}, visibleLanguages = {}) {
+  if (!hasMeasuredVerseLines(metric)) return false;
+  return getLanguagesNeedingLineMetrics(item, visibleLanguages).every((language) =>
+    Array.isArray(metric?.[language]?.lines));
+}
+
 export function hasMeasuredVerseLines(metric = {}) {
   return ["english", "french", "coptic", "arabic"].some(
     (language) => Array.isArray(metric[language]?.lines) && metric[language].lines.length,
   );
 }
 
-function createVerseLineState(languageMetric = {}, fontSize, item = {}) {
+/**
+ * The lines of each language still to be placed: from `start` (per
+ * language; the top of the verse by default) up to `end` (its last line by
+ * default). A language keeps its place in the state even with nothing left
+ * in this stretch, so its column stays in the row.
+ */
+function createVerseLineState(languageMetric = {}, fontSize, item = {}, { start, end } = {}) {
   return {
     languages: ["english", "french", "coptic", "arabic"]
-      .map((language) => ({
-        language,
-        lineHeight: getSlideshowLanguageLineHeight(language, item, fontSize),
-        lines: getMetricLinesForLanguage(languageMetric[language]?.lines || [], language, item),
-        offset: 0,
-      }))
+      .map((language) => {
+        const lines = getMetricLinesForLanguage(languageMetric[language]?.lines || [], language, item);
+        const to = clamp(Math.floor(Number(end?.[language] ?? lines.length)), 0, lines.length);
+        return {
+          language,
+          lineHeight: getSlideshowLanguageLineHeight(language, item, fontSize),
+          lines,
+          offset: clamp(Math.floor(Number(start?.[language] ?? 0)), 0, to),
+          end: to,
+        };
+      })
       .filter((entry) => entry.lines.length),
   };
 }
 
 function hasRemainingVerseLines(state) {
-  return state.languages.some((entry) => entry.offset < entry.lines.length);
+  return state.languages.some((entry) => entry.offset < entry.end);
 }
 
 function getIndependentLineCapacities(state, height, fontSize, item, visibleLanguages) {
@@ -509,7 +591,7 @@ function getIndependentLineCapacities(state, height, fontSize, item, visibleLang
   if (usableHeight <= 0) return {};
 
   return state.languages
-    .filter((entry) => entry.offset < entry.lines.length)
+    .filter((entry) => entry.offset < entry.end)
     .reduce((capacities, entry) => {
       capacities[entry.language] = Math.max(0, Math.floor(usableHeight / entry.lineHeight));
       return capacities;
@@ -534,16 +616,16 @@ function hasPositiveLineCapacity(lineCapacities = {}) {
 
 function getMinimumLineCapacities(state) {
   return state.languages
-    .filter((entry) => entry.offset < entry.lines.length)
+    .filter((entry) => entry.offset < entry.end)
     .reduce((capacities, entry) => {
       capacities[entry.language] = 1;
       return capacities;
     }, {});
 }
 
-export function createVerseLineSegment(item, state, lineCapacities, segmentIndex) {
+export function createVerseLineSegment(item, state, lineCapacities, segmentIndex, label = `segment-${segmentIndex}`) {
   const originalLanguageKeys = state.languages.map((entry) => entry.language);
-  const showSeasonalPrefix = segmentIndex === 0 && hasSeasonalPrefixLine(item.verse);
+  const hasPrefix = hasSeasonalPrefixLine(item.verse);
   const verse = {
     ...item.verse,
     arabic: "",
@@ -551,7 +633,7 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
     english: "",
     french: "",
     bibleVerseNumber: item.verse?.bibleVerseNumber,
-    slideshowSeasonalPrefixVisible: showSeasonalPrefix,
+    slideshowSeasonalPrefixVisible: false,
   };
   const lineCounts = {};
   const lineRanges = {};
@@ -561,13 +643,17 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
 
   state.languages.forEach((entry) => {
     const start = entry.offset;
-    const remainingCount = entry.lines.length - start;
-    const takeCount = Math.min(lineCapacities[entry.language] || 0, remainingCount);
+    const remainingCount = entry.end - start;
+    const takeCount = Math.max(0, Math.min(lineCapacities[entry.language] || 0, remainingCount));
     const lines = entry.lines.slice(start, start + takeCount);
     if (lines.length) segmentEntries.push({ entry, lines, start });
     entry.offset += takeCount;
   });
 
+  // The seasonal prefix and the Bible verse number belong to the first lines
+  // of each column, wherever that column begins: a column held over to the
+  // next slide brings its own along.
+  let showsPrefix = false;
   segmentEntries.forEach(({ entry, lines, start }) => {
     const joinedBody = joinRenderedLines(lines);
     const beginsWithBibleNumber = Boolean(item.verse?.bibleVerseNumber) && start === 0;
@@ -577,10 +663,13 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
     const prefix = String(item.verse?.seasonalHoosVersePrefix || "").trim();
     const originalText = String(item.verse?.[entry.language] || "").trimStart();
     const shouldPrependPrefix =
-      showSeasonalPrefix &&
+      hasPrefix &&
+      !state.prefixShownOnOwnPage &&
+      start === 0 &&
       (entry.language === "english" || entry.language === "arabic") &&
       prefix &&
       originalText.startsWith(prefix);
+    if (shouldPrependPrefix) showsPrefix = true;
 
     verse[entry.language] = shouldPrependPrefix
       ? `${prefix}${body ? `\n${body}` : ""}`
@@ -591,6 +680,7 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
     if (beginsWithBibleNumber) bibleNumberLanguages.push(entry.language);
   });
 
+  verse.slideshowSeasonalPrefixVisible = showsPrefix;
   verse.slideshowLanguageKeys = originalLanguageKeys;
   verse.slideshowForcedLines = forcedLines;
   verse.slideshowBibleNumberLanguages = bibleNumberLanguages;
@@ -599,8 +689,8 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
   return {
     item: {
       ...item,
-      id: segmentIndex ? `${sourceItemId}-segment-${segmentIndex}` : sourceItemId,
-      slideId: `${sourceItemId}-segment-${segmentIndex}`,
+      id: segmentIndex ? `${sourceItemId}-${label}` : sourceItemId,
+      slideId: `${sourceItemId}-${label}`,
       sourceItemId,
       suppressSpeakerLabel: Boolean(item.suppressSpeakerLabel) || segmentIndex > 0,
       verse,
@@ -611,7 +701,11 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
   };
 }
 
+// A page of the verse's decorations alone (its speaker label, its seasonal
+// prefix) when not one line of text fits beside them: the prefix is then
+// shown, and the lines that follow do not show it again.
 function createVerseDecorationSegment(item, state) {
+  state.prefixShownOnOwnPage = true;
   const prefix = String(item.verse?.seasonalHoosVersePrefix || "").trim();
   const verse = {
     ...item.verse,
@@ -738,14 +832,14 @@ export function isSlideshowLanguageJustified(verse = {}, language) {
 
 /**
  * The languages whose measured lines pagination needs before it can trust an
- * item: the justified columns that have text. Those are the only ones a slide
- * can split, and a split is rendered from exactly these lines.
+ * item: every column of a verse that has text. A slide can split any of
+ * them, and each is rendered from exactly these lines.
  */
 export function getLanguagesNeedingLineMetrics(item, visibleLanguages = {}) {
   if (item?.type !== "verse") return [];
   const verse = item.verse || {};
   return getVisibleVerseLanguages(item, visibleLanguages).filter((language) =>
-    isSlideshowLanguageJustified(verse, language) && Boolean(String(verse[language] || "").trim()));
+    Boolean(String(verse[language] || "").trim()));
 }
 
 /**
@@ -967,7 +1061,8 @@ export function findSlideIndexForAnchor(slides = [], anchor) {
 export function getSlideKey(slide = [], index = 0) {
   const first = slide[0];
   const last = slide[slide.length - 1];
-  return `${first?.slideId || getSourceItemId(first) || "empty"}:${last?.slideId || getSourceItemId(last) || "empty"}:${index}`;
+  if (!first) return `empty:${index}`;
+  return `${first.slideId || getSourceItemId(first)}:${last?.slideId || getSourceItemId(last)}`;
 }
 
 export function getAdjacentSlideIndexes(currentIndex, slideCount) {
@@ -997,11 +1092,14 @@ export function getSlideRenderLayers(currentIndex, slideCount) {
  * first row of the section asked for, else the top.
  */
 export function getReadingItemIndex(items, anchor, preferredSectionId) {
-  const matchedIndex = items.findIndex((item) =>
-    (anchor?.sourceItemId && getSourceItemId(item) === anchor.sourceItemId) ||
-    (preferredSectionId && item.sectionId === preferredSectionId),
-  );
-  return matchedIndex >= 0 ? matchedIndex : 0;
+  const anchoredIndex = anchor?.sourceItemId
+    ? items.findIndex((item) => getSourceItemId(item) === anchor.sourceItemId)
+    : -1;
+  if (anchoredIndex >= 0) return anchoredIndex;
+  const sectionIndex = preferredSectionId
+    ? items.findIndex((item) => item.sectionId === preferredSectionId)
+    : -1;
+  return sectionIndex >= 0 ? sectionIndex : 0;
 }
 
 /**
@@ -1025,7 +1123,7 @@ export function getPaginationRunStart(items, index) {
  * fill that produced it then has no estimate left in it. An empty slide has
  * nothing to settle.
  */
-export function isSlideSettled(items, slides, slideIndex, isMeasured, itemIndexById) {
+export function isSlideSettled(items, slides, slideIndex, isMeasured, itemIndexById, breakIndex = null) {
   const slide = slides[slideIndex];
   if (!slide) return false;
   if (!items.length || !slide.length) return true;
@@ -1036,10 +1134,21 @@ export function isSlideSettled(items, slides, slideIndex, isMeasured, itemIndexB
   const next = slides[slideIndex + 1]?.[0];
   const nextIndex = next ? indexById.get(getSourceItemId(next)) : null;
   const end = Math.max(lastIndex, nextIndex ?? lastIndex);
-  for (let index = getPaginationRunStart(items, firstIndex); index <= end; index += 1) {
+  for (let index = getSettleStart(items, firstIndex, breakIndex); index <= end; index += 1) {
     if (!isMeasured(items[index])) return false;
   }
   return true;
+}
+
+/**
+ * The first item a slide's layout depends on: the reader's own break (see
+ * paginateItems' breakAt) when it is at or before the slide, else the start
+ * of the slide's run.
+ */
+export function getSettleStart(items, firstIndex, breakIndex = null) {
+  const runStart = getPaginationRunStart(items, firstIndex);
+  if (breakIndex != null && breakIndex >= 0 && breakIndex <= firstIndex) return Math.max(runStart, breakIndex);
+  return runStart;
 }
 
 /**

@@ -619,6 +619,8 @@ test("viewport tap direction remains correct across inset surface sizes", () => 
 
 import {
   coordinateLineCapacities,
+  getReadingItemIndex,
+  getSlideKey,
   getLanguagesNeedingLineMetrics,
   getPaginationRunStart,
   isSlideSettled,
@@ -681,6 +683,7 @@ function lineState(counts, offsets = {}) {
       lineHeight: 24,
       lines: metricLines(language, count),
       offset: offsets[language] || 0,
+      end: count,
     })),
   };
 }
@@ -714,15 +717,25 @@ test("a split never leaves a single line on either side of the turn, and a short
     coordinateLineCapacities(lineState({ english: 10, arabic: 5 }), { english: 3, arabic: 6 }),
     { english: 3, arabic: 2 },
   );
-  // Three lines or fewer go whole: here, since the limiting column keeps over half...
+  // Three lines or fewer go whole on this slide whenever they fit...
   assert.deepEqual(
     coordinateLineCapacities(lineState({ english: 10, arabic: 3 }), { english: 7, arabic: 6 }),
     { english: 7, arabic: 3 },
   );
-  // ...and whole on the next slide when it does not.
   assert.deepEqual(
     coordinateLineCapacities(lineState({ english: 10, arabic: 3 }), { english: 4, arabic: 6 }),
+    { english: 4, arabic: 3 },
+  );
+  // ...and whole on the next slide when they do not.
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 10, arabic: 3 }), { english: 4, arabic: 2 }),
     { english: 4, arabic: 0 },
+  );
+  // The limiting column decides the share after its own stray-line rule, so the others follow it:
+  // with room for one line in a four-line Arabic column nothing goes, and the verse starts a fresh slide.
+  assert.deepEqual(
+    coordinateLineCapacities(lineState({ english: 4, coptic: 4, arabic: 4 }), { english: 2, coptic: 2, arabic: 1 }),
+    { english: 0, coptic: 0, arabic: 0 },
   );
   // Never more than fits, never more than remains.
   for (const counts of [{ english: 7, coptic: 13, arabic: 9 }, { english: 20, coptic: 4, arabic: 11 }]) {
@@ -776,9 +789,10 @@ test("an item is measured only once its height and the lines of every column tha
   const englishOnly = { english: true, french: false, coptic: false, arabic: false };
   assert.deepEqual(getLanguagesNeedingLineMetrics(item, englishOnly), ["english"]);
   assert.deepEqual(getLanguagesNeedingLineMetrics(verseItem({ verse: { ...item.verse, arabic: "  " } }), ALL_LANGUAGES), ["english", "coptic"]);
-  assert.deepEqual(getLanguagesNeedingLineMetrics(verseItem({ verse: { ...item.verse, type: "refrainLabel" } }), ALL_LANGUAGES), []);
+  // Centered columns are laid out from their lines too.
+  assert.deepEqual(getLanguagesNeedingLineMetrics(verseItem({ verse: { ...item.verse, type: "refrainLabel" } }), ALL_LANGUAGES), ["english", "coptic", "arabic"]);
   const alone = verseItem({ verse: { coptic: "Ⲁⲗⲗⲏⲗⲟⲩⲓⲁ", invincibleCoptic: true } });
-  assert.deepEqual(getLanguagesNeedingLineMetrics(alone, ALL_LANGUAGES), []);
+  assert.deepEqual(getLanguagesNeedingLineMetrics(alone, ALL_LANGUAGES), ["coptic"]);
   assert.equal(isSlideshowLanguageJustified(alone.verse, "coptic"), false);
   assert.equal(isSlideshowLanguageJustified(item.verse, "coptic"), true);
   assert.equal(isSlideshowLanguageJustified({ type: "readingReference" }, "english"), false);
@@ -830,4 +844,136 @@ test("measurement takes the reader's run first, then spreads out from the reader
   assert.deepEqual(batch.map((item) => item.id), ["row-20", "row-21", "row-24", "row-25", "row-26", "row-27", "row-28", "row-29", "row-30", "row-31"]);
   // A predicate that says everything is measured leaves nothing to do.
   assert.deepEqual(getMeasurementBatch(items, () => true, 10, { sourceItemId: "row-25" }, null, 8, 20), []);
+});
+
+test("a verse is split only when every column that could be split has its lines", () => {
+  const first = verseItem({ id: "first", sectionId: "first" });
+  const tall = verseItem({ id: "tall", sectionId: "tall" });
+  // Only the English lines have landed: the verse moves on whole, all three columns intact.
+  const partial = { tall: { english: { lines: metricLines("English", 30) } } };
+  const slides = paginateItems([first, tall], { first: 600, tall: 900 }, partial, 1000, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides.map((slide) => slide.map((entry) => entry.id)), [["first"], ["tall"]]);
+  const placed = slides[1][0];
+  assert.equal(placed.verse.slideshowForcedLines, undefined);
+  assert.equal(placed.verse.coptic, tall.verse.coptic);
+  assert.equal(placed.verse.arabic, tall.verse.arabic);
+  // With every column's lines it splits, and every segment keeps all three columns.
+  const complete = { tall: { english: { lines: metricLines("English", 30) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 30) }, arabic: { lines: metricLines("عربي", 30) } } };
+  const split = paginateItems([first, tall], { first: 600, tall: 900 }, complete, 1000, 18, ALL_LANGUAGES, 1024);
+  const segments = split.flat().filter((entry) => (entry.sourceItemId || entry.id) === "tall");
+  assert.ok(segments.length > 1);
+  segments.forEach((segment) => assert.deepEqual(segment.verse.slideshowLanguageKeys, ["english", "coptic", "arabic"]));
+});
+
+// ---- The slide the reader is on begins where they are ----
+
+import { getSettleStart } from "../src/components/vine/slideshowLayout.js";
+
+test("the reader's item opens its slide, and nothing before it can move that slide", () => {
+  const title = { id: "t", sectionId: "s", type: "title", title: { english: "Psalm" } };
+  const verse = (index) => verseItem({ id: `v${index}`, sectionId: "s" });
+  const items = [title, verse(0), verse(1), verse(2), verse(3), verse(4)];
+  const heights = Object.fromEntries(items.map((item) => [item.id, 100]));
+  const plain = paginateItems(items, heights, {}, 250, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(plain.map((slide) => slide.map((entry) => entry.id)), [["t", "v0"], ["v1", "v2"], ["v3", "v4"]]);
+  // Reading from v2: v2 opens a slide, v1 is left on the one before.
+  const anchored = paginateItems(items, heights, {}, 250, 18, ALL_LANGUAGES, 1024, { itemId: "v2", offsets: {} });
+  assert.deepEqual(anchored.map((slide) => slide.map((entry) => entry.id)), [["t", "v0"], ["v1"], ["v2", "v3"], ["v4"]]);
+  // Settling that slide needs v2, v3 and the v4 that did not fit: not the title, not v0 or v1.
+  const measured = new Set(["v2", "v3", "v4"]);
+  assert.equal(getSettleStart(items, 3, 3), 3);
+  assert.equal(getSettleStart(items, 3, null), 0);
+  assert.equal(isSlideSettled(items, anchored, 2, (item) => measured.has(item.id), undefined, 3), true);
+  assert.equal(isSlideSettled(items, anchored, 2, (item) => measured.has(item.id)), false);
+  // The reader's break is only a break at or before the slide: paging back, the earlier slides follow the run.
+  assert.equal(isSlideSettled(items, anchored, 1, (item) => measured.has(item.id), undefined, 3), false);
+});
+
+test("a reader partway down a measured verse sees it carry on from their line, the lines before it on the slide before", () => {
+  const item = verseItem({ id: "long", sectionId: "s" });
+  const metric = {
+    english: { lines: metricLines("English", 12) },
+    coptic: { lines: metricLines("ⲕⲟⲡⲧ", 12) },
+    arabic: { lines: metricLines("عربي", 12) },
+  };
+  const fontSize = 18;
+  const lineHeight = getSlideshowLanguageLineHeight("arabic", item, fontSize);
+  const budget = lineHeight * 5 + 40;
+  const offsets = { english: 7, coptic: 7, arabic: 7 };
+  const slides = paginateItems([item], { long: 9999 }, { long: metric }, budget, fontSize, ALL_LANGUAGES, 1024, { itemId: "long", offsets });
+  const starts = slides.map((slide) => slide[0].slideshowLineRanges.english.start);
+  assert.ok(starts.includes(7), `no slide starts at the reader's line: ${starts}`);
+  const readerSlide = slides.findIndex((slide) => slide[0].slideshowLineRanges.english.start === 7);
+  // Everything before line 7 is on the slides before; everything from it on the slides from there.
+  assert.ok(slides.slice(0, readerSlide).every((slide) => slide.every((entry) => entry.slideshowLineRanges.english.end <= 7)));
+  assert.ok(slides.slice(readerSlide).every((slide) => slide.every((entry) => entry.slideshowLineRanges.english.start >= 7)));
+  // Every line still renders exactly once, in order, and the segments keep distinct ids.
+  const rendered = slides.flat().flatMap((entry) => entry.verse.slideshowForcedLines.english);
+  assert.deepEqual(rendered, metric.english.lines);
+  assert.equal(new Set(slides.flat().map((entry) => entry.slideId)).size, slides.flat().length);
+  // The reader's own piece keeps its identity however the lines before it are divided up.
+  assert.equal(slides[readerSlide][0].slideId, "long-segment-1");
+  const tighter = paginateItems([item], { long: 9999 }, { long: metric }, lineHeight * 3 + 40, fontSize, ALL_LANGUAGES, 1024, { itemId: "long", offsets });
+  assert.equal(tighter.find((slide) => slide[0].slideshowLineRanges.english.start === 7)[0].slideId, "long-segment-1");
+  // The anchor made from the reader's slide finds it again.
+  assert.equal(findSlideIndexForAnchor(slides, createSlideAnchor(slides[readerSlide])), readerSlide);
+  // Not yet measured, the verse is placed whole, beginning the slide, with no forced lines.
+  const whole = paginateItems([verseItem({ id: "before", sectionId: "s" }), item], { before: 100, long: 300 }, {}, budget, fontSize, ALL_LANGUAGES, 1024, { itemId: "long", offsets });
+  assert.deepEqual(whole.map((slide) => slide.map((entry) => entry.id)), [["before"], ["long"]]);
+  assert.equal(whole[1][0].verse.slideshowForcedLines, undefined);
+});
+
+test("a measured verse that fits whole still carries its measured lines, as one object per measurement", () => {
+  const item = verseItem({ id: "fits", sectionId: "s" });
+  const metric = { english: { lines: metricLines("English", 3) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 4) }, arabic: { lines: metricLines("عربي", 2) } };
+  const first = paginateItems([item], { fits: 200 }, { fits: metric }, 1000, 18, ALL_LANGUAGES, 1024)[0][0];
+  assert.deepEqual(first.verse.slideshowForcedLines, { english: metric.english.lines, coptic: metric.coptic.lines, arabic: metric.arabic.lines });
+  assert.deepEqual(first.slideshowLineRanges, { english: { start: 0, end: 3 }, coptic: { start: 0, end: 4 }, arabic: { start: 0, end: 2 } });
+  assert.equal(first.id, "fits");
+  const again = paginateItems([item], { fits: 200 }, { fits: metric }, 1000, 18, ALL_LANGUAGES, 1024)[0][0];
+  assert.equal(again, first);
+  const remeasured = paginateItems([item], { fits: 200 }, { fits: { ...metric } }, 1000, 18, ALL_LANGUAGES, 1024)[0][0];
+  assert.notEqual(remeasured, first);
+  // An anchor with line offsets resolves to the verse placed whole, but never to a decoration-only page.
+  const anchor = { sourceItemId: "fits", sectionId: "s", segmentIndex: 1, primaryLanguage: "english", offsets: { english: 2 } };
+  assert.equal(findSlideIndexForAnchor([[item]], anchor), 0);
+  assert.equal(findSlideIndexForAnchor([[{ ...item, slideshowLineRanges: {}, slideshowSegmentIndex: 0 }]], anchor), -1);
+});
+
+test("a column held over to the next slide brings its seasonal prefix with it, and a decoration page shows it once", () => {
+  const prefix = "Watos";
+  const base = verseItem().verse;
+  const item = verseItem({ verse: { ...base, seasonalHoosVersePrefix: prefix, english: `${prefix} ${base.english}`, arabic: `${prefix} ${base.arabic}` } });
+  const state = {
+    languages: [
+      { language: "english", lineHeight: 24, lines: metricLines("English", 6), offset: 0, end: 6 },
+      { language: "arabic", lineHeight: 24, lines: metricLines("عربي", 3), offset: 0, end: 3 },
+    ],
+  };
+  const first = createVerseLineSegment(item, state, { english: 4, arabic: 0 }, 0).item;
+  const second = createVerseLineSegment(item, state, { english: 2, arabic: 3 }, 1).item;
+  assert.ok(first.verse.english.startsWith(prefix));
+  assert.equal(first.verse.arabic, "");
+  assert.ok(second.verse.arabic.startsWith(prefix), "the Arabic prefix went with the Arabic");
+  assert.ok(!second.verse.english.startsWith(prefix));
+  assert.equal(first.verse.slideshowSeasonalPrefixVisible, true);
+  assert.equal(second.verse.slideshowSeasonalPrefixVisible, true);
+  // Shown on a page of its own, the prefix is not shown again on the lines that follow.
+  const { segments } = splitVerse(verseItem({ hasSpeakerLabel: true, verse: item.verse }), { availableHeight: 380 });
+  assert.equal(segments.filter((segment) => segment.verse.slideshowSeasonalPrefixVisible).length, 1);
+});
+
+test("the reader's own row comes first; the section is only a fallback", () => {
+  const items = [
+    { id: "a-title", sectionId: "a", type: "title", title: { english: "A" } },
+    verseItem({ id: "a-0", sectionId: "a" }),
+    verseItem({ id: "a-1", sectionId: "a" }),
+  ];
+  assert.equal(getReadingItemIndex(items, { sourceItemId: "a-1" }, "a"), 2);
+  assert.equal(getReadingItemIndex(items, { sourceItemId: "gone" }, "a"), 0);
+  assert.equal(getReadingItemIndex(items, null, "a"), 0);
+  assert.equal(getReadingItemIndex(items, null, null), 0);
+  // A slide's key is its content, whatever its number.
+  assert.equal(getSlideKey([items[1], items[2]], 3), getSlideKey([items[1], items[2]], 9));
+  assert.notEqual(getSlideKey([items[1]], 0), getSlideKey([items[2]], 0));
 });

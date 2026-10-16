@@ -107,7 +107,7 @@ export default function VerseBlock({
     {
       key: "english",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "english", bishopPresent),
-      text: String(verse.english || ""),
+      text: String(verse.english || "").trimEnd(),
       bibleVerseNumber: bibleNumberFor("english"),
       seasonalHoosVersePrefix: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
       fontSize: getSlideshowLanguageFontSize("english", { verse }, fontSize),
@@ -121,7 +121,7 @@ export default function VerseBlock({
     {
       key: "french",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "french", bishopPresent),
-      text: String(verse.french || ""),
+      text: String(verse.french || "").trimEnd(),
       bibleVerseNumber: bibleNumberFor("french"),
       // The seasonal prefix is English/Arabic text; French keeps its line
       // blank so its verse starts level with theirs.
@@ -136,7 +136,7 @@ export default function VerseBlock({
     },
     {
       key: "coptic",
-      text: formatCopticNumbers(verse.coptic, verse.preserveCopticDigits),
+      text: formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd(),
       bibleVerseNumber: bibleNumberFor("coptic"),
       seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine
         ? verse.seasonalHoosVersePrefix
@@ -152,7 +152,7 @@ export default function VerseBlock({
     {
       key: "arabic",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "arabic", bishopPresent),
-      text: formatArabicNumbers(verse.arabic),
+      text: formatArabicNumbers(verse.arabic).trimEnd(),
       bibleVerseNumber: bibleNumberFor("arabic"),
       seasonalHoosVersePrefix: hasSeasonalPrefixLine
         ? formatArabicNumbers(verse.seasonalHoosVersePrefix)
@@ -209,6 +209,10 @@ export default function VerseBlock({
   const speakerRowHeight = hasSpeakerLabel
     ? Math.max(...rowLanguages.filter((language) => language.speakerLabel).map((language) => language.lineHeight))
     : 0;
+
+  // Off-screen, in the slideshow's measurement layer: the metrics are
+  // reported, and the body need not be drawn in full.
+  const isMeasuring = Boolean(onLanguageLayout);
 
   function reportLanguageMetric(language, metric) {
     onLanguageLayout?.(language, metric);
@@ -274,34 +278,29 @@ export default function VerseBlock({
           ) : (
             <JustifiedVerseBody
               theme={theme}
-            language={language}
-            textStyle={textStyle}
-            selectableText={selectableText}
-            columnWidth={cellWidth - SPACING.xs * 2}
-            forceLines={language.forceLines}
-            minWordsToJustify={language.minWordsToJustify}
-            fontStyle={bodyFontStyle}
-            fontWeight={bodyFontWeight}
-            onMetric={(metric) => reportLanguageMetric(language.key, metric)}
+              language={language}
+              textStyle={textStyle}
+              selectableText={selectableText}
+              columnWidth={cellWidth - SPACING.xs * 2}
+              forceLines={language.forceLines}
+              minWordsToJustify={language.minWordsToJustify}
+              fontStyle={bodyFontStyle}
+              fontWeight={bodyFontWeight}
+              measureOnly={isMeasuring}
+              onMetric={(metric) => reportLanguageMetric(language.key, metric)}
             />
           )
         ) : (
-          <Text
-            selectable={selectableText}
-            style={[...textStyle, { textAlign: getSafeTextAlign(language) }]}
-            onLayout={(event) =>
-              reportLanguageMetric(language.key, {
-                height: event.nativeEvent.layout.height,
-              })
-            }
-            onTextLayout={(event) =>
-              reportLanguageMetric(language.key, {
-                lines: toReportedLines(annotateNativeLines(event.nativeEvent.lines || [], getPlainRenderedText(language))),
-              })
-            }
-          >
-            {renderLanguageText(language, theme)}
-          </Text>
+          <PlainVerseBody
+            theme={theme}
+            language={language}
+            textStyle={[...textStyle, { textAlign: getSafeTextAlign(language) }]}
+            selectableText={selectableText}
+            columnWidth={cellWidth - SPACING.xs * 2}
+            fontStyle={bodyFontStyle}
+            fontWeight={bodyFontWeight}
+            onMetric={(metric) => reportLanguageMetric(language.key, metric)}
+          />
         )}
       </View>
     );
@@ -325,6 +324,7 @@ export default function VerseBlock({
           >
             {language.speakerLabel ? (
               <Text
+                allowFontScaling={false}
                 selectable={selectableText}
                 style={[
                   ...language.styles,
@@ -383,42 +383,29 @@ export default function VerseBlock({
  * mode, and every non-justified slideshow verse type).
  */
 function CssJustifiedVerseBody({ language, textStyle, selectableText, columnWidth, fontStyle, fontWeight, onMetric, theme }) {
-  const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
-  const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
-  const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
-  const bodyText = parts ? parts.body : language.text;
-  const measuredText = bibleVerseNumber ? `${bibleVerseNumber} ${bodyText}` : bodyText;
-  const lines = useMemo(
-    () => measureJustifiedLinesWeb(
-      measuredText,
-      language.fontSize,
-      language.fontFamily,
-      columnWidth,
-      fontWeight,
-      fontStyle,
-    ) || [],
-    [columnWidth, fontStyle, fontWeight, language.fontFamily, language.fontSize, measuredText],
-  );
+  const { text, seasonalHoosVersePrefix, bibleVerseNumber: rawBibleVerseNumber, key, fontSize, fontFamily } = language;
+  const parts = getSeasonalHoosPrefixParts(text, seasonalHoosVersePrefix);
+  const prefixStyle = getSeasonalHoosPrefixStyle(fontSize);
+  const bibleVerseNumber = formatBibleVerseNumber(rawBibleVerseNumber, key);
+  const bodyText = parts ? parts.body : text;
+  const lines = useMemo(() => {
+    // The text as rendered: the verse number first, set bold (see
+    // renderTextWithBibleVerseNumber), so it is measured bold.
+    const number = formatBibleVerseNumber(rawBibleVerseNumber, key);
+    const body = getSeasonalHoosPrefixParts(text, seasonalHoosVersePrefix)?.body ?? text;
+    const measured = number ? `${number} ${body}` : body;
+    return measureJustifiedLinesWeb(measured, fontSize, fontFamily, columnWidth, fontWeight, fontStyle, number ? "700" : fontWeight) || [];
+  }, [columnWidth, fontFamily, fontSize, fontStyle, fontWeight, key, rawBibleVerseNumber, seasonalHoosVersePrefix, text]);
 
   useEffect(() => {
     onMetric?.({ lines });
   }, [lines, onMetric]);
 
-  let prefixNode = null;
-  if (parts) {
-    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: theme.colors.refrain }]}>{parts.prefix}</Text>;
-  } else if (language.seasonalHoosVersePrefixSpacer) {
-    prefixNode = (
-      <Text selectable={selectableText} style={[prefixStyle, { color: "transparent" }]}>
-        {language.seasonalHoosVersePrefixSpacer}
-      </Text>
-    );
-  }
-
   return (
     <>
-      {prefixNode}
+      {renderPrefixNode(language, parts, prefixStyle, selectableText, theme)}
       <Text
+        allowFontScaling={false}
         selectable={selectableText}
         style={[textStyle, { textAlign: "justify", textJustify: "inter-word" }]}
         onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}
@@ -429,20 +416,70 @@ function CssJustifiedVerseBody({ language, textStyle, selectableText, columnWidt
   );
 }
 
-function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, onMetric, theme }) {
+function renderPrefixNode(language, parts, prefixStyle, selectableText, theme) {
+  if (parts) {
+    return <Text allowFontScaling={false} selectable={selectableText} style={[prefixStyle, { color: theme.colors.refrain }]}>{parts.prefix}</Text>;
+  }
+  if (language.seasonalHoosVersePrefixSpacer) {
+    return (
+      <Text allowFontScaling={false} selectable={selectableText} style={[prefixStyle, { color: "transparent" }]}>
+        {language.seasonalHoosVersePrefixSpacer}
+      </Text>
+    );
+  }
+  return null;
+}
+
+/**
+ * A centered column (a refrain label, a reading reference, a Coptic line
+ * standing alone). Its lines are measured like a justified column's -- on
+ * web by the same canvas measurement, on the phone from the text engine's
+ * own layout -- so pagination can turn it over the page too; and a page's
+ * share of it is then rendered line by line, each line centered.
+ */
+function PlainVerseBody({ language, textStyle, selectableText, columnWidth, fontStyle, fontWeight, onMetric, theme }) {
+  const renderedText = getPlainRenderedText(language);
+  const webLines = useMemo(
+    () => (Platform.OS === "web"
+      ? measureJustifiedLinesWeb(renderedText, language.fontSize, language.fontFamily, columnWidth, fontWeight, fontStyle)
+      : null),
+    [columnWidth, fontStyle, fontWeight, language.fontFamily, language.fontSize, renderedText],
+  );
+  useEffect(() => {
+    if (webLines) onMetric?.({ lines: webLines });
+  }, [onMetric, webLines]);
+
+  if (language.forceLines) {
+    return (
+      <View onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}>
+        {language.forceLines.map((line, index) => (
+          <Text key={index} allowFontScaling={false} selectable={selectableText} style={textStyle}>
+            {String(line.text || "").trim() || "\u00a0"}
+          </Text>
+        ))}
+      </View>
+    );
+  }
+
+  return (
+    <Text
+      allowFontScaling={false}
+      selectable={selectableText}
+      style={textStyle}
+      onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}
+      onTextLayout={(event) =>
+        onMetric?.({ lines: toReportedLines(annotateNativeLines(event.nativeEvent.lines || [], renderedText)) })
+      }
+    >
+      {renderLanguageText(language, theme)}
+    </Text>
+  );
+}
+
+function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, measureOnly, onMetric, theme }) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
-
-  let prefixNode = null;
-
-  if (parts) {
-    prefixNode = <Text selectable={selectableText} style={[prefixStyle, { color: theme.colors.refrain }]}>{parts.prefix}</Text>;
-  } else if (language.seasonalHoosVersePrefixSpacer) {
-    prefixNode = (
-      <Text selectable={selectableText} style={[prefixStyle, { color: "transparent" }]}>{language.seasonalHoosVersePrefixSpacer}</Text>
-    );
-  }
 
   const fullText = getJustifiedBodyText(language);
   const metropolitanColor = theme.colors.metropolitan;
@@ -450,7 +487,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
 
   return (
     <>
-      {prefixNode}
+      {renderPrefixNode(language, parts, prefixStyle, selectableText, theme)}
       <JustifiedText
         text={fullText}
         style={textStyle}
@@ -465,6 +502,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         forceLines={forceLines}
         minWordsToJustify={minWordsToJustify}
         selectable={selectableText}
+        measureOnly={measureOnly}
         onLayout={(event) => onMetric({ height: event.nativeEvent.layout.height })}
         onLines={(lines) => onMetric({ lines })}
       />
@@ -478,7 +516,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
 // JustifiedVerseBody's render and measurement paths.
 function getJustifiedBodyText(language) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
-  const bodyText = parts ? parts.body : language.text;
+  const bodyText = (parts ? parts.body : language.text).trimEnd();
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
   return bibleVerseNumber ? `${bibleVerseNumber} ${bodyText}` : bodyText;
 }
@@ -488,10 +526,11 @@ function getJustifiedBodyText(language) {
 // (see annotateNativeLines) and a page break between them keeps its breaks.
 function getPlainRenderedText(language) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
-  if (parts) return `${parts.prefix}\n${parts.body}`;
-  if (language.seasonalHoosVersePrefixSpacer) return `${language.seasonalHoosVersePrefixSpacer}\n${language.text}`;
+  const text = String(language.text || "").trimEnd();
+  if (parts) return `${parts.prefix}\n${parts.body.trimEnd()}`;
+  if (language.seasonalHoosVersePrefixSpacer) return `${language.seasonalHoosVersePrefixSpacer}\n${text}`;
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
-  return bibleVerseNumber ? `${bibleVerseNumber} ${language.text}` : language.text;
+  return bibleVerseNumber ? `${bibleVerseNumber} ${text}` : text;
 }
 
 function renderLanguageText(language, theme) {
@@ -502,27 +541,28 @@ function renderLanguageText(language, theme) {
     language.key,
   );
 
+  const text = String(language.text || "").trimEnd();
   if (!parts) {
     if (language.seasonalHoosVersePrefixSpacer) {
       return (
         <>
-          <Text style={[prefixStyle, { color: "transparent" }]}>
+          <Text allowFontScaling={false} style={[prefixStyle, { color: "transparent" }]}>
             {language.seasonalHoosVersePrefixSpacer}
           </Text>
           {"\n"}
-          {language.text}
+          {text}
         </>
       );
     }
 
-    return renderTextWithBibleVerseNumber(language.text, bibleVerseNumber, theme);
+    return renderTextWithBibleVerseNumber(text, bibleVerseNumber, theme);
   }
 
   return (
     <>
-      <Text style={[prefixStyle, { color: theme.colors.refrain }]}>{parts.prefix}</Text>
+      <Text allowFontScaling={false} style={[prefixStyle, { color: theme.colors.refrain }]}>{parts.prefix}</Text>
       {"\n"}
-      {parts.body}
+      {parts.body.trimEnd()}
     </>
   );
 }
@@ -535,7 +575,7 @@ function renderTextWithBibleVerseNumber(text, bibleVerseNumber, theme) {
 
   return (
     <>
-      <Text style={{ color: theme.colors.gold, fontWeight: "700" }}>{bibleVerseNumber} </Text>
+      <Text allowFontScaling={false} style={{ color: theme.colors.gold, fontWeight: "700" }}>{bibleVerseNumber} </Text>
       {content}
     </>
   );
@@ -587,7 +627,7 @@ function renderTextWithMetropolitanHighlight(text, color) {
       nodes.push(raw.slice(lastIndex, match.index));
     }
     nodes.push(
-      <Text key={`metropolitan-${key++}`} style={{ color }}>
+      <Text key={`metropolitan-${key++}`} allowFontScaling={false} style={{ color }}>
         {match[0]}
       </Text>,
     );

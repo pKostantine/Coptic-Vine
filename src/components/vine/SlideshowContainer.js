@@ -15,8 +15,8 @@ import {
   getItemSignature,
   getMeasurementBatch,
   getPageTurnForKey,
-  getPaginationRunStart,
   getReadingItemIndex,
+  getSettleStart,
   isKeyKeptByFocusedControl,
   getPageTurnForSwipe,
   getPageTurnForTap,
@@ -26,6 +26,7 @@ import {
   getSlidePadding,
   getSlideRenderLayers,
   getSlideshowChromeMetrics,
+  hashSlideshowText,
   isSlideSettled,
   isSlideshowItemMeasured,
   normalizeLanguageMetric,
@@ -46,14 +47,13 @@ function readCachedMeasurement(key) {
 function writeCachedMeasurement(key, patch) {
   if (!key) return;
   const current = slideshowMeasurementCache.get(key) || {};
-  const next = {
-    ...current,
-    ...patch,
-    languageHeights: {
-      ...(current.languageHeights || {}),
-      ...(patch.languageHeights || {}),
-    },
-  };
+  // Merged a language at a time: a flush brings a language's height in one
+  // frame and its lines in another, and the cache must end up holding both.
+  const languageHeights = { ...(current.languageHeights || {}) };
+  Object.entries(patch.languageHeights || {}).forEach(([language, metric]) => {
+    languageHeights[language] = { ...(languageHeights[language] || {}), ...metric };
+  });
+  const next = { ...current, ...patch, languageHeights };
   slideshowMeasurementCache.delete(key);
   slideshowMeasurementCache.set(key, next);
   while (slideshowMeasurementCache.size > MAX_MEASUREMENT_CACHE_ENTRIES) {
@@ -85,6 +85,10 @@ export default function SlideshowContainer({
   const [viewportWidth, setViewportWidth] = useState(0);
   const [measuredHeights, setMeasuredHeights] = useState({});
   const [measuredLanguageHeights, setMeasuredLanguageHeights] = useState({});
+  // What the measurements in hand were taken for. Until the reset effect
+  // below has caught up with a new width, font or set of languages (a commit
+  // later), they are measurements of something else and settle nothing.
+  const [measuredForKey, setMeasuredForKey] = useState(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const navigationIndexRef = useRef(0);
   // Unlike a numeric page index, this survives front-to-back measurement and
@@ -177,6 +181,7 @@ export default function SlideshowContainer({
     [globalMeasurementKey, itemSignatures, items],
   );
   const measuredKey = `${globalMeasurementKey}:${itemsSignature}`;
+  const measurementEpoch = useMemo(() => hashSlideshowText(measuredKey), [measuredKey]);
   useLayoutEffect(() => {
     measurementSignatureRef.current = measuredKey;
     pendingHeightsRef.current = {};
@@ -231,6 +236,7 @@ export default function SlideshowContainer({
 
     setMeasuredHeights(keepUnchangedHeights);
     setMeasuredLanguageHeights(keepUnchangedLanguageHeights);
+    setMeasuredForKey(globalMeasurementKey);
     lastGlobalMeasurementKeyRef.current = globalMeasurementKey;
     lastItemSignaturesRef.current = newSignatures;
   }, [globalMeasurementKey, itemMeasurementCacheKeys, itemSignatures, items, measuredKey]);
@@ -374,6 +380,8 @@ export default function SlideshowContainer({
       measuredViewportHeight,
       getSlidePadding(measuredViewportHeight),
     );
+    // The slide the reader is on begins where they are (see paginateItems'
+    // breakAt), so it depends on nothing before it and settles on its own.
     const paginated = paginateItems(
       items,
       effectiveHeights,
@@ -382,10 +390,14 @@ export default function SlideshowContainer({
       fontSize,
       visibleLanguages,
       slideTableWidth,
+      currentAnchor?.sourceItemId && currentAnchor.breaks !== false
+        ? { itemId: currentAnchor.sourceItemId, offsets: currentAnchor.offsets }
+        : null,
     );
 
     return dropEmptySlides(paginated);
   }, [
+    currentAnchor,
     fontSize,
     items,
     measuredHeights,
@@ -426,11 +438,18 @@ export default function SlideshowContainer({
   );
   const itemIndexById = useMemo(() => new Map(items.map((item, index) => [item.id, index])), [items]);
   const preferredSectionId = restoreRequest?.target.sectionId || selectedSectionId || currentAnchor?.sectionId;
-  // Whatever the reader's slide needs before it can settle comes first: its
-  // run, from the start, up to the reader's own row.
-  const readingRunStart = useMemo(
-    () => getPaginationRunStart(items, getReadingItemIndex(items, currentAnchor, preferredSectionId)),
+  // Whatever the reader's slide needs before it can settle comes first: from
+  // their own break, or the start of their run, up to their row.
+  const readingItemIndex = useMemo(
+    () => getReadingItemIndex(items, currentAnchor, preferredSectionId),
     [currentAnchor, items, preferredSectionId],
+  );
+  const anchorBreakIndex = currentAnchor?.sourceItemId && currentAnchor.breaks !== false
+    ? readingItemIndex
+    : null;
+  const readingRunStart = useMemo(
+    () => getSettleStart(items, readingItemIndex, anchorBreakIndex),
+    [anchorBreakIndex, items, readingItemIndex],
   );
   const measurementBatch = useMemo(() => {
     if (!(viewportHeight || viewportHeightOverride)) return [];
@@ -460,13 +479,6 @@ export default function SlideshowContainer({
     return Math.min(currentSlideIndex, Math.max(slides.length - 1, 0));
   }, [anchoredSlideIndex, currentSlideIndex, slides]);
 
-  // Update synchronously after every committed page so rapid taps/clicker
-  // presses can advance repeatedly without waiting for the next render's
-  // callback closure to capture a newer resolvedSlideIndex.
-  useLayoutEffect(() => {
-    navigationIndexRef.current = resolvedSlideIndex;
-  }, [resolvedSlideIndex]);
-
   // The slide on screen is never provisional. Pagination runs on estimates
   // until the measurements land, and a slide built on estimates can change
   // as they do: so the deck shows the last slide that was settled (see
@@ -478,9 +490,14 @@ export default function SlideshowContainer({
   // verses out whole, never with a guessed line break.
   // Until the anchor finds its slide again, the slide index is only the old
   // number, and the slide at it is not the reader's: not settled either.
-  const settled = Boolean(measuredViewportHeight) &&
+  // Measurements taken for another width, font or set of languages (the
+  // reset effect above wipes them a commit later) settle nothing here.
+  const measurementsCurrent = measuredForKey === globalMeasurementKey;
+  const settled = Boolean(measuredViewportHeight) && measurementsCurrent &&
     (!currentAnchor || anchoredSlideIndex >= 0) &&
-    isSlideSettled(items, slides, resolvedSlideIndex, isItemMeasured, itemIndexById);
+    isSlideSettled(items, slides, resolvedSlideIndex, isItemMeasured, itemIndexById, anchorBreakIndex);
+  // What the deck is rendered from: the slides, which slide, and the size,
+  // font and languages they were laid out for.
   const liveDeck = useMemo(() => ({
     slides,
     currentIndex: resolvedSlideIndex,
@@ -491,23 +508,38 @@ export default function SlideshowContainer({
     slidePadding,
   }), [fontSize, resolvedSlideIndex, slideColumnWidth, slidePadding, slideTableWidth, slides, visibleLanguages]);
   const [settledDeck, setSettledDeck] = useState(null);
-  const [settleTimedOut, setSettleTimedOut] = useState(false);
+  const liveDeckRef = useRef(liveDeck);
   useLayoutEffect(() => {
+    liveDeckRef.current = liveDeck;
     if (!settled) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the deck just settled is what the next unsettled frame keeps showing
     setSettledDeck(liveDeck);
   }, [liveDeck, settled]);
   useEffect(() => {
-    if (settled) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the wait is over the moment the live deck is exact
-      setSettleTimedOut(false);
-      return undefined;
-    }
-    const timer = setTimeout(() => setSettleTimedOut(true), SETTLE_TIMEOUT_MS);
+    if (settled || !measuredViewportHeight) return undefined;
+    // Waited long enough: the live deck as it stands is pinned, and shown
+    // until the real one settles -- one change at most, not one per flush.
+    const timer = setTimeout(() => setSettledDeck(liveDeckRef.current), SETTLE_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [settled]);
-  const shownDeck = settled || settleTimedOut || !settledDeck ? liveDeck : settledDeck;
-  const deckHidden = !settled && !settleTimedOut && !settledDeck;
+  }, [measuredViewportHeight, settled]);
+  // A deck laid out for another width, font or set of languages is not
+  // shown in this one: turned sideways, its columns would be cut off or
+  // leave the page half blank. Nothing shows until the new layout settles.
+  const settledDeckFits = Boolean(settledDeck) &&
+    settledDeck.tableWidth === slideTableWidth &&
+    settledDeck.fontSize === fontSize &&
+    settledDeck.visibleLanguages === visibleLanguages;
+  const shownDeck = settled || !settledDeckFits ? liveDeck : settledDeck;
+  const deckHidden = !settled && !settledDeckFits;
+  // Both updated synchronously after every committed page, so rapid
+  // taps/clicker presses can advance repeatedly without waiting for the next
+  // render's callback closure to capture a newer index: the page turned from
+  // is the one on screen.
+  const shownDeckRef = useRef(null);
+  useLayoutEffect(() => {
+    shownDeckRef.current = deckHidden ? null : shownDeck;
+    navigationIndexRef.current = deckHidden ? resolvedSlideIndex : shownDeck.currentIndex;
+  }, [deckHidden, resolvedSlideIndex, shownDeck]);
 
   // The settings/calendar transaction is independent of the content-selector
   // selection. Its token must jump even when the hymn id has not changed (a
@@ -534,8 +566,11 @@ export default function SlideshowContainer({
     pendingRestoreSectionIdRef.current = sectionId;
     pendingRestoreCandidatesRef.current = [];
     navigationIndexRef.current = targetSlideIndex;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-off restore, keyed by the request's token
     setCurrentSlideIndex(targetSlideIndex);
-    setCurrentAnchor(createSlideAnchor(targetItem ? [targetItem] : targetSlide));
+    // The anchor names the hymn's own item, which can sit partway down the
+    // page: the page is not made to begin there.
+    setCurrentAnchor({ ...createSlideAnchor(targetItem ? [targetItem] : targetSlide), breaks: !targetItem });
   }, [restoreRequest?.token, slides, selectedSectionId, viewportHeight, viewportHeightOverride]);
 
   // A pill tapped above the document. The Antiphonary's Adam and Vatos pills
@@ -687,11 +722,15 @@ export default function SlideshowContainer({
     onCurrentSectionChange?.(currentSectionId, currentSlide?.find((item) => item.verse?.tune)?.verse.tune ?? null);
   }, [currentAnchor, onCurrentSectionChange, resolvedSlideIndex, slides, viewportHeight, viewportHeightOverride]);
 
+  // A page is turned from the deck on screen: the next slide is the one
+  // after the slide the reader is looking at, and the anchor it sets names
+  // that slide's content, which the live deck finds again as it settles.
   const goToSlide = useCallback((requestedIndex) => {
-    const nextIndex = Math.min(Math.max(requestedIndex, 0), Math.max(slides.length - 1, 0));
+    const deck = shownDeckRef.current?.slides?.length ? shownDeckRef.current.slides : slides;
+    const nextIndex = Math.min(Math.max(requestedIndex, 0), Math.max(deck.length - 1, 0));
     navigationIndexRef.current = nextIndex;
     setCurrentSlideIndex(nextIndex);
-    setCurrentAnchor(createSlideAnchor(slides[nextIndex]));
+    setCurrentAnchor(createSlideAnchor(deck[nextIndex]));
   }, [slides]);
 
   const goToPreviousSlide = useCallback(() => {
@@ -720,7 +759,7 @@ export default function SlideshowContainer({
       if (pageTurn === "previous") goToPreviousSlide();
       if (pageTurn === "next") goToNextSlide();
       if (pageTurn === "first") goToSlide(0);
-      if (pageTurn === "last") goToSlide(slides.length - 1);
+      if (pageTurn === "last") goToSlide((shownDeckRef.current?.slides?.length || slides.length) - 1);
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -750,7 +789,11 @@ export default function SlideshowContainer({
               and re-rendered the whole batch on each flush. */}
           {measurementBatch.map((item) => (
             <MeasurementItem
-              key={item.id}
+              // Keyed by the measurement too: a wipe while an item is still
+              // being measured mounts it afresh, so its layout is reported
+              // again even where its size did not change (neither Fabric nor
+              // a ResizeObserver reports an unchanged size twice).
+              key={`${measurementEpoch}:${item.id}`}
               item={item}
               visibleLanguages={visibleLanguages}
               fontSize={fontSize}
@@ -1157,6 +1200,7 @@ const SlideItem = memo(function SlideItem({
         >
           {label ? (
             <Text
+              allowFontScaling={false}
               selectable={false}
               style={[
                 styles.openButtonText,
@@ -1172,6 +1216,7 @@ const SlideItem = memo(function SlideItem({
           ) : null}
           {arabicLabel ? (
             <Text
+              allowFontScaling={false}
               selectable={false}
               style={[
                 styles.openButtonText,
@@ -1274,6 +1319,7 @@ const SlideItem = memo(function SlideItem({
               >
                 {language.text ? (
                   <Text
+                    allowFontScaling={false}
                     selectable={false}
                     style={[
                       styles.sectionTitle,
