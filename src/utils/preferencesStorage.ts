@@ -4,11 +4,16 @@ import { Dimensions, Platform } from 'react-native';
 import { DEFAULT_DOCUMENT_THEME_ID, isDocumentThemeId, type DocumentThemeId } from '../constants/documentThemes';
 import {
   classifyReadingDevice,
-  DEFAULT_READING_FONT_LEVEL,
-  MAX_READING_FONT_LEVEL,
-  migrateReadingFontLevel,
-  MIN_READING_FONT_LEVEL,
-  readingFontSizeForLevel,
+  DEFAULT_FONT_SCALE,
+  FONT_SCALE_STEPS as FONT_SCALE_DIVISIONS,
+  FONT_SCALE_VERSION,
+  fontScaleStep,
+  fontScaleToPx as scaleToPixels,
+  maxFontScaleForScreen,
+  MIN_FONT_SCALE as MIN_READING_FONT_SCALE,
+  readStoredFontScale,
+  snapFontScale,
+  stepFontScale,
 } from './readingFontSize';
 
 export interface VisibleLanguages {
@@ -49,9 +54,14 @@ export interface ReadingPreferences {
   visibleLanguages: VisibleLanguages;
   bibleVisibleLanguages: BibleVisibleLanguages;
   sermonPlannerVisibleLanguages: SermonPlannerVisibleLanguages;
-  fontScale: number; // integer 1-10, see MIN_FONT_SCALE/MAX_FONT_SCALE
-  /** Persisted range marker used to migrate earlier Coptic Vine font-size scales. */
-  fontScaleRangeMax: number;
+  /**
+   * The reading text size: a scale of the 14px base (readingFontSize.js),
+   * from MIN_FONT_SCALE to MAX_FONT_SCALE, which this screen decides. A
+   * device choice, never synced: a phone and a desk are read differently.
+   */
+  fontScale: number;
+  /** Marks fontScale as a scale (FONT_SCALE_VERSION); earlier installations stored a level, which readStoredFontScale still reads. */
+  fontScaleVersion: number;
   orientationMode: OrientationMode;
   selectText: boolean;
   slideshowMode: boolean;
@@ -103,7 +113,8 @@ export type SyncedReadingPreferences = Pick<ReadingPreferences,
   | 'appLanguage'
 >;
 
-// New installations start at the comfortable middle of the 1-10 scale.
+// New installations start at a scale of 1.5: 21px, between the sizes the
+// earlier per-device tables opened at.
 export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   visibleLanguages: {
     english: true,
@@ -126,8 +137,8 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
     english: true,
     arabic: true,
   },
-  fontScale: DEFAULT_READING_FONT_LEVEL,
-  fontScaleRangeMax: MAX_READING_FONT_LEVEL,
+  fontScale: DEFAULT_FONT_SCALE,
+  fontScaleVersion: FONT_SCALE_VERSION,
   orientationMode: 'auto',
   selectText: false,
   slideshowMode: false,
@@ -155,16 +166,24 @@ export function setCurrentAppLanguage(language: AppLanguage): void {
   currentAppLanguage = language;
 }
 
-/** Lowest selectable font scale. */
-export const MIN_FONT_SCALE = MIN_READING_FONT_LEVEL;
-/** Highest selectable font scale. */
-export const MAX_FONT_SCALE = MAX_READING_FONT_LEVEL;
-
+// The device's screen, read once: the window changes with rotation and
+// split view, the screen's shortest side does not.
 const screen = Dimensions.get('screen');
+
+/** Lowest selectable text scale: the 14px base (readingFontSize.js). */
+export const MIN_FONT_SCALE: number = MIN_READING_FONT_SCALE;
+/** Highest selectable text scale on this screen: its shortest side over 140, the same either way up. */
+export const MAX_FONT_SCALE: number = maxFontScaleForScreen(screen.width, screen.height);
+/** The divisions of the text-size slider between its ends, whatever the screen. */
+export const FONT_SCALE_STEPS: number = FONT_SCALE_DIVISIONS;
+/** One division of the slider: what the step buttons and the keyboard move by. */
+export const FONT_SCALE_STEP: number = fontScaleStep(MAX_FONT_SCALE);
+
 export type ReadingDeviceClass = 'phone' | 'tablet' | 'desktop';
 
-// Capture the physical device class once. Rotation can change the live window
-// dimensions used for wrapping and pagination, but never this font-size input.
+// The physical device class, captured once. Only the sizes earlier
+// installations stored as levels depend on it (readStoredFontScale): the
+// scale itself renders the same on every device.
 export const READING_DEVICE_CLASS = classifyReadingDevice({
   platform: Platform.OS,
   deviceType: Device.deviceType,
@@ -175,9 +194,19 @@ export const READING_DEVICE_CLASS = classifyReadingDevice({
   maxTouchPoints: Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0,
 }) as ReadingDeviceClass;
 
-/** Maps the selected 1-10 level to a stable logical pixel size for this device. */
-export function fontScaleToPx(fontScale: number) {
-  return readingFontSizeForLevel(fontScale, READING_DEVICE_CLASS);
+/** The size a scale renders at, in whole logical pixels: the same on every device. */
+export function fontScaleToPx(fontScale: number): number {
+  return scaleToPixels(fontScale);
+}
+
+/** The nearest division of this screen's slider to a value. */
+export function snapFontScaleValue(value: number): number {
+  return snapFontScale(value, MAX_FONT_SCALE);
+}
+
+/** The division `delta` steps from the nearest one to a value, held within this screen's range. */
+export function stepFontScaleValue(value: number, delta: number): number {
+  return stepFontScale(value, delta, MAX_FONT_SCALE);
 }
 
 const STORAGE_KEY = 'chc-reading-preferences';
@@ -215,11 +244,11 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   if (!ORIENTATION_MODES.includes(merged.orientationMode)) {
     merged.orientationMode = 'auto';
   }
-  const storedFontScale = stored?.fontScale;
-  merged.fontScale = stored && typeof storedFontScale === 'number' && Number.isFinite(storedFontScale)
-    ? migrateReadingFontLevel(storedFontScale, stored.fontScaleRangeMax, READING_DEVICE_CLASS)
-    : DEFAULT_READING_PREFERENCES.fontScale;
-  merged.fontScaleRangeMax = MAX_FONT_SCALE;
+  // Whatever format the size was stored in, the scale that renders at that size here.
+  merged.fontScale = readStoredFontScale(stored, READING_DEVICE_CLASS, MAX_FONT_SCALE);
+  merged.fontScaleVersion = FONT_SCALE_VERSION;
+  // The level format's range marker, if an earlier installation wrote one.
+  Reflect.deleteProperty(merged, 'fontScaleRangeMax');
   if (!isAppLanguage(merged.appLanguage)) {
     merged.appLanguage = 'en';
   }

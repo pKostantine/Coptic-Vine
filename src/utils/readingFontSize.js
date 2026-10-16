@@ -1,3 +1,97 @@
+/**
+ * The reading text size: one number, a scale of READING_FONT_BASE_PX, that
+ * every device renders the same way (fontScaleToPx), chosen on a slider
+ * whose top end grows with the screen (maxFontScaleForScreen) -- the model
+ * the Spirit & Truth app uses, rather than a device-class table of sizes.
+ *
+ * The scale is stored as written; a phone and a tablet at the same scale
+ * show the same size, and a stored size never changes under the reader
+ * because a device was reclassified. The screen only decides how far the
+ * slider goes: a phone to about the width of nine letters, a large tablet
+ * or a projected screen several times further.
+ */
+
+/** Rendered size, in logical pixels, at a scale of 1. */
+export const READING_FONT_BASE_PX = 14;
+/** The smallest text offered: the base size. */
+export const MIN_FONT_SCALE = 1;
+/** A new installation's size: 21px, between the sizes the earlier tables opened at. */
+export const DEFAULT_FONT_SCALE = 1.5;
+/** The slider's divisions between its two ends, whatever the screen. */
+export const FONT_SCALE_STEPS = 20;
+/** Marks a stored fontScale as a scale; earlier installations stored a level. */
+export const FONT_SCALE_VERSION = 2;
+// Logical pixels of the screen's shortest side per unit of scale: a 390pt
+// phone reaches 2.79 (39px), an 820pt tablet 5.86 (82px), a 1080p screen
+// 7.71 (108px). Spirit & Truth divides by 130 on a slightly smaller base.
+const SHORT_EDGE_PER_SCALE = 140;
+const FALLBACK_SHORT_EDGE = 390;
+
+/**
+ * How far the slider goes on a screen, from its shortest side: the same
+ * either way up, so turning the device never moves the reader's size, and
+ * never less than a scale of 2.
+ */
+export function maxFontScaleForScreen(screenWidth, screenHeight) {
+  const shortEdge = Math.min(positiveDimension(screenWidth), positiveDimension(screenHeight)) || FALLBACK_SHORT_EDGE;
+  return Math.max(MIN_FONT_SCALE + 1, roundScale(shortEdge / SHORT_EDGE_PER_SCALE));
+}
+
+/** The width of one of the slider's divisions. */
+export function fontScaleStep(maxScale) {
+  return (maxScale - MIN_FONT_SCALE) / FONT_SCALE_STEPS;
+}
+
+export function clampFontScale(value, maxScale) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return Math.min(DEFAULT_FONT_SCALE, maxScale);
+  return Math.min(maxScale, Math.max(MIN_FONT_SCALE, numeric));
+}
+
+/** The nearest of the slider's divisions. */
+export function snapFontScale(value, maxScale) {
+  const step = fontScaleStep(maxScale);
+  const division = Math.round((clampFontScale(value, maxScale) - MIN_FONT_SCALE) / step);
+  return roundScale(MIN_FONT_SCALE + division * step);
+}
+
+/** The division `delta` steps from the nearest one to `value`: what the step buttons and keyboard do. */
+export function stepFontScale(value, delta, maxScale) {
+  const step = fontScaleStep(maxScale);
+  const division = Math.round((clampFontScale(value, maxScale) - MIN_FONT_SCALE) / step) + Math.round(Number(delta) || 0);
+  return snapFontScale(MIN_FONT_SCALE + division * step, maxScale);
+}
+
+/** The size a scale renders at, whole logical pixels, the same on every device. */
+export function fontScaleToPx(scale) {
+  const numeric = Number(scale);
+  return Math.max(1, Math.round(READING_FONT_BASE_PX * (Number.isFinite(numeric) ? numeric : DEFAULT_FONT_SCALE)));
+}
+
+/**
+ * The scale a stored text size means, whatever Coptic Vine wrote it as: a
+ * scale (fontScaleVersion 2); before that a 1-10 level in a per-device
+ * table (fontScaleRangeMax 10); before that a 0-10 or 0-20 range. An older
+ * value becomes the scale that renders at the size it rendered on this
+ * device, so an update never changes the size a reader had chosen.
+ */
+export function readStoredFontScale(stored, deviceClass, maxScale) {
+  const value = Number(stored?.fontScale);
+  if (!Number.isFinite(value)) return clampFontScale(DEFAULT_FONT_SCALE, maxScale);
+  if (stored.fontScaleVersion === FONT_SCALE_VERSION) return clampFontScale(value, maxScale);
+  const level = migrateReadingFontLevel(value, stored.fontScaleRangeMax, deviceClass);
+  return clampFontScale(roundScale(readingFontSizeForLevel(level, deviceClass) / READING_FONT_BASE_PX), maxScale);
+}
+
+function roundScale(value) {
+  return Math.round(value * 1000) / 1000;
+}
+
+// ---------------------------------------------------------------------------
+// The earlier model, kept to read what it stored: ten levels, each a size
+// from a table for the device's class. Nothing renders from it any more.
+// ---------------------------------------------------------------------------
+
 export const MIN_READING_FONT_LEVEL = 1;
 export const MAX_READING_FONT_LEVEL = 10;
 export const DEFAULT_READING_FONT_LEVEL = 5;
@@ -99,8 +193,8 @@ export function nearestReadingFontLevel(pixelSize, deviceClass) {
 
 /**
  * Converts both prior Coptic Vine ranges to their old rendered size, then chooses the
- * closest level in the new device-aware table. A stored range marker of 10 is
- * the new format; the original 0-10 format never wrote a marker.
+ * closest level in the device-aware table. A stored range marker of 10 is
+ * the level format; the original 0-10 format never wrote a marker.
  */
 export function migrateReadingFontLevel(storedLevel, storedRangeMax, deviceClass) {
   if (storedRangeMax === MAX_READING_FONT_LEVEL) {

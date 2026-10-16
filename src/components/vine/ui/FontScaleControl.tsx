@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { toEasternArabicDigits } from '@/utils/localeFormat';
-import { MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
+import { FONT_SCALE_STEP, fontScaleToPx, MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
 
 export interface FontScaleControlProps {
   fontScale: number;
@@ -25,9 +25,11 @@ export interface FontScaleControlProps {
 
 /**
  * Native font-size control (Coptic Vine design, "Book settings"): the setting's
- * name and its value, then a real SwiftUI/Jetpack Compose slider between a
- * small A and a large one, which beats repeatedly tapping step buttons to
- * cross the range on a phone.
+ * name and its value (the size the text renders at, in points), then a real
+ * SwiftUI/Jetpack Compose slider between a small A and a large one, which
+ * beats repeatedly tapping step buttons to cross the range on a phone. The
+ * slider runs over this screen's range in the twenty divisions every screen
+ * gets (preferencesStorage.ts, readingFontSize.js).
  *
  * The Host wrapper is mandatory, not decorative. Slider is not a React Native
  * view — it is a SwiftUI view on iOS and a Jetpack Compose view on Android, and
@@ -53,12 +55,13 @@ export default function FontScaleControl({
   onSetValue,
   compact = false,
 }: FontScaleControlProps) {
+  const size = fontScaleToPx(fontScale);
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
       <View style={styles.header}>
         <Text style={[styles.label, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>{label}</Text>
         <Text style={[styles.value, isArabic && styles.arabicText]} maxFontSizeMultiplier={1.3}>
-          {isArabic ? toEasternArabicDigits(fontScale) : fontScale}
+          {isArabic ? toEasternArabicDigits(size) : size}
         </Text>
       </View>
       <View style={styles.track}>
@@ -86,7 +89,7 @@ export default function FontScaleControl({
             value={fontScale}
             min={MIN_FONT_SCALE}
             max={MAX_FONT_SCALE}
-            step={1}
+            step={FONT_SCALE_STEP}
             onValueChange={onSetValue}
           />
         </Host>

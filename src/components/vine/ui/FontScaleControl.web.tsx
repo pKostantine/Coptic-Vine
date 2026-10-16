@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'r
 
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { toEasternArabicDigits } from '@/utils/localeFormat';
-import { MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
+import { FONT_SCALE_STEP, FONT_SCALE_STEPS, fontScaleToPx, MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
 import type { FontScaleControlProps } from './FontScaleControl';
 import Icon from './Icon';
 
@@ -11,21 +11,24 @@ const THUMB = 24;
 
 /**
  * Web font-size control (Coptic Vine design, "Book settings"): the setting's
- * name and its value, then a gold track between a small A and a large one. A
- * click on the track sets the size there; the keyboard and a screen reader
- * step it. On a desktop it is a plain row instead, the value between − and +
- * buttons. Keeping @expo/ui's slider off this path also keeps it out of the
- * web bundle. The native build gets FontScaleControl.tsx.
+ * name and its value (the size the text renders at, in pixels), then a gold
+ * track between a small A and a large one. A click on the track sets the
+ * size to the nearest of the twenty divisions there; the keyboard and a
+ * screen reader step it one division. On a desktop it is a plain row
+ * instead, the value between − and + buttons. Keeping @expo/ui's slider off
+ * this path also keeps it out of the web bundle. The native build gets
+ * FontScaleControl.tsx.
  */
 export default function FontScaleControl({ fontScale, isArabic, label, onStep, onSetValue, compact = false, stepper = false }: FontScaleControlProps) {
   const [width, setWidth] = useState(0);
-  const steps = MAX_FONT_SCALE - MIN_FONT_SCALE;
-  const fraction = (fontScale - MIN_FONT_SCALE) / steps;
-  const value = isArabic ? toEasternArabicDigits(fontScale) : fontScale;
+  const fraction = Math.min(1, Math.max(0, (fontScale - MIN_FONT_SCALE) / (MAX_FONT_SCALE - MIN_FONT_SCALE)));
+  const size = fontScaleToPx(fontScale);
+  const value = isArabic ? toEasternArabicDigits(size) : size;
 
   if (stepper) {
     const stepButton = (delta: 1 | -1) => {
-      const atEnd = delta < 0 ? fontScale <= MIN_FONT_SCALE : fontScale >= MAX_FONT_SCALE;
+      // Within half a division of an end, there is no step left that way.
+      const atEnd = delta < 0 ? fontScale <= MIN_FONT_SCALE + FONT_SCALE_STEP / 2 : fontScale >= MAX_FONT_SCALE - FONT_SCALE_STEP / 2;
       return (
         <Pressable
           accessibilityRole="button"
@@ -54,7 +57,7 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
   const setFromPoint = (event: GestureResponderEvent) => {
     if (width <= 0) return;
     const x = Math.min(width, Math.max(0, event.nativeEvent.locationX));
-    onSetValue(MIN_FONT_SCALE + Math.round((x / width) * steps));
+    onSetValue(MIN_FONT_SCALE + Math.round((x / width) * FONT_SCALE_STEPS) * FONT_SCALE_STEP);
   };
 
   return (
@@ -72,7 +75,7 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
         <Pressable
           accessibilityRole="adjustable"
           accessibilityLabel={label}
-          accessibilityValue={{ min: MIN_FONT_SCALE, max: MAX_FONT_SCALE, now: fontScale }}
+          accessibilityValue={{ min: fontScaleToPx(MIN_FONT_SCALE), max: fontScaleToPx(MAX_FONT_SCALE), now: size }}
           accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(event) => onStep(event.nativeEvent.actionName === 'increment' ? 1 : -1)}
           onLayout={(event) => setWidth(event.nativeEvent.layout.width)}

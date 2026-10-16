@@ -28,11 +28,16 @@ function loadPreferences() {
     'react-native': { Dimensions: { get: () => ({ width: 390, height: 844 }) }, Platform: { OS: 'web' } },
     './readingFontSize': {
       classifyReadingDevice: () => 'phone',
-      DEFAULT_READING_FONT_LEVEL: 5,
-      MAX_READING_FONT_LEVEL: 10,
-      MIN_READING_FONT_LEVEL: 1,
-      migrateReadingFontLevel: (level) => level,
-      readingFontSizeForLevel: (level) => 12 + level,
+      DEFAULT_FONT_SCALE: 1.5,
+      FONT_SCALE_STEPS: 20,
+      FONT_SCALE_VERSION: 2,
+      fontScaleStep: (max) => (max - 1) / 20,
+      fontScaleToPx: (scale) => Math.round(14 * scale),
+      maxFontScaleForScreen: () => 2.786,
+      MIN_FONT_SCALE: 1,
+      readStoredFontScale: (stored) => (Number.isFinite(Number(stored?.fontScale)) ? Number(stored.fontScale) : 1.5),
+      snapFontScale: (value) => value,
+      stepFontScale: (value, delta) => value + delta,
     },
   });
 }

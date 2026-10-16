@@ -10,13 +10,13 @@ import {
     BibleVisibleLanguages,
     DEFAULT_READING_PREFERENCES,
     loadReadingPreferences,
-    MAX_FONT_SCALE,
-    MIN_FONT_SCALE,
     OrientationMode,
     ReadingPreferences,
     saveReadingPreferences,
     setCurrentAppLanguage,
     SermonPlannerVisibleLanguages,
+    snapFontScaleValue,
+    stepFontScaleValue,
     syncedReadingPreferences,
     VisibleLanguages,
 } from '../utils/preferencesStorage';
@@ -58,13 +58,6 @@ interface ReadingPreferencesContextValue {
 }
 
 const ReadingPreferencesContext = createContext<ReadingPreferencesContextValue | null>(null);
-
-/** Rounds to a whole step and pins it inside the selectable range. */
-function clampFontScale(value: number) {
-  const rounded = Math.round(value);
-  if (!Number.isFinite(rounded)) return DEFAULT_READING_PREFERENCES.fontScale;
-  return Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, rounded));
-}
 
 function normalizeBookmarks(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -257,13 +250,14 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     });
   }, []);
 
+  // One division of the slider at a time: the step buttons and the keyboard.
   const setFontScale = useCallback((delta: number) => {
-    setPreferences((prev) => ({ ...prev, fontScale: clampFontScale(prev.fontScale + delta) }));
+    setPreferences((prev) => ({ ...prev, fontScale: stepFontScaleValue(prev.fontScale, delta) }));
   }, []);
 
   const setFontScaleValue = useCallback((value: number) => {
     setPreferences((prev) => {
-      const fontScale = clampFontScale(value);
+      const fontScale = snapFontScaleValue(value);
       // The slider reports every value it passes through while dragging, and
       // each accepted change repaginates any open document. Bailing out when
       // the step hasn't actually changed keeps a drag to one update per step.
