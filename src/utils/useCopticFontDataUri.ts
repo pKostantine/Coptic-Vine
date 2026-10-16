@@ -2,7 +2,7 @@ import { Asset } from 'expo-asset';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
-const copticFontModule = require('../../assets/fonts/CopticVine-Regular-v3.1.ttf');
+const copticFontModule = require('../../assets/fonts/CopticVine-Regular-v4.1.ttf');
 
 let cachedDataUri: string | null = null;
 

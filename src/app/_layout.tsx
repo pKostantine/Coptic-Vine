@@ -8,16 +8,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
 import NotificationBootstrap from '@/components/NotificationBootstrap';
-import SideBar from '@/components/vine/ui/SideBar';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
+import SideBar from '@/components/vine/ui/SideBar';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
 import { BottomChromeProvider, useBottomChrome } from '@/context/BottomChromeContext';
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import type { OrientationMode } from '@/utils/preferencesStorage';
 import { keepsWholeWindow } from '@/utils/desktopChrome';
+import type { OrientationMode } from '@/utils/preferencesStorage';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 SplashScreen.preventAutoHideAsync();
@@ -104,7 +104,7 @@ export default function RootLayout() {
   // Keep the two Coptic fonts deliberately separate: Books/readers use the
   // Coptic Vine custom face, while Music synchronized lyrics use Athanasius.
   const [copticLoaded] = useLocalFonts({
-    'CopticVine-Regular': require('../../assets/fonts/CopticVine-Regular-v3.1.ttf'),
+    'CopticVine-Regular': require('../../assets/fonts/CopticVine-Regular-v4.1.ttf'),
     Athanasius: require('../../assets/fonts/CopticVine-Athanasius-v1.0.ttf'),
   });
 
