@@ -14,7 +14,7 @@
       "icon": "./assets/images/coptic-vine-icon.png",
       "supportsTablet": true,
       "requireFullScreen": true,
-      "bundleIdentifier": "com.pkostantine.CopticVine",
+      "bundleIdentifier": "com.copticvine.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -26,7 +26,7 @@
         "backgroundImage": "./assets/images/coptic-vine-icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.pkostantine.CopticHymnsCentre",
+      "package": "com.copticvine.app",
       "permissions": [
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.FOREGROUND_SERVICE",
