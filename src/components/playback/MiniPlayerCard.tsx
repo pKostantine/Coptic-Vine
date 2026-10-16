@@ -7,6 +7,8 @@ import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 
 /** How far the card must be swiped to skip. */
 const SKIP_DISTANCE = 60;
+/** How far the card must be pulled down to hide, as the Hide button does. */
+const HIDE_DISTANCE = 36;
 
 interface MiniPlayerCardProps {
   artwork: ReactNode;
@@ -59,12 +61,17 @@ export default function MiniPlayerCard({
 
   // Swiped sideways the card follows the finger: to the left it skips to the
   // next track, to the right back to the one before, as a music app's bar
-  // does. A tap still opens the player, and a vertical drag is left alone.
-  const skip = useRef({ next: onNext, previous: onPrevious, reduced });
+  // does. Pulled down it follows the finger and, let go far enough or fast
+  // enough, hides as the Hide button does. A tap still opens the player, and
+  // an upward drag is left alone.
+  const skip = useRef({ next: onNext, previous: onPrevious, hide: onHide, reduced });
   useEffect(() => {
-    skip.current = { next: onNext, previous: onPrevious, reduced };
+    skip.current = { next: onNext, previous: onPrevious, hide: onHide, reduced };
   });
   const [offset] = useState(() => new Animated.Value(0));
+  const [drop] = useState(() => new Animated.Value(0));
+  // The way the swipe under way was taken: across to skip, or down to hide.
+  const axis = useRef<'across' | 'down'>('across');
   // A browser still clicks what the finger lifts off after a swipe; a tap
   // that ends a swipe is not a tap.
   const swipedAt = useRef(0);
@@ -74,15 +81,37 @@ export default function MiniPlayerCard({
   };
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
   const [swipe] = useState(() => {
-    const settle = () => Animated.spring(offset, { toValue: 0, useNativeDriver: Platform.OS !== 'web', bounciness: 6 }).start();
+    const settle = () => {
+      Animated.spring(offset, { toValue: 0, useNativeDriver: Platform.OS !== 'web', bounciness: 6 }).start();
+      Animated.spring(drop, { toValue: 0, useNativeDriver: Platform.OS !== 'web', bounciness: 6 }).start();
+    };
+    const across = (gesture: { dx: number; dy: number }) => Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5;
+    const down = (gesture: { dx: number; dy: number }) => Boolean(skip.current.hide) && gesture.dy > 10 && gesture.dy > Math.abs(gesture.dx) * 1.2;
     return PanResponder.create({
-      onMoveShouldSetPanResponderCapture: (_, gesture) => Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+      onMoveShouldSetPanResponderCapture: (_, gesture) => {
+        if (across(gesture)) { axis.current = 'across'; return true; }
+        if (down(gesture)) { axis.current = 'down'; return true; }
+        return false;
+      },
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => { swipedAt.current = Date.now(); },
-      onPanResponderMove: (_, gesture) => offset.setValue(gesture.dx),
+      onPanResponderMove: (_, gesture) => {
+        if (axis.current === 'down') drop.setValue(Math.max(0, gesture.dy));
+        else offset.setValue(gesture.dx);
+      },
       onPanResponderRelease: (_, gesture) => {
         swipedAt.current = Date.now();
-        const { next, previous, reduced: still } = skip.current;
+        const { next, previous, hide, reduced: still } = skip.current;
+        if (axis.current === 'down') {
+          if (!hide || (gesture.dy < HIDE_DISTANCE && gesture.vy < 0.5)) { settle(); return; }
+          // Down and out of sight, then hidden; the card is back in place for
+          // when the bar is shown again.
+          Animated.timing(drop, { toValue: 140, duration: motionDuration(140, still), useNativeDriver: Platform.OS !== 'web' }).start(() => {
+            hide();
+            drop.setValue(0);
+          });
+          return;
+        }
         const forward = gesture.dx < -SKIP_DISTANCE || gesture.vx < -0.6;
         const back = (gesture.dx > SKIP_DISTANCE || gesture.vx > 0.6) && Boolean(previous);
         if (!forward && !back) { settle(); return; }
@@ -100,8 +129,11 @@ export default function MiniPlayerCard({
     });
   });
   const swipeStyle = {
-    opacity: offset.interpolate({ inputRange: [-160, 0, 160], outputRange: [0.35, 1, 0.35], extrapolate: 'clamp' as const }),
-    transform: [{ translateX: offset }],
+    opacity: Animated.multiply(
+      offset.interpolate({ inputRange: [-160, 0, 160], outputRange: [0.35, 1, 0.35], extrapolate: 'clamp' as const }),
+      drop.interpolate({ inputRange: [0, 120], outputRange: [1, 0.2], extrapolate: 'clamp' as const }),
+    ),
+    transform: [{ translateX: offset }, { translateY: drop }],
   };
 
   return (
