@@ -53,6 +53,8 @@ interface ReadingPreferencesContextValue {
   toggleInterpretation: (id: string) => void;
   /** Sets the whole choice at once: the defaults, all, or none. */
   setSelectedInterpretations: (ids: string[]) => void;
+  /** Turns the saints' psalies (the SaintPsalies condition) on or off. */
+  toggleSaintPsalies: () => void;
   toggleInMonastery: () => void;
   toggleKeepScreenAwake: () => void;
   /** Picks the page a document is read on — see constants/documentThemes.ts. */
@@ -345,6 +347,10 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     });
   }, []);
 
+  const toggleSaintPsalies = useCallback(() => {
+    setPreferences((prev) => ({ ...prev, saintPsalies: !prev.saintPsalies }));
+  }, []);
+
   const toggleInMonastery = useCallback(() => {
     setPreferences((prev) => ({ ...prev, inMonastery: !prev.inMonastery }));
   }, []);
@@ -386,6 +392,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       clearSaintHymns,
       toggleInterpretation,
       setSelectedInterpretations,
+      toggleSaintPsalies,
       toggleInMonastery,
       toggleKeepScreenAwake,
       setDocumentTheme,
@@ -415,6 +422,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       clearSaintHymns,
       toggleInterpretation,
       setSelectedInterpretations,
+      toggleSaintPsalies,
       toggleInMonastery,
       toggleKeepScreenAwake,
       setDocumentTheme,

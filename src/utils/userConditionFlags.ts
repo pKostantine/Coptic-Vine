@@ -9,10 +9,12 @@ import type { ReadingPreferences } from './preferencesStorage';
  * disabling it must leave that token false even when another context is set.
  */
 export function getUserConditionFlags(
-  preferences: Pick<ReadingPreferences, 'selectedSaintHymns' | 'inMonastery'>,
+  preferences: Pick<ReadingPreferences, 'selectedSaintHymns' | 'inMonastery' | 'saintPsalies'>,
 ): Record<string, boolean> {
   return {
     ...Object.fromEntries((preferences.selectedSaintHymns || []).map((token) => [token, true])),
     Monastery: preferences.inMonastery === true,
+    // The saints' psalies, switched on from the Saint Hymns page.
+    SaintPsalies: preferences.saintPsalies === true,
   };
 }

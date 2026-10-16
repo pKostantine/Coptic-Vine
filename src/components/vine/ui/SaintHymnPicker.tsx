@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from '@/components/vine/ui/Icon';
 import SheetFrame from '@/components/vine/ui/SheetFrame';
+import ToggleRow from '@/components/vine/ui/ToggleRow';
 import SubPageHeader from '@/components/vine/ui/SubPageHeader';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import DocumentWebView from '@/components/vine/DocumentWebView';
@@ -48,6 +49,7 @@ interface SaintHymnPickerProps {
 const LABELS = {
   title: { english: 'Saint Hymns', arabic: 'ألحان القديسين', french: 'Hymnes des saints' },
   search: { english: 'Search saints', arabic: 'ابحث عن قديس', french: 'Rechercher des saints' },
+  saintPsalies: { english: 'Saint Psalies', arabic: 'إبصاليات القديسين', french: 'Psalies des saints' },
   empty: { english: 'No saints match that search.', arabic: 'لا يوجد قديس مطابق.', french: 'Aucun saint ne correspond à cette recherche.' },
   clear: { english: 'Clear', arabic: 'مسح', french: 'Effacer' },
   choose: { english: 'Choose hymns', arabic: 'اختر الألحان', french: 'Choisir les hymnes' },
@@ -99,7 +101,7 @@ export default function SaintHymnPicker({
   const [previewHymns, setPreviewHymns] = useState<SaintHymnPreviewHymn[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const { height: windowHeight } = useWindowDimensions();
-  const { preferences } = useReadingPreferences();
+  const { preferences, toggleSaintPsalies } = useReadingPreferences();
   const layout = useLayoutMode();
   const wide = layout !== 'phone';
 
@@ -425,6 +427,21 @@ export default function SaintHymnPicker({
     </View>
   ) : null;
 
+  // The saints' psalies are read or not as a whole (the SaintPsalies
+  // condition), so they are one switch above the saints rather than a hymn
+  // of each saint.
+  const psaliesSwitch = (
+    <View style={[styles.psalies, wide && styles.searchFlush]}>
+      <ToggleRow
+        label={label(LABELS.saintPsalies)}
+        isArabic={isArabic}
+        active={preferences.saintPsalies === true}
+        onPress={toggleSaintPsalies}
+        minHeight={48}
+      />
+    </View>
+  );
+
   const search = (
     <View style={[styles.search, wide && styles.searchFlush]}>
       <Icon name="search-outline" size={19} color={COLORS.gold} />
@@ -478,6 +495,7 @@ export default function SaintHymnPicker({
           {wide ? (
             <View style={styles.columns}>
               <View style={[styles.listColumn, layout === 'desktop' ? styles.listColumnDesktop : styles.listColumnTablet]}>
+                {psaliesSwitch}
                 {search}
                 {list}
               </View>
@@ -486,6 +504,7 @@ export default function SaintHymnPicker({
             </View>
           ) : (
             <>
+              {psaliesSwitch}
               {search}
               {list}
             </>
@@ -515,6 +534,7 @@ const styles = StyleSheet.create({
   page: { backgroundColor: COLORS.black, flex: 1 },
   flex: { flex: 1, minWidth: 0 },
   pressed: { opacity: 0.75 },
+  psalies: { marginBottom: 10, marginHorizontal: 16 },
   search: {
     alignItems: 'center',
     backgroundColor: COLORS.surface,

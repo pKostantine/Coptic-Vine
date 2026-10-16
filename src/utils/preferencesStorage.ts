@@ -92,6 +92,12 @@ export interface ReadingPreferences {
    * Praises at all.
    */
   inMonastery: boolean;
+  /**
+   * Raises the `SaintPsalies` condition: the saints' psalies in the Vespers
+   * and Midnight Praises. Chosen on the Saint Hymns page, synced like the
+   * saint hymns themselves.
+   */
+  saintPsalies: boolean;
   /** Menu-chrome-only language (main menu + submenus/list screens) — never affects the text rendered inside an actual document, which is governed by visibleLanguages instead. */
   appLanguage: AppLanguage;
   /**
@@ -119,6 +125,7 @@ export type SyncedReadingPreferences = Pick<ReadingPreferences,
   | 'selectedSaintHymns'
   | 'selectedInterpretations'
   | 'inMonastery'
+  | 'saintPsalies'
   | 'appLanguage'
 >;
 
@@ -160,6 +167,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   selectedSaintHymns: [],
   selectedInterpretations: [...DEFAULT_SELECTED_INTERPRETATIONS],
   inMonastery: false,
+  saintPsalies: false,
   keepScreenAwake: true,
   documentTheme: DEFAULT_DOCUMENT_THEME_ID,
 };
@@ -271,6 +279,7 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   merged.selectedSaintHymns = Array.isArray(merged.selectedSaintHymns)
     ? merged.selectedSaintHymns.filter((token): token is string => typeof token === 'string' && token.includes(':'))
     : [];
+  merged.saintPsalies = booleanValue(stored?.saintPsalies, DEFAULT_READING_PREFERENCES.saintPsalies);
   merged.keepScreenAwake = booleanValue(stored?.keepScreenAwake, DEFAULT_READING_PREFERENCES.keepScreenAwake);
   merged.documentTheme = isDocumentThemeId(stored?.documentTheme) ? stored.documentTheme : DEFAULT_DOCUMENT_THEME_ID;
   return merged;
@@ -299,6 +308,7 @@ export function syncedReadingPreferences(preferences: ReadingPreferences): Synce
     selectedSaintHymns: preferences.selectedSaintHymns,
     selectedInterpretations: preferences.selectedInterpretations,
     inMonastery: preferences.inMonastery,
+    saintPsalies: preferences.saintPsalies,
     appLanguage: preferences.appLanguage,
   };
 }
@@ -351,6 +361,7 @@ export function applySyncedReadingPreferences(
       ? normalizeSelectedInterpretations(cloud.selectedInterpretations)
       : local.selectedInterpretations,
     inMonastery: booleanValue(cloud.inMonastery, local.inMonastery),
+    saintPsalies: booleanValue(cloud.saintPsalies, local.saintPsalies),
     appLanguage: isAppLanguage(cloud.appLanguage) ? cloud.appLanguage : local.appLanguage,
   };
 }

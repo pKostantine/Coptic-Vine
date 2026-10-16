@@ -68,3 +68,21 @@ test('the document uses the toggle flags after route-specific context', () => {
     /\.\.\.epistleFlags,\s*\.\.\.extraContext,\s*\.\.\.userConditionFlags/,
   );
 });
+
+test('Saint Psalies on the Saint Hymns page raises SaintPsalies, and only when on', () => {
+  const getUserConditionFlags = loadUserFlags();
+  const evaluateCondition = loadEvaluator();
+  const on = getUserConditionFlags({ selectedSaintHymns: [], inMonastery: false, saintPsalies: true });
+  const off = getUserConditionFlags({ selectedSaintHymns: [], inMonastery: false, saintPsalies: false });
+  assert.equal(evaluateCondition('SaintPsalies', on), true);
+  assert.equal(evaluateCondition('SaintPsalies', off), false);
+  // An installation from before the switch has no value: off.
+  assert.equal(evaluateCondition('SaintPsalies', getUserConditionFlags({ selectedSaintHymns: [], inMonastery: false })), false);
+  const screen = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+  assert.match(screen, /\[preferences\.selectedSaintHymns, preferences\.inMonastery, preferences\.saintPsalies\]/);
+  const storage = fs.readFileSync('src/utils/preferencesStorage.ts', 'utf8');
+  assert.match(storage, /\| 'saintPsalies'/);
+  assert.match(storage, /saintPsalies: booleanValue\(cloud\.saintPsalies, local\.saintPsalies\),/);
+  const picker = fs.readFileSync('src/components/vine/ui/SaintHymnPicker.tsx', 'utf8');
+  assert.match(picker, /active=\{preferences\.saintPsalies === true\}\n\s+onPress=\{toggleSaintPsalies\}/);
+});

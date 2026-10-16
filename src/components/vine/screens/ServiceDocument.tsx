@@ -208,7 +208,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // gating the Prayer of the Veil.
   const userConditionFlags = useMemo(
     () => getUserConditionFlags(preferences),
-    [preferences.selectedSaintHymns, preferences.inMonastery],
+    [preferences.selectedSaintHymns, preferences.inMonastery, preferences.saintPsalies],
   );
 
   const [hydratedSections, setHydratedSections] = useState<DocumentSection[] | null>(null);
@@ -243,7 +243,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     documentPreferences.visibleLanguages, preferences.fontScale, preferences.orientationMode,
     preferences.selectText, preferences.slideshowMode, preferences.displayComments,
     preferences.displaySilentPrayers, preferences.displayNowPlayingBar,
-    preferences.bishopPresent, preferences.copticGospelRite, preferences.inMonastery,
+    preferences.bishopPresent, preferences.copticGospelRite, preferences.inMonastery, preferences.saintPsalies,
     preferences.selectedSaintHymns, preferences.selectedInterpretations, preferences.appLanguage, preferences.documentTheme, effectiveDate, vespersEffectiveDate,
   ]);
   const [readerFocused, setReaderFocused] = useState(true);
