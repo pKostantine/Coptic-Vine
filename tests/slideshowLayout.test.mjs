@@ -622,8 +622,8 @@ test("viewport tap direction remains correct across inset surface sizes", () => 
 // ---- Text on a slide is never laid out from a guess ----
 
 import {
-  coordinateLineCapacities,
   getReadingItemIndex,
+  independentLineTakes,
   getSlideKey,
   getLanguagesNeedingLineMetrics,
   getPaginationRunStart,
@@ -678,7 +678,7 @@ test("whatever is measured, forced lines only ever come from measured lines", ()
   }
 });
 
-// ---- The columns of a split verse stay in step ----
+// ---- Each column of a tall verse shows as much of itself as fits ----
 
 function lineState(counts, offsets = {}) {
   return {
@@ -692,89 +692,40 @@ function lineState(counts, offsets = {}) {
   };
 }
 
-test("a split verse takes the same share of every column as its most constrained one", () => {
-  // Coptic (7 of 10 fit) sets the share: English and Arabic take about seven tenths too.
+test("each column takes as many of its own lines as fit, whatever the others do", () => {
   assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 6, coptic: 10, arabic: 5 }), { english: 8, coptic: 7, arabic: 6 }),
-    { english: 4, coptic: 7, arabic: 3 },
+    independentLineTakes(lineState({ english: 14, coptic: 10, arabic: 6 }), { english: 11, coptic: 11, arabic: 9 }),
+    { english: 11, coptic: 10, arabic: 6 },
   );
-  // When everything fits, nothing is held back.
+  // Never a single line left over for the next slide.
   assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 4, coptic: 6 }), { english: 9, coptic: 9 }),
-    { english: 9, coptic: 9 },
+    independentLineTakes(lineState({ english: 12, arabic: 4 }), { english: 11, arabic: 3 }),
+    { english: 10, arabic: 2 },
   );
-  // Columns already finished (offset at the end) are left out.
+  // Columns already finished are left out; a column with no room takes nothing.
   assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 6, coptic: 6 }, { english: 6 }), { english: 9, coptic: 4 }),
-    { coptic: 4 },
+    independentLineTakes(lineState({ english: 6, coptic: 6 }, { english: 6 }), { english: 9, coptic: 0 }),
+    { coptic: 0 },
   );
 });
 
-test("a split never leaves a single line on either side of the turn, and a short column is never chopped", () => {
-  // Arabic would take 3 of 4 and leave one: it takes 2 instead.
-  assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 10, arabic: 4 }), { english: 8, arabic: 8 }),
-    { english: 8, arabic: 2 },
-  );
-  // A share of a single line becomes two.
-  assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 10, arabic: 5 }), { english: 3, arabic: 6 }),
-    { english: 3, arabic: 2 },
-  );
-  // Three lines or fewer go whole on this slide whenever they fit...
-  assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 10, arabic: 3 }), { english: 7, arabic: 6 }),
-    { english: 7, arabic: 3 },
-  );
-  assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 10, arabic: 3 }), { english: 4, arabic: 6 }),
-    { english: 4, arabic: 3 },
-  );
-  // ...and whole on the next slide when they do not.
-  assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 10, arabic: 3 }), { english: 4, arabic: 2 }),
-    { english: 4, arabic: 0 },
-  );
-  // The limiting column decides the share after its own stray-line rule, so the others follow it:
-  // with room for one line in a four-line Arabic column nothing goes, and the verse starts a fresh slide.
-  assert.deepEqual(
-    coordinateLineCapacities(lineState({ english: 4, coptic: 4, arabic: 4 }), { english: 2, coptic: 2, arabic: 1 }),
-    { english: 0, coptic: 0, arabic: 0 },
-  );
-  // Never more than fits, never more than remains.
-  for (const counts of [{ english: 7, coptic: 13, arabic: 9 }, { english: 20, coptic: 4, arabic: 11 }]) {
-    for (let capacity = 0; capacity <= 20; capacity += 1) {
-      const capacities = { english: capacity, coptic: Math.max(0, capacity - 2), arabic: Math.min(capacity, 9) };
-      // When everything fits the capacities come back as they are; the segment takes what remains.
-      const takes = coordinateLineCapacities(lineState(counts), capacities);
-      Object.entries(takes).forEach(([language, capacityTaken]) => {
-        const take = Math.min(capacityTaken, counts[language]);
-        assert.ok(take <= capacities[language] && take >= 0, `${language} took ${take} at capacity ${capacity}`);
-        const remaining = counts[language] - take;
-        assert.notEqual(remaining, 1, `${language} left a single line at capacity ${capacity}`);
-        if (take === 1) assert.equal(counts[language], 1);
-      });
-    }
-  }
-});
-
-test("a verse split across slides shows every language on every slide of it, in step", () => {
+test("a verse split across slides lets each column run at its own pace", () => {
   const item = verseItem({ id: "psalm", sectionId: "psalm" });
   const metric = {
-    english: { lines: metricLines("English", 12) },
-    coptic: { lines: metricLines("ⲕⲟⲡⲧ", 20) },
-    arabic: { lines: metricLines("عربي", 10) },
+    english: { lines: metricLines("English", 20) },
+    coptic: { lines: metricLines("ⲕⲟⲡⲧ", 12) },
+    arabic: { lines: metricLines("عربي", 6) },
   };
   const fontSize = 18;
   const lineHeight = getSlideshowLanguageLineHeight("coptic", item, fontSize);
   const slides = paginateItems([item], { psalm: 9999 }, { psalm: metric }, lineHeight * 8 + 40, fontSize, ALL_LANGUAGES, 1024);
-  assert.ok(slides.length >= 3);
-  slides.forEach((slide, index) => {
-    const counts = slide[0].slideshowLineCounts;
-    assert.ok(counts.english > 0 && counts.coptic > 0 && counts.arabic > 0, `slide ${index} lost a column: ${JSON.stringify(counts)}`);
-    const shareOf = (language) => (slide[0].slideshowLineRanges[language].end) / metric[language].lines.length;
-    assert.ok(Math.abs(shareOf("english") - shareOf("coptic")) < 0.2, `slide ${index}: English and Coptic drift apart`);
-    assert.ok(Math.abs(shareOf("arabic") - shareOf("coptic")) < 0.2, `slide ${index}: Arabic and Coptic drift apart`);
+  assert.ok(slides.length >= 2);
+  // The Arabic finishes on the first slide; the English carries on alone at the end.
+  assert.equal(slides[0][0].slideshowLineCounts.arabic, 6);
+  assert.equal(slides[slides.length - 1][0].slideshowLineCounts.arabic ?? 0, 0);
+  assert.ok(slides[slides.length - 1][0].slideshowLineCounts.english > 0);
+  ["english", "coptic", "arabic"].forEach((language) => {
+    assert.deepEqual(slides.flatMap((slide) => slide[0].verse.slideshowForcedLines[language] || []), metric[language].lines);
   });
 });
 
@@ -908,18 +859,19 @@ test("a reader partway down a measured verse sees it carry on from their line, t
   const slides = paginateItems([item], { long: 9999 }, { long: metric }, budget, fontSize, ALL_LANGUAGES, 1024, { itemId: "long", offsets });
   const starts = slides.map((slide) => slide[0].slideshowLineRanges.english.start);
   assert.ok(starts.includes(7), `no slide starts at the reader's line: ${starts}`);
-  const readerSlide = slides.findIndex((slide) => slide[0].slideshowLineRanges.english.start === 7);
+  // The reader's slide: where the English picks up at line 7 (a column finished before it stands empty at 7 too).
+  const readerSlide = slides.findIndex((slide) => slide[0].slideshowLineRanges.english.start === 7 && slide[0].slideshowLineRanges.english.end > 7);
   // Everything before line 7 is on the slides before; everything from it on the slides from there.
   assert.ok(slides.slice(0, readerSlide).every((slide) => slide.every((entry) => entry.slideshowLineRanges.english.end <= 7)));
   assert.ok(slides.slice(readerSlide).every((slide) => slide.every((entry) => entry.slideshowLineRanges.english.start >= 7)));
   // Every line still renders exactly once, in order, and the segments keep distinct ids.
-  const rendered = slides.flat().flatMap((entry) => entry.verse.slideshowForcedLines.english);
+  const rendered = slides.flat().flatMap((entry) => entry.verse.slideshowForcedLines.english || []);
   assert.deepEqual(rendered, metric.english.lines);
   assert.equal(new Set(slides.flat().map((entry) => entry.slideId)).size, slides.flat().length);
   // The reader's own piece keeps its identity however the lines before it are divided up.
   assert.equal(slides[readerSlide][0].slideId, "long-segment-1");
   const tighter = paginateItems([item], { long: 9999 }, { long: metric }, lineHeight * 3 + 40, fontSize, ALL_LANGUAGES, 1024, { itemId: "long", offsets });
-  assert.equal(tighter.find((slide) => slide[0].slideshowLineRanges.english.start === 7)[0].slideId, "long-segment-1");
+  assert.equal(tighter.find((slide) => slide[0].slideshowLineRanges.english.start === 7 && slide[0].slideshowLineRanges.english.end > 7)[0].slideId, "long-segment-1");
   // The anchor made from the reader's slide finds it again.
   assert.equal(findSlideIndexForAnchor(slides, createSlideAnchor(slides[readerSlide])), readerSlide);
   // Not yet measured, the verse is placed whole, beginning the slide, with no forced lines.

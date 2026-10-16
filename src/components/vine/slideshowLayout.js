@@ -328,9 +328,9 @@ export function paginateItems(
       return;
     }
 
-    // Only a verse taller than a whole slide is turned over the page, from a
-    // fresh slide, as many of its lines at a time as fit, every column in
-    // step -- never in a piece of fewer than two lines, either side of the turn.
+      // Only a verse taller than a whole slide is turned over the page, from a
+    // fresh slide, each column as many of its lines at a time as fit --
+    // never in a piece of fewer than two lines, either side of the turn.
     appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem));
   };
 
@@ -442,7 +442,7 @@ function appendTallVerseSegments({
       ? createContinuationCapacityItem(item, state)
       : item;
     const remainingHeight = availableHeight - currentHeight;
-    let lineCapacities = coordinateLineCapacities(state, getIndependentLineCapacities(
+    let lineCapacities = independentLineTakes(state, getIndependentLineCapacities(
       state,
       remainingHeight,
       fontSize,
@@ -516,49 +516,23 @@ function appendTallVerseSegments({
 }
 
 /**
- * Keeps the columns of a split verse in step. Each language's capacity says
- * how many of its own remaining lines would fit; taken independently, the
- * English could finish on this slide while the Coptic carried on alone over
- * the page. Instead the most constrained column (the smallest capacity over
- * remaining lines) decides what share of the verse this slide shows, and
- * every other column takes the same share of its own remaining lines, so
- * the slide shows the same stretch of the verse in every language, give or
- * take a line, and the remainders turn the page together. Never a single
- * line either side of the turn. A short column (three lines or fewer) is
- * not chopped: it goes whole on this slide when it fits, otherwise whole on
- * the next.
+ * Each column of a verse too tall for a slide shows as much of itself as
+ * fits, on its own: the Arabic may finish on this slide while the English
+ * carries on to the next, and an empty cell is left where it finished.
+ * Only a single stray line is held back, so the turn of the page never
+ * leaves a column one line on its own.
  */
-export function coordinateLineCapacities(state, capacities) {
-  const entries = state.languages
+export function independentLineTakes(state, capacities) {
+  const takes = {};
+  state.languages
     .filter((entry) => entry.offset < entry.end)
-    .map((entry) => ({
-      language: entry.language,
-      remaining: entry.end - entry.offset,
-      capacity: Math.max(0, capacities[entry.language] ?? 0),
-    }));
-  if (!entries.length) return {};
-  if (entries.every((entry) => entry.capacity >= entry.remaining)) return capacities;
-
-  const limiting = entries.reduce((best, entry) =>
-    (entry.capacity * best.remaining < best.capacity * entry.remaining ? entry : best));
-  const limitingTake = takeWithoutStrays(limiting, Math.min(limiting.capacity, limiting.remaining));
-  const coordinated = {};
-  entries.forEach((entry) => {
-    const share = limitingTake === 0
-      ? 0
-      : Math.floor((entry.remaining * limitingTake) / limiting.remaining);
-    coordinated[entry.language] = takeWithoutStrays(entry, entry === limiting ? limitingTake : share);
-  });
-  return coordinated;
-}
-
-/** A column's take with no stray single line on either side of the turn, and no chopped short column. */
-function takeWithoutStrays(entry, wanted) {
-  let take = Math.max(0, Math.min(wanted, entry.capacity, entry.remaining));
-  if (entry.remaining <= 3) return entry.capacity >= entry.remaining ? entry.remaining : 0;
-  if (take > 0 && entry.remaining - take === 1) take = entry.remaining - 2;
-  if (take === 1) take = entry.capacity >= 2 ? 2 : 0;
-  return Math.max(0, Math.min(take, entry.capacity, entry.remaining));
+    .forEach((entry) => {
+      const remaining = entry.end - entry.offset;
+      let take = Math.max(0, Math.min(capacities[entry.language] ?? 0, remaining));
+      if (take >= 2 && remaining - take === 1) take -= 1;
+      takes[entry.language] = take;
+    });
+  return takes;
 }
 
 // What a continuation segment still carries: no speaker label, and the
