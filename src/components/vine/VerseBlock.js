@@ -12,6 +12,7 @@ import {
   hasRenderableSlideshowLanguageBody,
   hasSeasonalPrefixLine as hasVisibleSeasonalPrefixLine,
   isSlideshowLanguageJustified,
+  SLIDESHOW_JUSTIFIED,
 } from "./slideshowLayout";
 import { annotateNativeLines, toReportedLines } from "./textLines";
 
@@ -407,7 +408,7 @@ function CssJustifiedVerseBody({ language, textStyle, selectableText, columnWidt
       <Text
         allowFontScaling={false}
         selectable={selectableText}
-        style={[textStyle, { textAlign: "justify", textJustify: "inter-word" }]}
+        style={[textStyle, SLIDESHOW_JUSTIFIED ? { textAlign: "justify", textJustify: "inter-word" } : { textAlign: language.key === "arabic" ? "right" : "left" }]}
         onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}
       >
         {renderTextWithBibleVerseNumber(bodyText, bibleVerseNumber, theme)}
@@ -500,7 +501,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         firstWordStyle={bibleVerseNumber ? { color: theme.colors.gold, fontWeight: "700" } : null}
         wordStyles={wordStyles}
         forceLines={forceLines}
-        minWordsToJustify={minWordsToJustify}
+        minWordsToJustify={SLIDESHOW_JUSTIFIED ? minWordsToJustify : Number.POSITIVE_INFINITY}
         selectable={selectableText}
         measureOnly={measureOnly}
         onLayout={(event) => onMetric({ height: event.nativeEvent.layout.height })}

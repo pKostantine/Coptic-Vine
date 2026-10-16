@@ -18,6 +18,13 @@ function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+/**
+ * Slideshow text is set ragged -- left for English, French and Coptic,
+ * right for Arabic -- not justified: at a projected size, in a column a
+ * third of the page wide, justified lines open into rivers of space.
+ */
+export const SLIDESHOW_JUSTIFIED = false;
+
 export function getSlideshowChromeMetrics(fontSize) {
   const safeFontSize = Math.max(Number(fontSize) || 18, 1);
   const documentChrome = getDocumentChromeMetrics(safeFontSize);
@@ -304,22 +311,39 @@ export function paginateItems(
       return;
     }
 
-    // A measured verse that fits is still rendered from its measured lines,
-    // so what the page shows is what the page was laid out for, to the line.
-    if (currentHeight + verseHeight <= safeAvailableHeight) {
+    // A slide holds whole verses. One that doesn't fit what is left of the
+    // slide moves on whole to the next, like the next verse of a hymn on a
+    // projected page: never a sentence cut in two across a turn. A measured
+    // verse is still rendered from its measured lines, so what the page
+    // shows is what it was laid out for, to the line.
+    if (currentHeight + verseHeight > safeAvailableHeight && currentSlide.length) flushSlide();
+    if (verseHeight <= safeAvailableHeight) {
       currentSlide.push(createWholeVerseItem(verseItem, languageMetric, fontSize));
       currentHeight += verseHeight;
       return;
     }
 
-    // A verse that doesn't fit what is left of the slide fills it with as
-    // many of its lines as fit and carries on over the page, rather than
-    // moving on whole and leaving the foot of the slide empty -- never in a
-    // piece of fewer than two lines, either side of the turn.
+    // Only a verse taller than a whole slide is turned over the page, from a
+    // fresh slide, as many of its lines at a time as fit, every column in
+    // step -- never in a piece of fewer than two lines, either side of the turn.
     appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem));
   };
 
-  for (const unit of units) {
+  // A title, a speaker's cue, a toggle: nothing to end a slide on. If what
+  // follows it would not fit beneath it, it goes over the page with it.
+  const keepsWithNext = (item) => item.type === "title" || item.type === "gospelRiteToggle";
+  const itemHeightOf = (item) => Math.ceil((heights[item.id] ?? 0) + 2);
+  const wouldStrand = (index) => {
+    const item = items[index];
+    const next = items[index + 1];
+    if (!keepsWithNext(item) || !next || units[index + 1].breakBefore) return false;
+    const after = next.type === "verse" && !isMeasuredVerse(next)
+      ? itemHeightOf(next)
+      : Math.min(itemHeightOf(next), safeAvailableHeight - itemHeightOf(item));
+    return currentHeight + itemHeightOf(item) + Math.max(after, 1) > safeAvailableHeight;
+  };
+
+  units.forEach((unit, index) => {
     const item = unit.items[0];
     const readerStartsHere = Boolean(breakAt && breakAt.itemId === item.id) &&
       !(item.type === "verse" && readerLineOffsets(item));
@@ -327,14 +351,14 @@ export function paginateItems(
 
     if (item.type === "verse") {
       placeVerse(item);
-      continue;
+      return;
     }
 
-    const itemHeight = Math.ceil((heights[item.id] ?? 0) + 2);
-    if (currentSlide.length && currentHeight + itemHeight > safeAvailableHeight) flushSlide();
+    const itemHeight = itemHeightOf(item);
+    if (currentSlide.length && (currentHeight + itemHeight > safeAvailableHeight || wouldStrand(index))) flushSlide();
     currentSlide.push(item);
     currentHeight += itemHeight;
-  }
+  });
 
   flushSlide();
   return slides.length ? slides : [[]];
@@ -675,9 +699,15 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
       ? `${prefix}${body ? `\n${body}` : ""}`
       : body;
     lineCounts[entry.language] = lines.length;
-    lineRanges[entry.language] = { start, end: start + lines.length };
     forcedLines[entry.language] = lines;
     if (beginsWithBibleNumber) bibleNumberLanguages.push(entry.language);
+  });
+  // Every column, including one with nothing on this page: where it stands
+  // is what an anchor made here must say, or a column already shown whole
+  // on the page before would start again from its top.
+  state.languages.forEach((entry) => {
+    const taken = lineCounts[entry.language] || 0;
+    lineRanges[entry.language] = { start: entry.offset - taken, end: entry.offset };
   });
 
   verse.slideshowSeasonalPrefixVisible = showsPrefix;
@@ -962,10 +992,13 @@ function getSourceItemId(item = {}) {
 export function createSlideAnchor(slide = []) {
   const item = slide.find((candidate) => candidate && getSourceItemId(candidate));
   if (!item) return null;
+  const ranges = item.slideshowLineRanges || {};
   const offsets = Object.fromEntries(
-    Object.entries(item.slideshowLineRanges || {}).map(([language, range]) => [language, range.start]),
+    Object.entries(ranges).map(([language, range]) => [language, range.start]),
   );
-  const primaryLanguage = Object.keys(offsets)[0] || null;
+  // The reading position is held by a column with lines on this page.
+  const primaryLanguage = Object.keys(ranges).find((language) => ranges[language].end > ranges[language].start) ||
+    Object.keys(offsets)[0] || null;
   return {
     sourceItemId: getSourceItemId(item),
     sectionId: item.sectionId || null,
@@ -980,6 +1013,8 @@ export function createSlideAnchor(slide = []) {
 function getLineRangeDistance(range, offset) {
   if (!range) return 100000;
   if (offset >= range.start && offset < range.end) return 0;
+  // A column with nothing on this page stands at one line: its own.
+  if (range.start === range.end && offset === range.start) return 0;
 
   // Line ranges are half-open: [start, end). The first line of the next
   // segment therefore has offset === the previous segment's end. Giving

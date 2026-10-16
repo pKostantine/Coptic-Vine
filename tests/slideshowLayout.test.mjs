@@ -283,22 +283,26 @@ test("a band or divider sits with what comes either side of it", () => {
   assert.deepEqual(slides.map((slide) => slide.map((entry) => entry.id)), [["before", "divider", "next-title"]]);
 });
 
-test("a verse that doesn't fit fills the rest of the slide and carries on, never leaving a single line", () => {
+test("a verse that doesn't fit moves on whole; only one taller than a slide is turned over the page, from a fresh slide", () => {
   const first = verseItem({ id: "first", sectionId: "first", verse: { english: "", type: "priest" } });
   const second = verseItem({ id: "second", sectionId: "second" });
   const lines = (count) => ({ english: { lines: metricLines("English", count) } });
   const english = { english: true, french: false, coptic: false, arabic: false };
   const lineHeight = getSlideshowLanguageLineHeight("english", second, 18);
   const budget = 1000;
-  // The first verse leaves room for about five of the second's six lines.
-  const firstHeight = budget - lineHeight * 5 - 40;
-  const slides = paginateItems([first, second], { first: firstHeight, second: lineHeight * 6 + 40 }, { second: lines(6) }, budget, 18, english, 1024);
   const lineCount = (entry) => (entry.verse.english.match(/English\d+/g) || []).length;
-  // Four of its lines fill this slide; the last two turn the page together.
-  assert.deepEqual(slides.map((slide) => slide.map(lineCount)), [[0, 4], [2]]);
-  // With room for a single line it moves on whole.
-  const tight = paginateItems([first, second], { first: budget - lineHeight - 40, second: lineHeight * 6 + 40 }, { second: lines(6) }, budget, 18, english, 1024);
-  assert.deepEqual(tight.map((slide) => slide.map(lineCount)), [[0], [6]]);
+  // The first verse leaves room for five of the second's six lines: the second goes whole to the next slide.
+  const slides = paginateItems([first, second], { first: budget - lineHeight * 5 - 40, second: lineHeight * 6 + 40 }, { second: lines(6) }, budget, 18, english, 1024);
+  assert.deepEqual(slides.map((slide) => slide.map(lineCount)), [[0], [6]]);
+  assert.equal(slides[1][0].verse.slideshowForcedLines.english.length, 6);
+  // A verse of forty lines, taller than any slide, is turned over in pieces that each fit, from a fresh slide,
+  // never leaving a single line either side of a turn.
+  const giant = paginateItems([first, second], { first: 100, second: lineHeight * 40 + 40 }, { second: lines(40) }, 400, 18, english, 1024);
+  assert.deepEqual(giant[0].map((entry) => entry.id), ["first"]);
+  const pieces = giant.slice(1).map((slide) => slide.map(lineCount));
+  assert.ok(pieces.length > 1 && pieces.every((slide) => slide.length === 1));
+  assert.equal(pieces.flat().reduce((sum, count) => sum + count, 0), 40);
+  pieces.flat().forEach((count) => assert.ok(count >= 2 && count * lineHeight <= 400, `piece of ${count} lines`));
 });
 
 test("line anchors follow the same content when page capacity changes", () => {
@@ -858,8 +862,9 @@ test("a verse is split only when every column that could be split has its lines"
   assert.equal(placed.verse.coptic, tall.verse.coptic);
   assert.equal(placed.verse.arabic, tall.verse.arabic);
   // With every column's lines it splits, and every segment keeps all three columns.
-  const complete = { tall: { english: { lines: metricLines("English", 30) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 30) }, arabic: { lines: metricLines("عربي", 30) } } };
-  const split = paginateItems([first, tall], { first: 600, tall: 900 }, complete, 1000, 18, ALL_LANGUAGES, 1024);
+  const complete = { tall: { english: { lines: metricLines("English", 60) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 60) }, arabic: { lines: metricLines("عربي", 60) } } };
+  // Taller than a whole slide, it is the one kind of verse that is split.
+  const split = paginateItems([first, tall], { first: 600, tall: 1800 }, complete, 1000, 18, ALL_LANGUAGES, 1024);
   const segments = split.flat().filter((entry) => (entry.sourceItemId || entry.id) === "tall");
   assert.ok(segments.length > 1);
   segments.forEach((segment) => assert.deepEqual(segment.verse.slideshowLanguageKeys, ["english", "coptic", "arabic"]));
@@ -976,4 +981,42 @@ test("the reader's own row comes first; the section is only a fallback", () => {
   // A slide's key is its content, whatever its number.
   assert.equal(getSlideKey([items[1], items[2]], 3), getSlideKey([items[1], items[2]], 9));
   assert.notEqual(getSlideKey([items[1]], 0), getSlideKey([items[2]], 0));
+});
+
+test("a title never ends a slide: it goes over the page with what follows it", () => {
+  const title = (id, extra = {}) => ({ id: `${id}-title`, sectionId: id, type: "title", title: { english: id }, ...extra });
+  const verse = (id, index) => verseItem({ id: `${id}-${index}`, sectionId: id });
+  // A Minimizable hymn's title does not open a slide of its own, so it can land at the foot of one.
+  const items = [title("a"), verse("a", 0), verse("a", 1), title("b", { isCollapsed: true, collapsible: true }), verse("b", 0)];
+  const heights = { "a-title": 40, "a-0": 350, "a-1": 350, "b-title": 40, "b-0": 350 };
+  const slides = paginateItems(items, heights, {}, 700, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides.map((slide) => slide.map((entry) => entry.id)), [["a-title", "a-0"], ["a-1"], ["b-title", "b-0"]]);
+  // With room for both, they share the slide.
+  const roomy = paginateItems(items, heights, {}, 1000, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(roomy.map((slide) => slide.map((entry) => entry.id)), [["a-title", "a-0", "a-1"], ["b-title", "b-0"]]);
+});
+
+test("a column shown whole on the page before never starts again on the reader's page", () => {
+  // A giant verse whose English and Arabic are short: they go whole with the first piece, the Coptic carries on.
+  const item = verseItem({ id: "giant", sectionId: "s" });
+  const metric = { english: { lines: metricLines("English", 3) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 30) }, arabic: { lines: metricLines("عربي", 2) } };
+  const fontSize = 18;
+  const lineHeight = getSlideshowLanguageLineHeight("coptic", item, fontSize);
+  const budget = lineHeight * 8 + 40;
+  const slides = paginateItems([item], { giant: 9999 }, { giant: metric }, budget, fontSize, ALL_LANGUAGES, 1024);
+  assert.ok(slides.length > 1);
+  assert.equal(slides[0][0].slideshowLineCounts.english, 3);
+  assert.equal(slides[1][0].slideshowLineCounts.english ?? 0, 0);
+  // Every column says where it stands on the second page, the finished ones at their end.
+  assert.deepEqual(slides[1][0].slideshowLineRanges.english, { start: 3, end: 3 });
+  const anchor = createSlideAnchor(slides[1]);
+  assert.equal(anchor.primaryLanguage, "coptic");
+  assert.equal(anchor.offsets.english, 3);
+  assert.equal(findSlideIndexForAnchor(slides, anchor), 1);
+  // Paginated again from that page, the English stays on the page before it.
+  const again = paginateItems([item], { giant: 9999 }, { giant: metric }, budget, fontSize, ALL_LANGUAGES, 1024, { itemId: "giant", offsets: anchor.offsets });
+  const readerSlide = findSlideIndexForAnchor(again, anchor);
+  assert.ok(readerSlide > 0);
+  assert.equal(again[readerSlide][0].slideshowLineCounts.english ?? 0, 0);
+  assert.equal(again.flat().reduce((sum, entry) => sum + (entry.slideshowLineCounts.english || 0), 0), 3);
 });
