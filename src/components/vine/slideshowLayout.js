@@ -11,7 +11,7 @@ import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from "./documentPr
 
 const SPACING_XS = 4;
 const SPACING_SM = 8;
-const SPACING_XL = 32;
+const SPACING_MD = 16;
 const MIN_USEFUL_FRAGMENT_LINES = 2;
 
 function clamp(value, minimum, maximum) {
@@ -99,11 +99,13 @@ function getVerseCommonHeight(item, fontSize, visibleLanguages) {
   return getVerseVerticalPadding(item) + getSpeakerRowHeight(item, fontSize, visibleLanguages);
 }
 
-/** Responsive breathing room which never crowds a short landscape viewport. */
-export function getSlidePadding(viewportHeight = 0) {
-  if (!viewportHeight) return { bottom: SPACING_SM * 2, top: SPACING_SM * 2 };
-  const edge = clamp(Math.floor(viewportHeight * 0.04), SPACING_SM, SPACING_XL);
-  return { bottom: edge, top: edge };
+/**
+ * The slide's margin above and below its text: the same as the scrolling
+ * page's (documentHtml.ts's `.document` padding), so a slide uses as much
+ * of the screen as the page does.
+ */
+export function getSlidePadding() {
+  return { bottom: SPACING_MD, top: SPACING_MD };
 }
 
 /** The content budget is always bounded by the real viewport. */

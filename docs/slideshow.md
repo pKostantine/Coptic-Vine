@@ -111,7 +111,8 @@ nothing of the system font scale.
 
 `paginateItems(items, heights, languageHeights, budget, fontSize, visibleLanguages, tableWidth, breakAt)`
 returns the slides, each a list of items (or verse pieces). The budget is
-the viewport height less `getSlidePadding`.
+the viewport height less `getSlidePadding`: 16px above and below, the
+scrolling page's own margin, so a slide uses the screen as the page does.
 
 ### Where a slide must begin (`buildPaginationUnits`)
 
