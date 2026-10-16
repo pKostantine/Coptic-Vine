@@ -22,6 +22,10 @@ test('each tab page builds its layout afresh when the device turns, rather than 
   // Home's two columns (a phone on its side) and three (an iPad) are keyed apart too.
   assert.match(read('src/components/vine/screens/HomeScreen.tsx'), /\s+key=\{`\$\{layout\}-\$\{twoColumns\}`\}/);
   assert.match(read('src/components/vine/ui/BottomTabBar.tsx'), /key=\{tablet \? 'tablet' : isCompactLandscape \? 'sideways' : 'phone'\}/);
+  // The seasons' frame and year bar, centred and narrowed on an iPad, are keyed apart too.
+  const seasons = read('src/components/vine/screens/SeasonSelectorScreen.tsx');
+  assert.match(seasons, /<View key=\{wide \? 'wide' : 'phone'\} style=\{\[styles\.frame, wide && styles\.frameWide\]\}>/);
+  assert.match(seasons, /<View key=\{wide \? 'wide' : 'phone'\} style=\{\[\n\s+styles\.yearBar,/);
   // A phone on its side keeps the wide layouts designed for it.
   assert.doesNotMatch(read('src/utils/useLayoutMode.ts'), /useIsCompactLandscape/);
 });
@@ -32,7 +36,7 @@ test('no page wraps its glow, green header or tab bar in a side-padded safe area
   const offenders = [...sourceFiles('src/app'), ...sourceFiles('src/components')].filter((file) => {
     const source = read(file);
     const sidePadded = /<SafeAreaView edges=\{\['left', 'right'/.test(source);
-    const chrome = /<PageGlow|<HeroGlow|<AppHeader|<BottomTabBar|<PersonHero/.test(source);
+    const chrome = /<PageGlow|<HeroGlow|<AppHeader|<BottomTabBar|<PersonHero|<DocumentTopBar/.test(source);
     return sidePadded && chrome && !/BleedPage/.test(source);
   });
   assert.deepEqual(offenders, []);
@@ -46,6 +50,11 @@ test('the chrome that spans the screen keeps its own contents clear of the notch
   assert.match(overlay, /right: 18 \+ insets\.right,/);
   // The artist's and cantor's glow reaches back out past the page's notch padding.
   assert.match(read('src/components/vine/ui/PersonHero.tsx'), /\{ left: -insets\.left, right: -insets\.right \}/);
+  // The documents' green bar, and the Bible chapter's above the text, run to both edges.
+  assert.match(read('src/components/vine/ui/DocumentTopBar.tsx'), /paddingTop: insets\.top, paddingLeft: insets\.left, paddingRight: insets\.right/);
+  const chapter = read('src/app/bible/[bookKey]/[chapter].tsx');
+  assert.match(chapter, /<BleedPage\n\s+edges=\{\['bottom'\]\}[\s\S]*header=\{\([\s\S]*<DocumentTopBar/);
+  assert.doesNotMatch(chapter, /<SafeAreaView/);
 });
 
 test('the book pages run edge to edge with their content padded clear of the notch', () => {

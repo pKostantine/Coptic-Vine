@@ -4,10 +4,11 @@ import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BibleWebView, { BibleWebViewHandle } from '@/components/vine/BibleWebView';
 import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/vine/bibleDocumentHtml';
+import BleedPage from '@/components/vine/ui/BleedPage';
 import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
@@ -493,23 +494,30 @@ export default function BibleChapterDocument() {
   }, [goBackALevel, screenWidth, isSelectorOpen, pencilGestureActive, bookSettingsOpen]);
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safeArea, { backgroundColor: theme.colors.page }]} {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}>
+    <BleedPage
+      edges={['bottom']}
+      style={[styles.safeArea, { backgroundColor: theme.colors.page }]}
+      header={(
+        // The same bar as every other document. Unlike them it stays in the
+        // app too, not only on the web: it is the only place that says which
+        // book and chapter is open. It runs to both edges; the chapter keeps
+        // clear of the notch.
+        <DocumentTopBar
+          title={{ english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench }}
+          onBack={goBackALevel}
+          leadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
+          onLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
+          leadingAccessibilityLabel={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+          trailingIcon="list-outline"
+          trailingAccessibilityLabel={selectorText.openSelector}
+          onTrailingPress={openVerseSelector}
+        />
+      )}
+      {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}
+    >
       <Head>
         <title>{`Coptic Vine ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
-      {/* The same bar as every other document. Unlike them it stays in the
-          app too, not only on the web: it is the only place that says which
-          book and chapter is open. */}
-      <DocumentTopBar
-        title={{ english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench }}
-        onBack={goBackALevel}
-        leadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-        onLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-        leadingAccessibilityLabel={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
-        trailingIcon="list-outline"
-        trailingAccessibilityLabel={selectorText.openSelector}
-        onTrailingPress={openVerseSelector}
-      />
       {error ? (
         <LoadFailure
           error={error}
@@ -709,7 +717,7 @@ export default function BibleChapterDocument() {
         </View>
       )}
       <BookSettingsSheet inDocument visible={bookSettingsOpen} onClose={() => showBookSettings(false)} />
-    </SafeAreaView>
+    </BleedPage>
   );
 }
 

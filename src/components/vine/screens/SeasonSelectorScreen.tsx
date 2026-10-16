@@ -255,7 +255,9 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
           <title>{`Coptic Vine ${title}`}</title>
         </Head>
       )}
-      <View style={[styles.frame, wide && styles.frameWide]}>
+      {/* Keyed by layout, as the year bar is: a turn of the device builds them afresh
+          rather than restyling them in place, which iOS laid out wrongly. */}
+      <View key={wide ? 'wide' : 'phone'} style={[styles.frame, wide && styles.frameWide]}>
         <SubPageHeader title={title} arabic={isArabic} onBack={closeScreen} backLabel={tr('Close the seasons', 'Fermer les temps liturgiques', 'أغلق الفترات')} />
 
         {year === null || !rows ? (
@@ -298,7 +300,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
       </View>
 
       {year !== null ? (
-        <View style={[
+        <View key={wide ? 'wide' : 'phone'} style={[
           styles.yearBar,
           wide ? styles.yearBarWide : null,
           { bottom: (wide ? 28 : Math.max(24, insets.bottom)) + nowPlayingInset },

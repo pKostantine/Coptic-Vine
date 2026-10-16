@@ -66,7 +66,8 @@ export default function DocumentTopBar({
   const sideWidth = slots * BUTTON + (slots - 1) * SPACING.xs;
 
   return (
-    <View style={[styles.bar, { paddingTop: insets.top }]}>
+    // The green runs to both edges; the buttons keep clear of the notch.
+    <View style={[styles.bar, { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <View style={styles.row}>
         <View style={[styles.side, { width: sideWidth }]}>
           <Pressable

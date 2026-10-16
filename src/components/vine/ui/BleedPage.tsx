@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type ViewProps } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { COLORS } from '../../../constants/theme';
 
-interface BleedPageProps {
+interface BleedPageProps extends Omit<ViewProps, 'children'> {
   /** Drawn behind everything, edge to edge: the page's glow. */
   background?: ReactNode;
   /** Across the top, edge to edge (AppHeader, which keeps its own buttons clear of the notch). */
@@ -13,7 +13,6 @@ interface BleedPageProps {
   footer?: ReactNode;
   /** Safe-area edges the content keeps clear of besides the sides: the foot on a page with no tab bar. */
   edges?: Edge[];
-  style?: StyleProp<ViewStyle>;
   children: ReactNode;
 }
 
@@ -23,9 +22,9 @@ interface BleedPageProps {
  * the notch and the rounded corners take the sides; a page wrapped whole in a
  * SafeAreaView drew black bands beside its glow and header there.
  */
-export default function BleedPage({ background, header, footer, edges = [], style, children }: BleedPageProps) {
+export default function BleedPage({ background, header, footer, edges = [], style, children, ...rest }: BleedPageProps) {
   return (
-    <View style={[styles.page, style]}>
+    <View {...rest} style={[styles.page, style]}>
       {background}
       {header}
       <SafeAreaView edges={['left', 'right', ...edges]} style={styles.body}>
