@@ -3,7 +3,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { resolveRubricKey } from "../../utils/verseRubric";
-import JustifiedText, { measureJustifiedLinesWeb } from "./JustifiedText";
+import JustifiedText, { glyphRoomStyle, measureJustifiedLinesWeb } from "./JustifiedText";
 import { getLanguageColumnGap } from "./documentPresentationMetrics";
 import {
   copticStandsAlone as isCopticStandingAlone,
@@ -287,6 +287,7 @@ export default function VerseBlock({
               minWordsToJustify={language.minWordsToJustify}
               fontStyle={bodyFontStyle}
               fontWeight={bodyFontWeight}
+              glyphRoomFontSize={language.key === "coptic" ? language.fontSize : 0}
               measureOnly={isMeasuring}
               onMetric={(metric) => reportLanguageMetric(language.key, metric)}
             />
@@ -440,6 +441,10 @@ function renderPrefixNode(language, parts, prefixStyle, selectableText, theme) {
  */
 function PlainVerseBody({ language, textStyle, selectableText, columnWidth, fontStyle, fontWeight, onMetric, theme }) {
   const renderedText = getPlainRenderedText(language);
+  // Room for the Coptic font's capitals and descenders past their lines
+  // (glyphRoomStyle): a Text on iOS and Android draws only inside its frame.
+  const glyphRoom = language.key === "coptic" ? glyphRoomStyle(language.fontSize) : null;
+  const roomHeight = glyphRoom ? glyphRoom.paddingTop + glyphRoom.paddingBottom : 0;
   const webLines = useMemo(
     () => (Platform.OS === "web"
       ? measureJustifiedLinesWeb(renderedText, language.fontSize, language.fontFamily, columnWidth, fontWeight, fontStyle)
@@ -454,7 +459,7 @@ function PlainVerseBody({ language, textStyle, selectableText, columnWidth, font
     return (
       <View onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}>
         {language.forceLines.map((line, index) => (
-          <Text key={index} allowFontScaling={false} selectable={selectableText} style={textStyle}>
+          <Text key={index} allowFontScaling={false} selectable={selectableText} style={[textStyle, glyphRoom]}>
             {String(line.text || "").trim() || "\u00a0"}
           </Text>
         ))}
@@ -466,8 +471,9 @@ function PlainVerseBody({ language, textStyle, selectableText, columnWidth, font
     <Text
       allowFontScaling={false}
       selectable={selectableText}
-      style={textStyle}
-      onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}
+      style={[textStyle, glyphRoom]}
+      // The room is padding, which a Text's own layout counts: the text is as tall as before.
+      onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height - roomHeight })}
       onTextLayout={(event) =>
         onMetric?.({ lines: toReportedLines(annotateNativeLines(event.nativeEvent.lines || [], renderedText)) })
       }
@@ -477,7 +483,7 @@ function PlainVerseBody({ language, textStyle, selectableText, columnWidth, font
   );
 }
 
-function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, measureOnly, onMetric, theme }) {
+function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, glyphRoomFontSize = 0, measureOnly, onMetric, theme }) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
@@ -504,6 +510,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         minWordsToJustify={SLIDESHOW_JUSTIFIED ? minWordsToJustify : Number.POSITIVE_INFINITY}
         selectable={selectableText}
         measureOnly={measureOnly}
+        glyphRoomFontSize={glyphRoomFontSize}
         onLayout={(event) => onMetric({ height: event.nativeEvent.layout.height })}
         onLines={(lines) => onMetric({ lines })}
       />

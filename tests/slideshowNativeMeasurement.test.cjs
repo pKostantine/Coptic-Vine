@@ -115,3 +115,19 @@ test('forced lines render line for line on every platform', () => {
   // Text with no words never waits on a layout event that cannot come.
   assert.match(justified, /splitWords\(text\)\.length \? nativeLineCache\.get\(cacheKey\) : NO_LINES/);
 });
+
+test('every drawn Coptic line has room for the ornamented capitals and descenders a native Text would cut off', () => {
+  // iOS and Android draw a Text only inside its own frame: the Coptic font's
+  // capitals rise past a line set at little more than its size. Each drawn
+  // line's frame grows above and below by padding, taken back by an equal
+  // negative margin, so the text and the line heights stay where they were.
+  const justified = fs.readFileSync('src/components/vine/JustifiedText.js', 'utf8');
+  assert.match(justified, /export function glyphRoomStyle\(fontSize\) \{[\s\S]*?if \(IS_WEB \|\| size <= 0\) return null;[\s\S]*?return \{ marginBottom: -below, marginTop: -above, paddingBottom: below, paddingTop: above \};/);
+  assert.equal((justified.match(/\{ textAlign: fallbackAlign \}, glyphRoom\]/g) || []).length, 2);
+  assert.match(justified, /wordStyles\?\.\[lineWordOffsets\[index\] \+ wordIndex\],\n\s+glyphRoom,/);
+  const verse = fs.readFileSync('src/components/vine/VerseBlock.js', 'utf8');
+  assert.match(verse, /glyphRoomFontSize=\{language\.key === "coptic" \? language\.fontSize : 0\}/);
+  assert.match(verse, /const glyphRoom = language\.key === "coptic" \? glyphRoomStyle\(language\.fontSize\) : null;/);
+  // The plain body reports its text's height, not the room around it.
+  assert.match(verse, /height: event\.nativeEvent\.layout\.height - roomHeight/);
+});

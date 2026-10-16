@@ -4,6 +4,25 @@ import { Platform, Text, View } from "react-native";
 import { annotateNativeLines, splitParagraphs, splitWords } from "./textLines";
 
 const IS_WEB = Platform.OS === "web";
+
+/**
+ * Room for glyphs that reach past their line, as the Coptic font's
+ * ornamented capitals (1.04 em above the baseline) and its descenders do in
+ * a line set at little more than its own size. iOS and Android draw a Text
+ * only inside its own frame, so whatever rises above a line's top or falls
+ * below its foot is cut off, whatever its parents allow. Each line's frame
+ * is grown by this much above and below with padding, and the same negative
+ * margin takes it back, so the text sits exactly where it did and the lines
+ * keep their height: only the area the platform draws in grows. The web
+ * draws past a box anyway, and gets nothing.
+ */
+export function glyphRoomStyle(fontSize) {
+  const size = Number(fontSize) || 0;
+  if (IS_WEB || size <= 0) return null;
+  const above = Math.ceil(size * 0.5);
+  const below = Math.ceil(size * 0.3);
+  return { marginBottom: -below, marginTop: -above, paddingBottom: below, paddingTop: above };
+}
 const DISABLED_SELECTION_STYLE = IS_WEB
   ? {
       WebkitTouchCallout: "none",
@@ -336,6 +355,9 @@ export default function JustifiedText({
   selectable = false,
   // Off-screen, for measurement only: the lines are reported, no rows drawn.
   measureOnly = false,
+  // The font size whose glyphs may reach past their lines (the Coptic
+  // column's): each drawn line gets room for them (glyphRoomStyle).
+  glyphRoomFontSize = 0,
 }) {
   const fallbackAlign = rtl ? "right" : "left";
   const reportedLinesForRef = useRef(null);
@@ -396,6 +418,7 @@ export default function JustifiedText({
   const lastIndex = lines.length - 1;
   const firstContentLineIndex = lines.findIndex((line) => line.words.length);
   const selectionStyle = selectable ? null : DISABLED_SELECTION_STYLE;
+  const glyphRoom = glyphRoomStyle(glyphRoomFontSize);
 
   return (
     <View style={[{ width }, selectionStyle]} onLayout={onLayout}>
@@ -410,7 +433,7 @@ export default function JustifiedText({
 
         if (line.isBlank) {
           return (
-            <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
+            <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }, glyphRoom]}>
               {"\u00a0"}
             </Text>
           );
@@ -423,7 +446,7 @@ export default function JustifiedText({
         if (isLastLine || mixesDirections || lineWords.length < minWordsToJustify) {
           const needsRichWords = Boolean(firstWordStyle && isFirstLine) || Boolean(wordStyles);
           return (
-            <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }]}>
+            <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }, glyphRoom]}>
               {needsRichWords ? lineWords.map((word, wordIndex) => {
                 const globalWordIndex = lineWordOffsets[index] + wordIndex;
                 return (
@@ -465,6 +488,7 @@ export default function JustifiedText({
                     selectionStyle,
                     isFirstLine && wordIndex === 0 ? firstWordStyle : null,
                     wordStyles?.[lineWordOffsets[index] + wordIndex],
+                    glyphRoom,
                   ]
                 }
               >
