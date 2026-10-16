@@ -117,10 +117,19 @@ export type LyricsScale = 'panel' | 'phone' | 'landscape' | 'large';
 
 const SCALES: Record<LyricsScale, { size: number; lineHeight: number; gap: number; top: number; fade: number; centred: boolean }> = {
   panel: { size: 23, lineHeight: 29.9, gap: 14, top: 0, fade: 86, centred: false },
-  phone: { size: 29, lineHeight: 37.7, gap: 18, top: 26, fade: 75, centred: true },
-  landscape: { size: 23, lineHeight: 29.9, gap: 10, top: 14, fade: 75, centred: true },
-  large: { size: 54, lineHeight: 62.1, gap: 28, top: 60, fade: 70, centred: true },
+  phone: { size: 33, lineHeight: 42.9, gap: 18, top: 26, fade: 75, centred: true },
+  // A phone on its side reads from further off, on a stand or in the hand at
+  // arm's length: as large as the short screen leaves room for, about five lines.
+  landscape: { size: 31, lineHeight: 40.3, gap: 12, top: 14, fade: 75, centred: true },
+  large: { size: 60, lineHeight: 69, gap: 30, top: 60, fade: 70, centred: true },
 };
+
+/**
+ * Athanasius, the lyrics' Coptic face, sets its small letters at 0.39 of the
+ * em where the system face sets English at 0.51: at one size the Coptic reads
+ * a quarter smaller. Scaled by this, the two read at one size.
+ */
+const COPTIC_LYRIC_SCALE = 1.3;
 
 interface MusicLyricsViewProps {
   lyricSets: PublishedLyricSet[];
@@ -203,7 +212,9 @@ export default function MusicLyricsView({
     const arabic = selectedSet?.locale === 'ar';
     const lineStyle: StyleProp<TextStyle> = [
       styles.playerLine,
-      { fontSize: metrics.size, lineHeight: metrics.lineHeight },
+      coptic
+        ? { fontSize: Math.round(metrics.size * COPTIC_LYRIC_SCALE), lineHeight: Math.round(metrics.lineHeight * COPTIC_LYRIC_SCALE) }
+        : { fontSize: metrics.size, lineHeight: metrics.lineHeight },
       metrics.centred && styles.centred,
       coptic && styles.playerCoptic,
       arabic && styles.arabic,
@@ -389,8 +400,9 @@ const styles = StyleSheet.create({
   lineTextUnsynced: { color: COLORS.white, opacity: 1 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicPanel: { textAlign: 'right' },
-  coptic: { fontFamily: TYPOGRAPHY.musicCoptic, fontSize: 23, lineHeight: 33 },
-  copticCompact: { fontSize: 18, lineHeight: 27 },
+  // The list's English is 20 and 16: the Coptic at COPTIC_LYRIC_SCALE of that.
+  coptic: { fontFamily: TYPOGRAPHY.musicCoptic, fontSize: 26, lineHeight: 38 },
+  copticCompact: { fontSize: 21, lineHeight: 31 },
   empty: { alignItems: 'center', paddingVertical: SPACING.xl, paddingHorizontal: SPACING.md },
   emptyTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 18, fontWeight: '700' },
   emptyBody: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: SPACING.sm, textAlign: 'center' },
