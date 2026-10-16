@@ -25,6 +25,7 @@ import { getDownloadPreferences, setDownloadPreferences, type DownloadPreference
 import type { BookDownloadProgress, ManagedContentResource } from '@/types/bookDownloads';
 import type { OfflineDownloadProgress, OfflineStorageSummary } from '@/types/offlineDownloads';
 import { tr } from '@/utils/appText';
+import { describeDownloadError } from '@/utils/loadErrors';
 import { formatDayMonthDate, toEasternArabicDigits } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 import { useLayoutMode } from '@/utils/useLayoutMode';
@@ -124,7 +125,12 @@ function NativeDownloadsScreen() {
   const music = mediaItems.filter((item) => item.domain === 'music');
   const learning = mediaItems.filter((item) => item.domain === 'learning');
   const run = async (action: () => Promise<void>) => {
-    try { await action(); } catch (error) { if (error instanceof Error && error.message !== 'Download paused.') Alert.alert(tr('Download', 'Téléchargement', 'التنزيل'), error.message); }
+    try { await action(); } catch (error) {
+      if (!(error instanceof Error) || error.message === 'Download paused.') return;
+      console.warn('Download failed:', error.message);
+      const { title, hint } = describeDownloadError(error.message);
+      Alert.alert(title, hint);
+    }
   };
   // A check says what it found: the books it is updating, or that every
   // downloaded book is the latest edition published.

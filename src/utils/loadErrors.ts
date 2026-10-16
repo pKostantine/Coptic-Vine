@@ -62,3 +62,19 @@ export function describeLoadError(message: string | null | undefined, language: 
     detail: message?.trim() || null,
   };
 }
+
+/**
+ * A download that failed, as the reader should see it. What the database or
+ * the file system said ("FunctionCallException: Calling the 'finalizeAsync'
+ * function has failed…") means nothing to a reader; it goes to the log.
+ */
+export function describeDownloadError(message: string | null | undefined, language: AppLanguage = getCurrentAppLanguage()): { title: string; hint: string } {
+  if (isLostConnectionMessage(message)) {
+    const offline = describeLoadError(message, language);
+    return { title: offline.title, hint: offline.hint };
+  }
+  return {
+    title: tr('The download didn’t finish', 'Le téléchargement n’a pas abouti', 'لم يكتمل التنزيل', language),
+    hint: tr('Please try again.', 'Veuillez réessayer.', 'يُرجى المحاولة مرة أخرى.', language),
+  };
+}
