@@ -4,6 +4,7 @@ import { SPACING } from "../../constants/theme";
 import { getAlternatingVerseColorIndex } from "../../utils/versePresentation";
 import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
+import { arabicItalicStyle } from "../../utils/arabicItalic";
 import { Headpiece, headpieceSize, Medallion, medallionSize } from "./ui/DocumentOrnaments";
 import { DOCUMENT_CONTROL_METRICS, getLanguageColumnGap } from "./documentPresentationMetrics";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
@@ -1411,6 +1412,8 @@ const SlideItem = memo(function SlideItem({
                         lineHeight: chrome.titleLineHeight,
                         textAlign: language.align,
                       },
+                      // Arabic in italic, slanted as Chrome slants it (utils/arabicItalic.ts).
+                      isSilentPrayerHymn && language.key === "arabic" ? arabicItalicStyle() : null,
                     ]}
                   >
                     {language.text}

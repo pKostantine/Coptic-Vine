@@ -33,6 +33,7 @@ import {
 import { goBack } from '@/utils/navigation';
 import { writeRichClipboard } from '@/utils/richClipboard';
 import { swipeEdge, swipeStartX } from '@/utils/edgeSwipe';
+import { arabicItalicStyle } from '@/utils/arabicItalic';
 import { appText, type AppText } from '@/utils/appText';
 import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
@@ -669,6 +670,8 @@ export default function BibleChapterDocument() {
                               isArabicBibleLanguage(previewLanguage) && styles.selectorVersePreviewArabic,
                               previewLanguage === 'coptic' && styles.selectorVersePreviewCoptic,
                               isPsalmIntroduction && styles.selectorVersePreviewIntro,
+                              // Arabic in italic, slanted as Chrome slants it (utils/arabicItalic.ts).
+                              isPsalmIntroduction && isArabicBibleLanguage(previewLanguage) && arabicItalicStyle(),
                             ]}
                           >
                             {verse[previewLanguage]}

@@ -15,6 +15,7 @@ import {
   SLIDESHOW_JUSTIFIED,
 } from "./slideshowLayout";
 import { annotateNativeLines, toReportedLines } from "./textLines";
+import { arabicFontStyle, arabicItalicStyle } from "../../utils/arabicItalic";
 
 const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   ? {
@@ -228,6 +229,10 @@ export default function VerseBlock({
     const selectionStyle = selectableText ? null : DISABLED_SELECTION_STYLE;
     const cellWidth = spansRow ? tableWidth : rowColumnWidth;
     const cellWidthStyle = { flexBasis: cellWidth, maxWidth: cellWidth };
+    // Arabic in italic is drawn upright and skewed 14 degrees on iOS and
+    // Android, as Chrome slants it (utils/arabicItalic.ts); laid out upright.
+    const slantsArabic = language.key === "arabic" && bodyFontStyle === "italic";
+    const languageFontStyle = slantsArabic ? arabicFontStyle(true) : bodyFontStyle;
     const textStyle = [
       styles.text,
       ...language.styles,
@@ -236,10 +241,11 @@ export default function VerseBlock({
         color: rowTextColor,
         fontFamily: language.fontFamily,
         fontSize: language.fontSize,
-        fontStyle: bodyFontStyle,
+        fontStyle: languageFontStyle,
         fontWeight: bodyFontWeight,
         letterSpacing: 0,
         lineHeight: language.lineHeight,
+        ...(slantsArabic ? arabicItalicStyle() : null),
         ...(Platform.OS === "web"
           ? {
               overflowWrap: "break-word",
@@ -272,7 +278,7 @@ export default function VerseBlock({
               textStyle={textStyle}
               selectableText={selectableText}
               columnWidth={cellWidth - SPACING.xs * 2}
-              fontStyle={bodyFontStyle}
+              fontStyle={languageFontStyle}
               fontWeight={bodyFontWeight}
               onMetric={(metric) => reportLanguageMetric(language.key, metric)}
             />
@@ -285,7 +291,7 @@ export default function VerseBlock({
               columnWidth={cellWidth - SPACING.xs * 2}
               forceLines={language.forceLines}
               minWordsToJustify={language.minWordsToJustify}
-              fontStyle={bodyFontStyle}
+              fontStyle={languageFontStyle}
               fontWeight={bodyFontWeight}
               glyphRoomFontSize={language.key === "coptic" ? language.fontSize : 0}
               measureOnly={isMeasuring}
@@ -299,7 +305,7 @@ export default function VerseBlock({
             textStyle={[...textStyle, { textAlign: getSafeTextAlign(language) }]}
             selectableText={selectableText}
             columnWidth={cellWidth - SPACING.xs * 2}
-            fontStyle={bodyFontStyle}
+            fontStyle={languageFontStyle}
             fontWeight={bodyFontWeight}
             onMetric={(metric) => reportLanguageMetric(language.key, metric)}
           />
@@ -340,6 +346,8 @@ export default function VerseBlock({
                     textAlign: getSafeTextAlign(language),
                     width: "100%",
                   },
+                  // Arabic in italic, slanted as Chrome slants it (utils/arabicItalic.ts).
+                  language.key === "arabic" && bodyFontStyle === "italic" ? arabicItalicStyle() : null,
                 ]}
               >
                 {language.speakerLabel}

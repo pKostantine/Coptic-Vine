@@ -13,6 +13,7 @@ import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection, pickDocumentTitle } from '../documentHtml';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import Icon from './Icon';
+import { arabicItalicStyle } from '../../../utils/arabicItalic';
 import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 interface ContentSelectorDrawerProps {
@@ -392,7 +393,7 @@ export default function ContentSelectorDrawer({
                   ) : (
                     <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
                       {showArabic ? (
-                        <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isChoice && styles.selectorTitleChoice, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
+                        <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isChoice && styles.selectorTitleChoice, isSilentPrayerHymn && styles.selectorTitleSilentPrayer, isSilentPrayerHymn && arabicItalicStyle()]}>{selectorTitle.arabic}</Text>
                       ) : (
                         <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isChoice && styles.selectorTitleChoice, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{pickedTitle.text}</Text>
                       )}
