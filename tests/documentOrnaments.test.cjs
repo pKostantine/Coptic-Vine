@@ -31,17 +31,29 @@ test('a service opens on its name in the Stepped headpiece and closes on the Med
 });
 
 test('each Hoos is set in a Lintel, on its titled first part only', () => {
+  const seasonalHooses = [
+    'theKiahkHoos',
+    'theNativityHoos',
+    'theTheophanyHoos',
+    'theLentenHoos',
+    'thePalmSundayHoos',
+    'theResurrectionHoos',
+  ];
   const dressed = withDocumentOrnaments([
     section('theFirstHoos-29', 'theFirstHoos', 'The First Hoos'),
     section('theFirstHoos-29-cont1', 'theFirstHoos'),
     section('theFourthHoos-122', 'theFourthHoos', 'The Fourth Hoos'),
     section('theFirstHoosLobsh-30', 'theFirstHoosLobsh', 'Lobsh'),
+    ...seasonalHooses.map((key, index) => section(`${key}-${index}`, key, key)),
   ], TITLE);
   const byId = Object.fromEntries(dressed.map((entry) => [entry.id, entry.ornament]));
   assert.equal(byId['theFirstHoos-29'], 'lintel');
   assert.equal(byId['theFirstHoos-29-cont1'], undefined);
   assert.equal(byId['theFourthHoos-122'], 'lintel');
   assert.equal(byId['theFirstHoosLobsh-30'], undefined);
+  for (const [index, key] of seasonalHooses.entries()) {
+    assert.equal(byId[`${key}-${index}`], 'lintel', key);
+  }
 });
 
 test('the Psalm and Gospel are set in the Three Roundels, in every service that reads them', () => {

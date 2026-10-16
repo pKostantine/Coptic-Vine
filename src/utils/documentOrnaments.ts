@@ -5,8 +5,19 @@ export const DOCUMENT_TITLE_SECTION_ID = 'document-title';
 /** The Medallion that closes the document. */
 export const DOCUMENT_END_SECTION_ID = 'document-end';
 
-/** The Psalmody's four Hooses: each one's title is set in a Lintel instead of the plain title. */
-const HOOS_KEYS = new Set(['theFirstHoos', 'theSecondHoos', 'theThirdHoos', 'theFourthHoos']);
+/** Hooses whose titles are set in a Lintel instead of the plain title. */
+const HOOS_KEYS = new Set([
+  'theFirstHoos',
+  'theSecondHoos',
+  'theThirdHoos',
+  'theFourthHoos',
+  'theKiahkHoos',
+  'theNativityHoos',
+  'theTheophanyHoos',
+  'theLentenHoos',
+  'thePalmSundayHoos',
+  'theResurrectionHoos',
+]);
 
 /**
  * The Psalm and Gospel, wherever a service reads them: the Gospel rites

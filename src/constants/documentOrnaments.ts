@@ -4,8 +4,8 @@ import type { SeasonThemeKey } from './seasonAppearance';
 
 /**
  * The ornaments a document is dressed with (Coptic Vine Ornaments 1): a
- * headpiece a title is set inside -- the Lintel over each of the Psalmody's
- * Hooses, the Stepped frame over a service's own name at its start, the
+ * headpiece a title is set inside -- the Lintel over each Hoos, the Stepped
+ * frame over a service's own name at its start, the
  * Interlace over the Theotokia of the day, the Three Roundels over the Psalm
  * and Gospel -- and the Medallion that closes a service.
  */
