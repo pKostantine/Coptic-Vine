@@ -200,10 +200,26 @@ piece), the others as tie-breakers. A verse placed whole holds every line,
 so it matches; a decoration-only page never does. A backward anchor takes
 the last of equal matches.
 
-Position is reported to the parent by section (`onCurrentSectionChange`),
-which persists it; Settings and the Calendar restore through
-`restoreRequest`, the pills through `jumpRequest`, the content selector
-through `selectedSectionId`.
+Position is reported to the parent by section and by the first verse of
+that section on the slide, as its index in the hymn's own rows
+(`onCurrentSectionChange(id, tune, verseIndex)`); the parent persists the
+section. Items are named by that same row index (`verse.sourceIndex`, kept
+through the display filters by `buildSlideshowSections`), as the scrolling
+reader names its verses (`<section>::v<index>`), so the two readers mean the
+same verse.
+
+**After any change** — a setting, the calendar, a mode switch, rotation —
+the reader is brought back to that verse (`src/utils/sectionRestore.ts`,
+`resolveDocumentRestore`): the same hymn, by its section id or, on another
+day's order, by its hymn key, at the verse that was at the top of the page
+(`restoreRequest.target.verseIndex`: the slide is made to begin at it; the
+scrolling page scrolls to it); if the change hid that verse, the hymn's
+start; if the hymn itself is gone, the END of the nearest earlier hymn that
+was shown before and still is (a Kiahk psali on Palm Sunday lands at the
+last verse of the Fourth Hoos). The pills jump through `jumpRequest`, the
+content selector through `selectedSectionId`; a Slideshow Mode flip jumps
+to the verse the page was scrolled to, and the other way seeds the page
+with it (`initialScrollVerseIndex`).
 
 ## 5. What is shown: settled pages only
 

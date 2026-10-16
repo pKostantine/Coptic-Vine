@@ -10,6 +10,7 @@ import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
 import { swipeEdge, swipeStartX } from '../../../utils/edgeSwipe';
 import GlobalNowPlayingOverlay from '../../playback/GlobalNowPlayingOverlay';
 import DocumentSurface, { type SlideJumpRequest } from '../DocumentSurface';
+import { verseIndexFromId } from '@/utils/sectionRestore';
 import {
   ANTIPHONARY_GROUPS, findAntiphonaryIntroduction, getActiveAntiphonaryGroup, getVerseTune,
   type AntiphonaryGroup, type AntiphonaryTune,
@@ -155,6 +156,9 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // same hymn, with nothing lost.
   const [overlayScreen, setOverlayScreen] = useState<'calendar' | 'seasons' | 'settings' | null>(null);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  // The verse at the top of the reader's page, as its index in the hymn's
+  // rows: what a Slideshow Mode flip opens the other renderer at.
+  const [currentVerseIndex, setCurrentVerseIndex] = useState<number | null>(null);
   // The Antiphonary only: the tune of the verse being read, for its pills.
   const [currentTune, setCurrentTune] = useState<AntiphonaryTune | null>(null);
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
@@ -188,6 +192,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       // section the reader never actually scrolled to.
       if (!isCovered && action.sectionId) {
         setCurrentSectionId(action.sectionId);
+        setCurrentVerseIndex(verseIndexFromId(action.verseId));
         setCurrentTune(getVerseTune(sections, action.verseId));
       }
       return;
@@ -289,6 +294,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     if (!preferences.slideshowMode || !currentSectionId) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedSlideSectionId(currentSectionId);
+    // The slide opens at the verse the page was scrolled to, not the hymn's first.
+    requestSlideJump({ sectionId: currentSectionId, verseIndex: currentVerseIndex });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferences.slideshowMode]);
 
@@ -464,12 +471,14 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 onAction={handleAction}
                 selectedSectionId={selectedSlideSectionId}
                 jumpRequest={slideJumpRequest}
-                onCurrentSectionChange={(id, tune) => {
+                onCurrentSectionChange={(id, tune, verseIndex) => {
                   setCurrentSectionId(id);
+                  setCurrentVerseIndex(verseIndex);
                   setCurrentTune(tune);
                 }}
                 onOpenSelector={() => setSelectorOpen(true)}
                 initialScrollSectionId={currentSectionId}
+                initialScrollVerseIndex={currentVerseIndex}
                 onCollapseToggle={setSelectedSlideSectionId}
                 keyboardNavigationEnabled={visible && !isCovered}
               />

@@ -12,6 +12,8 @@ import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGa
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
 export interface DocumentVerse {
+  /** Set by the slideshow's section builder: this verse's index in the hymn's own rows, kept through the display filters so the reader's verse stays the same verse. */
+  sourceIndex?: number;
   english: string;
   /** hymn_texts.french — absent or empty wherever the French books had no counterpart. */
   french?: string;
@@ -728,6 +730,17 @@ export function buildDocumentHtml(
           var candidate = candidates[i];
           var id = typeof candidate === 'string' ? candidate : candidate && candidate.sectionId;
           var targetEdge = typeof candidate === 'string' ? edge : candidate && candidate.edge;
+          // A candidate can name the verse that was at the top of the
+          // reader's page: that verse, if the page still has it, else the
+          // hymn's edge.
+          var verseId = typeof candidate === 'string' ? null : candidate && candidate.verseId;
+          var verse = verseId && document.querySelector('[data-verse-id="' + verseId + '"]');
+          if (verse && verse.closest('.section') && verse.closest('.section').id === id) {
+            jumpAndHold(function () {
+              return verse.isConnected ? clampScrollTop(documentTop(verse.getBoundingClientRect().top) - 1) : null;
+            });
+            return true;
+          }
           var element = id && document.getElementById(id);
           if (element) {
             jumpAndHold(function () { return sectionScrollTop(element, targetEdge); });

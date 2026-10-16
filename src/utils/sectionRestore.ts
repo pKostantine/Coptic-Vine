@@ -33,48 +33,96 @@ export function sectionRestoreCandidates(
   return candidates;
 }
 
-/** A settings/calendar restore always starts at the original hymn's title.
- * If the hymn is gone, the nearest *preceding* surviving hymn is shown at its
- * end instead. Never substitute a following hymn when an earlier one exists. */
+/**
+ * Where a settings/calendar/mode change puts the reader back. The verse that
+ * was at the top of their page, if the same hymn is still shown and the
+ * renderer still has that verse; else the START of that hymn; else the END of
+ * the nearest *preceding* hymn that was shown before and still is. Never a
+ * following hymn when an earlier one exists.
+ *
+ * A hymn is the same hymn by its section id, or, failing that, by its hymn
+ * key: the same hymn on another day can sit at another place in the order
+ * and so carry another id.
+ */
 export interface DocumentRestoreTarget {
   sectionId: string;
   edge: 'start' | 'end';
+  /** The verse (its index in the hymn's own rows) to land on, for a surviving hymn; null for its start. */
+  verseIndex?: number | null;
 }
 export interface DocumentRestoreRequest {
   token: string;
   target: DocumentRestoreTarget;
 }
 
+/** A section as a restore sees it: its id, and the hymn key it was assembled from. */
+export interface DocumentSectionRef {
+  id: string;
+  hymnKey?: string | null;
+}
+
+export function toSectionRefs(sections: readonly (string | DocumentSectionRef)[]): DocumentSectionRef[] {
+  return sections.map((section) => (typeof section === 'string' ? { id: section } : { id: section.id, hymnKey: section.hymnKey ?? null }));
+}
+
 /** The ordering MUST come from the document before it changed. */
 export function resolveDocumentRestore(
-  originalSectionIds: readonly string[],
+  originalSections: readonly (string | DocumentSectionRef)[],
   originalSectionId: string,
-  visibleNewSectionIds: readonly string[],
+  visibleNewSections: readonly (string | DocumentSectionRef)[],
+  verseIndex: number | null = null,
 ): DocumentRestoreTarget | null {
-  const visible = new Set(visibleNewSectionIds);
-  if (visible.has(originalSectionId)) return { sectionId: originalSectionId, edge: 'start' };
-  const originalIndex = originalSectionIds.lastIndexOf(originalSectionId);
+  const original = toSectionRefs(originalSections);
+  const visible = toSectionRefs(visibleNewSections);
+  const visibleById = new Map(visible.map((section) => [section.id, section]));
+  const findShown = (section: DocumentSectionRef): DocumentSectionRef | undefined =>
+    visibleById.get(section.id) ??
+    (section.hymnKey ? visible.find((candidate) => candidate.hymnKey === section.hymnKey) : undefined);
+
+  const originalIndex = original.map((section) => section.id).lastIndexOf(originalSectionId);
+  const originalSection = originalIndex >= 0 ? original[originalIndex] : { id: originalSectionId };
+  const same = findShown(originalSection);
+  if (same) return { sectionId: same.id, edge: 'start', verseIndex: verseIndex ?? null };
   for (let index = originalIndex - 1; index >= 0; index -= 1) {
-    const sectionId = originalSectionIds[index];
-    if (visible.has(sectionId)) return { sectionId, edge: 'end' };
+    const previous = findShown(original[index]);
+    if (previous) return { sectionId: previous.id, edge: 'end' };
   }
   // A removed first hymn has no predecessor. There is no sensible "end of
   // previous" target, so take the new document's start.
-  return visibleNewSectionIds.length ? { sectionId: visibleNewSectionIds[0], edge: 'start' } : null;
+  return visible.length ? { sectionId: visible[0].id, edge: 'start' } : null;
 }
 
-export function visibleDocumentSectionIds(
-  sections: readonly {
-    id: string; titlePrayerType?: string | null; bishopOnly?: boolean;
-    priestOnly?: boolean; copticGospelRiteOnly?: boolean; nonCopticGospelRiteOnly?: boolean;
-  }[],
-  preferences: { displaySilentPrayers: boolean; bishopPresent: boolean; copticGospelRite: boolean },
-): string[] {
-  return sections.filter(section =>
-    (preferences.displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer') &&
+interface VisibleSectionInput {
+  id: string; hymnKey?: string | null; titlePrayerType?: string | null; bishopOnly?: boolean;
+  priestOnly?: boolean; copticGospelRiteOnly?: boolean; nonCopticGospelRiteOnly?: boolean;
+}
+interface VisibilityPreferences { displaySilentPrayers: boolean; bishopPresent: boolean; copticGospelRite: boolean }
+
+function isSectionVisible(section: VisibleSectionInput, preferences: VisibilityPreferences): boolean {
+  return (preferences.displaySilentPrayers || section.titlePrayerType !== 'Silent Prayer') &&
     (!section.bishopOnly || preferences.bishopPresent) &&
     (!section.priestOnly || !preferences.bishopPresent) &&
     (!section.copticGospelRiteOnly || preferences.copticGospelRite) &&
-    (!section.nonCopticGospelRiteOnly || !preferences.copticGospelRite)
-  ).map(section => section.id);
+    (!section.nonCopticGospelRiteOnly || !preferences.copticGospelRite);
+}
+
+export function visibleDocumentSectionIds(
+  sections: readonly VisibleSectionInput[],
+  preferences: VisibilityPreferences,
+): string[] {
+  return sections.filter((section) => isSectionVisible(section, preferences)).map((section) => section.id);
+}
+
+/** The sections shown under these preferences, with the hymn keys a restore matches by. */
+export function visibleDocumentSectionRefs(
+  sections: readonly VisibleSectionInput[],
+  preferences: VisibilityPreferences,
+): DocumentSectionRef[] {
+  return sections.filter((section) => isSectionVisible(section, preferences)).map((section) => ({ id: section.id, hymnKey: section.hymnKey ?? null }));
+}
+
+/** The verse a scroll-mode report names, as its index in the hymn's own rows (`<section id>::v<index>`), or null. */
+export function verseIndexFromId(verseId: string | null | undefined): number | null {
+  const match = /::v(\d+)$/.exec(String(verseId || ''));
+  return match ? Number(match[1]) : null;
 }

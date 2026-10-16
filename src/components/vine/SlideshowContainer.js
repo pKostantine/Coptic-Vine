@@ -548,18 +548,25 @@ export default function SlideshowContainer({
   useLayoutEffect(() => {
     if (!restoreRequest || lastAppliedRestoreTokenRef.current === restoreRequest.token) return;
     if (!(viewportHeight || viewportHeightOverride)) return;
-    const { sectionId, edge } = restoreRequest.target;
+    const { sectionId, edge, verseIndex } = restoreRequest.target;
+    // The verse that was at the top of the reader's page, if the deck still
+    // has it: its slide, and the page made to begin at it.
+    const isTargetVerse = (item) => item.sectionId === sectionId && Number.isFinite(verseIndex) && item.verseIndexInSection === verseIndex;
+    const verseSlideIndex = edge === 'start' ? slides.findIndex((slide) => slide.some(isTargetVerse)) : -1;
     let targetSlideIndex = -1;
     slides.forEach((slide, index) => {
       if (!slide.some(item => item.sectionId === sectionId)) return;
       if (edge === 'end' || targetSlideIndex < 0) targetSlideIndex = index;
     });
+    if (verseSlideIndex >= 0) targetSlideIndex = verseSlideIndex;
     if (targetSlideIndex < 0) return; // still measuring/loading this deck
     const targetSlide = slides[targetSlideIndex];
     // The last page can also hold the start of the next hymn. Anchor to the
     // target hymn's own final item rather than the first item of that page.
     const targetItems = targetSlide.filter(item => item.sectionId === sectionId);
-    const targetItem = edge === 'end' ? targetItems[targetItems.length - 1] : targetItems[0];
+    const targetItem = verseSlideIndex >= 0
+      ? targetSlide.find(isTargetVerse)
+      : edge === 'end' ? targetItems[targetItems.length - 1] : targetItems[0];
     lastAppliedRestoreTokenRef.current = restoreRequest.token;
     lastAppliedSelectedSectionId.current = selectedSectionId ?? null;
     preservedSectionIdRef.current = sectionId;
@@ -568,9 +575,10 @@ export default function SlideshowContainer({
     navigationIndexRef.current = targetSlideIndex;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-off restore, keyed by the request's token
     setCurrentSlideIndex(targetSlideIndex);
-    // The anchor names the hymn's own item, which can sit partway down the
-    // page: the page is not made to begin there.
-    setCurrentAnchor({ ...createSlideAnchor(targetItem ? [targetItem] : targetSlide), breaks: !targetItem });
+    // Back to a verse, the page begins at it. Otherwise the anchor names the
+    // hymn's own item, which can sit partway down the page: the page is not
+    // made to begin there.
+    setCurrentAnchor({ ...createSlideAnchor(targetItem ? [targetItem] : targetSlide), breaks: verseSlideIndex >= 0 || !targetItem });
   }, [restoreRequest?.token, slides, selectedSectionId, viewportHeight, viewportHeightOverride]);
 
   // A pill tapped above the document. The Antiphonary's Adam and Vatos pills
@@ -582,10 +590,16 @@ export default function SlideshowContainer({
   useLayoutEffect(() => {
     if (!jumpRequest || lastAppliedJumpTokenRef.current === jumpRequest.token) return;
     if (!(viewportHeight || viewportHeightOverride)) return;
-    const isTargetItem = jumpRequest.tune
+    // A jump to a verse of the hymn (the one the reader was on in the other
+    // mode) opens the slide at it, if the deck has it; else the hymn's first.
+    const isTargetVerse = (item) =>
+      item.sectionId === jumpRequest.sectionId && Number.isFinite(jumpRequest.verseIndex) && item.verseIndexInSection === jumpRequest.verseIndex;
+    const isTargetSection = jumpRequest.tune
       ? (item) => item.verse?.tune === jumpRequest.tune
       : (item) => item.sectionId === jumpRequest.sectionId;
-    const targetSlideIndex = slides.findIndex((slide) => slide.some(isTargetItem));
+    const verseSlideIndex = jumpRequest.tune ? -1 : slides.findIndex((slide) => slide.some(isTargetVerse));
+    const isTargetItem = verseSlideIndex >= 0 ? isTargetVerse : isTargetSection;
+    const targetSlideIndex = verseSlideIndex >= 0 ? verseSlideIndex : slides.findIndex((slide) => slide.some(isTargetItem));
     if (targetSlideIndex < 0) return; // still measuring/loading this deck
     const targetItem = slides[targetSlideIndex].find(isTargetItem);
     lastAppliedJumpTokenRef.current = jumpRequest.token;
@@ -652,13 +666,22 @@ export default function SlideshowContainer({
     // came before it and take the nearest one that survived. An explicit
     // content-selector pick never needs this: it can only name something
     // currently on the list.
+    // Landed on an earlier hymn, the reader is put at its END: the last page
+    // holding it, anchored to its own last item.
+    let landedAtEnd = null;
     if (nextSlideIndex < 0 && !hasFreshExplicitSelection) {
       const candidates = pendingRestoreCandidatesRef.current;
       for (let i = 0; i < candidates.length; i += 1) {
         const candidateSlideIndex = findSlideFor(candidates[i]);
         if (candidateSlideIndex >= 0) {
           targetSectionId = candidates[i];
-          nextSlideIndex = candidateSlideIndex;
+          let lastSlideIndex = candidateSlideIndex;
+          slides.forEach((slide, index) => {
+            if (slide.some((item) => item.sectionId === targetSectionId)) lastSlideIndex = index;
+          });
+          const ownItems = slides[lastSlideIndex].filter((item) => item.sectionId === targetSectionId);
+          nextSlideIndex = lastSlideIndex;
+          landedAtEnd = ownItems[ownItems.length - 1] || null;
           break;
         }
       }
@@ -666,7 +689,7 @@ export default function SlideshowContainer({
 
     if (nextSlideIndex >= 0) {
       setCurrentSlideIndex(nextSlideIndex);
-      setCurrentAnchor(createSlideAnchor(slides[nextSlideIndex]));
+      setCurrentAnchor(landedAtEnd ? { ...createSlideAnchor([landedAtEnd]), breaks: false } : createSlideAnchor(slides[nextSlideIndex]));
       if (hasFreshExplicitSelection) {
         lastAppliedSelectedSectionId.current = targetSectionId;
       }
@@ -719,7 +742,13 @@ export default function SlideshowContainer({
     // stops changing (it never resets back to undefined on its own).
     pendingRestoreSectionIdRef.current = null;
     preservedSectionIdRef.current = currentSectionId;
-    onCurrentSectionChange?.(currentSectionId, currentSlide?.find((item) => item.verse?.tune)?.verse.tune ?? null);
+    // The first verse of that hymn on the slide: where a change brings the reader back to.
+    const topVerse = currentSlide?.find((item) => item.type === "verse" && item.sectionId === currentSectionId);
+    onCurrentSectionChange?.(
+      currentSectionId,
+      currentSlide?.find((item) => item.verse?.tune)?.verse.tune ?? null,
+      Number.isFinite(topVerse?.verseIndexInSection) ? topVerse.verseIndexInSection : null,
+    );
   }, [currentAnchor, onCurrentSectionChange, resolvedSlideIndex, slides, viewportHeight, viewportHeightOverride]);
 
   // A page is turned from the deck on screen: the next slide is the one
@@ -1535,9 +1564,14 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         ornament: section.ornament || null,
       },
       ...verses.map((verse, verseIndex) => ({
-        id: `${section.id}-${verseIndex}`,
+        // Named by the verse's index in the hymn's own rows (sourceIndex, see
+        // buildSlideshowSections), as the scrolling reader names it, so a
+        // position kept across a settings change means the same verse
+        // whatever the change hid.
+        id: `${section.id}-${verse.sourceIndex ?? verseIndex}`,
         sectionId: section.id,
         type: "verse",
+        verseIndexInSection: verse.sourceIndex ?? verseIndex,
         verse,
         colorIndex: getAlternatingVerseColorIndex(section, verseIndex, bishopPresent),
         suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || Boolean(suppressMap.get(verse)),

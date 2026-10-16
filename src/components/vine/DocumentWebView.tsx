@@ -13,11 +13,12 @@ import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/docume
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
 
 export interface DocumentWebViewHandle {
-  scrollToSection: (id: string, edge?: 'start' | 'end') => void;
+  /** To the section's edge, or, with `verseIndex`, to that verse of it (its index in the hymn's rows) if the page has it. */
+  scrollToSection: (id: string, edge?: 'start' | 'end', verseIndex?: number | null) => void;
   scrollToVerse: (id: string) => void;
   scrollToTune: (tune: string) => void;
   /** Pre-set the section the WebView will restore to on its next load (e.g. before triggering a state change that causes a full HTML rebuild). */
-  setPreservedSection: (id: string, edge?: 'start' | 'end') => void;
+  setPreservedSection: (id: string, edge?: 'start' | 'end', verseIndex?: number | null) => void;
   scrollToSermonHighlight: (id: string) => void;
 }
 
@@ -39,6 +40,8 @@ interface DocumentWebViewProps {
   collapsedSectionIds?: Record<string, boolean>;
   /** Section to scroll to the moment this WebView finishes its first load — e.g. wherever the user was reading in slideshow mode just before switching, or the last remembered position for a brand-new mount. Only consulted once, at mount; changing it on a later render has no effect (use the imperative scrollToSection handle for that). */
   initialSectionId?: string | null;
+  /** With initialSectionId: the verse of it (its index in the hymn's rows) to land on, if the page has it. */
+  initialVerseIndex?: number | null;
   /** Explicit post-settings/calendar jump. The token forces a jump even to the already selected hymn. */
   restoreRequest?: DocumentRestoreRequest | null;
   /** Extra scrollable space at the bottom for floating app chrome such as the global mini player. */
@@ -82,6 +85,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       suppressAllSpeakerLabels = false,
       onAction,
       initialSectionId,
+      initialVerseIndex,
       restoreRequest,
       bottomContentInset = 0,
       collapsedSectionIds,
@@ -108,6 +112,12 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     // from its *second* reload onward.
     const preservedSectionIdRef = useRef<string | null>(initialSectionId ?? null);
     const preservedEdgeRef = useRef<'start' | 'end'>('start');
+    // The verse at the top of the reader's page, named as the page names it
+    // (`<section id>::v<index>`): where a reload puts them back, when the
+    // page still has it; else the section's edge above.
+    const verseIdOf = (sectionId: string | null | undefined, verseIndex: number | null | undefined) =>
+      sectionId && Number.isFinite(verseIndex as number) ? `${sectionId}::v${verseIndex}` : null;
+    const preservedVerseIdRef = useRef<string | null>(verseIdOf(initialSectionId, initialVerseIndex));
     const pendingRestoreSectionIdRef = useRef<string | null>(null);
     const lastRestoreTokenRef = useRef<string | null>(null);
     // A freshly (re)loaded page reports where it is the moment it first
@@ -134,15 +144,19 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       lastRestoreTokenRef.current = restoreRequest.token;
       preservedSectionIdRef.current = restoreRequest.target.sectionId;
       preservedEdgeRef.current = restoreRequest.target.edge;
+      preservedVerseIdRef.current = verseIdOf(restoreRequest.target.sectionId, restoreRequest.target.verseIndex);
       pendingRestoreSectionIdRef.current = restoreRequest.target.sectionId;
     }
 
     useImperativeHandle(ref, () => ({
-      scrollToSection: (id: string, edge: 'start' | 'end' = 'start') => {
+      scrollToSection: (id: string, edge: 'start' | 'end' = 'start', verseIndex: number | null = null) => {
         preservedSectionIdRef.current = id;
         preservedEdgeRef.current = edge;
+        preservedVerseIdRef.current = verseIdOf(id, verseIndex);
         guardJump(id);
-        webviewRef.current?.injectJavaScript(`window.scrollToSection(${JSON.stringify(id)}, ${JSON.stringify(edge)}); true;`);
+        webviewRef.current?.injectJavaScript(
+          `window.scrollToSection(${JSON.stringify([{ sectionId: id, edge, verseId: preservedVerseIdRef.current || undefined }])}); true;`,
+        );
       },
       scrollToVerse: (id: string) => {
         webviewRef.current?.injectJavaScript(`window.scrollToVerse(${JSON.stringify(id)}); true;`);
@@ -150,9 +164,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       scrollToTune: (tune: string) => {
         webviewRef.current?.injectJavaScript(`window.scrollToTune(${JSON.stringify(tune)}); true;`);
       },
-      setPreservedSection: (id: string, edge: 'start' | 'end' = 'start') => {
+      setPreservedSection: (id: string, edge: 'start' | 'end' = 'start', verseIndex: number | null = null) => {
         preservedSectionIdRef.current = id;
         preservedEdgeRef.current = edge;
+        preservedVerseIdRef.current = verseIdOf(id, verseIndex);
         pendingRestoreSectionIdRef.current = id;
       },
       scrollToSermonHighlight: (id: string) => {
@@ -188,6 +203,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         pendingRestoreSectionIdRef.current = null;
         preservedSectionIdRef.current = action.sectionId;
         preservedEdgeRef.current = 'start';
+        preservedVerseIdRef.current = action.verseId || null;
       }
       // Remember the title that was actually tapped before the collapse
       // state rebuilds this HTML, so the reload stays anchored there.
@@ -231,7 +247,12 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       // may be what hid the section being restored to. See
       // sectionRestoreCandidates.
       const candidates = sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current)
-        .map((sectionId, index) => ({ sectionId, edge: index ? 'end' : preservedEdgeRef.current }));
+        .map((sectionId, index) => ({
+          sectionId,
+          edge: index ? 'end' : preservedEdgeRef.current,
+          // The reader's own verse first, for their own section only.
+          verseId: index ? undefined : preservedVerseIdRef.current || undefined,
+        }));
       if (candidates.length) {
         webviewRef.current?.injectJavaScript(
           `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(candidates)}); } true;`,
@@ -249,8 +270,9 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     useEffect(() => {
       if (!restoreRequest) return;
+      const { sectionId, edge, verseIndex } = restoreRequest.target;
       webviewRef.current?.injectJavaScript(
-        `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(restoreRequest.target.sectionId)}, ${JSON.stringify(restoreRequest.target.edge)}); } true;`,
+        `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify([{ sectionId, edge, verseId: verseIdOf(sectionId, verseIndex) || undefined }])}); } true;`,
       );
     }, [restoreRequest?.token]);
 

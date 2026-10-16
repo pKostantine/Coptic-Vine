@@ -8,6 +8,13 @@
 // Seasons over it, a date or a setting changed. A document left -- backed out
 // of, swiped away, replaced by the next service -- forgets it, and opens again
 // at the top.
+import type { DocumentSectionRef } from './sectionRestore';
+
+// Kept free of runtime imports: the tests load this module on its own.
+function toSectionRefs(sections: readonly (string | DocumentSectionRef)[]): DocumentSectionRef[] {
+  return sections.map((section) => (typeof section === 'string' ? { id: section } : { id: section.id, hymnKey: section.hymnKey ?? null }));
+}
+
 const lastPositionByDocument = new Map<string, string>();
 // Left, and not yet opened again: a stray report from the closing reader must
 // not write a position back after it was forgotten.
@@ -42,19 +49,32 @@ export interface PendingDocumentRestore {
   revision: number;
   sectionId: string;
   originalSectionIds: string[];
+  /** The sections as they were, with the hymn keys a restore matches by. */
+  originalSections: DocumentSectionRef[];
+  /** The verse at the top of the reader's page (its index in the hymn's rows), or null. */
+  verseIndex: number | null;
   dirty: boolean;
   signature?: string;
 }
 const pendingRestores = new Map<string, PendingDocumentRestore>();
 let nextRestoreSequence = 0;
 
-export function captureDocumentRestore(key: string, sectionId: string | null | undefined, sectionIds: readonly string[], signature?: string): void {
-  if (closedDocuments.has(key) || pendingRestores.has(key) || !sectionId || !sectionIds.length) return;
+export function captureDocumentRestore(
+  key: string,
+  sectionId: string | null | undefined,
+  sections: readonly (string | DocumentSectionRef)[],
+  signature?: string,
+  verseIndex: number | null = null,
+): void {
+  if (closedDocuments.has(key) || pendingRestores.has(key) || !sectionId || !sections.length) return;
+  const originalSections = toSectionRefs(sections);
   pendingRestores.set(key, {
     sequence: ++nextRestoreSequence,
     revision: 0,
     sectionId,
-    originalSectionIds: [...sectionIds],
+    originalSectionIds: originalSections.map((section) => section.id),
+    originalSections,
+    verseIndex: Number.isFinite(verseIndex as number) ? verseIndex : null,
     dirty: false,
     signature,
   });

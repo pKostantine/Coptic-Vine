@@ -17,6 +17,8 @@ import type { AntiphonaryTune } from './antiphonaryNavigation';
 export interface SlideJumpRequest {
   token: number;
   sectionId?: string;
+  /** With `sectionId`: the verse (its index in the hymn's rows) to open the slide at, if the slideshow has it; else the hymn's first slide. */
+  verseIndex?: number | null;
   tune?: AntiphonaryTune;
 }
 
@@ -27,11 +29,13 @@ interface DocumentSurfaceProps {
   collapseMemoryScope: string;
   onAction?: (action: DocumentAction) => void;
   selectedSectionId?: string | null;
-  /** Slideshow only: the section on the current slide, and the Antiphonary tune of its first tuned verse (null anywhere else). */
-  onCurrentSectionChange?: (id: string, tune: AntiphonaryTune | null) => void;
+  /** Slideshow only: the section on the current slide, the Antiphonary tune of its first tuned verse (null anywhere else), and the first verse of that section on the slide (its index in the hymn's rows; null when the slide shows none). */
+  onCurrentSectionChange?: (id: string, tune: AntiphonaryTune | null, verseIndex: number | null) => void;
   onOpenSelector?: () => void;
   /** Where a freshly mounted WebView (scroll mode) should scroll to on its very first load — see DocumentWebView's initialSectionId. Slideshow mode has its own equivalent via selectedSectionId, which (unlike this) can also drive jumps after the initial mount. */
   initialScrollSectionId?: string | null;
+  /** With initialScrollSectionId: the verse of that section (its index in the hymn's rows) to open at, if the page has it. */
+  initialScrollVerseIndex?: number | null;
   /** Frozen pre-settings/calendar anchor, resolved against the new visible document. */
   restoreRequest?: DocumentRestoreRequest | null;
   /** Slideshow only: a one-off jump from a pill. Unlike selectedSectionId, each new token jumps again, even back to the section already selected. */
@@ -96,9 +100,12 @@ function buildSlideshowSections(
         ? (collapsedSectionIds[section.id] ?? Boolean(section.defaultCollapsed))
         : false;
 
+      // Each verse keeps its index in the hymn's own rows (`sourceIndex`):
+      // the slideshow names it by that, as the scrolling reader does, so the
+      // reader's verse is the same verse whatever these filters hide.
       const verses = currentlyCollapsed
         ? []
-        : section.verses.filter((verse, index) => {
+        : section.verses.map((verse, index) => ({ ...verse, sourceIndex: index })).filter((verse, index) => {
             if ((verse.bishopOnly && !bishopPresent) || (verse.priestOnly && bishopPresent)) return false;
             if ((verse.copticGospelRiteOnly && !copticGospelRite) || (verse.nonCopticGospelRiteOnly && copticGospelRite)) return false;
             // A row explicitly marked both Comment and Silent Prayer needs
@@ -136,6 +143,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       copticGospelRite = false,
       suppressAllSpeakerLabels = false,
       initialScrollSectionId,
+      initialScrollVerseIndex,
       restoreRequest,
       jumpRequest,
       onCollapseToggle,
@@ -374,6 +382,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         suppressAllSpeakerLabels={suppressAllSpeakerLabels}
         onAction={handleDocumentAction}
         initialSectionId={initialScrollSectionId}
+        initialVerseIndex={initialScrollVerseIndex}
         restoreRequest={restoreRequest}
         bottomContentInset={nowPlayingInset}
         sermonPlannerMode={sermonPlannerMode}

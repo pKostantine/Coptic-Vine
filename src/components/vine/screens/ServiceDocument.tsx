@@ -41,7 +41,7 @@ import {
   getPendingDocumentRestore, markPendingDocumentRestoresDirty, openDocumentPosition, setLastDocumentPosition,
 } from '../../../utils/lastDocumentPosition';
 import {
-  resolveDocumentRestore, visibleDocumentSectionIds, type DocumentRestoreRequest,
+  resolveDocumentRestore, type DocumentRestoreRequest, verseIndexFromId, visibleDocumentSectionRefs, type DocumentSectionRef,
 } from '../../../utils/sectionRestore';
 import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
@@ -269,6 +269,13 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // Slideshow mode doesn't need this: SlideshowContainer already restores
   // its own verse-level position internally whenever it repaginates.
   const [currentVerseId, setCurrentVerseId] = useState<string | null>(null);
+  // The same verse as its index in the hymn's own rows, reported by both
+  // renderers (the scrolling reader names it `<section>::v<index>`, the
+  // slideshow by its item): what every change -- a setting, the calendar, a
+  // mode switch -- brings the reader back to. Read through the ref where a
+  // snapshot is taken outside a render.
+  const [currentVerseIndex, setCurrentVerseIndex] = useState<number | null>(null);
+  const currentVerseIndexRef = useRef<number | null>(null);
   // The Antiphonary only: the tune of the verse being read, for its pills.
   const [currentTune, setCurrentTune] = useState<AntiphonaryTune | null>(null);
   const [slideJumpRequest, setSlideJumpRequest] = useState<SlideJumpRequest | null>(null);
@@ -309,8 +316,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const lastSettingsSignatureRef = useRef(restoreSettingsSignature);
   const latestSettingsSignatureRef = useRef(restoreSettingsSignature);
   latestSettingsSignatureRef.current = restoreSettingsSignature;
-  const latestSectionOrderRef = useRef<string[]>([]);
-  if (readySections) latestSectionOrderRef.current = readySections.map(section => section.id);
+  const latestSectionOrderRef = useRef<DocumentSectionRef[]>([]);
+  if (readySections) latestSectionOrderRef.current = readySections.map(section => ({ id: section.id, hymnKey: section.hymnKey ?? null }));
   // Blur is authoritative; never trust background scroll/page callbacks while
   // Settings or Calendar is covering the reader, even on a slow device.
   useFocusEffect(useCallback(() => {
@@ -323,6 +330,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
         latestSectionOrderRef.current,
         latestSettingsSignatureRef.current,
+        currentVerseIndexRef.current,
       );
       navigatingAwayRef.current = true;
       setReaderFocused(false);
@@ -340,8 +348,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     captureDocumentRestore(
       documentPositionKey,
       currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
-      sections.map(section => section.id),
+      sections.map(section => ({ id: section.id, hymnKey: section.hymnKey ?? null })),
       previousSignature,
+      currentVerseIndexRef.current,
     );
     markPendingDocumentRestoresDirty();
   }, [restoreSettingsSignature, readerFocused, sections, documentPositionKey]);
@@ -506,22 +515,29 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       navigatingAwayRef.current = false;
       return;
     }
-    const visibleIds = visibleDocumentSectionIds(readySections, {
+    const visibleRefs = visibleDocumentSectionRefs(readySections, {
       displaySilentPrayers: preferences.displaySilentPrayers,
       bishopPresent: preferences.bishopPresent,
       copticGospelRite,
     });
-    const target = resolveDocumentRestore(pending.originalSectionIds, pending.sectionId, visibleIds);
+    // The verse the reader was on, in the same hymn (by id, else by hymn
+    // key); else that hymn's start; else the end of the nearest earlier hymn
+    // still shown. Each renderer falls back from the verse to the hymn's
+    // start itself when the change hid that verse.
+    const target = resolveDocumentRestore(pending.originalSections, pending.sectionId, visibleRefs, pending.verseIndex);
     if (!target) return; // no visible hymns; keep the snapshot until there are
     const token = `${pending.sequence}:${pending.revision}:${restoreSettingsSignature}`;
+    const targetVerseIndex = target.verseIndex ?? null;
     pendingScrollRestoreSectionIdRef.current = target.sectionId;
     currentSectionIdRef.current = target.sectionId;
     setCurrentSectionId(target.sectionId);
-    setCurrentVerseId(null);
+    currentVerseIndexRef.current = targetVerseIndex;
+    setCurrentVerseIndex(targetVerseIndex);
+    setCurrentVerseId(targetVerseIndex != null ? `${target.sectionId}::v${targetVerseIndex}` : null);
     setLastDocumentPosition(documentPositionKey, target.sectionId);
     setSelectedSlideSectionId(target.sectionId);
     setRestoreRequest({ token, target });
-    documentRef.current?.setPreservedSection(target.sectionId, target.edge);
+    documentRef.current?.setPreservedSection(target.sectionId, target.edge, targetVerseIndex);
     clearPendingDocumentRestore(documentPositionKey, pending.sequence);
     navigatingAwayRef.current = false;
     const clearGuard = setTimeout(() => {
@@ -537,8 +553,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // imperatively too. Its load handler separately enforces the same target.
   useEffect(() => {
     if (!restoreRequest || preferences.slideshowMode) return;
-    documentRef.current?.setPreservedSection(restoreRequest.target.sectionId, restoreRequest.target.edge);
-    documentRef.current?.scrollToSection(restoreRequest.target.sectionId, restoreRequest.target.edge);
+    documentRef.current?.setPreservedSection(restoreRequest.target.sectionId, restoreRequest.target.edge, restoreRequest.target.verseIndex ?? null);
+    documentRef.current?.scrollToSection(restoreRequest.target.sectionId, restoreRequest.target.edge, restoreRequest.target.verseIndex ?? null);
   }, [restoreRequest, preferences.slideshowMode]);
 
   // The scrolling WebView reader has no equivalent "seed the initial prop"
@@ -628,6 +644,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
 
     if (preferences.slideshowMode) {
       setSelectedSlideSectionId(currentSectionId);
+      // The slide opens at the verse the page was scrolled to, not the hymn's first.
+      setSlideJumpRequest((current) => ({ sectionId: currentSectionId, verseIndex: currentVerseIndexRef.current, token: (current?.token ?? 0) + 1 }));
       return;
     }
 
@@ -664,8 +682,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     captureDocumentRestore(
       documentPositionKey,
       currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
-      readySections?.map(section => section.id) ?? [],
+      latestSectionOrderRef.current,
       restoreSettingsSignature,
+      currentVerseIndexRef.current,
     );
     navigatingAwayRef.current = true;
     coveredRef.current = true;
@@ -680,8 +699,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     captureDocumentRestore(
       documentPositionKey,
       currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
-      readySections?.map(section => section.id) ?? [],
+      latestSectionOrderRef.current,
       restoreSettingsSignature,
+      currentVerseIndexRef.current,
     );
     setSelectorOpen(false);
     setCalendarOpen(true);
@@ -754,7 +774,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       captureDocumentRestore(
         documentPositionKey,
         action.sectionId ?? currentSectionIdRef.current,
-        readySections?.map(section => section.id) ?? [],
+        latestSectionOrderRef.current,
         restoreSettingsSignature,
       );
       markPendingDocumentRestoresDirty();
@@ -790,6 +810,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         setLastDocumentPosition(documentPositionKey, action.sectionId);
       }
       setCurrentVerseId(action.verseId || null);
+      currentVerseIndexRef.current = verseIndexFromId(action.verseId);
+      setCurrentVerseIndex(currentVerseIndexRef.current);
       if (isAntiphonary) setCurrentTune(getVerseTune(sections, action.verseId));
       return;
     }
@@ -1003,7 +1025,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             onAction={handleAction}
             selectedSectionId={selectedSlideSectionId}
             jumpRequest={slideJumpRequest}
-            onCurrentSectionChange={(id, tune) => {
+            onCurrentSectionChange={(id, tune, verseIndex) => {
               // Only SlideshowContainer ever calls this — a report arriving
               // while slideshowMode is actually false can only be a stale
               // callback from an instance that's already mid-unmount (e.g.
@@ -1015,6 +1037,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               pendingScrollRestoreSectionIdRef.current = null;
               currentSectionIdRef.current = id;
               setCurrentSectionId(id);
+              currentVerseIndexRef.current = verseIndex;
+              setCurrentVerseIndex(verseIndex);
+              setCurrentVerseId(verseIndex != null ? `${id}::v${verseIndex}` : null);
               setLastDocumentPosition(documentPositionKey, id);
               setCurrentTune(tune);
             }}
@@ -1022,6 +1047,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             copticGospelRite={copticGospelRite}
             suppressAllSpeakerLabels={schema === 'agpeya'}
             initialScrollSectionId={restoreRequest?.target.sectionId ?? currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
+            initialScrollVerseIndex={restoreRequest ? restoreRequest.target.verseIndex ?? null : currentVerseIndex}
             onCollapseToggle={setSelectedSlideSectionId}
             keyboardNavigationEnabled={!isCoveredByModal}
             sermonPlannerMode={isSermonPlanner}

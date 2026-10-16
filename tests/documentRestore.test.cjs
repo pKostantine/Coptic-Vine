@@ -20,7 +20,7 @@ test('every settings change returns to the START of the same surviving hymn', ()
   const original = ['opening', 'psalm', 'gospel', 'closing'];
   assert.deepEqual(
     resolveDocumentRestore(original, 'gospel', ['opening', 'psalm', 'gospel', 'closing']),
-    { sectionId: 'gospel', edge: 'start' },
+    { sectionId: 'gospel', edge: 'start', verseIndex: null },
   );
 });
 
@@ -174,7 +174,7 @@ test('a reload or a jump never lets the page\'s first "at the top" report replac
     assert.match(view, /if \(loadingRef\.current\) \{\s*reportDuringLoadRef\.current = action;\s*return;/, file);
     assert.match(view, /guard\.sectionId !== action\.sectionId && Date\.now\(\) < guard\.until\) return;/, file);
     // A jump records its target before the page has scrolled anywhere.
-    assert.match(view, /scrollToSection: \(id: string, edge: 'start' \| 'end' = 'start'\) => \{\s*preservedSectionIdRef\.current = id;\s*preservedEdgeRef\.current = edge;\s*guardJump\(id\);/, file);
+    assert.match(view, /scrollToSection: \(id: string, edge: 'start' \| 'end' = 'start', verseIndex: number \| null = null\) => \{\s*preservedSectionIdRef\.current = id;\s*preservedEdgeRef\.current = edge;\s*preservedVerseIdRef\.current = verseIdOf\(id, verseIndex\);\s*guardJump\(id\);/, file);
     // Reports count again only once the restore has been sent.
     assert.match(view, /guardJump\(candidates\[0\]\.sectionId\);\s*\}\s*loadingRef\.current = false;/, file);
   }
@@ -346,4 +346,79 @@ test('a document left opens again at the top; its place is kept only while it is
   assert.match(screen, /navigation\.addListener\('beforeRemove', \(\) => forgetDocumentPosition\(documentPositionKey\)\)/);
   // Opening the Seasons over it covers it rather than leaving it.
   assert.match(screen, /navigatingAwayRef\.current = true;\n    coveredRef\.current = true;/);
+});
+
+// ---- Every change brings the reader back to their verse, their hymn, or the end of the hymn before ----
+
+test('a change restores the verse at the top of the page, by the hymn\'s id or, on another day, its key', () => {
+  const original = [{ id: 'hoos4-3', hymnKey: 'hoos4' }, { id: 'psali-5', hymnKey: 'kiahkPsali' }, { id: 'theotokia-6', hymnKey: 'theotokia' }];
+  // The same hymn, same place: the same verse.
+  assert.deepEqual(
+    resolveDocumentRestore(original, 'psali-5', original, 7),
+    { sectionId: 'psali-5', edge: 'start', verseIndex: 7 },
+  );
+  // The same hymn at another place in another day's order: still that hymn, that verse.
+  assert.deepEqual(
+    resolveDocumentRestore(original, 'psali-5', [{ id: 'hoos4-3', hymnKey: 'hoos4' }, { id: 'kiahkPsali-9', hymnKey: 'kiahkPsali' }], 7),
+    { sectionId: 'kiahkPsali-9', edge: 'start', verseIndex: 7 },
+  );
+  // No verse known: the hymn's start.
+  assert.deepEqual(resolveDocumentRestore(original, 'psali-5', original), { sectionId: 'psali-5', edge: 'start', verseIndex: null });
+});
+
+test('a hymn gone from the day lands at the END of the nearest earlier hymn still shown (a Kiahk psali on Palm Sunday: the Fourth Hoos)', () => {
+  const kiahk = [{ id: 'hoos4-3', hymnKey: 'hoos4' }, { id: 'kiahk-psali-4', hymnKey: 'kiahkPsali' }, { id: 'kiahk-psali-5', hymnKey: 'kiahkPsali2' }, { id: 'theotokia-6', hymnKey: 'theotokia' }];
+  const palmSunday = [{ id: 'hoos4-3', hymnKey: 'hoos4' }, { id: 'palm-psali-4', hymnKey: 'palmPsali' }, { id: 'theotokia-6', hymnKey: 'theotokia' }];
+  assert.deepEqual(resolveDocumentRestore(kiahk, 'kiahk-psali-5', palmSunday, 2), { sectionId: 'hoos4-3', edge: 'end' });
+  // The earlier hymn is found by its key too when its id moved.
+  const moved = [{ id: 'hoos4-9', hymnKey: 'hoos4' }, { id: 'theotokia-6', hymnKey: 'theotokia' }];
+  assert.deepEqual(resolveDocumentRestore(kiahk, 'kiahk-psali-5', moved, 2), { sectionId: 'hoos4-9', edge: 'end' });
+  // Plain ids still work as before.
+  assert.deepEqual(resolveDocumentRestore(['a', 'b', 'c'], 'b', ['a', 'c']), { sectionId: 'a', edge: 'end' });
+});
+
+test('the verse index is read from the scrolling reader\'s verse ids', () => {
+  const { verseIndexFromId, visibleDocumentSectionRefs } = loadPureTypeScript('src/utils/sectionRestore.ts');
+  assert.equal(verseIndexFromId('hoos4-3::v12'), 12);
+  assert.equal(verseIndexFromId('hoos4-3::v0'), 0);
+  assert.equal(verseIndexFromId(null), null);
+  assert.equal(verseIndexFromId('hoos4-3'), null);
+  assert.deepEqual(
+    visibleDocumentSectionRefs([{ id: 'a', hymnKey: 'ka' }, { id: 'silent', hymnKey: 'ks', titlePrayerType: 'Silent Prayer' }], { displaySilentPrayers: false, bishopPresent: false, copticGospelRite: false }),
+    [{ id: 'a', hymnKey: 'ka' }],
+  );
+});
+
+test('both renderers name a verse by its index in the hymn\'s rows and go back to it', () => {
+  const surface = fs.readFileSync('src/components/vine/DocumentSurface.tsx', 'utf8');
+  const slides = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
+  const html = fs.readFileSync('src/components/vine/documentHtml.ts', 'utf8');
+  const native = fs.readFileSync('src/components/vine/DocumentWebView.tsx', 'utf8');
+  const web = fs.readFileSync('src/components/vine/DocumentWebView.web.tsx', 'utf8');
+  const reader = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+  const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
+  // The slideshow keeps each verse's row index through the display filters and names its items by it.
+  assert.match(surface, /section\.verses\.map\(\(verse, index\) => \(\{ \.\.\.verse, sourceIndex: index \}\)\)\.filter/);
+  assert.match(slides, /id: `\$\{section\.id\}-\$\{verse\.sourceIndex \?\? verseIndex\}`/);
+  assert.match(slides, /verseIndexInSection: verse\.sourceIndex \?\? verseIndex/);
+  // It reports the first verse of the hymn on the slide, and restores or jumps to a verse when asked.
+  assert.match(slides, /onCurrentSectionChange\?\.\(\s*currentSectionId,[\s\S]*?topVerse\.verseIndexInSection/);
+  assert.match(slides, /const \{ sectionId, edge, verseIndex \} = restoreRequest\.target;/);
+  assert.match(slides, /jumpRequest\.verseIndex/);
+  // An earlier hymn is landed on at its end.
+  assert.match(slides, /landedAtEnd \? \{ \.\.\.createSlideAnchor\(\[landedAtEnd\]\), breaks: false \}/);
+  // The page scrolls to the verse a candidate names before the section's edge, and both readers hand it one.
+  assert.match(html, /var verseId = typeof candidate === 'string' \? null : candidate && candidate\.verseId;/);
+  for (const source of [native, web]) {
+    assert.match(source, /preservedVerseIdRef/);
+    assert.match(source, /verseId: index \? undefined : preservedVerseIdRef\.current \|\| undefined/);
+    assert.match(source, /initialVerseIndex/);
+  }
+  // The documents capture the verse with the hymn keys, and switch modes to it.
+  assert.match(reader, /currentVerseIndexRef\.current,\s*\);/);
+  assert.match(reader, /resolveDocumentRestore\(pending\.originalSections, pending\.sectionId, visibleRefs, pending\.verseIndex\)/);
+  assert.match(reader, /setSlideJumpRequest\(\(current\) => \(\{ sectionId: currentSectionId, verseIndex: currentVerseIndexRef\.current, token:/);
+  assert.match(reader, /initialScrollVerseIndex=/);
+  assert.match(modal, /requestSlideJump\(\{ sectionId: currentSectionId, verseIndex: currentVerseIndex \}\)/);
+  assert.match(modal, /initialScrollVerseIndex=\{currentVerseIndex\}/);
 });
