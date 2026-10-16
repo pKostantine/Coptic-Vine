@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import BookPage, { BookRow, ReadingRow, RowList, SectionHeading } from './BookPage';
+import CalendarSheet from '../ui/CalendarSheet';
 import DayControls from '../ui/DayControls';
 import Icon from '../ui/Icon';
 import TodayCard from '../ui/TodayCard';
@@ -41,6 +42,8 @@ export default function LectionaryMenu() {
   // The readings are the rite's: after the eve, the next morning's.
   const dateKey = effectiveDate.toISOString().slice(0, 10);
   const [readings, setReadings] = useState<DayReadings | null>(null);
+  // The date on the day card opens the calendar, to read any day's readings.
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -106,6 +109,8 @@ export default function LectionaryMenu() {
             )}
             heading={day.coptic ? formatCopticDayMonth(day.coptic.monthName, day.coptic.day, arabic) : ' '}
             subheading={formatDayMonthYearDate(day.date, arabic)}
+            onPressHeading={() => setCalendarOpen(true)}
+            headingAccessibilityLabel={tr('Choose the day', 'Choisir le jour', 'اختر اليوم')}
           />
       )}
     >
@@ -123,6 +128,7 @@ export default function LectionaryMenu() {
           <BookRow icon="create-outline" title={entryLabel(sermonPlanner)} arabic={arabic} bookmarked={bookmarked(sermonPlanner)} onPress={() => open(sermonPlanner)} />
         ) : null}
       </RowList>
+      <CalendarSheet visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={() => router.push('/season-selector')} />
     </BookPage>
   );
 }

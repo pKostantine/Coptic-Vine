@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentPillBar from '../ui/DocumentPillBar';
 import DocumentTopBar from '../ui/DocumentTopBar';
 import CalendarSheet from '../ui/CalendarSheet';
+import DocumentDateBar from '../ui/DocumentDateBar';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
 import LoadFailure from '../ui/LoadFailure';
@@ -75,6 +76,9 @@ interface ServiceDocumentProps {
 }
 
 /** Appends a hyperlink button to the next service, labelled with that service's own name, after a hydrated document. The same section shape hymnLibrary builds for an order row whose item_type is Hyperlink. */
+/** The documents read for a day, which carry a date bar: the Lectionary's three services and the Sermon Planner. */
+const DATE_BAR_TABLES = new Set(['lectionary_vespers', 'lectionary_matins', 'lectionary_liturgy', 'sermon_planner']);
+
 function withAppendedHyperlink(sections: DocumentSection[], hyperlinkKey?: string): DocumentSection[] {
   const destination = hyperlinkKey ? HYPERLINK_TARGETS[hyperlinkKey] : undefined;
   if (!hyperlinkKey || !destination) return sections;
@@ -130,6 +134,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   } = useReadingPreferences();
   const { effectiveDate, vespersEffectiveDate } = useCalendar();
   const isSermonPlanner = schema === 'liturgy' && table === 'sermon_planner';
+  // Read for a day, and often for another day than today: the day is changed
+  // from a bar across the top (DocumentDateBar) rather than the content list.
+  const showDateBar = schema === 'liturgy' && DATE_BAR_TABLES.has(table);
   // The Antiphonary read as a book of its own keeps the Introduction/Adam/Vatos
   // pills it has when a service opens it.
   const isAntiphonary = schema === 'psalmody' && table === 'antiphonary';
@@ -695,7 +702,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // The calendar opens over the document rather than as a page of its own.
   // Choosing another day re-reads the document for it, so its place is kept
   // first, as when leaving for another page.
-  const openCalendar = () => {
+  const keepPlaceForAnotherDay = () => {
     captureDocumentRestore(
       documentPositionKey,
       currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
@@ -703,6 +710,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       restoreSettingsSignature,
       currentVerseIndexRef.current,
     );
+  };
+  const openCalendar = () => {
+    keepPlaceForAnotherDay();
     setSelectorOpen(false);
     setCalendarOpen(true);
   };
@@ -1004,6 +1014,14 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           trailingIcon={isSermonPlanner ? 'document-text-outline' : 'list-outline'}
           trailingAccessibilityLabel={isSermonPlanner ? 'Open sermon notes' : 'Open content list'}
           onTrailingPress={() => setSelectorOpen(true)}
+        />
+      ) : null}
+      {showDateBar && !error ? (
+        <DocumentDateBar
+          arabic={preferences.appLanguage === 'ar'}
+          theme={documentTheme}
+          onBeforeChange={keepPlaceForAnotherDay}
+          onOpenCalendar={openCalendar}
         />
       ) : null}
       {error ? (
