@@ -238,7 +238,7 @@ export function paginateItems(
   const safeAvailableHeight = Math.max(Number(availableHeight) || 0, 1);
   const units = buildPaginationUnits(items);
   if (breakAt?.direction === "backward") {
-    const forward = packBackwardFromItem(items, units, heights, languageHeights, safeAvailableHeight, fontSize, visibleLanguages, breakAt.itemId);
+    const forward = packBackwardFromItem(items, units, heights, languageHeights, safeAvailableHeight, fontSize, visibleLanguages, breakAt.itemId, breakAt.offsets);
     return paginateItems(items, heights, languageHeights, availableHeight, fontSize, visibleLanguages, tableWidth, forward);
   }
   const slides = [];
@@ -379,15 +379,22 @@ export function paginateItems(
  * taller than a slide, the slide shows that verse's last piece (and
  * whatever follows it that fits, as a forward turn would).
  */
-function packBackwardFromItem(items, units, heights, languageHeights, availableHeight, fontSize, visibleLanguages, itemId) {
+function packBackwardFromItem(items, units, heights, languageHeights, availableHeight, fontSize, visibleLanguages, itemId, lineOffsets) {
   const last = items.findIndex((item) => item.id === itemId);
   if (last < 0) return null;
   const heightOf = (index) => Math.ceil((heights[items[index].id] ?? 0) + 2);
   const measured = (item) => item.type === "verse" && hasEveryMeasuredColumn(item, languageHeights[item.id], visibleLanguages);
   if (measured(items[last]) && heightOf(last) > availableHeight) {
-    const pieces = paginateItems([items[last]], heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0);
-    const lastPiece = pieces[pieces.length - 1]?.[0];
-    const offsets = Object.fromEntries(Object.entries(lastPiece?.slideshowLineRanges || {}).map(([language, range]) => [language, range.start]));
+    // The verse's pieces, as a fresh slide divides them: the page ending at
+    // the line asked for is the piece holding that line, else the last.
+    const pieces = paginateItems([items[last]], heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0)
+      .map((slide) => slide[0]).filter((piece) => piece?.slideshowLineRanges);
+    const wanted = lineOffsets && Object.entries(lineOffsets).find(([, line]) => Number.isFinite(line) && line >= 0);
+    const piece = (wanted && pieces.find((candidate) => {
+      const range = candidate.slideshowLineRanges[wanted[0]];
+      return range && wanted[1] >= range.start && wanted[1] < range.end;
+    })) || pieces[pieces.length - 1];
+    const offsets = Object.fromEntries(Object.entries(piece?.slideshowLineRanges || {}).map(([language, range]) => [language, range.start]));
     return { itemId, offsets, endsBeforeItemId: items[last + 1]?.id };
   }
   const keepsWithNext = (item) => item?.type === "title" || item?.type === "gospelRiteToggle";

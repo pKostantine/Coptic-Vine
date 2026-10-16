@@ -740,8 +740,32 @@ export default function SlideshowContainer({
     const deck = shownDeckRef.current?.slides?.length ? shownDeckRef.current.slides : slides;
     const index = navigationIndexRef.current;
     const current = deck[index];
-    const firstIndex = current?.length ? itemIndexById.get(current[0].sourceItemId || current[0].id) : -1;
-    if (firstIndex == null || firstIndex <= 0 || index <= 0) {
+    const first = current?.[0];
+    const firstIndex = first ? itemIndexById.get(first.sourceItemId || first.id) : -1;
+    if (firstIndex == null || index <= 0) {
+      goToSlide(index - 1);
+      return;
+    }
+    // Partway down a verse too tall for a slide, the page before is the
+    // piece of the same verse ending at the line above: it is named by that
+    // line, in the column that has lines here.
+    const ranges = first.slideshowLineRanges || {};
+    const continued = Object.keys(ranges).filter((language) => ranges[language].start > 0);
+    if (continued.length) {
+      const primaryLanguage = continued.find((language) => ranges[language].end > ranges[language].start) || continued[0];
+      navigationIndexRef.current = index - 1;
+      setCurrentSlideIndex(index - 1);
+      setCurrentAnchor({
+        sourceItemId: first.sourceItemId || first.id,
+        sectionId: first.sectionId || null,
+        segmentIndex: null,
+        primaryLanguage,
+        offsets: Object.fromEntries([primaryLanguage, ...continued.filter((language) => language !== primaryLanguage)].map((language) => [language, ranges[language].start - 1])),
+        direction: "backward",
+      });
+      return;
+    }
+    if (firstIndex <= 0) {
       goToSlide(index - 1);
       return;
     }

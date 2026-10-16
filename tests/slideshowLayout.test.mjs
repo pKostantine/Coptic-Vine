@@ -1000,3 +1000,23 @@ test("turned back, the page is packed from its foot up, ending where the page on
   assert.deepEqual(into[landing + 1].map((entry) => entry.id), ["v9"]);
   assert.equal(into[landing][0].slideshowLineRanges.english.end, 30);
 });
+
+test("turned back from the second piece of a tall verse, the page is the piece before it, not the slide before the verse", () => {
+  const before = verseItem({ id: "before", sectionId: "s" });
+  const giant = verseItem({ id: "giant", sectionId: "s" });
+  const metric = { english: { lines: metricLines("English", 30) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 30) }, arabic: { lines: metricLines("عربي", 30) } };
+  const lineHeight = getSlideshowLanguageLineHeight("arabic", giant, 18);
+  const budget = lineHeight * 8 + 40;
+  const forward = paginateItems([before, giant], { before: 60, giant: 9999 }, { giant: metric }, budget, 18, ALL_LANGUAGES, 1024);
+  const pieces = forward.filter((slide) => (slide[0].sourceItemId || slide[0].id) === "giant");
+  assert.ok(pieces.length >= 3);
+  const second = pieces[1][0];
+  // The anchor a turn back from the second piece sets: the line above it, in a column that has lines there.
+  const anchor = { sourceItemId: "giant", direction: "backward", primaryLanguage: "english", offsets: { english: second.slideshowLineRanges.english.start - 1, coptic: second.slideshowLineRanges.coptic.start - 1, arabic: second.slideshowLineRanges.arabic.start - 1 } };
+  const back = paginateItems([before, giant], { before: 60, giant: 9999 }, { giant: metric }, budget, 18, ALL_LANGUAGES, 1024, { itemId: "giant", ...anchor });
+  const landing = findSlideIndexForAnchor(back, anchor);
+  assert.equal((back[landing][0].sourceItemId || back[landing][0].id), "giant");
+  assert.deepEqual(back[landing][0].slideshowLineRanges.english, pieces[0][0].slideshowLineRanges.english);
+  // The page after it is the piece the reader turned back from.
+  assert.deepEqual(back[landing + 1][0].slideshowLineRanges.english, second.slideshowLineRanges.english);
+});
