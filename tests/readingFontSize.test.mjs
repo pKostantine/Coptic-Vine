@@ -33,12 +33,14 @@ test('the text size is one scale of a 14px base, rendered the same on every devi
 test('the slider reaches further on a larger screen, the same either way up', () => {
   assert.equal(maxFontScaleForScreen(390, 844), 2.786);
   assert.equal(maxFontScaleForScreen(844, 390), 2.786);
-  assert.equal(maxFontScaleForScreen(360, 800), 2.571);
+  // A small phone's range still reaches the earlier phone table's largest size, 38px.
+  assert.equal(maxFontScaleForScreen(360, 800), 2.714);
+  assert.equal(fontScaleToPx(maxFontScaleForScreen(320, 568)), 38);
   assert.equal(maxFontScaleForScreen(820, 1180), 5.857);
   assert.equal(maxFontScaleForScreen(1920, 1080), 7.714);
   // Nothing known about the screen: a phone's range. A tiny one still has a range.
   assert.equal(maxFontScaleForScreen(0, 0), 2.786);
-  assert.equal(maxFontScaleForScreen(100, 100), 2);
+  assert.equal(maxFontScaleForScreen(100, 100), 2.714);
 });
 
 test('twenty divisions between the ends: a step lands on the next one, never past an end', () => {
@@ -82,6 +84,16 @@ test('a stored size of any earlier format becomes the scale that renders at that
   // The 0-20 and 0-10 ranges before that, by the size they rendered.
   assert.equal(fontScaleToPx(readStoredFontScale({ fontScale: 2, fontScaleRangeMax: 20 }, 'phone', max)), 23);
   assert.equal(fontScaleToPx(readStoredFontScale({ fontScale: 1 }, 'phone', max)), 23);
+  // Every level the earlier phone table offered keeps its size on the smallest phone.
+  const smallest = maxFontScaleForScreen(320, 568);
+  for (let level = 1; level <= 10; level++) {
+    assert.equal(fontScaleToPx(readStoredFontScale({ fontScale: level, fontScaleRangeMax: 10 }, 'phone', smallest)), readingFontSizeForLevel(level, 'phone'));
+  }
+  // A scale record a level build has since rewritten carries its range marker: it is read as the level it now holds.
+  const rewritten = { fontScale: 7, fontScaleRangeMax: 10, fontScaleVersion: 2 };
+  assert.equal(fontScaleToPx(readStoredFontScale(rewritten, 'phone', max)), readingFontSizeForLevel(7, 'phone'));
+  // A later version's scale is still a scale.
+  assert.equal(readStoredFontScale({ fontScale: 1.75, fontScaleVersion: 3 }, 'phone', max), 1.75);
   // Nothing stored, or nonsense: the default.
   assert.equal(readStoredFontScale(null, 'phone', max), 1.5);
   assert.equal(readStoredFontScale({ fontScale: 'big' }, 'phone', max), 1.5);

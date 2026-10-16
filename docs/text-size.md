@@ -27,11 +27,13 @@ projected screen.
 ## The range grows with the screen
 
 The slider runs from a scale of 1 (14px) to `maxFontScaleForScreen`: the
-screen's shortest side over 140, never less than 2.
+screen's shortest side over 140, never less than 2.714 (38px, the largest
+size the earlier phone table offered), so no reader's size shrinks on a
+small phone.
 
 | screen (shortest side) | top of the range | largest English |
 | --- | --- | --- |
-| 360pt phone | 2.57 | 36px |
+| 320–380pt phone | 2.71 | 38px |
 | 390pt phone | 2.79 | 39px |
 | 820pt iPad | 5.86 | 82px |
 | 1080p screen | 7.71 | 108px |
@@ -43,7 +45,9 @@ divisions between the ends whatever the screen (`FONT_SCALE_STEPS`): on a
 phone a step is about 1px, on a 1080p screen about 5px, which is what the
 step buttons, the keyboard and the native slider's `step` move by. The
 slider snaps to a division (`snapFontScale`); a size set otherwise (a
-migrated one) keeps its exact value until the slider is touched.
+migrated one) keeps its exact value until the slider is touched. On the web
+the track is focusable and answers the keys a slider does: the arrows step
+one division, Page Up and Page Down five, Home and End go to the ends.
 
 New installations open at a scale of 1.5: 21px, between the sizes the
 earlier tables opened at.
@@ -52,8 +56,11 @@ earlier tables opened at.
 
 `fontScale` is a device choice, not a synced one (a phone on a pew and a
 laptop at home are read differently), stored with
-`fontScaleVersion: 2`. `readStoredFontScale` reads whatever an earlier
-installation wrote: a 1–10 level with `fontScaleRangeMax: 10`, or the
+`fontScaleVersion: 2`. A level build that rewrites such a record (an
+update rolled back, an old web tab) keeps the version marker and writes its
+level beside it with `fontScaleRangeMax`, which this build never writes, so
+a record carrying `fontScaleRangeMax` is read as a level whatever version it
+claims. `readStoredFontScale` reads whatever an earlier installation wrote: a 1–10 level with `fontScaleRangeMax: 10`, or the
 0–10 and 0–20 ranges before that. Each becomes the scale that renders at
 the size it rendered on this device (the old table and device class are
 kept for that alone), so an update never changes the size a reader had

@@ -238,16 +238,20 @@ export function getTitlePairedVerseCount(hymnKey) {
   return TITLE_PAIRED_VERSE_COUNTS[hymnKey] || 1;
 }
 
+// A rubric (a Comment row, shown only with Display Comments on) is not the
+// hymn's text: it never takes one of the verses a title keeps.
+const isRubricVerse = (item) => item.verse?.type === "comment" || item.verse?.type === "silentComment";
+
 /**
  * The index of the title the verse at `index` is kept with, else -1: a title
- * is before the verse, with nothing but the Coptic Gospel toggle and fewer
- * verses than the title keeps between them.
+ * is before the verse, with nothing but the Coptic Gospel toggle, rubrics,
+ * and fewer verses than the title keeps between them.
  */
 function pairedTitleIndex(items, index) {
   let versesBetween = 0;
   let start = index - 1;
   while (start >= 0 && items[start].type !== "title") {
-    if (items[start].type === "verse") versesBetween += 1;
+    if (items[start].type === "verse") versesBetween += isRubricVerse(items[start]) ? 0 : 1;
     else if (items[start].type !== "gospelRiteToggle") return -1;
     if (versesBetween >= MAX_TITLE_PAIRED_VERSES) return -1;
     start -= 1;
@@ -1323,8 +1327,11 @@ export function isSlideSettled(items, slides, slideIndex, isMeasured, itemIndexB
  */
 export function getSettleStart(items, firstIndex, breakIndex = null) {
   const runStart = getPaginationRunStart(items, firstIndex);
-  if (breakIndex != null && breakIndex >= 0 && breakIndex <= firstIndex) return Math.max(runStart, breakIndex);
-  return runStart;
+  if (breakIndex == null || breakIndex < 0 || breakIndex > firstIndex) return runStart;
+  // A break at a verse its title keeps is laid out from the title, so the
+  // slide waits on the title and the verses before it too.
+  const titleIndex = items[breakIndex]?.type === "verse" ? pairedTitleIndex(items, breakIndex) : -1;
+  return Math.max(runStart, titleIndex >= 0 ? titleIndex : breakIndex);
 }
 
 /**

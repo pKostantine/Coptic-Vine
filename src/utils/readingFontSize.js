@@ -26,15 +26,18 @@ export const FONT_SCALE_VERSION = 2;
 // 7.71 (108px). Spirit & Truth divides by 130 on a slightly smaller base.
 const SHORT_EDGE_PER_SCALE = 140;
 const FALLBACK_SHORT_EDGE = 390;
+// The largest size the earlier phone table offered (38px): no screen's range
+// stops short of it, so a reader who had it keeps it on a small phone too.
+const SMALLEST_RANGE_TOP = 2.714;
 
 /**
  * How far the slider goes on a screen, from its shortest side: the same
  * either way up, so turning the device never moves the reader's size, and
- * never less than a scale of 2.
+ * never short of the earlier tables' largest phone size.
  */
 export function maxFontScaleForScreen(screenWidth, screenHeight) {
   const shortEdge = Math.min(positiveDimension(screenWidth), positiveDimension(screenHeight)) || FALLBACK_SHORT_EDGE;
-  return Math.max(MIN_FONT_SCALE + 1, roundScale(shortEdge / SHORT_EDGE_PER_SCALE));
+  return Math.max(SMALLEST_RANGE_TOP, roundScale(shortEdge / SHORT_EDGE_PER_SCALE));
 }
 
 /** The width of one of the slider's divisions. */
@@ -74,11 +77,17 @@ export function fontScaleToPx(scale) {
  * table (fontScaleRangeMax 10); before that a 0-10 or 0-20 range. An older
  * value becomes the scale that renders at the size it rendered on this
  * device, so an update never changes the size a reader had chosen.
+ *
+ * A level build that reads a scale record keeps its unknown version marker
+ * and writes its level beside it, with its own range marker -- which this
+ * build never writes. A record carrying that marker is a level, whatever
+ * version it claims.
  */
 export function readStoredFontScale(stored, deviceClass, maxScale) {
   const value = Number(stored?.fontScale);
   if (!Number.isFinite(value)) return clampFontScale(DEFAULT_FONT_SCALE, maxScale);
-  if (stored.fontScaleVersion === FONT_SCALE_VERSION) return clampFontScale(value, maxScale);
+  const writtenAsLevel = stored.fontScaleRangeMax != null;
+  if (!writtenAsLevel && Number(stored.fontScaleVersion) >= FONT_SCALE_VERSION) return clampFontScale(value, maxScale);
   const level = migrateReadingFontLevel(value, stored.fontScaleRangeMax, deviceClass);
   return clampFontScale(roundScale(readingFontSizeForLevel(level, deviceClass) / READING_FONT_BASE_PX), maxScale);
 }

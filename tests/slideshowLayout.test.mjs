@@ -996,6 +996,41 @@ test("a title that keeps its first two verses shows as much of the second as fit
   assert.deepEqual(ids(roomy), [["h-title", "h-0", "h-1"], ["h-2"]]);
 });
 
+test("a rubric shown with Comments on never takes one of the verses a title keeps", () => {
+  const title = { id: "a-title", sectionId: "a", type: "title", title: { english: "Agios" }, pairedVerseCount: 2 };
+  const rubric = (index) => verseItem({ id: `a-c${index}`, sectionId: "a", verse: { english: "The priest takes the veil.", type: "comment" } });
+  const verse = (index) => verseItem({ id: `a-${index}`, sectionId: "a" });
+  const metric = { english: { lines: metricLines("English", 6) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 6) }, arabic: { lines: metricLines("عربي", 6) } };
+  const lineHeight = getSlideshowLanguageLineHeight("arabic", verse(1), 18);
+  const tall = lineHeight * 6 + 40;
+  const ids = (slides) => slides.map((slide) => slide.map((entry) => entry.sourceItemId || entry.id));
+  // Two rubrics, the short Agios line, then the full verse: the full verse still gives what fits beneath the title.
+  const items = [title, rubric(0), rubric(1), verse(0), verse(1), verse(2)];
+  const heights = { "a-title": 40, "a-c0": 40, "a-c1": 40, "a-0": 60, "a-1": tall, "a-2": 100 };
+  const budget = 40 + 40 + 40 + 60 + lineHeight * 3 + 40;
+  const slides = paginateItems(items, heights, { "a-1": metric }, budget, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(ids(slides), [["a-title", "a-c0", "a-c1", "a-0", "a-1"], ["a-1", "a-2"]]);
+  assert.ok(slides[0][4].slideshowLineCounts.english > 0 && slides[0][4].slideshowLineCounts.english < 6);
+  // The verse after the two kept ones is not the title's: it moves on whole.
+  const third = paginateItems([...items.slice(0, 5), verseItem({ id: "a-2", sectionId: "a" })], { ...heights, "a-1": 60, "a-2": tall }, { "a-2": metric }, budget, 18, ALL_LANGUAGES, 1024);
+  assert.deepEqual(ids(third), [["a-title", "a-c0", "a-c1", "a-0", "a-1"], ["a-2"]]);
+});
+
+test("a break at a verse its title keeps waits on the title to settle", () => {
+  const title = { id: "h-title", sectionId: "h", type: "title", title: { english: "Hoos" }, pairedVerseCount: 2 };
+  const verse = (index) => verseItem({ id: `h-${index}`, sectionId: "h" });
+  const items = [title, verse(0), verse(1), verse(2)];
+  // From the second verse's top, the slide is laid out from the title: it settles from there.
+  assert.equal(getSettleStart(items, 2, 2), 0);
+  // A title that keeps one verse lays the second out on its own.
+  const single = [{ ...title, pairedVerseCount: 1 }, verse(0), verse(1), verse(2)];
+  assert.equal(getSettleStart(single, 2, 2), 2);
+  const slides = [[title, verse(0)], [verse(1), verse(2)]];
+  const measuredButTitle = (item) => item.id !== "h-title";
+  assert.equal(isSlideSettled(items, slides, 1, measuredButTitle, null, 2), false);
+  assert.equal(isSlideSettled(items, slides, 1, () => true, null, 2), true);
+});
+
 test("the titles that keep two verses are named by hymn key, and the slideshow sets the count from the section", () => {
   assert.deepEqual(Object.keys(TITLE_PAIRED_VERSE_COUNTS).sort(), [
     "agiosAgiosAgiosStBasil", "agiosAgiosAgiosStCyril", "agiosAgiosAgiosStGregory",

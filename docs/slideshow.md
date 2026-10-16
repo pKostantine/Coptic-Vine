@@ -153,7 +153,11 @@ Items are placed in order; a slide holds whole items:
   second verse does as the first does beneath it: whole if it fits, else as
   much of it as fits, the rest over the page. If the first verse itself
   turned the page, the title's slide is full, and the second verse keeps
-  the whole-verse rule. Breaks and turns back treat it as they treat the
+  the whole-verse rule. A rubric (a Comment row, shown with Display
+  Comments on) never takes one of the verses a title keeps: it is kept with
+  the title too, and the hymn's own verses still count from the first. A
+  break at a kept verse settles from its title (`getSettleStart`), since
+  the slide is laid out from there. Breaks and turns back treat it as they treat the
   first verse: a break at it from its top is a break at the title, and a
   page turned back into it is the page a forward turn from the title gives
   it (`pairedTitleIndex`, `packBackwardFromItem`).

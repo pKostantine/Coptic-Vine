@@ -21,6 +21,14 @@ const THUMB = 24;
  */
 export default function FontScaleControl({ fontScale, isArabic, label, onStep, onSetValue, compact = false, stepper = false }: FontScaleControlProps) {
   const [width, setWidth] = useState(0);
+  const onTrackKey = (event: { key?: string; preventDefault?: () => void }) => {
+    const delta = { ArrowLeft: -1, ArrowDown: -1, PageDown: -5, ArrowRight: 1, ArrowUp: 1, PageUp: 5 }[event.key ?? ''];
+    if (delta != null) onStep(delta);
+    else if (event.key === 'Home') onSetValue(MIN_FONT_SCALE);
+    else if (event.key === 'End') onSetValue(MAX_FONT_SCALE);
+    else return;
+    event.preventDefault?.();
+  };
   const fraction = Math.min(1, Math.max(0, (fontScale - MIN_FONT_SCALE) / (MAX_FONT_SCALE - MIN_FONT_SCALE)));
   const size = fontScaleToPx(fontScale);
   const value = isArabic ? toEasternArabicDigits(size) : size;
@@ -55,8 +63,10 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
   }
 
   const setFromPoint = (event: GestureResponderEvent) => {
-    if (width <= 0) return;
-    const x = Math.min(width, Math.max(0, event.nativeEvent.locationX));
+    // A press from the keyboard (Enter, Space) has no point on the track.
+    const locationX = event?.nativeEvent?.locationX;
+    if (width <= 0 || !Number.isFinite(locationX)) return;
+    const x = Math.min(width, Math.max(0, locationX));
     onSetValue(MIN_FONT_SCALE + Math.round((x / width) * FONT_SCALE_STEPS) * FONT_SCALE_STEP);
   };
 
@@ -75,11 +85,17 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
         <Pressable
           accessibilityRole="adjustable"
           accessibilityLabel={label}
-          accessibilityValue={{ min: fontScaleToPx(MIN_FONT_SCALE), max: fontScaleToPx(MAX_FONT_SCALE), now: size }}
+          // react-native-web drops accessibilityValue: the aria props reach the DOM.
+          aria-valuemin={fontScaleToPx(MIN_FONT_SCALE)}
+          aria-valuemax={fontScaleToPx(MAX_FONT_SCALE)}
+          aria-valuenow={size}
+          aria-valuetext={`${size} px`}
           accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(event) => onStep(event.nativeEvent.actionName === 'increment' ? 1 : -1)}
           onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
           onPress={setFromPoint}
+          // The track is focusable, so it answers the keys a slider does.
+          {...({ onKeyDown: onTrackKey } as object)}
           style={styles.track}
         >
           <View style={styles.rail}>
