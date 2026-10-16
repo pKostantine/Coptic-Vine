@@ -135,6 +135,12 @@ export interface DocumentAction {
   collapsed?: boolean;
   anchors?: SermonHighlightAnchor[];
   color?: SermonHighlightColor;
+  /** "underline" for an underlined highlight; null or absent for a wash. */
+  style?: string | null;
+  /** The segments a new highlight takes the place of (textHighlights.ts). */
+  replaces?: string[];
+  /** A new highlight made from the toolbar's Note: its note opens. */
+  openNote?: boolean;
   highlightId?: string;
   /** Native WebView stylus gesture state, used to suspend edge navigation. */
   active?: boolean;
@@ -988,6 +994,8 @@ export function buildDocumentHtml(
           return blocks.join('\\n\\n');
         }
         document.addEventListener('selectionchange', function () {
+          // A Pencil stroke paints its own preview, and moves too often to rebuild this on.
+          if (window.__sermonPencilActive) return;
           var selection = window.getSelection && window.getSelection();
           updateSelectionPreview(buildSelectionPlan(selection));
         });
@@ -1542,14 +1550,30 @@ function renderVerse(
 }
 
 function sermonPlannerStyles() {
-  return textHighlightStyles();
+  // A selection or a Pencil stroke keeps to the column it began in.
+  return textHighlightStyles(['english', 'coptic', 'arabic', 'french']);
 }
 
-/** The shared highlighting layer (textHighlights.ts), posting the Sermon Planner's own actions; a tapped highlight opens its note. */
+/**
+ * The shared highlighting layer (textHighlights.ts), posting the Sermon
+ * Planner's own actions: a tapped highlight offers its colours, underline,
+ * note, copy and removal, as Apple Books does, and Note opens it in the
+ * planner's notes.
+ */
 function sermonPlannerScript() {
   return textHighlightScript({
     emit: 'function (type, payload) { postAction(type, payload); }',
-    actions: { create: 'createSermonHighlights', openNote: 'openSermonNote', pencil: 'sermonPencilGesture' },
+    actions: {
+      create: 'createSermonHighlights',
+      openNote: 'openSermonNote',
+      pencil: 'sermonPencilGesture',
+      recolor: 'recolorSermonHighlight',
+      remove: 'removeSermonHighlight',
+    },
+    tapToEdit: true,
+    copy: true,
+    notes: true,
+    singleLanguage: true,
   });
 }
 

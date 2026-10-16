@@ -40,7 +40,7 @@ import { useReadingKeepAwake } from '@/utils/useReadingKeepAwake';
 import { useCopticFontDataUri } from '@/utils/useCopticFontDataUri';
 import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
-import { createBibleHighlight, isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
+import { isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
 import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
 import { useModalOrientations } from '@/hooks/useModalOrientations';
 
@@ -536,10 +536,17 @@ export default function BibleChapterDocument() {
                 // Only from the chapter on screen now, never a page it replaced.
                 if (action.readerId !== readerId) return;
                 const color = isBibleHighlightColor(action.color) ? action.color : 'gold';
+                const style = action.style === 'underline' ? 'underline' : undefined;
                 if (action.type === 'createBibleHighlights') {
-                  bibleHighlights.addHighlights((action.anchors || []).filter(isBibleHighlightAnchor).map((anchor) => createBibleHighlight(anchor, color)));
+                  // One highlight, a verse at a time, taking in the ones it covers.
+                  bibleHighlights.createHighlightGroup({
+                    anchors: (action.anchors || []).filter(isBibleHighlightAnchor),
+                    color,
+                    style,
+                    replaces: Array.isArray(action.replaces) ? action.replaces.filter((id): id is string => typeof id === 'string') : [],
+                  });
                 } else if (action.highlightId && action.type === 'recolorBibleHighlight') {
-                  bibleHighlights.setHighlightColor(action.highlightId, color);
+                  bibleHighlights.setHighlightColor(action.highlightId, color, style ?? null);
                 } else if (action.highlightId) {
                   bibleHighlights.deleteHighlight(action.highlightId);
                 }

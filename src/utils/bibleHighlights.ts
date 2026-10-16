@@ -44,6 +44,8 @@ export function normalizeBibleHighlight(value: unknown): BibleHighlight | null {
   const now = new Date().toISOString();
   return {
     id: highlight.id.slice(0, 120),
+    ...(typeof highlight.groupId === 'string' && highlight.groupId && highlight.groupId.length <= 120 ? { groupId: highlight.groupId } : {}),
+    ...(highlight.style === 'underline' ? { style: 'underline' as const } : {}),
     verseId: highlight.verseId.slice(0, 64),
     language: highlight.language,
     startOffset: Number(highlight.startOffset),
@@ -112,7 +114,11 @@ export function mergeBibleHighlightBooks(local: BibleHighlightBook, cloud: Bible
   };
 }
 
-export function createBibleHighlight(anchor: BibleHighlightAnchor, color: BibleHighlightColor = 'gold'): BibleHighlight {
+export function createBibleHighlight(
+  anchor: BibleHighlightAnchor,
+  color: BibleHighlightColor = 'gold',
+  details?: { id: string; groupId: string; style?: 'underline'; createdAt: string; updatedAt: string },
+): BibleHighlight {
   const now = new Date().toISOString();
   return {
     verseId: anchor.verseId,
@@ -120,9 +126,11 @@ export function createBibleHighlight(anchor: BibleHighlightAnchor, color: BibleH
     startOffset: Number(anchor.startOffset),
     endOffset: Number(anchor.endOffset),
     quote: anchor.quote,
-    id: `bible-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+    id: details?.id ?? `bible-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+    ...(details?.groupId ? { groupId: details.groupId } : {}),
     color,
-    createdAt: now,
-    updatedAt: now,
+    ...(details?.style === 'underline' ? { style: 'underline' as const } : {}),
+    createdAt: details?.createdAt ?? now,
+    updatedAt: details?.updatedAt ?? now,
   };
 }

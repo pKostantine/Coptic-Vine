@@ -6,8 +6,17 @@ import {
   saveCloudBibleHighlights,
   saveLocalBibleHighlights,
 } from '@/services/bibleHighlightsService';
-import type { BibleHighlight, BibleHighlightBook, BibleHighlightColor } from '@/types/bibleHighlights';
-import { emptyBibleHighlightBook, mergeBibleHighlightBooks } from '@/utils/bibleHighlights';
+import type { BibleHighlight, BibleHighlightAnchor, BibleHighlightBook, BibleHighlightColor } from '@/types/bibleHighlights';
+import { createBibleHighlight, emptyBibleHighlightBook, mergeBibleHighlightBooks } from '@/utils/bibleHighlights';
+import {
+  applyHighlightCreation,
+  applyHighlightGroupRemoval,
+  applyHighlightGroupUpdate,
+  type HighlightCreation,
+} from '@/utils/highlightGroups';
+
+/** A book's cap on stored segments (the bible_highlights table checks it). */
+const MAX_SEGMENTS = 2000;
 
 /**
  * One Bible book's highlights: kept on the device, and — when signed in —
@@ -62,6 +71,26 @@ export function useBibleHighlights(bookKey: string | undefined, userId?: string 
     setBook((current) => ({ ...updater(current), updatedAt: new Date().toISOString() }));
   }, []);
 
+  /**
+   * One highlight made from a stroke or selection, a verse at a time, taking
+   * the place of those it covers or touches. Nothing is made when the book
+   * would pass its cap: the new highlight is refused rather than old ones
+   * dropped.
+   */
+  const createHighlightGroup = useCallback((creation: HighlightCreation<BibleHighlightAnchor> & { color: BibleHighlightColor }) => {
+    update((current) => {
+      const change = applyHighlightCreation(
+        current.highlights,
+        current.highlightDeletions,
+        creation,
+        (anchor, details) => createBibleHighlight(anchor, creation.color, details),
+        { prefix: 'bible' },
+      );
+      if (!change.lead || change.highlights.length > MAX_SEGMENTS) return current;
+      return { ...current, highlights: change.highlights, highlightDeletions: change.deletions };
+    });
+  }, [update]);
+
   const addHighlights = useCallback((highlights: BibleHighlight[]) => {
     if (!highlights.length) return;
     update((current) => {
@@ -71,26 +100,25 @@ export function useBibleHighlights(bookKey: string | undefined, userId?: string 
     });
   }, [update]);
 
-  const setHighlightColor = useCallback((id: string, color: BibleHighlightColor) => {
-    const updatedAt = new Date().toISOString();
+  // A colour or style given to any segment is the whole group's.
+  const setHighlightColor = useCallback((id: string, color: BibleHighlightColor, style?: 'underline' | null) => {
     update((current) => ({
       ...current,
-      highlights: current.highlights.map((highlight) => (highlight.id === id ? { ...highlight, color, updatedAt } : highlight)),
+      highlights: applyHighlightGroupUpdate(current.highlights, id, style === undefined ? { color } : { color, style }),
     }));
   }, [update]);
 
   const deleteHighlight = useCallback((id: string) => {
-    const deletedAt = new Date().toISOString();
-    update((current) => ({
-      ...current,
-      highlights: current.highlights.filter((highlight) => highlight.id !== id),
-      highlightDeletions: { ...current.highlightDeletions, [id]: deletedAt },
-    }));
+    update((current) => {
+      const change = applyHighlightGroupRemoval(current.highlights, current.highlightDeletions, id);
+      return { ...current, highlights: change.highlights, highlightDeletions: change.deletions };
+    });
   }, [update]);
 
   return {
     highlights: loadedIdentity === identity ? book.highlights : [],
     addHighlights,
+    createHighlightGroup,
     setHighlightColor,
     deleteHighlight,
   };

@@ -52,11 +52,12 @@ import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
 import { swipeEdge, swipeStartX } from '../../../utils/edgeSwipe';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
 import {
-  createSermonHighlight,
   getSermonPlannerReferences,
   getSermonHighlightVerseReferences,
   isSermonHighlightAnchor,
+  isSermonHighlightColor,
 } from '../../../utils/sermonPlanner';
+import { groupHighlights } from '../../../utils/highlightGroups';
 
 interface ServiceDocumentProps {
   schema: string;
@@ -787,19 +788,37 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       return;
     }
     if (isSermonPlanner && action.type === 'createSermonHighlights') {
-      const color = action.color === 'rose' || action.color === 'blue' || action.color === 'green'
-        ? action.color
-        : 'gold';
-      const highlights = (action.anchors || [])
-        .filter(isSermonHighlightAnchor)
-        .map((anchor) => createSermonHighlight(anchor, color));
-      sermonPlanner.addHighlights(highlights);
-      if (highlights[0]) setActiveSermonHighlightId(highlights[0].id);
+      // One highlight, a verse at a time, taking in the ones it covers
+      // (textHighlights.ts, utils/highlightGroups.ts).
+      const leadId = sermonPlanner.createHighlightGroup({
+        anchors: (action.anchors || []).filter(isSermonHighlightAnchor),
+        color: isSermonHighlightColor(action.color) ? action.color : 'gold',
+        style: action.style === 'underline' ? 'underline' : undefined,
+        replaces: Array.isArray(action.replaces) ? action.replaces.filter((id): id is string => typeof id === 'string') : [],
+      });
+      if (leadId) setActiveSermonHighlightId(leadId);
+      // Made from the toolbar's Note: the note opens to be written.
+      if (leadId && action.openNote) setSelectorOpen(true);
+      return;
+    }
+
+    if (isSermonPlanner && action.type === 'recolorSermonHighlight' && action.highlightId) {
+      sermonPlanner.updateHighlight(action.highlightId, {
+        color: isSermonHighlightColor(action.color) ? action.color : 'gold',
+        style: action.style === 'underline' ? 'underline' : null,
+      });
+      return;
+    }
+
+    if (isSermonPlanner && action.type === 'removeSermonHighlight' && action.highlightId) {
+      sermonPlanner.deleteHighlight(action.highlightId);
       return;
     }
 
     if (isSermonPlanner && action.type === 'openSermonNote' && action.highlightId) {
-      setActiveSermonHighlightId(action.highlightId);
+      // The note is the whole highlight's, kept on its first segment.
+      const group = groupHighlights(sermonPlanner.plan.highlights).find((entry) => entry.segments.some((segment) => segment.id === action.highlightId));
+      setActiveSermonHighlightId(group?.lead.id ?? action.highlightId);
       setSelectorOpen(true);
       return;
     }

@@ -64,8 +64,11 @@ export function normalizeSermonHighlight(value: unknown): SermonHighlight | null
     || !isSermonHighlightAnchor(highlight)
   ) return null;
 
+  const extras = value as Partial<Pick<SermonHighlight, 'groupId' | 'style'>>;
   return {
     id: metadata.id.slice(0, 120),
+    ...(typeof extras.groupId === 'string' && extras.groupId && extras.groupId.length <= 120 ? { groupId: extras.groupId } : {}),
+    ...(extras.style === 'underline' ? { style: 'underline' as const } : {}),
     sectionId: highlight.sectionId.slice(0, 512),
     verseId: highlight.verseId.slice(0, 640),
     language: highlight.language,
@@ -146,17 +149,29 @@ export function mergeSermonPlans(local: SermonPlan, cloud: SermonPlan): SermonPl
 export function createSermonHighlight(
   anchor: SermonHighlightAnchor,
   color: SermonHighlightColor = 'gold',
+  details?: { id: string; groupId: string; style?: 'underline'; note: string; createdAt: string; updatedAt: string },
 ): SermonHighlight {
   const now = new Date().toISOString();
   const randomPart = Math.random().toString(36).slice(2, 10);
   return {
-    ...anchor,
-    id: `sermon-${Date.now().toString(36)}-${randomPart}`,
+    sectionId: anchor.sectionId,
+    verseId: anchor.verseId,
+    language: anchor.language,
+    startOffset: Number(anchor.startOffset),
+    endOffset: Number(anchor.endOffset),
+    quote: String(anchor.quote),
+    id: details?.id ?? `sermon-${Date.now().toString(36)}-${randomPart}`,
+    ...(details?.groupId ? { groupId: details.groupId } : {}),
     color,
-    note: '',
-    createdAt: now,
-    updatedAt: now,
+    ...(details?.style === 'underline' ? { style: 'underline' as const } : {}),
+    note: details?.note ?? '',
+    createdAt: details?.createdAt ?? now,
+    updatedAt: details?.updatedAt ?? now,
   };
+}
+
+export function isSermonHighlightColor(value: unknown): value is SermonHighlightColor {
+  return isHighlightColor(value);
 }
 
 /**

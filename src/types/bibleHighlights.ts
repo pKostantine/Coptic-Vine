@@ -7,7 +7,7 @@ export const BIBLE_HIGHLIGHT_LANGUAGES = [
 
 export type BibleHighlightLanguage = (typeof BIBLE_HIGHLIGHT_LANGUAGES)[number];
 
-/** Same four colours as the Sermon Planner's highlights. */
+/** The same colours as the Sermon Planner's highlights. */
 export const BIBLE_HIGHLIGHT_COLORS = SERMON_HIGHLIGHT_COLORS;
 export type BibleHighlightColor = SermonHighlightColor;
 
@@ -21,8 +21,13 @@ export interface BibleHighlightAnchor {
 }
 
 export interface BibleHighlight extends BibleHighlightAnchor {
+  /** `<groupId>~<index>` for a highlight made with others (utils/highlightGroups.ts). */
   id: string;
+  /** The highlight it was made with: one stroke or selection across verses is one highlight. */
+  groupId?: string;
   color: BibleHighlightColor;
+  /** Underlined in the colour rather than washed with it. */
+  style?: 'underline';
   createdAt: string;
   updatedAt: string;
 }

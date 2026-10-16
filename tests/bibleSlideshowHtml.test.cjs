@@ -118,6 +118,7 @@ test('Bible reading view highlights by stored chapter and verse, and offers Copy
   assert.match(html, /data-sermon-verse-id="9:22" data-sermon-language="arabic"/);
   assert.match(html, /"copy":"copyBibleText"/);
   assert.match(html, /addAction\('copy', "Copy"\)/);
+  assert.match(html, /addAction\('remove', "Remove"\)/);
   assert.match(html, /window\.__vineBiblePost = post/);
   // Copy — the toolbar's and the system's — is signed with the chapter. The
   // toolbar writes it through the page's copy command, and the host only when
@@ -132,7 +133,7 @@ test('Bible reading view highlights by stored chapter and verse, and offers Copy
   // the touch itself and acts on the selection it kept.
   assert.match(html, /palette\.addEventListener\('touchstart', function \(event\) \{\s*paletteTouch = [^;]+;\s*if \(event\.cancelable\) event\.preventDefault\(\);/);
   assert.match(html, /palette\.addEventListener\('touchend'[\s\S]*?pressPaletteButton\(released\)/);
-  assert.match(html, /function commitSelection\(color\) \{\s*var selection = selectionForToolbar\(\);/);
+  assert.match(html, /function commitSelection\(color, style, openNote\) \{\s*var selection = selectionForToolbar\(\);/);
   // …and appears for a selection made with a long press, which never lifts a finger on the page.
   assert.match(html, /showTimer = setTimeout\(function \(\) \{ showPaletteForSelection\(false\); \}, 300\)/);
   const route = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');

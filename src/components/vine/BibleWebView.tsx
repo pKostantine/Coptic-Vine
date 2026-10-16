@@ -23,6 +23,10 @@ export interface BibleWebViewAction {
   readerId?: string;
   anchors?: unknown[];
   color?: string;
+  /** "underline" for an underlined highlight; null or absent for a wash. */
+  style?: string | null;
+  /** The segments a new highlight takes the place of (textHighlights.ts). */
+  replaces?: unknown[];
   highlightId?: string;
   active?: boolean;
   text?: string;

@@ -6,8 +6,19 @@ import {
   saveCloudSermonPlan,
   saveLocalSermonPlan,
 } from '@/services/sermonPlannerService';
-import type { SermonHighlight, SermonHighlightColor, SermonPlan } from '@/types/sermonPlanner';
-import { emptySermonPlan, mergeSermonPlans } from '@/utils/sermonPlanner';
+import type { SermonHighlight, SermonHighlightAnchor, SermonHighlightColor, SermonPlan } from '@/types/sermonPlanner';
+import {
+  applyHighlightCreation,
+  applyHighlightGroupRemoval,
+  applyHighlightGroupUpdate,
+  highlightSegmentId,
+  newHighlightGroupId,
+  type HighlightCreation,
+} from '@/utils/highlightGroups';
+import { createSermonHighlight, emptySermonPlan, mergeSermonPlans } from '@/utils/sermonPlanner';
+
+/** The plan's cap on stored segments (the sermon_plans table checks it). */
+const MAX_SEGMENTS = 1000;
 
 export type SermonPlanSyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 
@@ -97,6 +108,29 @@ export function useSermonPlanner(
     });
   }, []);
 
+  /**
+   * One highlight made from a stroke or selection, a verse at a time, taking
+   * the place of those it covers or touches. Returns the id the new group's
+   * first segment gets (chosen here, before the plan updates). The plan
+   * refuses a highlight that would pass its cap rather than dropping old ones.
+   */
+  const createHighlightGroup = useCallback((creation: HighlightCreation<SermonHighlightAnchor> & { color: SermonHighlightColor }) => {
+    if (!creation.anchors.length) return null;
+    const groupId = newHighlightGroupId('sermon');
+    updatePlan((current) => {
+      const change = applyHighlightCreation(
+        current.highlights,
+        current.highlightDeletions,
+        creation,
+        (anchor, details) => createSermonHighlight(anchor, creation.color, details),
+        { prefix: 'sermon', groupId },
+      );
+      if (!change.lead || change.highlights.length > MAX_SEGMENTS) return current;
+      return { ...current, highlights: change.highlights, highlightDeletions: change.deletions };
+    });
+    return highlightSegmentId(groupId, 0);
+  }, [updatePlan]);
+
   const addHighlights = useCallback((highlights: SermonHighlight[]) => {
     if (!highlights.length) return;
     updatePlan((current) => {
@@ -110,23 +144,20 @@ export function useSermonPlanner(
     });
   }, [updatePlan]);
 
-  const updateHighlight = useCallback((id: string, patch: Partial<Pick<SermonHighlight, 'note' | 'color'>>) => {
-    const updatedAt = new Date().toISOString();
+  // A colour, style or note given to any segment is the whole group's: the
+  // reader sees one highlight. The note is kept on the group's first segment.
+  const updateHighlight = useCallback((id: string, patch: { note?: string; color?: SermonHighlightColor; style?: 'underline' | null }) => {
     updatePlan((current) => ({
       ...current,
-      highlights: current.highlights.map((highlight) => (
-        highlight.id === id ? { ...highlight, ...patch, updatedAt } : highlight
-      )),
+      highlights: applyHighlightGroupUpdate(current.highlights, id, patch),
     }));
   }, [updatePlan]);
 
   const deleteHighlight = useCallback((id: string) => {
-    const deletedAt = new Date().toISOString();
-    updatePlan((current) => ({
-      ...current,
-      highlights: current.highlights.filter((highlight) => highlight.id !== id),
-      highlightDeletions: { ...current.highlightDeletions, [id]: deletedAt },
-    }));
+    updatePlan((current) => {
+      const change = applyHighlightGroupRemoval(current.highlights, current.highlightDeletions, id);
+      return { ...current, highlights: change.highlights, highlightDeletions: change.deletions };
+    });
   }, [updatePlan]);
 
   const setGeneralNotes = useCallback((generalNotes: string) => {
@@ -142,6 +173,7 @@ export function useSermonPlanner(
     ready: loadedIdentity === identity,
     syncStatus,
     addHighlights,
+    createHighlightGroup,
     updateHighlight,
     deleteHighlight,
     setGeneralNotes,

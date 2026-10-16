@@ -31,12 +31,15 @@ import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 import Icon from './Icon';
 import { useModalOrientations } from '@/hooks/useModalOrientations';
+import { groupHighlights } from '@/utils/highlightGroups';
 
+// Apple Books' five, in its order: yellow, green, blue, pink, purple.
 const HIGHLIGHT_COLORS: Record<SermonHighlightColor, string> = {
   gold: '#D7AD2C',
-  rose: '#D65B75',
-  blue: '#4C9AD8',
   green: '#4AAA73',
+  blue: '#4C9AD8',
+  rose: '#D65B75',
+  purple: '#9B6DD6',
 };
 
 const LANGUAGE_OPTIONS: { key: keyof SermonPlannerVisibleLanguages; label: string }[] = [
@@ -226,6 +229,8 @@ export default function SermonPlannerDrawer({
   const [slide] = useState(() => new Animated.Value(0));
   const scrollRef = useRef<ScrollView>(null);
   const noteRefs = useRef<Record<string, TextInput | null>>({});
+  // A highlight made across several verses is one card.
+  const highlightGroups = useMemo(() => groupHighlights(highlights), [highlights]);
   const [highlightLayouts, setHighlightLayouts] = useState<Record<string, number>>({});
   const visibleLanguageCount = Object.values(visibleLanguages).filter(Boolean).length;
 
@@ -359,16 +364,24 @@ export default function SermonPlannerDrawer({
 
             <View style={styles.highlightsHeader}>
               <Text style={styles.sectionHeading}>Highlights</Text>
-              <Text style={styles.sectionCount}>{highlights.length}</Text>
+              <Text style={styles.sectionCount}>{highlightGroups.length}</Text>
             </View>
-            {!highlights.length ? (
+            {!highlightGroups.length ? (
               <View style={styles.emptyState}>
                 <View style={styles.emptyMarker} />
                 <Text style={styles.emptyTitle}>No highlights yet</Text>
-                <Text style={styles.emptyBody}>Select text to choose a color. With Apple Pencil, drag across words to highlight them.</Text>
+                <Text style={styles.emptyBody}>Select text to choose a color. With Apple Pencil, draw down the text to highlight it, across as many verses as you like.</Text>
               </View>
-            ) : highlights.map((highlight) => {
-              const isActive = highlight.id === activeHighlightId;
+            ) : highlightGroups.map(({ lead: highlight, segments }) => {
+              // One card for one highlight, however many verses it spans:
+              // its first segment carries the note and stands for the rest.
+              const isActive = segments.some((segment) => segment.id === activeHighlightId);
+              const firstReference = verseReferences[highlight.verseId];
+              const lastReference = verseReferences[segments[segments.length - 1].verseId];
+              const reference = firstReference && lastReference && lastReference !== firstReference
+                ? `${firstReference} – ${lastReference.replace(/^.*?(\d+:\d+)$/, '$1')}`
+                : firstReference;
+              const quote = segments.map((segment) => segment.quote).join(' ');
               const recordLayout = (event: LayoutChangeEvent) => {
                 const y = event.nativeEvent.layout.y;
                 setHighlightLayouts((current) => current[highlight.id] === y ? current : { ...current, [highlight.id]: y });
@@ -380,7 +393,7 @@ export default function SermonPlannerDrawer({
                   style={[styles.highlightCard, isActive && styles.highlightCardActive]}
                 >
                   <View style={styles.highlightMetaRow}>
-                    <View style={[styles.highlightMarker, { backgroundColor: HIGHLIGHT_COLORS[highlight.color] }]} />
+                    <View style={[styles.highlightMarker, highlight.style === 'underline' ? styles.highlightMarkerUnderline : null, { backgroundColor: HIGHLIGHT_COLORS[highlight.color] }]} />
                     <Text style={styles.highlightLanguage}>{languageLabel(highlight.language)}</Text>
                     <View style={styles.highlightActions}>
                       <Pressable
@@ -394,17 +407,17 @@ export default function SermonPlannerDrawer({
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Go to highlighted verse${verseReferences[highlight.verseId] ? `, ${verseReferences[highlight.verseId]}` : ''}`}
+                    accessibilityLabel={`Go to highlighted verse${reference ? `, ${reference}` : ''}`}
                     onPress={() => {
                       onClose();
                       onJumpToHighlight(highlight);
                     }}
                     style={({ pressed }) => pressed && styles.pressed}
                   >
-                    {verseReferences[highlight.verseId] ? (
-                      <Text style={styles.highlightReference}>{verseReferences[highlight.verseId]}</Text>
+                    {reference ? (
+                      <Text style={styles.highlightReference}>{reference}</Text>
                     ) : null}
-                    <Text numberOfLines={5} style={styles.quote}>“{highlight.quote}”</Text>
+                    <Text numberOfLines={5} style={styles.quote}>“{quote}”</Text>
                   </Pressable>
                   <View style={styles.colorRow}>
                     {(Object.keys(HIGHLIGHT_COLORS) as SermonHighlightColor[]).map((color) => (
@@ -552,6 +565,8 @@ function createStyles(colors: PlannerColors) {
     highlightCardActive: { borderColor: colors.cardActiveEdge, backgroundColor: colors.cardActive },
     highlightMetaRow: { alignItems: 'center', flexDirection: 'row' },
     highlightMarker: { borderRadius: 3, height: 8, marginRight: SPACING.sm, width: 38 },
+    // An underlined highlight is shown as its line.
+    highlightMarkerUnderline: { borderRadius: 2, height: 3 },
     highlightLanguage: { color: colors.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
     highlightActions: { flexDirection: 'row', gap: SPACING.xs },
     iconButton: { alignItems: 'center', height: 34, justifyContent: 'center', width: 34 },
