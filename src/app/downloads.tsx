@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -15,6 +14,7 @@ import { BuddedCross } from '@/components/vine/ui/Ornaments';
 import PageTitle from '@/components/vine/ui/PageTitle';
 import SubPageHeader from '@/components/vine/ui/SubPageHeader';
 import { Switch } from '@/components/vine/ui/ToggleRow';
+import BleedPage from '@/components/vine/ui/BleedPage';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
@@ -330,9 +330,7 @@ function NativeDownloadsScreen() {
   const title = tr('Downloads & Storage', 'Téléchargements et stockage', 'التنزيلات والتخزين');
 
   return (
-    <View style={styles.page}>
-      <PageGlow kind="green" tall={wide} />
-      <SafeAreaView edges={['left', 'right']} style={styles.flex}>
+    <BleedPage background={<PageGlow kind="green" tall={wide} />} footer={<BottomTabBar active="account" />}>
         {wide ? (
           <View style={styles.wideHeader}><PageTitle title={title} arabic={arabic} /></View>
         ) : (
@@ -361,9 +359,7 @@ function NativeDownloadsScreen() {
             </PageGutterProvider>
           )}
         </NowPlayingAwareScrollView>
-        <BottomTabBar active="account" />
-      </SafeAreaView>
-    </View>
+    </BleedPage>
   );
 }
 

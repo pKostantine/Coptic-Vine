@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Icon from '@/components/vine/ui/Icon';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
@@ -35,6 +35,7 @@ import { useLayoutMode } from '@/utils/useLayoutMode';
 import { tr } from '../../utils/appText';
 import SearchResultRow from './SearchResultRow';
 import { countKey, useResultCounts } from './useResultCounts';
+import BleedPage from '@/components/vine/ui/BleedPage';
 
 type SearchSection = 'music' | 'learning';
 type SearchFilter = 'all' | UnifiedSearchKind;
@@ -528,12 +529,11 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   );
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    // The glow stays put behind the field while the results scroll under it.
+    <BleedPage background={<PageGlow kind="green" tall={wide} />} footer={<BottomTabBar active={music ? 'music' : 'learn'} />}>
       <Head>
         <title>{music ? 'Search Music' : 'Search Learn & Study'}</title>
       </Head>
-      {/* The glow stays put behind the field while the results scroll under it. */}
-      <PageGlow kind="green" tall={wide} />
 
       {wide ? (
         <View style={[styles.topWide, { paddingTop: insets.top + 28 }]}>
@@ -607,9 +607,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
           ) : null}
         </PageGutterProvider>
       </NowPlayingAwareScrollView>
-
-      <BottomTabBar active={music ? 'music' : 'learn'} />
-    </SafeAreaView>
+    </BleedPage>
   );
 }
 

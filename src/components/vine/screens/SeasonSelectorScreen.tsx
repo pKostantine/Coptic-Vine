@@ -5,11 +5,12 @@ import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PageGlow } from '@/components/vine/screens/BookPage';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import SubPageHeader from '@/components/vine/ui/SubPageHeader';
+import BleedPage from '@/components/vine/ui/BleedPage';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { getEventFormalName, getSeasonFormalName } from '@/constants/seasonNames';
 import { useBottomChrome } from '@/context/BottomChromeContext';
@@ -247,14 +248,13 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
   const dayLine = (date: string) => [formatGregorianDate(date, isArabic), copticSubtitle(date)].filter(Boolean).join(' · ');
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={[styles.screen, DISABLED_TEXT_SELECTION_STYLE]}>
+    <BleedPage background={<PageGlow kind="green" tall={wide} />} style={DISABLED_TEXT_SELECTION_STYLE}>
       {/* Hosted over a document (DocumentModal) it's an overlay, not a page of its own. */}
       {isHosted ? null : (
         <Head>
           <title>{`Coptic Vine ${title}`}</title>
         </Head>
       )}
-      <PageGlow kind="green" tall={wide} />
       <View style={[styles.frame, wide && styles.frameWide]}>
         <SubPageHeader title={title} arabic={isArabic} onBack={closeScreen} backLabel={tr('Close the seasons', 'Fermer les temps liturgiques', 'أغلق الفترات')} />
 
@@ -325,7 +325,7 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
           </Pressable>
         </View>
       ) : null}
-    </SafeAreaView>
+    </BleedPage>
   );
 }
 

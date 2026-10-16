@@ -262,7 +262,7 @@ export default function GlobalNowPlayingOverlay() {
         pointerEvents="box-none"
         style={{
           position: 'absolute',
-          right: 18,
+          right: 18 + insets.right,
           bottom: overlayBottom,
           width: 42,
           height: 42,
@@ -294,8 +294,9 @@ export default function GlobalNowPlayingOverlay() {
       }}
       style={{
         position: 'absolute',
-        left: 12,
-        right: 12,
+        // Clear of the notch and the rounded corners on a phone on its side.
+        left: 12 + insets.left,
+        right: 12 + insets.right,
         bottom: overlayBottom,
         zIndex: 40,
         elevation: 40,

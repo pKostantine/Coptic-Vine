@@ -42,7 +42,8 @@ export default function PersonHero({ name, kicker, imageUri, bio, compact = fals
 
   return (
     <View>
-      <View style={[styles.glow, wide && styles.glowWide]} pointerEvents="none">
+      {/* The page pads its content clear of the notch; the glow reaches back out past that padding to both edges. */}
+      <View style={[styles.glow, wide && styles.glowWide, { left: -insets.left, right: -insets.right }]} pointerEvents="none">
         {imageUri ? (
           <Image source={{ uri: imageUri }} contentFit="cover" blurRadius={42} style={styles.glowImage} />
         ) : (

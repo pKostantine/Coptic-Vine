@@ -59,6 +59,9 @@ export default function AccountScreen() {
     <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head><title>{`${tr('Account', 'Compte', 'الحساب')} — Coptic Vine`}</title></Head>
       <NowPlayingAwareScrollView
+        // Keyed by layout: a turn of the phone mounts the page afresh rather than
+        // restyling its views in place, which iOS laid out wrongly (a column of zero width).
+        key={layout}
         contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

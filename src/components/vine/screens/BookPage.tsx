@@ -15,6 +15,7 @@ import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { appText, tr } from '../../../utils/appText';
 import { goBack } from '../../../utils/navigation';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
+import { useSidePadding } from '../../../utils/useSidePadding';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 
 const MAX_FONT_SCALE = 1.25;
@@ -96,6 +97,8 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
 
   const layout = useLayoutMode();
   const wideLayout = layout !== 'phone';
+  // The page and its glow run to both edges; its content keeps clear of the notch.
+  const sidePadding = useSidePadding(wideLayout ? 36 : 0);
 
   const nav = (
     <View style={[styles.nav, wideLayout ? styles.navWide : { paddingTop: insets.top + 4 }]}>
@@ -132,7 +135,7 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
   const content = padded ? <View style={[styles.padded, wideLayout && styles.paddedWide]}>{children}</View> : children;
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head>
         <title>{`Coptic Vine ${title.english}`}</title>
       </Head>
@@ -144,6 +147,7 @@ const BookPage = forwardRef<ScrollView, BookPageProps>(function BookPage(
           styles.content,
           { paddingBottom: 28 + insets.bottom },
           wideLayout && [styles.contentWide, { paddingTop: insets.top + 28 }],
+          sidePadding,
         ]}
         showsVerticalScrollIndicator={false}
       >

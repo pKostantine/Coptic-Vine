@@ -26,6 +26,7 @@ import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
+import { useSidePadding } from '@/utils/useSidePadding';
 
 import { tr } from '../../../utils/appText';
 
@@ -74,6 +75,8 @@ export default function MusicArtistScreen() {
   const layout = useLayoutMode();
   const width = useContentWidth();
   const wide = layout !== 'phone';
+  // The page and the hero's glow run to both edges; the content keeps clear of the notch.
+  const sidePadding = useSidePadding(0);
   const { play, isPlaying } = usePlayRelease(locale);
   // Likes come from the listener's library, which also says whether they can follow.
   const likes = useReleaseLikes(locale);
@@ -173,7 +176,7 @@ export default function MusicArtistScreen() {
   const tileWidth = Math.floor((available - gap * (columns - 1)) / columns);
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head><title>{artist ? `${artist.displayName} — Coptic Vine` : tr('Artist — Coptic Vine', 'Artiste — Coptic Vine', 'فنان — كوبتك فاين')}</title></Head>
       {artist ? (
         <ShareMetadata
@@ -186,7 +189,7 @@ export default function MusicArtistScreen() {
       ) : null}
 
       {!artist ? (
-        <View style={styles.pending}>
+        <View style={[styles.pending, { paddingLeft: 16 + sidePadding.paddingLeft, paddingRight: 16 + sidePadding.paddingRight }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} onPress={() => goBack(router, '/music')} style={({ pressed }) => [styles.pendingBack, pressed && styles.pressed]}>
             <Icon name="chevron-back" size={20} color={COLORS.gold} />
           </Pressable>
@@ -197,7 +200,8 @@ export default function MusicArtistScreen() {
           )}
         </View>
       ) : (
-        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        // Keyed by layout: a turn of the phone mounts the page afresh rather than restyling it in place.
+        <NowPlayingAwareScrollView key={layout} contentContainerStyle={[styles.content, sidePadding]} showsVerticalScrollIndicator={false}>
           <PageGutterProvider gutter={gutter}>
             <PersonHero
               name={artist.displayName}

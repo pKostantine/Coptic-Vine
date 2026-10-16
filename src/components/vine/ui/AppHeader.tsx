@@ -75,7 +75,7 @@ export default function AppHeader({
   const sideWidth = slots * ICON_BUTTON_SIZE + (slots - 1) * SPACING.sm;
 
   return (
-    <View style={[styles.container, tint ? { backgroundColor: tint, borderBottomColor: tint } : null, { paddingTop: SPACING.sm + insets.top }]}>
+    <View style={[styles.container, tint ? { backgroundColor: tint, borderBottomColor: tint } : null, { paddingTop: SPACING.sm + insets.top, paddingLeft: SPACING.md + insets.left, paddingRight: SPACING.md + insets.right }]}>
       <View style={styles.topRow}>
         <View style={[styles.side, { width: sideWidth }]}>
           {canGoBack ? (

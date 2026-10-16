@@ -7,6 +7,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, V
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/vine/ui/AppHeader';
+import BleedPage from '@/components/vine/ui/BleedPage';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon, { type IconName } from '@/components/vine/ui/Icon';
 import TabHeader from '@/components/vine/ui/TabHeader';
@@ -23,6 +24,7 @@ import { musicService } from '@/services/musicService';
 import type { MusicLibraryPayload } from '@/types/musicConsumer';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
+import { useSidePadding } from '@/utils/useSidePadding';
 
 import { tr } from '../../utils/appText';
 type LibraryFolder = 'likes' | 'playlists' | 'releases' | 'following' | 'downloads';
@@ -44,8 +46,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const router = useRouter();
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <AppHeader title={{ english: 'Your Library', arabic: 'مكتبتك', french: 'Votre bibliothèque' }} visibleLanguages={{ english: true, arabic: false }} />
+    <BleedPage header={<AppHeader title={{ english: 'Your Library', arabic: 'مكتبتك', french: 'Votre bibliothèque' }} visibleLanguages={{ english: true, arabic: false }} />}>
       <View style={styles.crashCard}>
         <Text style={styles.crashTitle}>Library could not be displayed</Text>
         <Text selectable style={styles.crashBody}>{error.message}</Text>
@@ -58,7 +59,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
           </Pressable>
         </View>
       </View>
-    </SafeAreaView>
+    </BleedPage>
   );
 }
 
@@ -74,6 +75,8 @@ export default function MusicLibraryScreen() {
   const layout = useLayoutMode();
   const contentWidth = useContentWidth();
   const wide = layout !== 'phone';
+  // The page and its glow run to both edges; its content keeps clear of the notch.
+  const sidePadding = useSidePadding(wide ? WIDE_MARGIN : 0);
   const { user } = useAuth();
   const { preferences } = useReadingPreferences();
   const { playQueue } = useMusicPlayer();
@@ -250,11 +253,14 @@ export default function MusicLibraryScreen() {
   ) : <Rail>{children}</Rail>);
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head><title>{tr('Your Library — Coptic Vine', 'Votre bibliothèque — Coptic Vine', 'مكتبتي — كوبتك فاين')}</title></Head>
 
       <NowPlayingAwareScrollView
-        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        // Keyed by layout: a turn of the phone mounts the page afresh rather than
+        // restyling its views in place, which iOS laid out wrongly (a column of zero width).
+        key={layout}
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         showsVerticalScrollIndicator={false}
       >
         <PageGlow kind="green" tall={wide} />

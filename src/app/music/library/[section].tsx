@@ -2,7 +2,6 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/vine/ui/AppHeader';
 import Icon from '@/components/vine/ui/Icon';
@@ -11,6 +10,7 @@ import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import MusicTrackActionsMenu from '@/components/music/MusicTrackActionsMenu';
 import MusicTrackRow from '@/components/music/MusicTrackRow';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
+import BleedPage from '@/components/vine/ui/BleedPage';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
@@ -325,13 +325,14 @@ export default function MusicLibraryFolderScreen() {
   })();
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <BleedPage header={(
       <AppHeader
         title={{ english: labels.en, arabic: labels.ar, french: labels.fr }}
         canGoBack
         onBack={() => goBack(router, '/music/library')}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
       />
+    )}>
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.searchBox}>
           <Icon name="search-outline" size={18} color={COLORS.muted} />
@@ -352,7 +353,7 @@ export default function MusicLibraryFolderScreen() {
         {!loading ? content : null}
       </NowPlayingAwareScrollView>
       <MusicMiniPlayer />
-    </SafeAreaView>
+    </BleedPage>
   );
 }
 

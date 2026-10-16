@@ -162,6 +162,9 @@ export default function BooksHome() {
       </Head>
 
       <NowPlayingAwareScrollView
+        // Keyed by layout: a turn of the phone mounts the page afresh rather than
+        // restyling its views in place, which iOS laid out wrongly (a column of zero width).
+        key={layout}
         contentContainerStyle={[styles.content, layout !== 'phone' && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         showsVerticalScrollIndicator={false}
       >
