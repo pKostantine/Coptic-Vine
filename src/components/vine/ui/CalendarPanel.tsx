@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { DAY_BLOCK_THEMES } from '../../../constants/seasonAppearance';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -229,6 +229,54 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
     void (mode === 'gregorian' ? goNextGregorian() : goAdjacentCoptic(1));
   };
 
+  // Swiped across, the calendar turns the month as its arrows do: to the left
+  // the next, to the right the one before. Taken only once the finger has
+  // clearly gone sideways, so a tap on a day still picks it and the sheet's
+  // own drag down still closes it.
+  const monthTurn = useRef({ next: goNextMonth, previous: goPreviousMonth });
+  useEffect(() => {
+    monthTurn.current = { next: goNextMonth, previous: goPreviousMonth };
+  });
+  // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
+  const [monthSwipe] = useState(() => {
+    const sideways = (gesture: { dx: number; dy: number }) => Math.abs(gesture.dx) > 16 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5;
+    return PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, gesture) => sideways(gesture),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: (_, gesture) => {
+        if (!sideways(gesture) || (Math.abs(gesture.dx) < 40 && Math.abs(gesture.vx) < 0.4)) return;
+        if (gesture.dx < 0) monthTurn.current.next();
+        else monthTurn.current.previous();
+      },
+    });
+  });
+
+  // Gregorian to Coptic and back, the calendar keeps to the month on screen
+  // rather than going back to the day selected: it shows the month of the
+  // other calendar that holds the first day of the month being viewed.
+  const switchMode = async (next: Mode) => {
+    if (next === mode) return;
+    if (next === 'coptic') {
+      const firstDay = new Date(Date.UTC(gregorianYear, gregorianMonth - 1, 1));
+      const month = await getCopticMonthForDate(firstDay).catch(() => null);
+      if (month) {
+        setCopticYear(month.coptic_year);
+        setCopticMonth(month.coptic_month);
+        setCopticMonthName(month.coptic_month_name);
+      }
+    } else if (copticYear !== null && copticMonth !== null) {
+      const showing = shownMonth?.mode === 'coptic' && shownMonth.year === copticYear && shownMonth.month === copticMonth;
+      const grid = showing && days ? days : await getCopticMonthGrid(copticYear, copticMonth).catch(() => null);
+      const firstDay = grid?.[0]?.gregorianDate;
+      if (firstDay) {
+        const date = new Date(`${firstDay}T00:00:00Z`);
+        setGregorianYear(date.getUTCFullYear());
+        setGregorianMonth(date.getUTCMonth() + 1);
+      }
+    }
+    setMode(next);
+  };
+
   // Pieces of the calendar, set one above another, or on a phone on its side
   // -- a postcard's height -- the controls beside the month so it all shows.
   const landscape = useIsCompactLandscape();
@@ -273,7 +321,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             style={[styles.segmentOption, active && styles.segmentOptionActive]}
-            onPress={() => setMode(option)}
+            onPress={() => { void switchMode(option); }}
           >
             <Text style={[styles.segmentText, active && styles.segmentTextActive, isArabic && styles.arabicText]} numberOfLines={1}>
               {appText(option === 'gregorian' ? LABELS.gregorian : LABELS.coptic)}
@@ -346,7 +394,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   );
 
   return (
-    <View style={DISABLED_TEXT_SELECTION_STYLE}>
+    <View style={DISABLED_TEXT_SELECTION_STYLE} {...monthSwipe.panHandlers}>
       {landscape ? (
         <View style={styles.landscape}>
           <View style={styles.landscapeControls}>
