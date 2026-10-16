@@ -62,3 +62,15 @@ test('the description follows the App Language', () => {
   // …and an explicit language wins over the stored one.
   assert.equal(loadErrors('en').describeLoadError('Failed to fetch', 'ar').title, 'أنت غير متصل بالإنترنت');
 });
+
+test('a failed download says so plainly, never with the database’s own words', () => {
+  const { describeDownloadError } = loadErrors();
+  const locked = "FunctionCallException: Calling the 'finalizeAsync' function has failed (at ExpoModulesCore/AsyncFunctionDefinition.swift:123) → Caused by: SQLiteErrorException: Error code 5: database is locked";
+  assert.deepEqual(describeDownloadError(locked), { title: 'The download didn’t finish', hint: 'Please try again.' });
+  assert.equal(describeDownloadError('Network request failed').title, 'You’re offline');
+  assert.equal(loadErrors('fr').describeDownloadError(locked).title, 'Le téléchargement n’a pas abouti');
+  // The Downloads page shows that, not the message, and keeps the message for the log.
+  const page = fs.readFileSync('src/app/downloads.tsx', 'utf8');
+  assert.match(page, /const \{ title, hint \} = describeDownloadError\(error\.message\);\n\s+Alert\.alert\(title, hint\);/);
+  assert.doesNotMatch(page, /Alert\.alert\(tr\('Download', 'Téléchargement', 'التنزيل'\), error\.message\)/);
+});

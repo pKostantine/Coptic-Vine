@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/vine/ui/AppHeader';
@@ -13,6 +12,7 @@ import { bookmarkKeyFor, CATEGORIES, DIVINE_LITURGY_SERVICES, HOLY_WEEK_HOURS, h
 import { goBack } from '@/utils/navigation';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { isBibleBookmark } from '@/components/vine/screens/BibleBookmarks';
+import BleedPage from '@/components/vine/ui/BleedPage';
 
 import { tr } from '../utils/appText';
 
@@ -118,16 +118,17 @@ export default function BookmarksScreen() {
   }, [bookmarks]);
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <Head>
-        <title>{`${title} — Coptic Vine`}</title>
-      </Head>
+    <BleedPage edges={['bottom']} header={(
       <AppHeader
         title={{ english: 'Bookmarks', arabic: 'العلامات', french: 'Signets' }}
         canGoBack
         onBack={() => goBack(router, '/books')}
         visibleLanguages={{ english: showEnglish, arabic: showArabic }}
       />
+    )}>
+      <Head>
+        <title>{`${title} — Coptic Vine`}</title>
+      </Head>
       {entries.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={[styles.emptyText, showArabic && styles.arabic]}>{tr('No bookmarks yet', 'Aucun signet pour l’instant', 'لا توجد علامات بعد')}</Text>
@@ -162,7 +163,7 @@ export default function BookmarksScreen() {
           }}
         />
       )}
-    </SafeAreaView>
+    </BleedPage>
   );
 }
 

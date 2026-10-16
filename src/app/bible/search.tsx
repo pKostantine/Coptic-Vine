@@ -4,11 +4,11 @@ import Head from 'expo-router/head';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareFlatList } from '@/components/playback/NowPlayingAwareScroll';
 import AppHeader from '@/components/vine/ui/AppHeader';
 import Icon from '@/components/vine/ui/Icon';
+import BleedPage from '@/components/vine/ui/BleedPage';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
@@ -243,10 +243,7 @@ export default function BibleSearchScreen() {
   const canLoadMore = results.length > 0 && results.length < total && !loadingMore;
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <Head>
-        <title>Coptic Vine Bible Search</title>
-      </Head>
+    <BleedPage edges={['bottom']} header={(
       <AppHeader
         title={LABELS.title}
         canGoBack
@@ -255,6 +252,10 @@ export default function BibleSearchScreen() {
         rightLeadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
         onRightLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
       />
+    )}>
+      <Head>
+        <title>Coptic Vine Bible Search</title>
+      </Head>
 
       <View style={styles.searchRow}>
         <Icon name="search-outline" size={20} color={COLORS.muted} />
@@ -397,7 +398,7 @@ export default function BibleSearchScreen() {
           )}
         />
       )}
-    </SafeAreaView>
+    </BleedPage>
   );
 }
 

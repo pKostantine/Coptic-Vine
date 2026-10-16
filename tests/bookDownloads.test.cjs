@@ -352,6 +352,28 @@ test('transactions take turns, with foreign keys on and the write lock taken bef
   await db.withExclusiveTransactionAsync(async (txn) => { await txn.runAsync('after'); });
   assert.equal(transactions[3].at(-2), 'after');
 
+  // The connection's own writes (a download's progress) wait their turn too,
+  // rather than racing an import for the lock: that raced write failed with
+  // "database is locked".
+  let releaseImport = () => undefined;
+  const runsBefore = mainRuns.length;
+  const importing = db.withExclusiveTransactionAsync(async (txn) => { await new Promise((resolve) => { releaseImport = resolve; }); await txn.runAsync('import'); });
+  const progress = db.runAsync('UPDATE offline_packages SET progress = ?', 0.5);
+  await settle();
+  assert.equal(mainRuns.length, runsBefore, 'the progress write waits for the import');
+  releaseImport();
+  await Promise.all([importing, progress]);
+  assert.deepEqual(mainRuns.at(-1), ['UPDATE offline_packages SET progress = ?', 0.5]);
+  // Reads do not wait.
+  let releaseAgain = () => undefined;
+  const holding = db.withExclusiveTransactionAsync(async () => { await new Promise((resolve) => { releaseAgain = resolve; }); });
+  await settle();
+  const readsWhileHeld = mainReads.length;
+  await db.getFirstAsync('SELECT 1');
+  assert.equal(mainReads.length, readsWhileHeld + 1);
+  releaseAgain();
+  await holding;
+
   // A file's update writes what it names, with nothing read first.
   const readsBefore = mainReads.length;
   await updateOfflineFile('content:bible:abc', { status: 'complete', bytesWritten: 12, resumeJson: null });

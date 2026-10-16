@@ -238,23 +238,32 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
  * by side, any of those is a failed download. So here transactions take
  * turns, and each turns foreign keys on, waits its turn at SQLite's write
  * lock, and holds it before reading anything.
+ *
+ * The writes this connection makes by itself (a download's progress, a
+ * book's state) take their turn in the same line. Waiting at the lock
+ * instead, behind imports running back to back, one waited out the busy
+ * timeout and failed the download with "database is locked".
  */
-function serializeTransactions(db: SQLite.SQLiteDatabase): void {
+function serializeWrites(db: SQLite.SQLiteDatabase): void {
   const exclusive = db.withExclusiveTransactionAsync.bind(db);
-  let turn: Promise<void> = Promise.resolve();
-  db.withExclusiveTransactionAsync = (task) => {
-    const run = turn.then(() => exclusive(async (txn) => {
-      // The deferred BEGIN expo-sqlite opened holds nothing yet: end it, set
-      // the connection up (foreign keys can only be switched outside a
-      // transaction), and begin again with the write lock.
-      await txn.execAsync(`COMMIT; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
-      try { await txn.execAsync('BEGIN IMMEDIATE'); }
-      catch (cause) { await txn.execAsync('BEGIN'); throw cause; } // leaves expo-sqlite a transaction to roll back
-      await task(txn);
-    }));
+  const write = db.runAsync.bind(db) as (...args: unknown[]) => Promise<SQLite.SQLiteRunResult>;
+  let turn: Promise<unknown> = Promise.resolve();
+  const takeTurn = <T>(work: () => Promise<T>): Promise<T> => {
+    const run = turn.then(work);
     turn = run.catch(() => undefined);
     return run;
   };
+  db.withExclusiveTransactionAsync = (task) => takeTurn(() => exclusive(async (txn) => {
+    // The deferred BEGIN expo-sqlite opened holds nothing yet: end it, set
+    // the connection up (foreign keys can only be switched outside a
+    // transaction), and begin again with the write lock.
+    await txn.execAsync(`COMMIT; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
+    try { await txn.execAsync('BEGIN IMMEDIATE'); }
+    catch (cause) { await txn.execAsync('BEGIN'); throw cause; } // leaves expo-sqlite a transaction to roll back
+    await task(txn);
+  }));
+  // Reads are left to run at once: in WAL mode they never wait on a writer.
+  db.runAsync = ((...args: unknown[]) => takeTurn(() => write(...args))) as typeof db.runAsync;
 }
 
 export async function getOfflineDatabase(): Promise<SQLite.SQLiteDatabase> {
@@ -262,7 +271,7 @@ export async function getOfflineDatabase(): Promise<SQLite.SQLiteDatabase> {
     databasePromise = SQLite.openDatabaseAsync(DATABASE_NAME, { useNewConnection: true })
       .then(async (db) => {
         await migrate(db);
-        serializeTransactions(db);
+        serializeWrites(db);
         // A JavaScript download task cannot survive process death. Preserve the
         // package and resume data, but expose interrupted work as paused.
         const now = nowIso();

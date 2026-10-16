@@ -35,6 +35,7 @@ import type {
   LearningProgressState,
 } from '@/types/learningPlatform';
 import { useLayoutMode } from '@/utils/useLayoutMode';
+import { useSidePadding } from '@/utils/useSidePadding';
 
 import { tr } from '../../utils/appText';
 const EMPTY_LIBRARY: LearningItemLibraryPayload = { authenticated: false, likedItemIds: [], items: [] };
@@ -74,6 +75,8 @@ export default function LearningLibraryScreen() {
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const arabic = locale === 'ar';
   const wide = layout !== 'phone';
+  // The page and its glow run to both edges; its content keeps clear of the notch.
+  const sidePadding = useSidePadding(wide ? 36 : 0);
   const [library, setLibrary] = useState(EMPTY_LIBRARY);
   const [playlistLibrary, setPlaylistLibrary] = useState(EMPTY_PLAYLISTS);
   const [activeState, setActiveState] = useState<LearningProgressState>('will_learn');
@@ -380,10 +383,13 @@ export default function LearningLibraryScreen() {
   );
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head><title>{tr('My Learning - Coptic Vine', 'Mon apprentissage - Coptic Vine', 'تعلّمي - كوبتك فاين')}</title></Head>
       <NowPlayingAwareScrollView
-        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }]]}
+        // Keyed by layout: a turn of the phone mounts the page afresh rather than
+        // restyling its views in place, which iOS laid out wrongly (a column of zero width).
+        key={layout}
+        contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >

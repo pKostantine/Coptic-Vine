@@ -12,12 +12,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '@/components/vine/ui/AppHeader';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
+import BleedPage from '@/components/vine/ui/BleedPage';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type SynaxariumYearRow } from '@/services/homeService';
@@ -172,15 +172,16 @@ export default function SynaxariumBrowserScreen() {
   const yearNumber = days[0]?.copticYear;
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <Head><title>Synaxarium — Coptic Vine</title></Head>
-
+    <BleedPage header={(
       <AppHeader
         title={{ english: 'Synaxarium', arabic: 'السنكسار', french: 'Synaxaire' }}
         canGoBack
         onBack={() => goBack(router, '/')}
         visibleLanguages={{ english: !isArabic, arabic: isArabic }}
       />
+    )}>
+      <Head><title>Synaxarium — Coptic Vine</title></Head>
+
 
       <View style={styles.searchArea}>
         <View style={styles.searchBox}>
@@ -312,7 +313,7 @@ export default function SynaxariumBrowserScreen() {
           })}
         </NowPlayingAwareScrollView>
       )}
-    </SafeAreaView>
+    </BleedPage>
   );
 }
 

@@ -89,6 +89,9 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
           tabs themselves above it. No screen with the tab bar insets its
           own bottom edge, so this is the only place it is made room for. */}
       <View
+        // Keyed by its shape, so a turn of the device builds the bar afresh
+        // rather than restyling its tabs in place (which iOS sized wrongly).
+        key={tablet ? 'tablet' : isCompactLandscape ? 'sideways' : 'phone'}
         accessibilityRole="tablist"
         style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet ? insets.bottom + 14 : Math.max(insets.bottom - 8, 0), paddingLeft: insets.left, paddingRight: insets.right }]}
       >

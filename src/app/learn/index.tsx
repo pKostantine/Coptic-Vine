@@ -97,6 +97,9 @@ export default function LearningHomeScreen() {
       </Head>
 
       <NowPlayingAwareScrollView
+        // Keyed by layout: a turn of the phone mounts the page afresh rather than
+        // restyling its views in place, which iOS laid out wrongly (a column of zero width).
+        key={layout}
         contentContainerStyle={[styles.content, wide && [styles.contentWide, { paddingTop: insets.top + 28 }], sidePadding]}
         showsVerticalScrollIndicator={false}
       >
