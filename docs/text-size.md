@@ -12,8 +12,8 @@ number from it: the base size in logical pixels.
 
 The preference is a single number, `fontScale`, a multiple of a 14px base
 (`READING_FONT_BASE_PX`). The text renders at `round(14 × scale)` pixels
-(`fontScaleToPx`) on every device: a phone and a tablet at a scale of 1.5
-both show 21px English. The per-script sizes hang off that one number as
+(`fontScaleToPx`) on every device: a phone and a tablet at the same scale
+show the same size. The per-script sizes hang off that one number as
 they always have — Coptic at 1.25× and Arabic at 1.15× the base, line
 heights of 1.3× (Arabic 1.6×), the gap between language columns a fraction
 of it (`documentPresentationMetrics.js`) — so the whole page grows and
@@ -24,33 +24,33 @@ This replaces the earlier ten levels, each a size from a per-device table
 uneven ladder and the same ceiling to a 7" tablet, a 13" iPad and a
 projected screen.
 
-## The range grows with the screen
+## Levels, as many as the screen has room for
 
-The slider runs from a scale of 1 (14px) to `maxFontScaleForScreen`: the
-screen's shortest side over 140, never less than 2.714 (38px, the largest
-size the earlier phone table offered), so no reader's size shrinks on a
-small phone.
+The slider moves in levels 2px apart, from level 1 (14px). The reader
+sees the level, 1 to N, never a pixel size; N is how many levels the
+screen has room for (`fontLevelCount`), up to its shortest side over 140
+and never short of 38px, the largest size the earlier phone table offered,
+so no reader's size shrinks on a small phone.
 
-| screen (shortest side) | top of the range | largest English |
+| screen (shortest side) | levels | largest English |
 | --- | --- | --- |
-| 320–380pt phone | 2.71 | 38px |
-| 390pt phone | 2.79 | 39px |
-| 820pt iPad | 5.86 | 82px |
-| 1080p screen | 7.71 | 108px |
+| any phone | 1–13 | 38px |
+| 820pt iPad | 1–35 | 82px |
+| 1024pt iPad | 1–45 | 102px |
+| 1080p screen | 1–48 | 108px |
 
 The shortest side is the same either way up, so turning the device never
 moves the reader's size, and it is read once at startup from
-`Dimensions.get('screen')`, the device, not the window. There are twenty
-divisions between the ends whatever the screen (`FONT_SCALE_STEPS`): on a
-phone a step is about 1px, on a 1080p screen about 5px, which is what the
-step buttons, the keyboard and the native slider's `step` move by. The
-slider snaps to a division (`snapFontScale`); a size set otherwise (a
-migrated one) keeps its exact value until the slider is touched. On the web
-the track is focusable and answers the keys a slider does: the arrows step
-one division, Page Up and Page Down five, Home and End go to the ends.
+`Dimensions.get('screen')`, the device, not the window. The step buttons,
+the keyboard and the native slider's `step` move one level
+(`FONT_SCALE_STEP`, 2/14); the slider snaps to a level (`snapFontScale`),
+and a size set otherwise (a migrated one) shows as the nearest level and
+keeps its exact value until the slider is touched. On the web the track is
+focusable and answers the keys a slider does: the arrows step one level,
+Page Up and Page Down five, Home and End go to the ends.
 
-New installations open at a scale of 1.5: 21px, between the sizes the
-earlier tables opened at.
+New installations open on level 5: 22px, between the sizes the earlier
+tables opened at.
 
 ## Stored, and read from every earlier format
 
@@ -72,8 +72,9 @@ Spirit & Truth stores one double (`textScaleFactor_v2`, default 1.5) and
 offers it on a slider from 1.0 to `shortestSide / 130` with 20 divisions;
 each script's size is `(base + offset) × scale` and the column gap
 `5 × scale`, so its layout scales as one. This model is the same shape: one
-scale, a screen-sized range, twenty divisions, every size derived from the
-one number. Two things it does that this app does not, yet: it bundles all
+scale, a screen-sized range, every size derived from the one number; its
+steps are a fixed 2px rather than a twentieth of the range, so a larger
+screen has more levels rather than coarser ones. Two things it does that this app does not, yet: it bundles all
 three fonts (its English and Arabic are system fonts here, so a line can
 measure differently from one platform to the next), and its script offsets
 are tuned to those fonts (ours are the 1.25×/1.15× multipliers for the

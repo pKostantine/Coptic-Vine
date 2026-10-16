@@ -49,10 +49,10 @@ const oklab = (hex) => {
 const apart = (x, y) => { const p = oklab(x); const q = oklab(y); return Math.hypot(p.L - q.L, p.a - q.a, p.b - q.b); };
 const RGBA = /^rgba\(\d+, \d+, \d+, (0(\.\d+)?|1)\)$/;
 
-const TEXT_COLORS = ['text', 'alternate', 'accent', 'priest', 'deacon', 'people', 'peopleText', 'refrain', 'metropolitan', 'subdoc', 'link'];
+const TEXT_COLORS = ['text', 'alternate', 'accent', 'priest', 'deacon', 'people', 'peopleText', 'refrain', 'metropolitan', 'subdoc', 'link', 'choice'];
 const QUIET_COLORS = ['comment', 'silent'];
 const SOLID_COLORS = ['page', 'surface', 'border', 'strip', 'stripActive', 'onAccent', ...TEXT_COLORS, ...QUIET_COLORS];
-const WASHES = ['accentSoft', 'accentLine', 'subdocSoft', 'subdocLine', 'linkSoft', 'linkLine'];
+const WASHES = ['accentSoft', 'accentLine', 'subdocSoft', 'subdocLine', 'linkSoft', 'linkLine', 'choiceSoft', 'choiceLine'];
 
 test('there are five pages, darkest to lightest, Night first and the default, each with a name in every App Language', () => {
   assert.deepEqual(DOCUMENT_THEME_IDS, ['night', 'walnut', 'vine', 'sepia', 'paper']);
@@ -184,6 +184,9 @@ test('Paper keeps its pinned colours: the rubrics deepened for white, and a Prus
     link: '#24735A',
     linkSoft: withAlpha('#24735A', 0.1),
     linkLine: withAlpha('#24735A', 0.4),
+    choice: '#5B3A9E',
+    choiceSoft: withAlpha('#5B3A9E', 0.1),
+    choiceLine: withAlpha('#5B3A9E', 0.4),
   });
 });
 

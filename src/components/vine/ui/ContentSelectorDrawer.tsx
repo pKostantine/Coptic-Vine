@@ -23,6 +23,8 @@ interface ContentSelectorDrawerProps {
   onSelectSection: (id: string) => void;
   /** Called instead of onSelectSection for a Hyperlink row — it leaves this document for another service rather than jumping within it. */
   onOpenHyperlink?: (hyperlinkKey?: string | null) => void;
+  /** Called instead of onSelectSection for the interpretations' choice row: it opens the choice, as its button in the document does. */
+  onOpenInterpretations?: () => void;
   bookmarked?: boolean;
   onToggleBookmark?: () => void;
   onOpenCalendar?: () => void;
@@ -73,6 +75,7 @@ export default function ContentSelectorDrawer({
   onClose,
   onSelectSection,
   onOpenHyperlink,
+  onOpenInterpretations,
   bookmarked,
   onToggleBookmark,
   onOpenCalendar,
@@ -132,6 +135,8 @@ export default function ContentSelectorDrawer({
     // Same for a Hyperlink: it carries no verses either, and it is the one way
     // to reach the next service from here without backing all the way out.
     if (section.isHyperlinkButton) return true;
+    // And the button that opens the choice of interpretations.
+    if (section.isInterpretationChooserButton) return true;
     const selectorTitle = getSectionSelectorTitle(section);
     return Boolean(selectorTitle.english || selectorTitle.arabic);
   });
@@ -294,6 +299,10 @@ export default function ContentSelectorDrawer({
               // height, since unlike a hyperlink they are content of this
               // service rather than a way out of it.
               const isSubdocument = Boolean(section.isSubdocumentButton || section.isAntiphonaryButton);
+              // The choice of interpretations: violet, as its button in the
+              // document is, and short like the hyperlink -- it changes what
+              // this service shows rather than being a place in it.
+              const isChoice = Boolean(section.isInterpretationChooserButton);
               // An hour opening renders as a rule across the list rather than
               // a card: it marks where one part of the service ends and the
               // next begins, so it should read as a seam rather than as one
@@ -322,8 +331,9 @@ export default function ContentSelectorDrawer({
                     isNested && styles.selectorItemNested,
                     isSubdocument && styles.selectorItemSubdocument,
                     isHyperlink && styles.selectorItemHyperlink,
+                    isChoice && styles.selectorItemChoice,
                     isDivider && styles.selectorItemDivider,
-                    !isHyperlink && !isDivider && isActive && styles.selectorItemActive,
+                    !isHyperlink && !isChoice && !isDivider && isActive && styles.selectorItemActive,
                   ]}
                   // A nested card's own y is measured inside its wrapper, so
                   // the wrapper reports position instead — itemLayouts feeds
@@ -352,6 +362,11 @@ export default function ContentSelectorDrawer({
                       onOpenHyperlink?.(section.hyperlinkKey);
                       return;
                     }
+                    if (isChoice) {
+                      onClose();
+                      onOpenInterpretations?.();
+                      return;
+                    }
                     onSelectSection(section.id);
                     onClose();
                   }}
@@ -377,13 +392,14 @@ export default function ContentSelectorDrawer({
                   ) : (
                     <View style={[styles.selectorTitleRow, isLandscapeViewport && styles.selectorTitleRowLandscape]}>
                       {showArabic ? (
-                        <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
+                        <Text style={[styles.selectorTitle, styles.selectorTitleArabic, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isChoice && styles.selectorTitleChoice, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{selectorTitle.arabic}</Text>
                       ) : (
-                        <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{pickedTitle.text}</Text>
+                        <Text style={[styles.selectorTitle, styles.centeredTitle, isSubdocument && styles.selectorTitleSubdocument, isHyperlink && styles.selectorTitleHyperlink, isChoice && styles.selectorTitleChoice, isSilentPrayerHymn && styles.selectorTitleSilentPrayer]}>{pickedTitle.text}</Text>
                       )}
                     </View>
                   )}
                   {isHyperlink ? <Text style={styles.selectorHyperlinkArrow}>→</Text> : null}
+                  {isChoice ? <Icon name="checkmark-done" size={17} color={theme.colors.choice} /> : null}
                 </Pressable>
               );
 
@@ -541,6 +557,16 @@ function createStyles(theme: DocumentTheme) {
     },
     selectorTitleHyperlink: {
       color: colors.link,
+    },
+    selectorItemChoice: {
+      alignItems: 'center',
+      backgroundColor: colors.choiceSoft,
+      borderColor: colors.choiceLine,
+      minHeight: 48,
+      paddingVertical: SPACING.sm,
+    },
+    selectorTitleChoice: {
+      color: colors.choice,
     },
     selectorHyperlinkArrow: {
       color: colors.link,

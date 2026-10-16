@@ -2,12 +2,14 @@ import * as Device from 'expo-device';
 import { Dimensions, Platform } from 'react-native';
 
 import { DEFAULT_DOCUMENT_THEME_ID, isDocumentThemeId, type DocumentThemeId } from '../constants/documentThemes';
+import { DEFAULT_SELECTED_INTERPRETATIONS, normalizeSelectedInterpretations } from './kiahkInterpretations';
 import {
   classifyReadingDevice,
   DEFAULT_FONT_SCALE,
-  FONT_SCALE_STEPS as FONT_SCALE_DIVISIONS,
+  FONT_SCALE_STEP as LEVEL_STEP,
   FONT_SCALE_VERSION,
-  fontScaleStep,
+  fontLevelCount,
+  fontScaleToLevel as scaleToLevel,
   fontScaleToPx as scaleToPixels,
   maxFontScaleForScreen,
   MIN_FONT_SCALE as MIN_READING_FONT_SCALE,
@@ -78,6 +80,12 @@ export interface ReadingPreferences {
    */
   selectedSaintHymns: string[];
   /**
+   * The interpretations read after each of the Kiahk Saturday Theotokias in
+   * the Vespers Praises, by id (utils/kiahkInterpretations.ts). A content
+   * choice, synced to the account like the saint hymns.
+   */
+  selectedInterpretations: string[];
+  /**
    * Raises the `Monastery` condition. Only the Prayer of the Veil is gated on
    * it — it is prayed in monasteries and skipped in parishes — so this decides
    * whether that subdocument appears in Offering of the Lamb and Vespers
@@ -109,6 +117,7 @@ export type SyncedReadingPreferences = Pick<ReadingPreferences,
   | 'bishopPresent'
   | 'copticGospelRite'
   | 'selectedSaintHymns'
+  | 'selectedInterpretations'
   | 'inMonastery'
   | 'appLanguage'
 >;
@@ -149,6 +158,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   copticGospelRite: false,
   appLanguage: 'en',
   selectedSaintHymns: [],
+  selectedInterpretations: [...DEFAULT_SELECTED_INTERPRETATIONS],
   inMonastery: false,
   keepScreenAwake: true,
   documentTheme: DEFAULT_DOCUMENT_THEME_ID,
@@ -174,10 +184,10 @@ const screen = Dimensions.get('screen');
 export const MIN_FONT_SCALE: number = MIN_READING_FONT_SCALE;
 /** Highest selectable text scale on this screen: its shortest side over 140, the same either way up. */
 export const MAX_FONT_SCALE: number = maxFontScaleForScreen(screen.width, screen.height);
-/** The divisions of the text-size slider between its ends, whatever the screen. */
-export const FONT_SCALE_STEPS: number = FONT_SCALE_DIVISIONS;
-/** One division of the slider: what the step buttons and the keyboard move by. */
-export const FONT_SCALE_STEP: number = fontScaleStep(MAX_FONT_SCALE);
+/** One level of the slider (2px): what the step buttons and the keyboard move by. */
+export const FONT_SCALE_STEP: number = LEVEL_STEP;
+/** How many levels this screen's slider has: the reader sees 1 to this. */
+export const FONT_LEVEL_COUNT: number = fontLevelCount(MAX_FONT_SCALE);
 
 export type ReadingDeviceClass = 'phone' | 'tablet' | 'desktop';
 
@@ -199,7 +209,12 @@ export function fontScaleToPx(fontScale: number): number {
   return scaleToPixels(fontScale);
 }
 
-/** The nearest division of this screen's slider to a value. */
+/** The level a scale is shown as, from 1 to FONT_LEVEL_COUNT. */
+export function fontScaleToLevel(fontScale: number): number {
+  return Math.min(FONT_LEVEL_COUNT, scaleToLevel(fontScale));
+}
+
+/** The nearest level of this screen's slider to a value. */
 export function snapFontScaleValue(value: number): number {
   return snapFontScale(value, MAX_FONT_SCALE);
 }
@@ -252,6 +267,7 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   if (!isAppLanguage(merged.appLanguage)) {
     merged.appLanguage = 'en';
   }
+  merged.selectedInterpretations = normalizeSelectedInterpretations(stored?.selectedInterpretations);
   merged.selectedSaintHymns = Array.isArray(merged.selectedSaintHymns)
     ? merged.selectedSaintHymns.filter((token): token is string => typeof token === 'string' && token.includes(':'))
     : [];
@@ -281,6 +297,7 @@ export function syncedReadingPreferences(preferences: ReadingPreferences): Synce
     bishopPresent: preferences.bishopPresent,
     copticGospelRite: preferences.copticGospelRite,
     selectedSaintHymns: preferences.selectedSaintHymns,
+    selectedInterpretations: preferences.selectedInterpretations,
     inMonastery: preferences.inMonastery,
     appLanguage: preferences.appLanguage,
   };
@@ -329,6 +346,10 @@ export function applySyncedReadingPreferences(
     bishopPresent: booleanValue(cloud.bishopPresent, local.bishopPresent),
     copticGospelRite: booleanValue(cloud.copticGospelRite, local.copticGospelRite),
     selectedSaintHymns: saintTokens,
+    // An account that has never chosen keeps this device's choice.
+    selectedInterpretations: Array.isArray(cloud.selectedInterpretations)
+      ? normalizeSelectedInterpretations(cloud.selectedInterpretations)
+      : local.selectedInterpretations,
     inMonastery: booleanValue(cloud.inMonastery, local.inMonastery),
     appLanguage: isAppLanguage(cloud.appLanguage) ? cloud.appLanguage : local.appLanguage,
   };

@@ -944,13 +944,15 @@ export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth)
   if (item.type === "ornament") return Math.min(Math.max(tableWidth * 0.28, 96), 150) + SPACING_SM * 6;
   if (item.type === "title") return chrome.titleLineHeight + SPACING_SM * 2;
   if (item.type === "button") {
-    const minimumHeight = item.isHyperlink
+    // The hyperlink's bar and the interpretations' choice share one shape.
+    const barLike = item.isHyperlink || item.isChoice;
+    const minimumHeight = barLike
       ? DOCUMENT_CONTROL_METRICS.hyperlinkMinHeight
       : DOCUMENT_CONTROL_METRICS.openButtonMinHeight;
-    const lineHeight = item.isHyperlink
+    const lineHeight = barLike
       ? chrome.hyperlinkLineHeight
       : chrome.buttonLineHeight;
-    const contentHeight = item.isHyperlink
+    const contentHeight = barLike
       ? lineHeight + SPACING_SM * 4
       : lineHeight * 2 + SPACING_SM * 6;
     return SPACING_SM * 4 + Math.max(minimumHeight, contentHeight);

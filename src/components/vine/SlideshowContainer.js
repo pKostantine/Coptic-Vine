@@ -1250,6 +1250,11 @@ const SlideItem = memo(function SlideItem({
     const label = titleHelpers.shouldShowEnglishTitle(item.title) ? titleHelpers.getTitleText(item.title) : "";
     const arabicLabel =
       titleHelpers.shouldShowArabicTitle(item.title) ? item.title?.arabic || "" : "";
+    // Blue opens a subdocument, green leaves for another service, violet
+    // opens a choice about this one.
+    const kind = item.isHyperlink ? "link" : item.isChoice ? "choice" : "subdoc";
+    const barLike = item.isHyperlink || item.isChoice;
+    const tint = theme.colors[kind];
 
     return (
       <View
@@ -1262,10 +1267,10 @@ const SlideItem = memo(function SlideItem({
           hitSlop={8}
           style={[
             styles.openButton,
-            item.isHyperlink && styles.hyperlinkButton,
+            barLike && styles.hyperlinkButton,
             {
-              backgroundColor: item.isHyperlink ? theme.colors.linkSoft : theme.colors.subdocSoft,
-              borderColor: item.isHyperlink ? theme.colors.linkLine : theme.colors.subdocLine,
+              backgroundColor: theme.colors[`${kind}Soft`],
+              borderColor: theme.colors[`${kind}Line`],
             },
           ]}
           onPress={(event) => {
@@ -1280,9 +1285,9 @@ const SlideItem = memo(function SlideItem({
               style={[
                 styles.openButtonText,
                 {
-                  color: item.isHyperlink ? theme.colors.link : theme.colors.subdoc,
-                  fontSize: item.isHyperlink ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
-                  lineHeight: item.isHyperlink ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
+                  color: tint,
+                  fontSize: barLike ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
+                  lineHeight: barLike ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
                 },
               ]}
             >
@@ -1297,9 +1302,9 @@ const SlideItem = memo(function SlideItem({
                 styles.openButtonText,
                 styles.openButtonTextArabic,
                 {
-                  color: item.isHyperlink ? theme.colors.link : theme.colors.subdoc,
-                  fontSize: item.isHyperlink ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
-                  lineHeight: item.isHyperlink ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
+                  color: tint,
+                  fontSize: barLike ? chrome.hyperlinkFontSize : chrome.buttonFontSize,
+                  lineHeight: barLike ? chrome.hyperlinkLineHeight : chrome.buttonLineHeight,
                 },
               ]}
             >
@@ -1509,6 +1514,21 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
     // The Medallion closing a service: a slide item of its own, with no title.
     if (section.ornament === "medallion") {
       return [{ id: `${section.id}-medallion`, sectionId: section.id, type: "ornament", ornament: "medallion" }];
+    }
+
+    // The choice of the Kiahk Theotokias' interpretations: a violet button
+    // that opens it over the document.
+    if (section.isInterpretationChooserButton) {
+      return [
+        {
+          id: `${section.id}-button`,
+          sectionId: section.id,
+          type: "button",
+          title: section.title,
+          isChoice: true,
+          buttonAction: "openInterpretations",
+        },
+      ];
     }
 
     if (section.isSubdocumentButton || section.isAntiphonaryButton || section.isHyperlinkButton) {

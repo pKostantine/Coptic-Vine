@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'r
 
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { toEasternArabicDigits } from '@/utils/localeFormat';
-import { FONT_SCALE_STEP, FONT_SCALE_STEPS, fontScaleToPx, MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
+import { FONT_LEVEL_COUNT, FONT_SCALE_STEP, fontScaleToLevel, MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
 import type { FontScaleControlProps } from './FontScaleControl';
 import Icon from './Icon';
 
@@ -11,10 +11,10 @@ const THUMB = 24;
 
 /**
  * Web font-size control (Coptic Vine design, "Book settings"): the setting's
- * name and its value (the size the text renders at, in pixels), then a gold
+ * name and its level (1 to as many as this screen has room for), then a gold
  * track between a small A and a large one. A click on the track sets the
- * size to the nearest of the twenty divisions there; the keyboard and a
- * screen reader step it one division. On a desktop it is a plain row
+ * size to the nearest level there; the keyboard and a screen reader step it
+ * one level. On a desktop it is a plain row
  * instead, the value between − and + buttons. Keeping @expo/ui's slider off
  * this path also keeps it out of the web bundle. The native build gets
  * FontScaleControl.tsx.
@@ -30,8 +30,8 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
     event.preventDefault?.();
   };
   const fraction = Math.min(1, Math.max(0, (fontScale - MIN_FONT_SCALE) / (MAX_FONT_SCALE - MIN_FONT_SCALE)));
-  const size = fontScaleToPx(fontScale);
-  const value = isArabic ? toEasternArabicDigits(size) : size;
+  const level = fontScaleToLevel(fontScale);
+  const value = isArabic ? toEasternArabicDigits(level) : level;
 
   if (stepper) {
     const stepButton = (delta: 1 | -1) => {
@@ -67,7 +67,7 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
     const locationX = event?.nativeEvent?.locationX;
     if (width <= 0 || !Number.isFinite(locationX)) return;
     const x = Math.min(width, Math.max(0, locationX));
-    onSetValue(MIN_FONT_SCALE + Math.round((x / width) * FONT_SCALE_STEPS) * FONT_SCALE_STEP);
+    onSetValue(MIN_FONT_SCALE + Math.round((x / width) * (FONT_LEVEL_COUNT - 1)) * FONT_SCALE_STEP);
   };
 
   return (
@@ -86,10 +86,10 @@ export default function FontScaleControl({ fontScale, isArabic, label, onStep, o
           accessibilityRole="adjustable"
           accessibilityLabel={label}
           // react-native-web drops accessibilityValue: the aria props reach the DOM.
-          aria-valuemin={fontScaleToPx(MIN_FONT_SCALE)}
-          aria-valuemax={fontScaleToPx(MAX_FONT_SCALE)}
-          aria-valuenow={size}
-          aria-valuetext={`${size} px`}
+          aria-valuemin={1}
+          aria-valuemax={FONT_LEVEL_COUNT}
+          aria-valuenow={level}
+          aria-valuetext={`${level} / ${FONT_LEVEL_COUNT}`}
           accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(event) => onStep(event.nativeEvent.actionName === 'increment' ? 1 : -1)}
           onLayout={(event) => setWidth(event.nativeEvent.layout.width)}

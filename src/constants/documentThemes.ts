@@ -64,6 +64,14 @@ export interface DocumentThemeColors {
   link: string;
   linkSoft: string;
   linkLine: string;
+  /**
+   * A button that opens a choice about this document (the Kiahk Theotokias'
+   * interpretations): violet, beside the blue that opens a subdocument and
+   * the green that leaves for another service.
+   */
+  choice: string;
+  choiceSoft: string;
+  choiceLine: string;
 }
 
 export interface DocumentTheme {
@@ -89,6 +97,8 @@ const rgba = withAlpha;
  */
 const darkButton = (hex: string) => ({ color: hex, soft: rgba(hex, 0.13), line: rgba(hex, 0.45) });
 const lightButton = (hex: string) => ({ color: hex, soft: rgba(hex, 0.1), line: rgba(hex, 0.4) });
+// The choice buttons' violet, set for each page as its blue and green are.
+const NIGHT_CHOICE = darkButton('#C3A4FF');
 
 export const NIGHT_DOCUMENT_THEME: DocumentTheme = {
   id: 'night',
@@ -121,11 +131,15 @@ export const NIGHT_DOCUMENT_THEME: DocumentTheme = {
     link: COLORS.link,
     linkSoft: COLORS.linkSoft,
     linkLine: COLORS.linkLine,
+    choice: NIGHT_CHOICE.color,
+    choiceSoft: NIGHT_CHOICE.soft,
+    choiceLine: NIGHT_CHOICE.line,
   },
 };
 
 const WALNUT_SUBDOC = darkButton('#EBC383');
 const WALNUT_LINK = darkButton('#DFA08A');
+const WALNUT_CHOICE = darkButton('#D4A9E0');
 
 const WALNUT_DOCUMENT_THEME: DocumentTheme = {
   id: 'walnut',
@@ -166,11 +180,15 @@ const WALNUT_DOCUMENT_THEME: DocumentTheme = {
     link: WALNUT_LINK.color,
     linkSoft: WALNUT_LINK.soft,
     linkLine: WALNUT_LINK.line,
+    choice: WALNUT_CHOICE.color,
+    choiceSoft: WALNUT_CHOICE.soft,
+    choiceLine: WALNUT_CHOICE.line,
   },
 };
 
 const VINE_SUBDOC = darkButton('#B3DDB4');
 const VINE_LINK = darkButton('#E5C97E');
+const VINE_CHOICE = darkButton('#CDB8F2');
 
 const VINE_DOCUMENT_THEME: DocumentTheme = {
   id: 'vine',
@@ -208,12 +226,16 @@ const VINE_DOCUMENT_THEME: DocumentTheme = {
     link: VINE_LINK.color,
     linkSoft: VINE_LINK.soft,
     linkLine: VINE_LINK.line,
+    choice: VINE_CHOICE.color,
+    choiceSoft: VINE_CHOICE.soft,
+    choiceLine: VINE_CHOICE.line,
   },
 };
 
 const SEPIA_ACCENT = '#7E4E0A';
 const SEPIA_SUBDOC = lightButton('#7C2318');
 const SEPIA_LINK = lightButton('#485C1F');
+const SEPIA_CHOICE = lightButton('#5E2C78');
 
 const SEPIA_DOCUMENT_THEME: DocumentTheme = {
   id: 'sepia',
@@ -251,11 +273,15 @@ const SEPIA_DOCUMENT_THEME: DocumentTheme = {
     link: SEPIA_LINK.color,
     linkSoft: SEPIA_LINK.soft,
     linkLine: SEPIA_LINK.line,
+    choice: SEPIA_CHOICE.color,
+    choiceSoft: SEPIA_CHOICE.soft,
+    choiceLine: SEPIA_CHOICE.line,
   },
 };
 
 const PAPER_SUBDOC = lightButton('#1B4E7E');
 const PAPER_LINK = lightButton('#24735A');
+const PAPER_CHOICE = lightButton('#5B3A9E');
 
 const PAPER_DOCUMENT_THEME: DocumentTheme = {
   id: 'paper',
@@ -290,6 +316,9 @@ const PAPER_DOCUMENT_THEME: DocumentTheme = {
     link: PAPER_LINK.color,
     linkSoft: PAPER_LINK.soft,
     linkLine: PAPER_LINK.line,
+    choice: PAPER_CHOICE.color,
+    choiceSoft: PAPER_CHOICE.soft,
+    choiceLine: PAPER_CHOICE.line,
   },
 };
 

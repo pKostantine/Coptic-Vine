@@ -6,19 +6,19 @@
  *
  * The scale is stored as written; a phone and a tablet at the same scale
  * show the same size, and a stored size never changes under the reader
- * because a device was reclassified. The screen only decides how far the
- * slider goes: a phone to about the width of nine letters, a large tablet
- * or a projected screen several times further.
+ * because a device was reclassified. The slider moves in levels of 2px,
+ * shown to the reader as 1, 2, 3...: the screen decides how many there are
+ * -- 13 on a phone, 35 on an iPad, 48 on a 1080p screen.
  */
 
 /** Rendered size, in logical pixels, at a scale of 1. */
 export const READING_FONT_BASE_PX = 14;
 /** The smallest text offered: the base size. */
 export const MIN_FONT_SCALE = 1;
-/** A new installation's size: 21px, between the sizes the earlier tables opened at. */
-export const DEFAULT_FONT_SCALE = 1.5;
-/** The slider's divisions between its two ends, whatever the screen. */
-export const FONT_SCALE_STEPS = 20;
+/** One level of the slider: 2px of rendered size, whatever the screen. */
+export const FONT_SCALE_STEP = 2 / READING_FONT_BASE_PX;
+/** A new installation's size: level 5, 22px, between the sizes the earlier tables opened at. */
+export const DEFAULT_FONT_SCALE = Math.round((1 + 4 * FONT_SCALE_STEP) * 1000) / 1000;
 /** Marks a stored fontScale as a scale; earlier installations stored a level. */
 export const FONT_SCALE_VERSION = 2;
 // Logical pixels of the screen's shortest side per unit of scale: a 390pt
@@ -26,23 +26,40 @@ export const FONT_SCALE_VERSION = 2;
 // 7.71 (108px). Spirit & Truth divides by 130 on a slightly smaller base.
 const SHORT_EDGE_PER_SCALE = 140;
 const FALLBACK_SHORT_EDGE = 390;
+// Scales are kept to three decimals, a few thousandths of a level off a whole one.
+const LEVEL_TOLERANCE = 0.01;
 // The largest size the earlier phone table offered (38px): no screen's range
 // stops short of it, so a reader who had it keeps it on a small phone too.
-const SMALLEST_RANGE_TOP = 2.714;
+const SMALLEST_RANGE_TOP = 38 / READING_FONT_BASE_PX;
 
 /**
  * How far the slider goes on a screen, from its shortest side: the same
  * either way up, so turning the device never moves the reader's size, and
- * never short of the earlier tables' largest phone size.
+ * never short of the earlier tables' largest phone size. It ends on a whole
+ * level, the last one the screen has room for.
  */
 export function maxFontScaleForScreen(screenWidth, screenHeight) {
   const shortEdge = Math.min(positiveDimension(screenWidth), positiveDimension(screenHeight)) || FALLBACK_SHORT_EDGE;
-  return Math.max(SMALLEST_RANGE_TOP, roundScale(shortEdge / SHORT_EDGE_PER_SCALE));
+  const reach = Math.max(SMALLEST_RANGE_TOP, shortEdge / SHORT_EDGE_PER_SCALE);
+  const levels = Math.floor((reach - MIN_FONT_SCALE) / FONT_SCALE_STEP + LEVEL_TOLERANCE);
+  return roundScale(MIN_FONT_SCALE + levels * FONT_SCALE_STEP);
 }
 
-/** The width of one of the slider's divisions. */
-export function fontScaleStep(maxScale) {
-  return (maxScale - MIN_FONT_SCALE) / FONT_SCALE_STEPS;
+/** The width of one of the slider's levels: 2px, whatever the screen. */
+export function fontScaleStep() {
+  return FONT_SCALE_STEP;
+}
+
+/** How many levels a slider ending at `maxScale` has: the reader sees 1 to this. */
+export function fontLevelCount(maxScale) {
+  return Math.floor((maxScale - MIN_FONT_SCALE) / FONT_SCALE_STEP + LEVEL_TOLERANCE) + 1;
+}
+
+/** The level a scale is shown as, from 1: the nearest one. */
+export function fontScaleToLevel(scale) {
+  const numeric = Number(scale);
+  if (!Number.isFinite(numeric)) return 1;
+  return Math.max(1, Math.round((numeric - MIN_FONT_SCALE) / FONT_SCALE_STEP) + 1);
 }
 
 export function clampFontScale(value, maxScale) {
@@ -51,18 +68,17 @@ export function clampFontScale(value, maxScale) {
   return Math.min(maxScale, Math.max(MIN_FONT_SCALE, numeric));
 }
 
-/** The nearest of the slider's divisions. */
+/** The nearest of the slider's levels. */
 export function snapFontScale(value, maxScale) {
-  const step = fontScaleStep(maxScale);
-  const division = Math.round((clampFontScale(value, maxScale) - MIN_FONT_SCALE) / step);
-  return roundScale(MIN_FONT_SCALE + division * step);
+  const top = fontLevelCount(maxScale) - 1;
+  const level = Math.min(top, Math.max(0, Math.round((clampFontScale(value, maxScale) - MIN_FONT_SCALE) / FONT_SCALE_STEP)));
+  return roundScale(MIN_FONT_SCALE + level * FONT_SCALE_STEP);
 }
 
-/** The division `delta` steps from the nearest one to `value`: what the step buttons and keyboard do. */
+/** The level `delta` steps from the nearest one to `value`: what the step buttons and keyboard do. */
 export function stepFontScale(value, delta, maxScale) {
-  const step = fontScaleStep(maxScale);
-  const division = Math.round((clampFontScale(value, maxScale) - MIN_FONT_SCALE) / step) + Math.round(Number(delta) || 0);
-  return snapFontScale(MIN_FONT_SCALE + division * step, maxScale);
+  const level = Math.round((clampFontScale(value, maxScale) - MIN_FONT_SCALE) / FONT_SCALE_STEP) + Math.round(Number(delta) || 0);
+  return snapFontScale(MIN_FONT_SCALE + level * FONT_SCALE_STEP, maxScale);
 }
 
 /** The size a scale renders at, whole logical pixels, the same on every device. */

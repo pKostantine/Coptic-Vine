@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import type { DocumentThemeId } from '../constants/documentThemes';
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
+import { normalizeSelectedInterpretations, toggleSelectedInterpretation } from '../utils/kiahkInterpretations';
 import { markPendingDocumentRestoresDirty } from '../utils/lastDocumentPosition';
 import {
     applySyncedReadingPreferences,
@@ -48,6 +49,10 @@ interface ReadingPreferencesContextValue {
   toggleSaintHymn: (token: string) => void;
   /** Clears every saint hymn choice for one saint, given its base token. */
   clearSaintHymns: (base: string) => void;
+  /** Turns one Kiahk Theotokia interpretation on or off (utils/kiahkInterpretations.ts). */
+  toggleInterpretation: (id: string) => void;
+  /** Sets the whole choice at once: the defaults, all, or none. */
+  setSelectedInterpretations: (ids: string[]) => void;
   toggleInMonastery: () => void;
   toggleKeepScreenAwake: () => void;
   /** Picks the page a document is read on — see constants/documentThemes.ts. */
@@ -328,6 +333,18 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     });
   }, []);
 
+  const toggleInterpretation = useCallback((id: string) => {
+    setPreferences((prev) => ({ ...prev, selectedInterpretations: toggleSelectedInterpretation(prev.selectedInterpretations || [], id) }));
+  }, []);
+
+  const setSelectedInterpretations = useCallback((ids: string[]) => {
+    setPreferences((prev) => {
+      const next = normalizeSelectedInterpretations(ids);
+      const same = next.length === (prev.selectedInterpretations || []).length && next.every((id, index) => prev.selectedInterpretations[index] === id);
+      return same ? prev : { ...prev, selectedInterpretations: next };
+    });
+  }, []);
+
   const toggleInMonastery = useCallback(() => {
     setPreferences((prev) => ({ ...prev, inMonastery: !prev.inMonastery }));
   }, []);
@@ -367,6 +384,8 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       setAppLanguage,
       toggleSaintHymn,
       clearSaintHymns,
+      toggleInterpretation,
+      setSelectedInterpretations,
       toggleInMonastery,
       toggleKeepScreenAwake,
       setDocumentTheme,
@@ -394,6 +413,8 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       setAppLanguage,
       toggleSaintHymn,
       clearSaintHymns,
+      toggleInterpretation,
+      setSelectedInterpretations,
       toggleInMonastery,
       toggleKeepScreenAwake,
       setDocumentTheme,

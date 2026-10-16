@@ -8,6 +8,8 @@ import DocumentPillBar from '../ui/DocumentPillBar';
 import DocumentTopBar from '../ui/DocumentTopBar';
 import CalendarSheet from '../ui/CalendarSheet';
 import DocumentDateBar from '../ui/DocumentDateBar';
+import InterpretationPicker from '../ui/InterpretationPicker';
+import { INTERPRETATION_CHOOSER_SECTION_ID, INTERPRETATION_CHOOSER_TITLE, withInterpretationChoices } from '../../../utils/kiahkInterpretations';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
 import LoadFailure from '../ui/LoadFailure';
@@ -209,7 +211,26 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     [preferences.selectedSaintHymns, preferences.inMonastery],
   );
 
-  const [sections, setSections] = useState<DocumentSection[] | null>(null);
+  const [hydratedSections, setHydratedSections] = useState<DocumentSection[] | null>(null);
+  // The document as the reader has chosen it: the Kiahk Theotokias'
+  // interpretations they did not choose taken out, and the button to choose
+  // them set in (utils/kiahkInterpretations.ts). A choice made here changes
+  // the document at once, with no new hydration.
+  const selectedInterpretations = preferences.selectedInterpretations;
+  const sections = useMemo(
+    () => hydratedSections && withInterpretationChoices<DocumentSection>(
+      hydratedSections,
+      selectedInterpretations || [],
+      () => ({
+        id: INTERPRETATION_CHOOSER_SECTION_ID,
+        hymnKey: 'selectInterpretations',
+        title: { ...INTERPRETATION_CHOOSER_TITLE },
+        verses: [],
+        isInterpretationChooserButton: true,
+      }),
+    ),
+    [hydratedSections, selectedInterpretations],
+  );
   // The season of the day being prayed, which the ornaments on Night and Paper
   // are drawn in; read with the document so it arrives with it.
   const [ornamentSeason, setOrnamentSeason] = useState<SeasonThemeKey | null>(null);
@@ -223,7 +244,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     preferences.selectText, preferences.slideshowMode, preferences.displayComments,
     preferences.displaySilentPrayers, preferences.displayNowPlayingBar,
     preferences.bishopPresent, preferences.copticGospelRite, preferences.inMonastery,
-    preferences.selectedSaintHymns, preferences.appLanguage, preferences.documentTheme, effectiveDate, vespersEffectiveDate,
+    preferences.selectedSaintHymns, preferences.selectedInterpretations, preferences.appLanguage, preferences.documentTheme, effectiveDate, vespersEffectiveDate,
   ]);
   const [readerFocused, setReaderFocused] = useState(true);
   // A liturgy runs for hours: the screen stays on while this is the screen being read.
@@ -240,6 +261,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // document stays focused and follows each change live, re-anchoring to the
   // hymn the reader is on (see the settings-signature layout effect below).
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The choice of the Kiahk Theotokias' interpretations, opened from its
+  // button in the document or its row in the content list.
+  const [interpretationsOpen, setInterpretationsOpen] = useState(false);
   const [activeSermonHighlightId, setActiveSermonHighlightId] = useState<string | null>(null);
   // Open: its position is remembered while it stays open -- through Settings,
   // the Calendar, the Seasons, a date or a setting changed -- and forgotten
@@ -347,15 +371,22 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // Also handle preference changes made from the in-document controls and
   // automatic live-calendar rollover while this screen itself is focused.
   // This layout effect runs before a new WebView can report a reflowed position.
+  //
+  // The sections captured are the ones read before the change: a change that
+  // re-reads the document has not yet replaced them, but one made here (the
+  // interpretations) already has, in the render that changed the signature.
+  const previousSectionsRef = useRef<DocumentSection[] | null>(null);
   useLayoutEffect(() => {
     const previousSignature = lastSettingsSignatureRef.current;
     const changed = previousSignature !== restoreSettingsSignature;
     lastSettingsSignatureRef.current = restoreSettingsSignature;
-    if (!changed || !readerFocused || !sections) return;
+    const before = previousSectionsRef.current ?? sections;
+    previousSectionsRef.current = sections;
+    if (!changed || !readerFocused || !before) return;
     captureDocumentRestore(
       documentPositionKey,
       currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey),
-      sections.map(section => ({ id: section.id, hymnKey: section.hymnKey ?? null })),
+      before.map(section => ({ id: section.id, hymnKey: section.hymnKey ?? null })),
       previousSignature,
       currentVerseIndexRef.current,
     );
@@ -393,7 +424,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
 
   useEffect(() => {
     let cancelled = false;
-    setSections(null);
+    setHydratedSections(null);
     setLoadedConditionsKey(null);
     setError(null);
     hasRestoredScrollPositionRef.current = false;
@@ -448,7 +479,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           // Sermon Planner is a working page, not a service, and stays bare.
           const newSections = isSermonPlanner ? hydrated : withDocumentOrnaments(hydrated, { english: title, arabic, french });
           setOrnamentSeason(season);
-          setSections(newSections);
+          setHydratedSections(newSections);
           setLoadedConditionsKey(conditionsKey);
           // Opened at one of its readings (?reading=Psalm, see lectionaryHref):
           // the document starts at that reading rather than where it was last
@@ -831,6 +862,12 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       return;
     }
 
+    if (action.type === 'openInterpretations') {
+      setSelectorOpen(false);
+      setInterpretationsOpen(true);
+      return;
+    }
+
     if (action.type === 'swipeBack') {
       if (!isCoveredByModal) leaveDocument();
       return;
@@ -937,7 +974,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // DocumentModal.tsx's own closeSwipePanResponder already correctly scopes
   // itself to close only the topmost modal; this ensures the document
   // BEHIND it never competes for the same gesture while anything covers it.
-  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen || settingsOpen;
+  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen || settingsOpen || interpretationsOpen;
 
   // Where the swipe this screen took began: decided while it is being taken,
   // kept for its release (see swipeStartX).
@@ -1122,6 +1159,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             onClose={() => setSelectorOpen(false)}
             onSelectSection={(id) => jumpToSection(id)}
             onOpenHyperlink={(hyperlinkKey) => openHyperlink(hyperlinkKey, { fromSelector: true })}
+            onOpenInterpretations={() => setInterpretationsOpen(true)}
             bookmarked={bookmarked}
             onToggleBookmark={() => toggleBookmark(bookmarkId)}
             onOpenCalendar={openCalendar}
@@ -1170,6 +1208,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       />
       <CalendarSheet inline visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={() => navigateAway('/season-selector')} />
       <BookSettingsSheet inDocument visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <InterpretationPicker inline visible={interpretationsOpen} onClose={() => setInterpretationsOpen(false)} />
     </SafeAreaView>
   );
 }

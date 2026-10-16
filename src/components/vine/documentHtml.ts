@@ -72,6 +72,12 @@ export interface DocumentSection {
   isAntiphonaryButton?: boolean;
   /** A Hyperlink placeholder: unlike a Subdocument (a modal over this document) it LEAVES this document for another service entirely, so it carries no prefetched content — only the key naming its destination. */
   isHyperlinkButton?: boolean;
+  /**
+   * The button that opens the choice of the Kiahk Theotokias' interpretations
+   * (utils/kiahkInterpretations.ts): no text of its own, violet like no other
+   * button, posting `openInterpretations`.
+   */
+  isInterpretationChooserButton?: boolean;
   hyperlinkKey?: string;
   /** Prefetched during the parent document's own hydration, so opening the button's modal is a local render, never a fresh fetch. */
   subdocumentSections?: DocumentSection[];
@@ -535,6 +541,39 @@ export function buildDocumentHtml(
         font-family: "Arial", sans-serif;
         font-size: ${openButtonFontSize}px;
         line-height: ${openButtonLineHeight}px;
+      }
+      .choice-button {
+        align-items: center;
+        background: ${colors.choiceSoft};
+        border: 1px solid ${colors.choiceLine};
+        border-radius: ${DOCUMENT_CONTROL_METRICS.hyperlinkBorderRadius}px;
+        color: ${colors.choice};
+        cursor: pointer;
+        display: flex;
+        font-family: Georgia, serif;
+        font-size: ${hyperlinkFontSize}px;
+        font-weight: 800;
+        gap: ${SPACING.md}px;
+        justify-content: center;
+        margin: ${SPACING.md}px auto;
+        max-width: ${DOCUMENT_CONTROL_METRICS.hyperlinkMaxWidth}px;
+        min-height: ${DOCUMENT_CONTROL_METRICS.hyperlinkMinHeight}px;
+        padding: ${SPACING.md}px ${SPACING.lg}px;
+        width: ${DOCUMENT_CONTROL_METRICS.controlWidthPercent}%;
+      }
+      .choice-button .choice-label {
+        font-size: ${hyperlinkFontSize}px;
+        line-height: ${hyperlinkLineHeight}px;
+        text-align: center;
+      }
+      .choice-button .choice-label.arabic {
+        direction: rtl;
+        font-family: "Arial", sans-serif;
+      }
+      .choice-button .choice-icon {
+        flex-shrink: 0;
+        height: 22px;
+        width: 22px;
       }
       .hyperlink-button {
         align-items: center;
@@ -1132,6 +1171,10 @@ function renderSection(
     return toggleHtml + renderHyperlinkButtonSection(section, appLanguage);
   }
 
+  if (section.isInterpretationChooserButton) {
+    return renderChoiceButtonSection(section, appLanguage);
+  }
+
   if (section.isSubdocumentButton || section.isAntiphonaryButton) {
     return toggleHtml + renderDocumentButtonSection(section, appLanguage);
   }
@@ -1216,6 +1259,30 @@ function renderDocumentButtonSection(section: DocumentSection, appLanguage: AppT
     <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
       <button class="open-button" onclick="${escapeAttribute(onclick)}">
         <span${title.language === 'arabic' && title.text ? ' class="arabic"' : ''}>${escapeHtml(label)}</span>
+      </button>
+    </section>
+  `;
+}
+
+/**
+ * The button that opens the choice of the Kiahk Theotokias' interpretations:
+ * a violet bar with a list-and-checks icon, the shape of the green
+ * hyperlink's bar but its own colour, since it neither opens a document nor
+ * leaves this one -- it changes what this one shows.
+ */
+function renderChoiceButtonSection(section: DocumentSection, appLanguage: AppTitleLanguage) {
+  const title = pickDocumentTitle(section.title, appLanguage);
+  const showArabic = title.language === 'arabic' && Boolean(title.text);
+  const label = title.text || 'Select Interpretations';
+  const onclick = `postAction('openInterpretations', { sectionId: ${JSON.stringify(section.id)} })`;
+
+  return `
+    <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
+      <button class="choice-button" onclick="${escapeAttribute(onclick)}">
+        <svg class="choice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 6.5l1.6 1.6L8.5 5"/><path d="M4 12.5l1.6 1.6 2.9-3.1"/><path d="M4 18.5l1.6 1.6 2.9-3.1"/><path d="M12 7h8"/><path d="M12 13h8"/><path d="M12 19h8"/>
+        </svg>
+        <span class="choice-label${showArabic ? ' arabic' : ''}">${escapeHtml(label)}</span>
       </button>
     </section>
   `;
