@@ -833,7 +833,10 @@ const styles = StyleSheet.create({
   },
   cell: {
     flexShrink: 1,
-    overflow: "hidden",
+    // Never clipped: the Coptic font's ornamented capitals rise past the
+    // ascent (yMax 1.04 em) and the tight slideshow line box, so a verse's
+    // first line lost the top of its initial at large sizes.
+    overflow: "visible",
     paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.sm,
   },
@@ -848,7 +851,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    overflow: "hidden",
+    overflow: "visible",
     width: "100%",
   },
   speakerCell: {
