@@ -18,12 +18,8 @@ function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-/**
- * Slideshow text is set ragged -- left for English, French and Coptic,
- * right for Arabic -- not justified: at a projected size, in a column a
- * third of the page wide, justified lines open into rivers of space.
- */
-export const SLIDESHOW_JUSTIFIED = false;
+/** Slideshow text is justified, as the scrolling page's is. */
+export const SLIDESHOW_JUSTIFIED = true;
 
 export function getSlideshowChromeMetrics(fontSize) {
   const safeFontSize = Math.max(Number(fontSize) || 18, 1);
@@ -223,6 +219,11 @@ function buildPaginationUnits(items) {
  * before it fill the slides before. So the slide on screen depends on
  * nothing before it, and can be shown as soon as its own items are
  * measured, however long the hymn or psalm before them is.
+ *
+ * Turned back (`breakAt.direction` "backward"), the reader's slide is the
+ * one ENDING at the item: it is packed from the foot up, as full as it can
+ * be, and begins wherever that leaves it. A page turned back to is a whole
+ * page, never the short remainder of a count from the top of the hymn.
  */
 export function paginateItems(
   items,
@@ -236,6 +237,10 @@ export function paginateItems(
 ) {
   const safeAvailableHeight = Math.max(Number(availableHeight) || 0, 1);
   const units = buildPaginationUnits(items);
+  if (breakAt?.direction === "backward") {
+    const forward = packBackwardFromItem(items, units, heights, languageHeights, safeAvailableHeight, fontSize, visibleLanguages, breakAt.itemId);
+    return paginateItems(items, heights, languageHeights, availableHeight, fontSize, visibleLanguages, tableWidth, forward);
+  }
   const slides = [];
   let currentSlide = [];
   let currentHeight = 0;
@@ -347,7 +352,9 @@ export function paginateItems(
     const item = unit.items[0];
     const readerStartsHere = Boolean(breakAt && breakAt.itemId === item.id) &&
       !(item.type === "verse" && readerLineOffsets(item));
-    if (currentSlide.length && (unit.breakBefore || readerStartsHere)) flushSlide();
+    // Turned back, the reader's page also ends where the page they left began.
+    const readerPageEndedBefore = Boolean(breakAt?.endsBeforeItemId) && breakAt.endsBeforeItemId === item.id;
+    if (currentSlide.length && (unit.breakBefore || readerStartsHere || readerPageEndedBefore)) flushSlide();
 
     if (item.type === "verse") {
       placeVerse(item);
@@ -362,6 +369,43 @@ export function paginateItems(
 
   flushSlide();
   return slides.length ? slides : [[]];
+}
+
+/**
+ * The slide that ends at an item, packed from the foot up: where it begins
+ * is where the reader's forward break then goes. A title, or anything else
+ * that keeps with the item after it, joins the slide with that item or not
+ * at all; an item that must open a slide ends the walk. Ending on a verse
+ * taller than a slide, the slide shows that verse's last piece (and
+ * whatever follows it that fits, as a forward turn would).
+ */
+function packBackwardFromItem(items, units, heights, languageHeights, availableHeight, fontSize, visibleLanguages, itemId) {
+  const last = items.findIndex((item) => item.id === itemId);
+  if (last < 0) return null;
+  const heightOf = (index) => Math.ceil((heights[items[index].id] ?? 0) + 2);
+  const measured = (item) => item.type === "verse" && hasEveryMeasuredColumn(item, languageHeights[item.id], visibleLanguages);
+  if (measured(items[last]) && heightOf(last) > availableHeight) {
+    const pieces = paginateItems([items[last]], heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0);
+    const lastPiece = pieces[pieces.length - 1]?.[0];
+    const offsets = Object.fromEntries(Object.entries(lastPiece?.slideshowLineRanges || {}).map(([language, range]) => [language, range.start]));
+    return { itemId, offsets, endsBeforeItemId: items[last + 1]?.id };
+  }
+  const keepsWithNext = (item) => item?.type === "title" || item?.type === "gospelRiteToggle";
+  let first = last;
+  let total = heightOf(last);
+  while (first > 0 && !units[first].breakBefore) {
+    // The group ending just before: an item plus whatever keeps with it.
+    let start = first - 1;
+    while (start > 0 && keepsWithNext(items[start - 1])) start -= 1;
+    let groupHeight = 0;
+    for (let index = start; index < first; index += 1) groupHeight += heightOf(index);
+    if (total + groupHeight > availableHeight) break;
+    total += groupHeight;
+    first = start;
+  }
+  // Nothing keeps with the item before it is left stranded at the foot of the slide before.
+  while (first > 0 && keepsWithNext(items[first - 1])) first -= 1;
+  return { itemId: items[first].id, offsets: {}, endsBeforeItemId: items[last + 1]?.id };
 }
 
 // A measured verse placed whole, carrying its lines: built once per verse
@@ -1081,10 +1125,12 @@ export function findSlideIndexForAnchor(slides = [], anchor) {
   if (!anchor?.sourceItemId) return -1;
   let bestIndex = -1;
   let bestDistance = Number.POSITIVE_INFINITY;
+  // Turned back to, the item ends its slide: of equal matches, the last.
+  const backward = anchor.direction === "backward";
   slides.forEach((slide, index) => {
     slide.forEach((item) => {
       const distance = anchorDistance(item, anchor);
-      if (distance < bestDistance) {
+      if (distance < bestDistance || (backward && distance === bestDistance && distance < Number.POSITIVE_INFINITY)) {
         bestDistance = distance;
         bestIndex = index;
       }

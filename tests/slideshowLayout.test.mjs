@@ -1020,3 +1020,31 @@ test("a column shown whole on the page before never starts again on the reader's
   assert.equal(again[readerSlide][0].slideshowLineCounts.english ?? 0, 0);
   assert.equal(again.flat().reduce((sum, entry) => sum + (entry.slideshowLineCounts.english || 0), 0), 3);
 });
+
+test("turned back, the page is packed from its foot up, ending where the page on screen begins", () => {
+  const title = { id: "t", sectionId: "s", type: "title", title: { english: "Hymn" } };
+  const verse = (index) => verseItem({ id: `v${index}`, sectionId: "s" });
+  const items = [title, verse(0), verse(1), verse(2), verse(3), verse(4), verse(5)];
+  const heights = { t: 40, v0: 100, v1: 100, v2: 100, v3: 100, v4: 100, v5: 100 };
+  // Reading from v4: the page before it holds as much as fits, ending at v3.
+  const back = paginateItems(items, heights, {}, 230, 18, ALL_LANGUAGES, 1024, { itemId: "v3", direction: "backward" });
+  assert.deepEqual(back.map((slide) => slide.map((entry) => entry.id)), [["t", "v0"], ["v1"], ["v2", "v3"], ["v4", "v5"]]);
+  assert.equal(findSlideIndexForAnchor(back, { sourceItemId: "v3", direction: "backward", offsets: {} }), 2);
+  // A title keeps with its verse: packed back to v0, the title comes along.
+  const toStart = paginateItems(items, heights, {}, 230, 18, ALL_LANGUAGES, 1024, { itemId: "v1", direction: "backward" });
+  assert.deepEqual(toStart.map((slide) => slide.map((entry) => entry.id)), [["t", "v0"], ["v1"], ["v2", "v3"], ["v4", "v5"]]);
+  const roomier = paginateItems(items, heights, {}, 260, 18, ALL_LANGUAGES, 1024, { itemId: "v1", direction: "backward" });
+  assert.deepEqual(roomier[0].map((entry) => entry.id), ["t", "v0", "v1"]);
+  // Turned back into a verse taller than a slide, the page shows its last piece, and what follows that fits.
+  const giant = verseItem({ id: "giant", sectionId: "s" });
+  const metric = { english: { lines: metricLines("English", 30) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 30) }, arabic: { lines: metricLines("عربي", 30) } };
+  const lineHeight = getSlideshowLanguageLineHeight("arabic", giant, 18);
+  const budget = lineHeight * 8 + 40;
+  const into = paginateItems([giant, verse(9)], { giant: 9999, v9: 60 }, { giant: metric }, budget, 18, ALL_LANGUAGES, 1024, { itemId: "giant", direction: "backward" });
+  const landing = findSlideIndexForAnchor(into, { sourceItemId: "giant", direction: "backward", offsets: {} });
+  assert.equal(landing, into.length - 2);
+  // ...and ends there: the verse after it opens the page the reader turned back from.
+  assert.deepEqual(into[landing].map((entry) => entry.sourceItemId || entry.id), ["giant"]);
+  assert.deepEqual(into[landing + 1].map((entry) => entry.id), ["v9"]);
+  assert.equal(into[landing][0].slideshowLineRanges.english.end, 30);
+});

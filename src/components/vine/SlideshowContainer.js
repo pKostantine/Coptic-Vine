@@ -391,7 +391,7 @@ export default function SlideshowContainer({
       visibleLanguages,
       slideTableWidth,
       currentAnchor?.sourceItemId && currentAnchor.breaks !== false
-        ? { itemId: currentAnchor.sourceItemId, offsets: currentAnchor.offsets }
+        ? { itemId: currentAnchor.sourceItemId, offsets: currentAnchor.offsets, direction: currentAnchor.direction }
         : null,
     );
 
@@ -733,9 +733,30 @@ export default function SlideshowContainer({
     setCurrentAnchor(createSlideAnchor(deck[nextIndex]));
   }, [slides]);
 
+  // Turned back, the page is packed from its foot up, ending exactly where
+  // the page on screen begins (see paginateItems' backward break): what the
+  // reader turns back to is a whole page.
   const goToPreviousSlide = useCallback(() => {
-    goToSlide(navigationIndexRef.current - 1);
-  }, [goToSlide]);
+    const deck = shownDeckRef.current?.slides?.length ? shownDeckRef.current.slides : slides;
+    const index = navigationIndexRef.current;
+    const current = deck[index];
+    const firstIndex = current?.length ? itemIndexById.get(current[0].sourceItemId || current[0].id) : -1;
+    if (firstIndex == null || firstIndex <= 0 || index <= 0) {
+      goToSlide(index - 1);
+      return;
+    }
+    const previous = items[firstIndex - 1];
+    navigationIndexRef.current = index - 1;
+    setCurrentSlideIndex(index - 1);
+    setCurrentAnchor({
+      sourceItemId: previous.id,
+      sectionId: previous.sectionId || null,
+      segmentIndex: null,
+      primaryLanguage: null,
+      offsets: {},
+      direction: "backward",
+    });
+  }, [goToSlide, itemIndexById, items, slides]);
 
   const goToNextSlide = useCallback(() => {
     goToSlide(navigationIndexRef.current + 1);
