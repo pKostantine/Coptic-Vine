@@ -269,7 +269,7 @@ export function paginateItems(
     return any ? offsets : null;
   };
 
-  const appendSegments = (verseItem, state, firstSegmentIndex = 0, labelSegment) => {
+  const appendSegments = (verseItem, state, firstSegmentIndex = 0, labelSegment, keepWithSlide = false) => {
     const result = appendTallVerseSegments({
       item: verseItem,
       state,
@@ -281,15 +281,31 @@ export function paginateItems(
       visibleLanguages,
       firstSegmentIndex,
       labelSegment,
+      keepWithSlide,
     });
     currentSlide = result.currentSlide;
     currentHeight = result.currentHeight;
     return result.nextSegmentIndex;
   };
 
-  const placeVerse = (verseItem) => {
+  // The one exception to whole verses: a hymn's title and its first verse
+  // always share a slide. The first verse gives as much of itself as fits
+  // beneath the title, turned over the page if it must be, rather than
+  // leave the title on a slide of its own. Every later verse keeps to the
+  // rule above. A verse is the title's first when the title (or the Coptic
+  // Gospel toggle set after it) comes right before it and is on the slide.
+  const titleChainStart = (index) => {
+    let start = index - 1;
+    while (start >= 0 && items[start].type === "gospelRiteToggle") start -= 1;
+    return start >= 0 && items[start].type === "title" ? start : -1;
+  };
+  const pairedWithTitleHere = (index) =>
+    titleChainStart(index) >= 0 && currentSlide.length > 0 && currentSlide[currentSlide.length - 1] === items[index - 1];
+
+  const placeVerse = (verseItem, index) => {
     const verseHeight = Math.ceil((heights[verseItem.id] ?? 0) + 2);
     const languageMetric = languageHeights[verseItem.id];
+    const paired = pairedWithTitleHere(index);
 
     // Only lines the platform's own text engine laid out are ever turned
     // over the page, or shown line by line: a split is rendered exactly as
@@ -299,7 +315,7 @@ export function paginateItems(
     // Coptic and Arabic beside it -- goes on whole and wraps as it will; its
     // real lines settle the page before it is shown (see isSlideSettled).
     if (!isMeasuredVerse(verseItem)) {
-      if (currentHeight + verseHeight > safeAvailableHeight && currentSlide.length) flushSlide();
+      if (currentHeight + verseHeight > safeAvailableHeight && currentSlide.length && !paired) flushSlide();
       currentSlide.push(verseItem);
       currentHeight += verseHeight;
       return;
@@ -309,7 +325,7 @@ export function paginateItems(
     if (offsets) {
       // The pieces before the reader's line are labelled apart, so the piece
       // the reader is on keeps the same identity however many they are.
-      const placed = appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem, { end: offsets }), 0, (index) => `before-${index}`);
+      const placed = appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem, { end: offsets }), 0, (piece) => `before-${piece}`, paired);
       flushSlide();
       // What follows is a continuation (no speaker label again), numbered on from the pieces before.
       appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem, { start: offsets }), Math.max(1, placed), (index, order) => `segment-${1 + order}`);
@@ -321,14 +337,23 @@ export function paginateItems(
     // projected page: never a sentence cut in two across a turn. A measured
     // verse is still rendered from its measured lines, so what the page
     // shows is what it was laid out for, to the line.
-    if (currentHeight + verseHeight > safeAvailableHeight && currentSlide.length) flushSlide();
+    if (currentHeight + verseHeight <= safeAvailableHeight) {
+      currentSlide.push(createWholeVerseItem(verseItem, languageMetric, fontSize));
+      currentHeight += verseHeight;
+      return;
+    }
+    if (paired) {
+      appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem), 0, undefined, true);
+      return;
+    }
+    if (currentSlide.length) flushSlide();
     if (verseHeight <= safeAvailableHeight) {
       currentSlide.push(createWholeVerseItem(verseItem, languageMetric, fontSize));
       currentHeight += verseHeight;
       return;
     }
 
-      // Only a verse taller than a whole slide is turned over the page, from a
+    // Only a verse taller than a whole slide is turned over the page, from a
     // fresh slide, each column as many of its lines at a time as fit --
     // never in a piece of fewer than two lines, either side of the turn.
     appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem));
@@ -340,24 +365,42 @@ export function paginateItems(
   const itemHeightOf = (item) => Math.ceil((heights[item.id] ?? 0) + 2);
   const wouldStrand = (index) => {
     const item = items[index];
-    const next = items[index + 1];
-    if (!keepsWithNext(item) || !next || units[index + 1].breakBefore) return false;
-    const after = next.type === "verse" && !isMeasuredVerse(next)
-      ? itemHeightOf(next)
-      : Math.min(itemHeightOf(next), safeAvailableHeight - itemHeightOf(item));
-    return currentHeight + itemHeightOf(item) + Math.max(after, 1) > safeAvailableHeight;
+    if (!keepsWithNext(item)) return false;
+    // Part of a chain already begun (the toggle after its title): it stays.
+    if (index > 0 && keepsWithNext(items[index - 1]) && currentSlide.length && currentSlide[currentSlide.length - 1] === items[index - 1]) return false;
+    // The chain from here, and the first item after it.
+    let end = index;
+    let chainHeight = 0;
+    while (end < items.length && keepsWithNext(items[end]) && (end === index || !units[end].breakBefore)) {
+      chainHeight += itemHeightOf(items[end]);
+      end += 1;
+    }
+    const next = items[end];
+    if (!next || units[end].breakBefore) return false;
+    // As much of what follows as a fresh slide would hold beneath the chain:
+    // if this slide cannot hold that much, the chain goes over the page.
+    const after = Math.min(itemHeightOf(next), Math.max(safeAvailableHeight - chainHeight, 1));
+    return currentHeight + chainHeight + Math.max(after, 1) > safeAvailableHeight;
   };
+
+  // A break at a title's first verse, from its top, is a break at the title:
+  // the two share a slide.
+  const breakIndex = breakAt ? items.findIndex((item) => item.id === breakAt.itemId) : -1;
+  const breakStartsAtId = breakIndex >= 0 && items[breakIndex].type === "verse" &&
+    !readerLineOffsets(items[breakIndex]) && titleChainStart(breakIndex) >= 0
+    ? items[titleChainStart(breakIndex)].id
+    : breakAt?.itemId;
 
   units.forEach((unit, index) => {
     const item = unit.items[0];
-    const readerStartsHere = Boolean(breakAt && breakAt.itemId === item.id) &&
+    const readerStartsHere = breakStartsAtId === item.id &&
       !(item.type === "verse" && readerLineOffsets(item));
     // Turned back, the reader's page also ends where the page they left began.
     const readerPageEndedBefore = Boolean(breakAt?.endsBeforeItemId) && breakAt.endsBeforeItemId === item.id;
     if (currentSlide.length && (unit.breakBefore || readerStartsHere || readerPageEndedBefore)) flushSlide();
 
     if (item.type === "verse") {
-      placeVerse(item);
+      placeVerse(item, index);
       return;
     }
 
@@ -384,20 +427,32 @@ function packBackwardFromItem(items, units, heights, languageHeights, availableH
   if (last < 0) return null;
   const heightOf = (index) => Math.ceil((heights[items[index].id] ?? 0) + 2);
   const measured = (item) => item.type === "verse" && hasEveryMeasuredColumn(item, languageHeights[item.id], visibleLanguages);
-  if (measured(items[last]) && heightOf(last) > availableHeight) {
-    // The verse's pieces, as a fresh slide divides them: the page ending at
-    // the line asked for is the piece holding that line, else the last.
-    const pieces = paginateItems([items[last]], heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0)
-      .map((slide) => slide[0]).filter((piece) => piece?.slideshowLineRanges);
+  const keepsWithNext = (item) => item?.type === "title" || item?.type === "gospelRiteToggle";
+  // The title (and toggle) a verse is the first of, if it is one: divided
+  // beneath its title, its pieces are not those of a fresh slide.
+  let chainStart = last;
+  while (chainStart > 0 && keepsWithNext(items[chainStart - 1])) chainStart -= 1;
+  const underTitle = chainStart < last && items[chainStart].type === "title";
+  const dividedHere = underTitle ? heightOf(last) > availableHeight - heightOf(chainStart) : heightOf(last) > availableHeight;
+  if (measured(items[last]) && dividedHere) {
+    // The verse's pieces, as they are divided: the page ending at the line
+    // asked for is the piece holding that line, else the last.
+    const pieces = paginateItems(items.slice(underTitle ? chainStart : last, last + 1), heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0)
+      .flat().filter((piece) => (piece.sourceItemId || piece.id) === itemId && piece.slideshowLineRanges);
     const wanted = lineOffsets && Object.entries(lineOffsets).find(([, line]) => Number.isFinite(line) && line >= 0);
     const piece = (wanted && pieces.find((candidate) => {
       const range = candidate.slideshowLineRanges[wanted[0]];
       return range && wanted[1] >= range.start && wanted[1] < range.end;
     })) || pieces[pieces.length - 1];
     const offsets = Object.fromEntries(Object.entries(piece?.slideshowLineRanges || {}).map(([language, range]) => [language, range.start]));
-    return { itemId, offsets, endsBeforeItemId: items[last + 1]?.id };
+    const firstPiece = !Object.values(offsets).some((line) => line > 0);
+    // The page ends at the verse's end only when it holds its last piece;
+    // any other piece fills its page on its own.
+    const endsBeforeItemId = piece === pieces[pieces.length - 1] ? items[last + 1]?.id : undefined;
+    return firstPiece && underTitle
+      ? { itemId: items[chainStart].id, offsets: {}, endsBeforeItemId }
+      : { itemId, offsets, endsBeforeItemId };
   }
-  const keepsWithNext = (item) => item?.type === "title" || item?.type === "gospelRiteToggle";
   let first = last;
   let total = heightOf(last);
   while (first > 0 && !units[first].breakBefore) {
@@ -440,6 +495,9 @@ function appendTallVerseSegments({
   visibleLanguages,
   firstSegmentIndex = 0,
   labelSegment,
+  // The first piece stays on the slide it is on, however little of it fits
+  // (a title's first verse): at least a line, over the foot if need be.
+  keepWithSlide = false,
 }) {
   let segmentIndex = firstSegmentIndex;
   let placedCount = 0;
@@ -457,7 +515,12 @@ function appendTallVerseSegments({
       visibleLanguages,
     ));
 
-    if (currentSlide.length && shouldAvoidTinyFragment(
+    const keepHere = keepWithSlide && segmentIndex === firstSegmentIndex && currentSlide.length > 0;
+    if (keepHere && !hasPositiveLineCapacity(lineCapacities)) {
+      lineCapacities = getMinimumLineCapacities(state);
+    }
+
+    if (!keepHere && currentSlide.length && shouldAvoidTinyFragment(
       state,
       lineCapacities,
       availableHeight,

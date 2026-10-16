@@ -207,8 +207,8 @@ test("seasonal decorations split safely on a short max-font landscape slide", ()
   assert.equal(segments.filter((segment) => segment.verse.slideshowSeasonalPrefixVisible).length, 1);
 });
 
-test("pagination starts a tall verse fresh instead of leaving a one-line orphan", () => {
-  const title = { id: "compact-title", sectionId: "compact", type: "title", isCollapsed: true, title: { english: "" } };
+test("a tall verse after something that is not its title starts fresh instead of leaving a one-line orphan", () => {
+  const before = verseItem({ id: "before", sectionId: "before", verse: { english: "Short", type: "priest" } });
   const item = verseItem();
   const metric = {
     english: { lines: metricLines("English", 8) },
@@ -216,15 +216,15 @@ test("pagination starts a tall verse fresh instead of leaving a one-line orphan"
     arabic: { lines: metricLines("عربي", 8) },
   };
   const slides = paginateItems(
-    [title, item],
-    { [title.id]: 210, [item.id]: 9999 },
+    [before, item],
+    { [before.id]: 210, [item.id]: 9999 },
     { [item.id]: metric },
     360,
     78,
     ALL_LANGUAGES,
     1024,
   );
-  assert.deepEqual(slides[0].map((entry) => entry.id), [title.id]);
+  assert.deepEqual(slides[0].map((entry) => entry.id), [before.id]);
   assert.equal(slides[1][0].sourceItemId, item.id);
 });
 
@@ -782,7 +782,8 @@ test("a slide is settled once its run, its items and the item that did not fit a
   assert.equal(isSlideSettled(items, slides, 3, isMeasured), true);
   assert.equal(isSlideSettled(items, slides, 0, isMeasured), false);
   // Segments of a split verse count by their source row.
-  const split = paginateItems([title("c"), verseItem({ id: "c-0", sectionId: "c" })], { "c-title": 30, "c-0": 9999 }, { "c-0": { english: { lines: metricLines("E", 12) } } }, 200, 18, ALL_LANGUAGES, 1024);
+  const cMetric = { english: { lines: metricLines("E", 12) }, coptic: { lines: metricLines("C", 12) }, arabic: { lines: metricLines("A", 12) } };
+  const split = paginateItems([title("c"), verseItem({ id: "c-0", sectionId: "c" })], { "c-title": 30, "c-0": 9999 }, { "c-0": cMetric }, 200, 18, ALL_LANGUAGES, 1024);
   assert.ok(split.length > 1);
   const cItems = [title("c"), verseItem({ id: "c-0", sectionId: "c" })];
   assert.equal(isSlideSettled(cItems, split, 1, (item) => ["c-title", "c-0"].includes(item.id)), true);
@@ -1019,4 +1020,73 @@ test("turned back from the second piece of a tall verse, the page is the piece b
   assert.deepEqual(back[landing][0].slideshowLineRanges.english, pieces[0][0].slideshowLineRanges.english);
   // The page after it is the piece the reader turned back from.
   assert.deepEqual(back[landing + 1][0].slideshowLineRanges.english, second.slideshowLineRanges.english);
+});
+
+// ---- A title and its first verse always share a slide ----
+
+test("a hymn's title shares its slide with its first verse, which gives as much of itself as fits beneath it", () => {
+  const title = { id: "psalm-title", sectionId: "psalm", type: "title", title: { english: "Psalm 85" } };
+  const first = verseItem({ id: "psalm-0", sectionId: "psalm" });
+  const second = verseItem({ id: "psalm-1", sectionId: "psalm" });
+  const metric = (count) => ({ english: { lines: metricLines("English", count) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", count) }, arabic: { lines: metricLines("عربي", count) } });
+  const fontSize = 18;
+  const lineHeight = getSlideshowLanguageLineHeight("arabic", first, fontSize);
+  // Ten lines fit a slide; the first verse is eight lines, so it fits a slide but not beneath the title.
+  const budget = lineHeight * 10 + 40;
+  const heights = { "psalm-title": lineHeight * 3, "psalm-0": lineHeight * 8 + 16, "psalm-1": lineHeight * 8 + 16 };
+  const slides = paginateItems([title, first, second], heights, { "psalm-0": metric(8), "psalm-1": metric(8) }, budget, fontSize, ALL_LANGUAGES, 1024);
+  // The title's slide holds the first verse's first lines (each column as many as fit beneath the
+  // title: the taller Arabic lines fewer than the English); the rest turns the page. The second verse,
+  // whole, follows what fits, as any later verse does.
+  assert.deepEqual(slides[0].map((entry) => entry.slideId || entry.id), ["psalm-title", "psalm-0-segment-0"]);
+  assert.equal(slides[1][0].slideId, "psalm-0-segment-1");
+  const firstPiece = slides[0][1].slideshowLineCounts.arabic;
+  assert.ok(firstPiece >= 1 && firstPiece < 8, `first piece of ${firstPiece} Arabic lines`);
+  assert.equal(slides[1][0].slideshowLineCounts.arabic, 8 - firstPiece);
+  assert.deepEqual(slides.flat().filter((entry) => entry.id === "psalm-1").length, 1);
+  // Even with room for a single line beneath the title, the first verse starts there.
+  const tallTitle = { "psalm-title": lineHeight * 9, "psalm-0": lineHeight * 8 + 16 };
+  const squeezed = paginateItems([title, first], tallTitle, { "psalm-0": metric(8) }, budget, fontSize, ALL_LANGUAGES, 1024);
+  assert.deepEqual(squeezed[0].map((entry) => entry.slideId || entry.id), ["psalm-title", "psalm-0-segment-0"]);
+  assert.ok(squeezed[0][1].slideshowLineCounts.english >= 1);
+  // The Coptic Gospel toggle between a title and its verse does not come between them.
+  const toggle = { id: "psalm-toggle", sectionId: "psalm", type: "gospelRiteToggle" };
+  const withToggle = paginateItems([title, toggle, first], { ...heights, "psalm-toggle": 30 }, { "psalm-0": metric(8) }, budget, fontSize, ALL_LANGUAGES, 1024);
+  assert.deepEqual(withToggle[0].map((entry) => entry.slideId || entry.id), ["psalm-title", "psalm-toggle", "psalm-0-segment-0"]);
+  // Not yet measured, the first verse still stays with its title, whatever its estimated height.
+  const unmeasured = paginateItems([title, first], heights, {}, budget, fontSize, ALL_LANGUAGES, 1024);
+  assert.deepEqual(unmeasured.map((slide) => slide.map((entry) => entry.id)), [["psalm-title", "psalm-0"]]);
+});
+
+test("turned back into a title's first verse, the pages are the same ones, title and first lines together", () => {
+  const title = { id: "psalm-title", sectionId: "psalm", type: "title", title: { english: "Psalm 85" } };
+  const first = verseItem({ id: "psalm-0", sectionId: "psalm" });
+  const second = verseItem({ id: "psalm-1", sectionId: "psalm" });
+  const metric = (count) => ({ english: { lines: metricLines("English", count) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", count) }, arabic: { lines: metricLines("عربي", count) } });
+  const fontSize = 18;
+  const lineHeight = getSlideshowLanguageLineHeight("arabic", first, fontSize);
+  const budget = lineHeight * 10 + 40;
+  const languageHeights = { "psalm-0": metric(24), "psalm-1": metric(3) };
+  const heights = { "psalm-title": lineHeight * 3, "psalm-0": lineHeight * 24 + 16, "psalm-1": lineHeight * 3 + 16 };
+  const forward = paginateItems([title, first, second], heights, languageHeights, budget, fontSize, ALL_LANGUAGES, 1024);
+  const ids = (slides) => slides.map((slide) => slide.map((entry) => entry.slideId || entry.id));
+  assert.deepEqual(ids(forward)[0], ["psalm-title", "psalm-0-segment-0"]);
+  const pieces = forward.flat().filter((entry) => entry.sourceItemId === "psalm-0");
+  assert.ok(pieces.length >= 3);
+  // Back from the second piece: the page is the title with the first piece, as it was.
+  const second1 = pieces[1];
+  const toFirst = { sourceItemId: "psalm-0", direction: "backward", primaryLanguage: "english", offsets: Object.fromEntries(["english", "coptic", "arabic"].map((language) => [language, second1.slideshowLineRanges[language].start - 1])) };
+  const back = paginateItems([title, first, second], heights, languageHeights, budget, fontSize, ALL_LANGUAGES, 1024, { itemId: "psalm-0", ...toFirst });
+  assert.deepEqual(ids(back), ids(forward));
+  assert.equal(findSlideIndexForAnchor(back, toFirst), 0);
+  // Back from the verse after: the last piece on a page of its own, the same pieces before it.
+  const toLast = { sourceItemId: "psalm-0", direction: "backward", offsets: {} };
+  const backFromAfter = paginateItems([title, first, second], heights, languageHeights, budget, fontSize, ALL_LANGUAGES, 1024, { itemId: "psalm-0", ...toLast });
+  const counts = (slides) => slides.map((slide) => slide.map((entry) => entry.slideshowLineCounts?.english ?? entry.id));
+  assert.deepEqual(counts(backFromAfter).slice(0, pieces.length), counts(forward).slice(0, pieces.length - 1).concat([[pieces[pieces.length - 1].slideshowLineCounts.english]]));
+  assert.equal(findSlideIndexForAnchor(backFromAfter, toLast), pieces.length - 1);
+  assert.deepEqual(backFromAfter[pieces.length].map((entry) => entry.id), ["psalm-1"]);
+  // A forward break at the first verse itself begins at the title.
+  const atVerse = paginateItems([title, first, second], heights, languageHeights, budget, fontSize, ALL_LANGUAGES, 1024, { itemId: "psalm-0", offsets: {} });
+  assert.deepEqual(ids(atVerse), ids(forward));
 });

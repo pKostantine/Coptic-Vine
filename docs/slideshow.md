@@ -135,6 +135,15 @@ Items are placed in order; a slide holds whole items:
   split; its real lines settle the page before the page is shown.
 - A title or the Gospel Rite toggle never ends a slide (`wouldStrand`): if
   what follows would not fit beneath it, it goes over the page with it.
+- **The one exception to whole verses: a hymn's title and its first verse
+  always share a slide.** If the first verse does not fit beneath its title
+  (and the toggle, if set between them), it is split there and gives as
+  much of itself as fits — at least a line — rather than leave the title on
+  a slide of its own; the rest turns the page. Only the first verse: every
+  later verse keeps the whole-verse rule (`pairedWithTitleHere`,
+  `keepWithSlide`). A break at such a verse, from its top, is a break at
+  its title, and a page turned back into it is the title with the first
+  piece again.
 
 ### A verse taller than a slide
 

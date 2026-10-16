@@ -87,7 +87,7 @@ test('no guessed line breaks reach the page, and the deck shows only settled sli
   const container = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
   assert.doesNotMatch(layout, /createEstimatedVerseMetric/);
   assert.doesNotMatch(container, /createEstimatedVerseMetric|createEstimatedTextLines/);
-  const placeVerse = layout.match(/const placeVerse = \(verseItem\) => \{([\s\S]*?)\n  \};/)?.[1] || '';
+  const placeVerse = layout.match(/const placeVerse = \(verseItem, index\) => \{([\s\S]*?)\n  \};/)?.[1] || '';
   assert.match(placeVerse, /if \(!isMeasuredVerse\(verseItem\)\)/);
   assert.match(layout, /const isMeasuredVerse = \(verseItem\) =>\s*hasEveryMeasuredColumn\(verseItem, languageHeights\[verseItem\.id\], visibleLanguages\)/);
   assert.match(container, /isSlideSettled\(items, slides, resolvedSlideIndex, isItemMeasured, itemIndexById, anchorBreakIndex\)/);
