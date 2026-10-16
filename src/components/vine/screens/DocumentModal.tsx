@@ -91,7 +91,7 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
  * would hand it over, but the dialog then draws dark status bar icons on the
  * black page; a swipe starting just inside the text works on Android as is.
  */
-function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwipeFromRight?: () => void) {
+function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwipeFromRight?: () => void, ignoresTouch?: () => boolean) {
   const { left: leftInset, right: rightInset } = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const startRef = useRef<{ x: number; y: number; edge: 'left' | 'right' } | null>(null);
@@ -105,7 +105,7 @@ function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwip
   const handlers = {
     onTouchStart: (event: GestureResponderEvent) => {
       startRef.current = null;
-      if (!enabled || isStylusGestureEvent(event) || event.nativeEvent.touches.length > 1) return;
+      if (!enabled || isStylusGestureEvent(event) || event.nativeEvent.touches.length > 1 || ignoresTouch?.()) return;
       const { pageX, pageY } = touchPoint(event);
       if (!startsInInset(pageX)) return;
       startRef.current = { x: pageX, y: pageY, edge: pageX < leftInset ? 'left' : 'right' };
@@ -353,7 +353,13 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // swipe had looked like it began at the left edge and none at the right:
   // in slideshow mode, with no page underneath to catch it instead, the
   // content list could never be swiped open.
-  const insetEdgeSwipe = useInsetEdgeSwipe(!isCovered, onClose, () => setSelectorOpen(true));
+  //
+  // The pill bar is a dead zone for both: a swipe along it scrolls the pills,
+  // however near an edge it starts. Every touch clears the mark on its way
+  // down (onTouchStartCapture on the SafeAreaView), and the bar sets it again
+  // when the touch lands on it, before the swipe can be taken.
+  const touchOnPillBarRef = useRef(false);
+  const insetEdgeSwipe = useInsetEdgeSwipe(!isCovered, onClose, () => setSelectorOpen(true), () => touchOnPillBarRef.current);
   const { startsInInset } = insetEdgeSwipe;
   const swipeTakenFromXRef = useRef(0);
   const swipeGesturePanResponder = useMemo(() => {
@@ -361,7 +367,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
         const startX = swipeStartX(gestureState);
-        if (isCovered || isStylusGestureEvent(_) || startsInInset(startX)) return false;
+        if (isCovered || isStylusGestureEvent(_) || startsInInset(startX) || touchOnPillBarRef.current) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal) return false;
         // Only from the very edge: a swipe across the page turns it, or does nothing.
@@ -425,6 +431,13 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         style={[styles.screen, { backgroundColor: documentTheme.colors.page }]}
         {...(isMobileDocument ? swipeGesturePanResponder.panHandlers : {})}
         {...(isMobileDocument ? insetEdgeSwipe.handlers : {})}
+        // The capture phase every native view registers (BaseViewConfig);
+        // React Native's types leave it out.
+        {...({
+          onTouchStartCapture: () => {
+            touchOnPillBarRef.current = false;
+          },
+        } as object)}
       >
         {/* A subdocument opens on top of a document the reader is already in,
             so on the app it gets no bar at all -- same as the document
@@ -449,6 +462,9 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             activeKey={activePillKey}
             onSelect={(key) => selectAntiphonaryGroup(key as AntiphonaryGroup)}
             theme={documentTheme}
+            onTouchStart={() => {
+              touchOnPillBarRef.current = true;
+            }}
           />
         ) : sectionPills.length > 1 ? (
           <DocumentPillBar
@@ -456,6 +472,9 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             activeKey={activePillKey}
             onSelect={jumpToSection}
             theme={documentTheme}
+            onTouchStart={() => {
+              touchOnPillBarRef.current = true;
+            }}
           />
         ) : null}
         {!sections ? (

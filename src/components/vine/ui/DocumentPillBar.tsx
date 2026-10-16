@@ -17,6 +17,12 @@ interface DocumentPillBarProps {
   onSelect: (key: string) => void;
   /** The page the bar sits on — see constants/documentThemes.ts. */
   theme?: DocumentTheme;
+  /**
+   * A touch landed on the bar. The screen's edge swipes (go back, open the
+   * contents) listen for it: a swipe along the pills scrolls them, and never
+   * does either.
+   */
+  onTouchStart?: () => void;
 }
 
 /**
@@ -29,7 +35,7 @@ interface DocumentPillBarProps {
  * row the reader has scrolled along themselves stays where they left it until
  * the next hymn comes.
  */
-export default function DocumentPillBar({ pills, activeKey, onSelect, theme = NIGHT_DOCUMENT_THEME }: DocumentPillBarProps) {
+export default function DocumentPillBar({ pills, activeKey, onSelect, theme = NIGHT_DOCUMENT_THEME, onTouchStart }: DocumentPillBarProps) {
   const scrollRef = useRef<ScrollView>(null);
   // The bar sits in a page inset from a phone's notch on its side. Its strip
   // runs out to the screen's edges -- it is only colour -- while the pills
@@ -63,6 +69,7 @@ export default function DocumentPillBar({ pills, activeKey, onSelect, theme = NI
         paddingRight: insets.right,
       }]}
       onLayout={(event) => setBarWidth(event.nativeEvent.layout.width - insets.left - insets.right)}
+      onTouchStart={onTouchStart}
     >
       <ScrollView
         ref={scrollRef}

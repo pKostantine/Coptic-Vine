@@ -932,12 +932,15 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // Where the swipe this screen took began: decided while it is being taken,
   // kept for its release (see swipeStartX).
   const swipeTakenFromXRef = useRef(0);
+  // The Antiphonary's pill bar is a dead zone for the edge swipes: a swipe
+  // along it scrolls the pills (see DocumentModal.tsx).
+  const touchOnPillBarRef = useRef(false);
   const gesturePanResponder = useMemo(
     () => {
-      // Only a swipe from the very edge goes back or opens the contents
+      // Only a swipe from the edge goes back or opens the contents
       // (utils/edgeSwipe.ts); one across the page turns it, or does nothing.
       const shouldHandleEdgeSwipe = (event: unknown, gestureState: PanResponderGestureState) => {
-        if (isCoveredByModal || isStylusGestureEvent(event) || pencilGestureActiveRef.current) return false;
+        if (isCoveredByModal || isStylusGestureEvent(event) || pencilGestureActiveRef.current || touchOnPillBarRef.current) return false;
         const startX = swipeStartX(gestureState);
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         const handles = swipeEdge(startX, screenWidth) !== null && isHorizontal && Math.abs(gestureState.dx) > 18;
@@ -971,6 +974,13 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
       style={[styles.safeArea, { backgroundColor: documentTheme.colors.page }]}
       {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
+      // The capture phase every native view registers (BaseViewConfig);
+      // React Native's types leave it out.
+      {...({
+        onTouchStartCapture: () => {
+          touchOnPillBarRef.current = false;
+        },
+      } as object)}
     >
       {/* The native stack's own default edge-swipe-to-go-back gesture isn't
           scoped to whether a subdocument modal is currently covering this
@@ -1013,6 +1023,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               activeKey={activeAntiphonaryGroup}
               onSelect={(key) => selectAntiphonaryGroup(key as AntiphonaryGroup)}
               theme={documentTheme}
+              onTouchStart={() => {
+                touchOnPillBarRef.current = true;
+              }}
             />
           ) : null}
           <View style={styles.documentFrame}>
