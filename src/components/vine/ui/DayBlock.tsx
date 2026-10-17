@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Platform, PanResponder, type PanResponderGestureState } from 'react-native';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Animated, Easing, Platform, PanResponder, type PanResponderGestureState, StyleSheet, View } from 'react-native';
 
 import { useCalendar } from '../../../context/CalendarContext';
 import { appText, tr } from '../../../utils/appText';
@@ -23,6 +23,18 @@ function weekStartOf(isoDate: string): string {
   const date = new Date(`${isoDate}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() - date.getUTCDay());
   return date.toISOString().slice(0, 10);
+}
+
+/** The ISO date some days on from another (back, for a negative count). */
+function shiftIso(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Whole weeks from one Sunday to another. */
+function weeksBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / (7 * 86400000));
 }
 
 /** The week's seven days from its Sunday, as ISO dates. */
@@ -56,64 +68,148 @@ interface DayBlockProps {
 export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, action }: DayBlockProps) {
   const { selectDate } = useCalendar();
   const { theme } = day;
-  const [week, setWeek] = useState<{ key: string; days: WeekStripDay[] } | null>(null);
+  const weekStart = weekStartOf(day.isoDate);
+  // The weeks either side are drawn too, just out of sight, so the next one
+  // comes in with the finger rather than after the swipe.
+  const weekStarts = [shiftIso(weekStart, -7), weekStart, shiftIso(weekStart, 7)];
+  const shownWeeks = weekStarts.join('|');
 
-  // The swipe, read once and kept: the responder outlives renders, so it
-  // reaches the day it moves from through a ref.
-  const swipeRef = useRef({ isoDate: day.isoDate, selectDate });
+  // Each week is read once for all its days: choosing another day of it moves
+  // only the gold pill.
+  const [weeks, setWeeks] = useState<Record<string, WeekStripDay[]>>({});
   useEffect(() => {
-    swipeRef.current = { isoDate: day.isoDate, selectDate };
+    let active = true;
+    const starts = shownWeeks.split('|');
+    for (const start of starts) {
+      void getWeekStrip(start).then((days) => {
+        if (!active) return;
+        setWeeks((current) => {
+          const kept: Record<string, WeekStripDay[]> = {};
+          for (const key of starts) if (current[key]) kept[key] = current[key];
+          return { ...kept, [start]: days };
+        });
+      }).catch(() => {});
+    }
+    return () => { active = false; };
+  }, [shownWeeks]);
+
+  // The week strip turns like a page: the weeks lie side by side in their lane
+  // and follow the finger, and a swipe far or quick enough carries the next
+  // one the rest of the way in. A shorter one springs back. The card itself
+  // stays where it is. The lane's position is counted in weeks from the one
+  // the block opened on: a week `k` on from it sits at (position + k) widths.
+  const reduced = useReducedMotion();
+  const [anchor] = useState(weekStart);
+  const [motion] = useState(() => ({ position: new Animated.Value(0), width: new Animated.Value(0), fade: new Animated.Value(1) }));
+  const [laneWidth, setLaneWidth] = useState(0);
+  // Each week's place in the lane, made once: re-made on every render, a
+  // week moving under the native driver would be handed a new one mid-flight.
+  const [placements] = useState(() => new Map<number, ReturnType<typeof Animated.multiply>>());
+  const placeFor = (offset: number) => {
+    let place = placements.get(offset);
+    if (!place) {
+      place = Animated.multiply(Animated.add(motion.position, offset), motion.width);
+      placements.set(offset, place);
+    }
+    return place;
+  };
+  // What the responder reads, kept current: it outlives renders. `rest` is
+  // where the lane comes to rest for the week shown; `paging` is set while a
+  // swiped week is on its way, so the new date does not move it again.
+  const swipeRef = useRef({ isoDate: day.isoDate, selectDate, reduced, width: 0, rest: 0, dragFrom: 0, paging: false, shownWeek: weekStart });
+  useEffect(() => {
+    Object.assign(swipeRef.current, { isoDate: day.isoDate, selectDate, reduced });
   });
-  const [drag] = useState(() => new Animated.Value(0));
+
+  useLayoutEffect(() => {
+    const swipe = swipeRef.current;
+    if (swipe.shownWeek === weekStart) return;
+    const later = weekStart > swipe.shownWeek;
+    swipe.shownWeek = weekStart;
+    const rest = -weeksBetween(anchor, weekStart);
+    swipe.rest = rest;
+    // A week swiped in is already where it belongs.
+    if (swipe.paging) {
+      swipe.paging = false;
+      return;
+    }
+    // A day chosen anywhere else -- the calendar, a day of this strip in
+    // another week -- puts its week in place with a small nudge from the side
+    // it lies on.
+    motion.position.stopAnimation();
+    if (reduced || !swipe.width) {
+      motion.position.setValue(rest);
+      return;
+    }
+    const nudge = 28 / swipe.width;
+    motion.position.setValue(rest + (later ? nudge : -nudge));
+    motion.fade.setValue(0.2);
+    Animated.parallel([
+      Animated.timing(motion.position, { toValue: rest, duration: motionDuration(220, reduced), easing: Easing.out(Easing.cubic), useNativeDriver: NATIVE_DRIVER }),
+      Animated.timing(motion.fade, { toValue: 1, duration: motionDuration(220, reduced), useNativeDriver: NATIVE_DRIVER }),
+    ]).start();
+  }, [anchor, motion, reduced, weekStart]);
+
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
   const [weekSwipe] = useState(() => {
     const sideways = (gesture: PanResponderGestureState) => Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5;
-    const settle = () => Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
+    const settle = () => Animated.spring(motion.position, { toValue: swipeRef.current.rest, speed: 16, bounciness: 4, useNativeDriver: NATIVE_DRIVER }).start();
     return PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => sideways(gesture),
       onPanResponderTerminationRequest: () => false,
-      // The card leans after the finger, a quarter of the way, so the swipe is felt.
-      onPanResponderMove: (_, gesture) => drag.setValue(gesture.dx / 4),
+      // A week still on its way is taken up from where it was going.
+      onPanResponderGrant: () => {
+        motion.position.stopAnimation();
+        motion.fade.stopAnimation();
+        motion.fade.setValue(1);
+        swipeRef.current.dragFrom = swipeRef.current.rest;
+      },
+      onPanResponderMove: (_, gesture) => {
+        const swipe = swipeRef.current;
+        motion.position.setValue(swipe.dragFrom + gesture.dx / (swipe.width || 320));
+      },
       onPanResponderRelease: (_, gesture) => {
-        settle();
-        if (Math.abs(gesture.dx) < 50 && Math.abs(gesture.vx) < 0.5) return;
-        const { isoDate, selectDate: select } = swipeRef.current;
-        const towardsLater = gesture.dx < 0;
-        const date = new Date(`${isoDate}T00:00:00Z`);
+        const swipe = swipeRef.current;
+        const width = swipe.width || 320;
+        // A flick turns the week however short it was; a slow drag, past a quarter of the lane.
+        const flicked = Math.abs(gesture.vx) > 0.4;
+        if (!flicked && Math.abs(gesture.dx) < width / 4) {
+          settle();
+          return;
+        }
+        const towardsLater = flicked ? gesture.vx < 0 : gesture.dx < 0;
+        const target = swipe.dragFrom + (towardsLater ? -1 : 1);
+        const date = new Date(`${swipe.isoDate}T00:00:00Z`);
         date.setUTCDate(date.getUTCDate() + (towardsLater ? 7 : -7));
-        select(date);
+        const from = swipe.shownWeek;
+        swipe.paging = true;
+        swipe.rest = target;
+        if (swipe.reduced) {
+          motion.position.setValue(target);
+        } else {
+          // On the rest of the way at the pace it was thrown, on the native
+          // side, so the page catching up with the new date cannot hold it up.
+          const remaining = Math.abs(target * width - (swipe.dragFrom * width + gesture.dx));
+          const speed = Math.max(Math.abs(gesture.vx), 1);
+          Animated.timing(motion.position, {
+            toValue: target,
+            duration: Math.min(260, Math.max(120, remaining / speed)),
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: NATIVE_DRIVER,
+          }).start(({ finished }) => {
+            // Should the date not have moved after all, the week goes back.
+            if (!finished || swipe.shownWeek !== from) return;
+            swipe.paging = false;
+            swipe.rest = -weeksBetween(anchor, from);
+            settle();
+          });
+        }
+        // The week is already drawn, so the date changes as it moves rather than after.
+        swipe.selectDate(date);
       },
       onPanResponderTerminate: settle,
     });
   });
-
-  // The week is read once for all its days: choosing another day of it moves
-  // only the gold pill.
-  const weekStart = weekStartOf(day.isoDate);
-  useEffect(() => {
-    let active = true;
-    void getWeekStrip(weekStart).then((days) => { if (active) setWeek({ key: weekStart, days }); }).catch(() => {});
-    return () => { active = false; };
-  }, [weekStart]);
-
-  // A new week slides in from the side it lies on -- a later one from the
-  // right -- as the old one leaves, rather than the strip simply changing.
-  const reduced = useReducedMotion();
-  const [stripMotion] = useState(() => ({ x: new Animated.Value(0), opacity: new Animated.Value(1) }));
-  const shownWeek = useRef(weekStart);
-  useEffect(() => {
-    if (shownWeek.current === weekStart) return;
-    const later = weekStart > shownWeek.current;
-    shownWeek.current = weekStart;
-    if (reduced) return;
-    stripMotion.x.setValue(later ? 28 : -28);
-    stripMotion.opacity.setValue(0.2);
-    const useNativeDriver = Platform.OS !== 'web';
-    Animated.parallel([
-      Animated.timing(stripMotion.x, { toValue: 0, duration: motionDuration(220, reduced), useNativeDriver }),
-      Animated.timing(stripMotion.opacity, { toValue: 1, duration: motionDuration(220, reduced), useNativeDriver }),
-    ]).start();
-  }, [weekStart, reduced, stripMotion]);
 
   const heading = day.coptic ? formatCopticDayMonth(day.coptic.monthName, day.coptic.day, arabic) : ' ';
   const weekdayNames = arabic ? WEEKDAYS.arabic : tr(WEEKDAYS.english.join('|'), WEEKDAYS.french.join('|'), '').split('|');
@@ -121,26 +217,31 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
   const next = day.overview?.nextSeason;
   const nextName = next ? NEXT_SEASON_NAMES[next.key] : undefined;
 
-  // The week's days are drawn at once, the Coptic days and feast dots as soon
+  // A week's days are drawn at once, the Coptic days and feast dots as soon
   // as they are read: the strip never empties, so the block never shrinks.
-  const readWeek = week?.key === weekStart ? week.days : null;
-  const strip: DayStripItem[] = weekDates(weekStart).map((isoDate, index) => {
-    const date = new Date(`${isoDate}T00:00:00Z`);
-    const read = readWeek?.find((weekDay) => weekDay.isoDate === isoDate);
-    return {
-      key: isoDate,
-      label: weekdayNames[index],
-      value: digits(date.getUTCDate()),
-      sub: read?.copticDay == null ? ' ' : digits(read.copticDay),
-      selected: isoDate === day.isoDate,
-      dot: Boolean(read?.hasFeast),
-      accessibilityLabel: formatDayMonthYearDate(date, arabic),
-      onPress: () => selectDate(date),
-    };
-  });
+  // The weeks either side carry the gold pill on the same weekday, where it
+  // will be when they are turned to.
+  const stripFor = (start: string): DayStripItem[] => {
+    const read = weeks[start];
+    const selectedIso = shiftIso(day.isoDate, 7 * weeksBetween(weekStart, start));
+    return weekDates(start).map((isoDate, index) => {
+      const date = new Date(`${isoDate}T00:00:00Z`);
+      const readDay = read?.find((weekDay) => weekDay.isoDate === isoDate);
+      return {
+        key: isoDate,
+        label: weekdayNames[index],
+        value: digits(date.getUTCDate()),
+        sub: readDay?.copticDay == null ? ' ' : digits(readDay.copticDay),
+        selected: isoDate === selectedIso,
+        dot: Boolean(readDay?.hasFeast),
+        accessibilityLabel: formatDayMonthYearDate(date, arabic),
+        onPress: () => selectDate(date),
+      };
+    });
+  };
 
   return (
-    <Animated.View style={{ transform: [{ translateX: drag }] }} {...weekSwipe.panHandlers}>
+    <View {...weekSwipe.panHandlers}>
     <TodayCard
       theme={theme}
       arabic={arabic}
@@ -152,8 +253,32 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
       onPressHeading={onOpenCalendar}
       headingAccessibilityLabel={`${heading}. ${tr('Open the calendar', 'Ouvrir le calendrier', 'افتح التقويم')}`}
       strip={(
-        <Animated.View style={{ opacity: stripMotion.opacity, transform: [{ translateX: stripMotion.x }] }}>
-          <DayStrip items={strip} theme={theme} arabic={arabic} />
+        // The weeks' lane: a week coming in or going out is cut at its edges.
+        <Animated.View
+          style={[styles.lane, { opacity: motion.fade }]}
+          onLayout={(event) => {
+            const width = event.nativeEvent.layout.width;
+            swipeRef.current.width = width;
+            motion.width.setValue(width);
+            setLaneWidth(width);
+          }}
+        >
+          {weekStarts.map((start) => {
+            const shown = start === weekStart;
+            // The weeks either side wait for the lane's width, or they would sit on top of this one.
+            if (!shown && !laneWidth) return null;
+            return (
+              <Animated.View
+                key={start}
+                pointerEvents={shown ? 'auto' : 'none'}
+                accessibilityElementsHidden={!shown}
+                importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'}
+                style={[shown ? null : styles.besideWeek, { transform: [{ translateX: placeFor(weeksBetween(anchor, start)) }] }]}
+              >
+                <DayStrip items={stripFor(start)} theme={theme} arabic={arabic} />
+              </Animated.View>
+            );
+          })}
         </Animated.View>
       )}
       footer={{
@@ -163,9 +288,16 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
         action: action ? { label: action.label, onPress: action.onPress, trailingIcon: 'chevron-forward' } : undefined,
       }}
     />
-    </Animated.View>
+    </View>
   );
 }
+
+const NATIVE_DRIVER = Platform.OS !== 'web';
+
+const styles = StyleSheet.create({
+  lane: { overflow: 'hidden' },
+  besideWeek: { left: 0, position: 'absolute', right: 0, top: 0 },
+});
 
 /** "1 day", "56 days"; in Arabic with the noun each count takes. */
 function dayCount(days: number, arabic: boolean): string {

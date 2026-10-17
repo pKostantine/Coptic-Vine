@@ -1,7 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { usePathname } from 'expo-router';
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Easing, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Animated, BackHandler, Easing, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MusicNowPlayingScreen from '@/components/music/MusicNowPlayingScreen';
@@ -196,6 +196,17 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
     reportNowPlayingExpanded(overlayId, isPopupOpen && allowDisplay);
     return () => reportNowPlayingExpanded(overlayId, false);
   }, [allowDisplay, isPopupOpen, overlayId, reportNowPlayingExpanded]);
+
+  // The full player is drawn over the page rather than in a modal, so Android's
+  // back would otherwise go to the page beneath it. It closes the player.
+  useEffect(() => {
+    if (!isPopupOpen || !allowDisplay) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setIsPopupOpen(false);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [allowDisplay, isPopupOpen]);
 
   useEffect(() => {
     // The slideshow deliberately renders underneath the floating player. The

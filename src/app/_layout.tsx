@@ -2,8 +2,8 @@ import { useFonts as useLocalFonts } from 'expo-font';
 import { Stack, usePathname, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { BackHandler, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
@@ -39,6 +39,10 @@ const STACK_ORIENTATIONS: Record<OrientationMode, StackOrientation> = {
   portrait: 'portrait_up',
 };
 
+/** A tab's own page: it opens in place, and is never swiped away to whatever lies beneath it. */
+const TAB_PAGE = { animation: 'none', gestureEnabled: false } as const;
+const TAB_PATHS = new Set(['/', '/books', '/music', '/learn', '/account']);
+
 function AppStack() {
   const { preferences } = useReadingPreferences();
   const orientation = STACK_ORIENTATIONS[preferences.orientationMode];
@@ -57,13 +61,18 @@ function AppStack() {
       }}
     >
       {/* Home, Books, Music, Learn & Study, and Account are peer sections,
-          so switching between them never grows a back stack. */}
-      <Stack.Screen name="index" options={{ animation: 'none' }} />
-      <Stack.Screen name="books" options={{ animation: 'none' }} />
-      <Stack.Screen name="music" options={{ animation: 'none' }} />
-      <Stack.Screen name="learn" options={{ animation: 'none' }} />
+          each a page of its own: there is nowhere to swipe back to from one.
+          The tab bar replaces whatever page it is on, but a book page (which
+          shows it) was pushed over Books, so Books stayed underneath the tab
+          it was replaced by, and iOS's edge swipe brought it back. A swipe
+          back from a page within a section -- a book, an album -- is that
+          page's own, and still goes back. */}
+      <Stack.Screen name="index" options={TAB_PAGE} />
+      <Stack.Screen name="books" options={TAB_PAGE} />
+      <Stack.Screen name="music" options={TAB_PAGE} />
+      <Stack.Screen name="learn" options={TAB_PAGE} />
       <Stack.Screen name="search" options={{ animation: 'none' }} />
-      <Stack.Screen name="account" options={{ animation: 'none' }} />
+      <Stack.Screen name="account" options={TAB_PAGE} />
       <Stack.Screen name="settings" options={{ animation: 'none' }} />
       <Stack.Screen name="synaxarium" options={{ animation: 'default' }} />
       <Stack.Screen name="app-settings" options={{ animation: 'none' }} />
@@ -88,6 +97,25 @@ function AppFrame() {
   // cannot tell us it is open — the overlay reports it instead.
   const { nowPlayingExpanded } = useBottomChrome();
   const showSideBar = layout === 'desktop' && !keepsWholeWindow(segments) && !nowPlayingExpanded;
+
+  // Android's back, button or swipe, on a tab's own page leaves the app, as at
+  // the root of any app, rather than uncovering the tab visited before it (see
+  // TAB_PAGE). Registered first, so it is asked last: a sheet or the player
+  // open over the page takes the back for itself before it gets here.
+  // The path is read from a ref rather than registering afresh on every
+  // change, which would put this handler first in line instead of last.
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!TAB_PATHS.has(pathnameRef.current)) return false;
+      BackHandler.exitApp();
+      return true;
+    });
+    return () => subscription.remove();
+  }, []);
 
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: COLORS.black }}>

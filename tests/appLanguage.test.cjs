@@ -94,7 +94,7 @@ test('Arabic keeps the English layout: no row, arrow or swipe turns round for it
 
   // A swipe to the left is the next week, whatever the language.
   const dayBlock = fs.readFileSync('src/components/vine/ui/DayBlock.tsx', 'utf8');
-  assert.match(dayBlock, /const towardsLater = gesture\.dx < 0;/);
+  assert.match(dayBlock, /const towardsLater = flicked \? gesture\.vx < 0 : gesture\.dx < 0;/);
   // The calendar's left arrow goes back a month, and says so in Arabic too.
   const calendar = fs.readFileSync('src/components/vine/ui/CalendarPanel.tsx', 'utf8');
   assert.match(calendar, /accessibilityLabel=\{tr\('Previous month', 'Mois précédent', 'الشهر السابق'\)\} style=\{styles\.arrow\} onPress=\{goPreviousMonth\}>\s*<Icon name="chevron-back"/);

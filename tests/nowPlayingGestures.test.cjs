@@ -66,6 +66,38 @@ test('over Walnut, Vine and Sepia the button wears the page\'s own button colour
   assert.match(chrome, /useFocusEffect\(useCallback\(\(\) => \{\n\s+reportDocumentTheme\(id, theme\);\n\s+return \(\) => reportDocumentTheme\(id, null\);/);
 });
 
+test('a tab\'s own page is never swiped or backed away to the tab visited before it', () => {
+  // A book page shows the tab bar and sits over Books: a tab chosen there
+  // replaced the book page, and iOS's edge swipe uncovered Books beneath it.
+  const layout = fs.readFileSync('src/app/_layout.tsx', 'utf8');
+  assert.match(layout, /const TAB_PAGE = \{ animation: 'none', gestureEnabled: false \} as const;/);
+  for (const name of ['index', 'books', 'music', 'learn', 'account']) {
+    assert.match(layout, new RegExp(`<Stack\\.Screen name="${name}" options=\\{TAB_PAGE\\} />`), name);
+  }
+  // Android's back on one leaves the app, after anything open over the page has had it.
+  assert.match(layout, /const TAB_PATHS = new Set\(\['\/', '\/books', '\/music', '\/learn', '\/account'\]\);/);
+  assert.match(layout, /if \(!TAB_PATHS\.has\(pathnameRef\.current\)\) return false;\n\s+BackHandler\.exitApp\(\);/);
+  const overlay = fs.readFileSync('src/components/playback/GlobalNowPlayingOverlay.tsx', 'utf8');
+  assert.match(overlay, /if \(!isPopupOpen \|\| !allowDisplay\) return undefined;\n\s+const subscription = BackHandler\.addEventListener\('hardwareBackPress', \(\) => \{\n\s+setIsPopupOpen\(false\);/);
+});
+
+test('the Books day block turns its week like a page, the card standing still', () => {
+  const block = fs.readFileSync('src/components/vine/ui/DayBlock.tsx', 'utf8');
+  // Nothing moves the card; the weeks lie side by side in a lane of their own.
+  assert.doesNotMatch(block, /gesture\.dx \/ 4/);
+  assert.match(block, /<View \{\.\.\.weekSwipe\.panHandlers\}>/);
+  assert.match(block, /const weekStarts = \[shiftIso\(weekStart, -7\), weekStart, shiftIso\(weekStart, 7\)\];/);
+  assert.match(block, /lane: \{ overflow: 'hidden' \},/);
+  assert.match(block, /place = Animated\.multiply\(Animated\.add\(motion\.position, offset\), motion\.width\);/);
+  // They follow the finger; far or quick enough, the next comes the rest of the way in, else they spring back.
+  assert.match(block, /motion\.position\.setValue\(swipe\.dragFrom \+ gesture\.dx \/ \(swipe\.width \|\| 320\)\);/);
+  assert.match(block, /if \(!flicked && Math\.abs\(gesture\.dx\) < width \/ 4\) \{\n\s+settle\(\);/);
+  assert.match(block, /const target = swipe\.dragFrom \+ \(towardsLater \? -1 : 1\);/);
+  // The neighbouring week is already drawn, pill and all, so the date changes as it moves, not after.
+  assert.match(block, /const selectedIso = shiftIso\(day\.isoDate, 7 \* weeksBetween\(weekStart, start\)\);/);
+  assert.match(block, /\/\/ The week is already drawn, so the date changes as it moves rather than after\.\n\s+swipe\.selectDate\(date\);/);
+});
+
 test('pulled down, the full-screen player goes away -- taken before its buttons can take the touch', () => {
   const hook = fs.readFileSync('src/components/playback/usePullDownToClose.ts', 'utf8');
   assert.match(hook, /onMoveShouldSetPanResponderCapture: \(_, gesture\) => gesture\.dy > 8 && Math\.abs\(gesture\.dy\) > Math\.abs\(gesture\.dx\) \* 1\.5/);
