@@ -1,35 +1,97 @@
 import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { mkdir, rm, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { pipeline } from 'node:stream/promises';
-import {
-  AbortMultipartUploadCommand,
-  CompleteMultipartUploadCommand,
-  CreateMultipartUploadCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-  UploadPartCommand,
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
+import { describeFfmpegExit } from './runtime.mjs';
 
-// The production Railway Hobby processor has 1 GB RAM AND 1 GB scratch disk.
-// Never stage a several-GB original or output on that service.
+// Sources at least this big are read straight from R2 instead of being
+// downloaded first: the Railway processor's scratch disk is small.
 export const STREAMING_THRESHOLD_BYTES = 256 * 1024 * 1024;
-export const STREAMING_PART_BYTES = 32 * 1024 * 1024;
+
+// Each R2 read covers at most this much of the original. A single read of a
+// multi-GB file held one connection open for the whole encode; when R2 or the
+// network dropped it, FFmpeg lost its input and the job failed. Short reads
+// are retried on their own, invisibly to FFmpeg.
+export const RANGE_WINDOW_BYTES = 16 * 1024 * 1024;
+const RANGE_READ_ATTEMPTS = 6;
+
+export class NoAudioTrackError extends Error {
+  constructor(message = 'The source has no audio track') {
+    super(message);
+    this.name = 'NoAudioTrackError';
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function imageExtension(key) {
   const extension = String(key || '').match(/\.[a-z0-9]{1,8}$/i)?.[0];
   return extension || '.mp4';
 }
 
+function waitForDrainOrClose(res) {
+  return new Promise((resolve) => {
+    const done = () => {
+      res.off('drain', done);
+      res.off('close', done);
+      resolve();
+    };
+    res.on('drain', done);
+    res.on('close', done);
+  });
+}
+
+/** Writes bytes first..last of an R2 object to `res`, in short, retried reads. */
+async function pipeObjectRange(client, bucket, key, res, first, last, windowBytes) {
+  let offset = first;
+  while (offset <= last) {
+    const end = Math.min(last, offset + windowBytes - 1);
+    let attempt = 0;
+    while (offset <= end) {
+      if (res.destroyed) return;
+      let body = null;
+      try {
+        const object = await client.send(new GetObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Range: `bytes=${offset}-${end}`,
+        }));
+        body = object.Body;
+        if (!body) throw new Error('R2 returned an empty media object body');
+        for await (const chunk of body) {
+          if (res.destroyed) return;
+          const room = end - offset + 1;
+          const usable = chunk.length > room ? chunk.subarray(0, room) : chunk;
+          offset += usable.length;
+          if (!res.write(usable)) await waitForDrainOrClose(res);
+          if (offset > end) break;
+        }
+        if (offset <= end) throw new Error(`R2 range read ended at byte ${offset} of ${end}`);
+      } catch (error) {
+        body?.destroy?.();
+        if (res.destroyed) return;
+        attempt += 1;
+        if (attempt >= RANGE_READ_ATTEMPTS) throw error;
+        await sleep(Math.min(15_000, 500 * 2 ** attempt));
+      }
+    }
+  }
+}
+
 /**
- * FFmpeg and ffprobe need random access to MP4/M4V metadata, sometimes at the
+ * FFmpeg and ffprobe need random access to MP4/MOV metadata, sometimes at the
  * very end of the original. An R2-backed localhost HTTP Range server allows
  * arbitrary seeks without staging the original on the Railway filesystem or
  * exposing a private object publicly.
  */
-export async function openR2RangeServer(client, bucket, key, info) {
+export async function openR2RangeServer(client, bucket, key, info, { windowBytes = RANGE_WINDOW_BYTES } = {}) {
   const objectSize = Number(info.ContentLength);
   if (!Number.isSafeInteger(objectSize) || objectSize <= 0) {
     throw new Error('R2 did not provide a valid original file size');
@@ -42,64 +104,46 @@ export async function openR2RangeServer(client, bucket, key, info) {
         return;
       }
 
-      res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Content-Type', info.ContentType || 'application/octet-stream');
-
       const requestedRange = req.headers.range;
-      if (requestedRange && !/^bytes=\d+-\d*$/.test(requestedRange)) {
-        res.writeHead(416, { 'Content-Range': 'bytes */' + objectSize }).end();
+      const match = requestedRange ? requestedRange.match(/^bytes=(\d+)-(\d*)$/) : null;
+      if (requestedRange && !match) {
+        res.writeHead(416, { 'Content-Range': `bytes */${objectSize}` }).end();
+        return;
+      }
+      const first = match ? Number(match[1]) : 0;
+      const last = match && match[2] ? Math.min(Number(match[2]), objectSize - 1) : objectSize - 1;
+      if (first >= objectSize || last < first) {
+        res.writeHead(416, { 'Content-Range': `bytes */${objectSize}` }).end();
         return;
       }
 
+      res.writeHead(match ? 206 : 200, {
+        'Accept-Ranges': 'bytes',
+        'Content-Type': info.ContentType || 'application/octet-stream',
+        'Content-Length': last - first + 1,
+        ...(match ? { 'Content-Range': `bytes ${first}-${last}/${objectSize}` } : {}),
+      });
       if (req.method === 'HEAD') {
-        if (requestedRange) {
-          const match = requestedRange.match(/^bytes=(\d+)-(\d*)$/);
-          const first = Number(match[1]);
-          const last = match[2] ? Number(match[2]) : objectSize - 1;
-          if (first >= objectSize || last < first) {
-            res.writeHead(416, { 'Content-Range': 'bytes */' + objectSize }).end();
-            return;
-          }
-          const end = Math.min(last, objectSize - 1);
-          res.writeHead(206, {
-            'Content-Length': end - first + 1,
-            'Content-Range': 'bytes ' + first + '-' + end + '/' + objectSize,
-          }).end();
-        } else {
-          res.writeHead(200, { 'Content-Length': objectSize }).end();
-        }
+        res.end();
         return;
       }
-
-      const object = await client.send(new GetObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        ...(requestedRange ? { Range: requestedRange } : {}),
-      }));
-      if (!object.Body) throw new Error('R2 returned an empty media object body');
-      if (requestedRange && !object.ContentRange) {
-        throw new Error('R2 did not honor the requested media byte range');
-      }
-      if (object.ContentLength !== undefined) {
-        res.setHeader('Content-Length', object.ContentLength);
-      }
-      if (object.ContentRange) {
-        res.setHeader('Content-Range', object.ContentRange);
-      }
-      res.statusCode = object.ContentRange ? 206 : 200;
-      await pipeline(object.Body, res);
+      await pipeObjectRange(client, bucket, key, res, first, last, windowBytes);
+      if (!res.destroyed) res.end();
     })().catch(() => {
       if (!res.headersSent) res.writeHead(502).end('R2 media range request failed');
       else res.destroy();
     });
   });
+  // A response may stream for as long as the encode runs.
+  server.requestTimeout = 0;
+  server.keepAliveTimeout = 60_000;
 
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
   });
   const address = server.address();
-  const url = 'http://127.0.0.1:' + address.port + '/media' + imageExtension(key);
+  const url = `http://127.0.0.1:${address.port}/media${imageExtension(key)}`;
   return {
     url,
     close: async () => {
@@ -124,147 +168,46 @@ export async function probeUrl(url) {
     child.once('close', (code) => resolve({ code }));
   });
   if (outcome.error || outcome.code !== 0) {
-    throw new Error('FFprobe could not read streamed media: ' + (outcome.error?.message || stderr || outcome.code));
+    throw new Error(`FFprobe could not read streamed media: ${outcome.error?.message || stderr || outcome.code}`);
   }
   return JSON.parse(stdout);
 }
 
-function assertOutput(jobType, probe) {
-  const stream = probe.streams?.find((part) => part.codec_type === (jobType === 'video_delivery' ? 'video' : 'audio'));
-  const expectedCodec = jobType === 'video_delivery' ? 'h264' : 'aac';
-  if (!stream || stream.codec_name !== expectedCodec) {
-    throw new Error('Streamed delivery validation failed: missing ' + expectedCodec + ' output');
-  }
-  const formatName = String(probe.format?.format_name || '');
-  if (!formatName.includes('mp4') && !formatName.includes('m4a')) {
-    throw new Error('Streamed delivery is not MP4/M4A: ' + formatName);
-  }
+export function runFfmpeg(args, { signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(ffmpegPath, args, { shell: false, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-32768); });
+    const onAbort = () => child.kill('SIGKILL');
+    signal?.addEventListener('abort', onAbort, { once: true });
+    child.once('error', (error) => {
+      signal?.removeEventListener('abort', onAbort);
+      reject(error);
+    });
+    child.once('close', (code, exitSignal) => {
+      signal?.removeEventListener('abort', onAbort);
+      if (signal?.aborted) reject(signal.reason instanceof Error ? signal.reason : new Error('Aborted'));
+      else if (code === 0) resolve();
+      else reject(new Error(`${describeFfmpegExit(code, exitSignal)}${stderr.trim() ? ` (${stderr.trim().slice(-1500)})` : ''}`));
+    });
+  });
 }
 
-function ffmpegArgs(jobType, inputUrl, inputProbe) {
-  const args = [
-    '-nostdin', '-hide_banner', '-loglevel', 'error',
-    '-rw_timeout', '120000000', '-i', inputUrl,
-    '-sn', '-dn',
-  ];
-  if (jobType === 'video_delivery') {
-    if (!inputProbe.streams?.some((stream) => stream.codec_type === 'video')) {
-      throw new Error('Source has no video stream');
-    }
-    args.push(
-      '-map', '0:v:0', '-map', '0:a:0?',
-      '-c:v', 'libx264', '-preset', 'fast', '-threads', '2',
-      '-filter_threads', '1', '-crf', '20',
-      '-profile:v', 'high', '-pix_fmt', 'yuv420p',
-      '-vf', "scale=w=-2:h='min(1080,ih)':flags=lanczos,setsar=1",
-      '-c:a', 'aac', '-b:a', '192k',
-    );
-  } else {
-    const audio = inputProbe.streams?.find((stream) => stream.codec_type === 'audio');
-    if (!audio) throw new Error('Cannot extract audio: source video has no audio stream');
-    args.push('-map', '0:a:0', '-vn', '-c:a', audio.codec_name === 'aac' ? 'copy' : 'aac');
-    if (audio.codec_name !== 'aac') args.push('-b:a', '256k');
-  }
-
-  // A normal +faststart MP4 must be seeked at the end, which is impossible on
-  // stdout. Fragmented MP4 begins with a valid moov header and supports R2
-  // byte-range playback while the output is streamed without scratch files.
-  args.push(
-    '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
-    '-frag_duration', '4000000',
-    '-f', 'mp4', 'pipe:1',
-  );
-  return args;
+export async function sha256OfFile(filePath) {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+  return hash.digest('hex');
 }
 
 /**
- * FFmpeg stdout -> bounded 32 MiB buffers -> R2 multipart. No source or
- * rendition ever lands on scratch disk and no whole-file Buffer is allocated.
+ * Audio delivery from a large source (a lesson video's audio-only copy made on
+ * its own, or a long lossless recording): the source is read straight from
+ * R2, and the small M4A is written to disk as a normal MP4 with its index at
+ * the front, so every player can seek in it. Smaller sources use the ordinary
+ * download pipeline (`null`).
  */
-export async function streamTranscodeToR2(client, inputUrl, inputProbe, jobType, bucket, key) {
-  const contentType = jobType === 'video_delivery' ? 'video/mp4' : 'audio/mp4';
-  const created = await client.send(new CreateMultipartUploadCommand({
-    Bucket: bucket, Key: key, ContentType: contentType,
-    CacheControl: 'public, max-age=31536000, immutable',
-  }));
-  if (!created.UploadId) throw new Error('R2 did not return a streaming upload ID');
-
-  let child;
-  try {
-    child = spawn(ffmpegPath, ffmpegArgs(jobType, inputUrl, inputProbe), {
-      shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stderr = '';
-    child.stderr.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-32768); });
-    // Convert process events to values so an early FFmpeg error cannot create
-    // an unhandled promise rejection while the stdout multipart loop runs.
-    const closed = new Promise((resolve) => {
-      child.once('error', (error) => resolve({ error }));
-      child.once('close', (code) => resolve({ code }));
-    });
-
-    const parts = [];
-    const checksum = createHash('sha256');
-    let totalBytes = 0;
-    let pending = [];
-    let pendingBytes = 0;
-    async function uploadPart(bytes) {
-      const partNumber = parts.length + 1;
-      const response = await client.send(new UploadPartCommand({
-        Bucket: bucket, Key: key,
-        UploadId: created.UploadId,
-        PartNumber: partNumber,
-        Body: bytes,
-        ContentLength: bytes.length,
-      }));
-      if (!response.ETag) throw new Error('R2 did not return ETag for output part ' + partNumber);
-      parts.push({ PartNumber: partNumber, ETag: response.ETag });
-    }
-
-    for await (const chunk of child.stdout) {
-      checksum.update(chunk);
-      totalBytes += chunk.length;
-      pending.push(chunk);
-      pendingBytes += chunk.length;
-      if (pendingBytes >= STREAMING_PART_BYTES) {
-        const joined = Buffer.concat(pending, pendingBytes);
-        await uploadPart(joined.subarray(0, STREAMING_PART_BYTES));
-        const tail = joined.subarray(STREAMING_PART_BYTES);
-        pending = tail.length ? [tail] : [];
-        pendingBytes = tail.length;
-      }
-    }
-
-    const result = await closed;
-    if (result.error || result.code !== 0) {
-      throw new Error('FFmpeg streamed transcode failed: ' + (result.error?.message || stderr || result.code));
-    }
-    if (!totalBytes) throw new Error('FFmpeg produced an empty media file');
-
-    if (pendingBytes > 0) await uploadPart(Buffer.concat(pending, pendingBytes));
-    await client.send(new CompleteMultipartUploadCommand({
-      Bucket: bucket, Key: key,
-      UploadId: created.UploadId,
-      MultipartUpload: { Parts: parts },
-    }));
-    return {
-      outputSizeBytes: totalBytes,
-      outputChecksumSha256: checksum.digest('hex'),
-      outputMimeType: contentType,
-      partsCount: parts.length,
-    };
-  } catch (error) {
-    if (child?.exitCode === null) child.kill('SIGTERM');
-    await client.send(new AbortMultipartUploadCommand({
-      Bucket: bucket, Key: key, UploadId: created.UploadId,
-    })).catch(() => undefined);
-    throw error;
-  }
-}
-
-/** Return null for small files that still use the ordinary FFmpeg pipeline. */
 export async function maybeRunStreamedMediaJob(config, job, operations, thresholdBytes = STREAMING_THRESHOLD_BYTES) {
-  if (config.r2Driver !== 's3' || !['video_delivery', 'audio_delivery'].includes(job.job_type)) {
+  if (config.r2Driver !== 's3' || job.job_type !== 'audio_delivery') {
     return null;
   }
 
@@ -275,48 +218,54 @@ export async function maybeRunStreamedMediaJob(config, job, operations, threshol
   }));
   if (Number(head.ContentLength || 0) < thresholdBytes) return null;
 
+  const jobDir = path.join(config.workDir || '/tmp', `coptic-vine-audio-job-${job.job_id}`);
+  const outputPath = path.join(jobDir, 'audio.m4a');
   const source = await openR2RangeServer(client, job.input_bucket, job.input_path, head);
-  let outputExists = false;
+  let uploaded = false;
   try {
+    await mkdir(jobDir, { recursive: true });
     const inputProbe = await probeUrl(source.url);
-    const output = await streamTranscodeToR2(
-      client, source.url, inputProbe, job.job_type, job.output_bucket, job.output_path,
-    );
-    outputExists = true;
-    const outputHead = await client.send(new HeadObjectCommand({
-      Bucket: job.output_bucket,
-      Key: job.output_path,
-    }));
-    if (Number(outputHead.ContentLength) !== output.outputSizeBytes) {
-      throw new Error('R2 streamed delivery size does not match FFmpeg output');
-    }
-    const outputServer = await openR2RangeServer(
-      client, job.output_bucket, job.output_path, outputHead,
-    );
-    let outputProbe;
-    try {
-      outputProbe = await probeUrl(outputServer.url);
-      assertOutput(job.job_type, outputProbe);
-    } finally {
-      await outputServer.close();
-    }
+    const audio = inputProbe.streams?.find((stream) => stream.codec_type === 'audio');
+    if (!audio) throw new NoAudioTrackError('Cannot extract audio: the source has no audio stream');
+    const copy = audio.codec_name === 'aac';
 
-    const video = job.job_type === 'video_delivery';
-    const inputAudio = inputProbe.streams?.find((stream) => stream.codec_type === 'audio');
-    const transcoding = video
-      ? { videoCodec: 'h264', audioCodec: 'aac', crf: 20, maxHeight: 1080,
-          container: 'fragmented_mp4', mode: 'streamed' }
-      : { audioCodec: 'aac', container: 'm4a', mode: 'streamed',
-          sourceCodec: inputAudio?.codec_name,
-          targetBitrate: inputAudio?.codec_name === 'aac' ? null : '256k' };
+    await runFfmpeg([
+      '-nostdin', '-hide_banner', '-loglevel', 'error',
+      '-reconnect', '1', '-reconnect_on_network_error', '1', '-reconnect_delay_max', '30',
+      '-rw_timeout', '120000000',
+      '-i', source.url,
+      '-map', '0:a:0', '-vn', '-sn', '-dn', '-map_metadata', '-1', '-map_chapters', '-1',
+      ...(copy ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '256k']),
+      '-movflags', '+faststart',
+      '-max_muxing_queue_size', '4096',
+      '-y', outputPath,
+    ], { signal: operations.signal });
+
+    const outputProbe = await probeUrl(outputPath);
+    const outputAudio = outputProbe.streams?.find((stream) => stream.codec_type === 'audio');
+    if (outputAudio?.codec_name !== 'aac') throw new Error('Streamed delivery validation failed: missing aac output');
+    const outputSizeBytes = (await stat(outputPath)).size;
+    const outputChecksumSha256 = await sha256OfFile(outputPath);
+    await operations.uploadFile(job.output_bucket, job.output_path, outputPath, 'audio/mp4');
+    uploaded = true;
 
     const completedRows = await operations.callRpc(config, 'complete_media_processing_job', {
       p_worker_token: config.mediaWorkerToken,
       p_job_id: job.job_id,
-      p_output_mime_type: output.outputMimeType,
-      p_output_size_bytes: output.outputSizeBytes,
-      p_output_checksum_sha256: output.outputChecksumSha256,
-      p_probe: { input: inputProbe, output: outputProbe, transcode: transcoding },
+      p_output_mime_type: 'audio/mp4',
+      p_output_size_bytes: outputSizeBytes,
+      p_output_checksum_sha256: outputChecksumSha256,
+      p_probe: {
+        input: inputProbe,
+        output: outputProbe,
+        transcode: {
+          audioCodec: 'aac',
+          container: 'm4a',
+          mode: 'streamed',
+          sourceCodec: audio.codec_name,
+          targetBitrate: copy ? null : '256k',
+        },
+      },
     });
     return {
       status: 'completed',
@@ -325,19 +274,19 @@ export async function maybeRunStreamedMediaJob(config, job, operations, threshol
       uploadIntentId: job.upload_intent_id,
       outputBucket: job.output_bucket,
       outputPath: job.output_path,
-      outputMimeType: output.outputMimeType,
-      outputSizeBytes: output.outputSizeBytes,
-      outputChecksumSha256: output.outputChecksumSha256,
+      outputMimeType: 'audio/mp4',
+      outputSizeBytes,
+      outputChecksumSha256,
       completion: completedRows[0] ?? null,
       streamed: true,
     };
   } catch (error) {
-    if (outputExists) {
-      await operations.deleteObject(config, job.output_bucket, job.output_path)
-        .catch(() => undefined);
+    if (uploaded) {
+      await operations.deleteObject(config, job.output_bucket, job.output_path).catch(() => undefined);
     }
     throw error;
   } finally {
     await source.close();
+    if (process.env.MEDIA_KEEP_WORK_DIR !== '1') await rm(jobDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }

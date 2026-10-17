@@ -16,7 +16,7 @@ Job types it handles:
 | Job type         | Source | Output             | Delivery bucket |
 | ---------------- | ------ | ------------------ | --------------- |
 | `audio_delivery` | audio  | AAC-LC M4A; existing AAC is fast-remuxed, other codecs encode at `256k` | `chc-music` / `chc-learning` |
-| `video_delivery` | video  | H.264 MP4, ≤1080p  | `chc-learning`  |
+| `video_delivery` | video  | H.264 MP4, ≤1080p, plus its audio-only M4A in the same pass | `chc-learning`  |
 | `image_delivery` | image  | JPEG, ≤3000px edge | `chc-images`    |
 
 Images are flattened onto white (so a transparent PNG does not go black),
@@ -75,7 +75,41 @@ A job failure never stops the worker. The failure is reported to
 `failed` and records a `processing_failed` event on the submission so the error
 is visible in review rather than leaving the submission stuck in `processing`.
 
-`SIGINT` / `SIGTERM` finish the job in flight and then exit.
+`SIGINT` / `SIGTERM` stop the job in flight and hand it straight back to the
+queue (`release_media_processing_jobs`, which does not spend an attempt), then
+exit.
+
+While a job runs the worker calls `heartbeat_media_processing_jobs` every 20
+seconds with its progress. A job whose heartbeat stops for five minutes is
+retried (or, on its last attempt, failed with a visible error) by the next
+claim, and a job an admin cancels or deletes stops at the next heartbeat.
+
+## Video lessons
+
+A `video_delivery` job claims its `audio_delivery` companion
+(`claim_companion_media_processing_job`) and makes both in **one FFmpeg pass**:
+
+- The original is read straight from private R2 through a localhost HTTP Range
+  server, in 16 MB reads that are retried on their own, so a dropped R2
+  connection never stops the encode and the original never touches the disk.
+- Video: H.264 `veryfast` at CRF 23, short edge capped at 1080 (portrait phone
+  videos stay sharp), at most 30 fps and 6 Mbit/s peaks; HDR phone video is
+  tone-mapped to SDR. Compact H.264 sources (≤1080, ≤30 fps, ≤8 Mbit/s) are
+  copied instead of re-encoded. GPS and device metadata are stripped.
+- FFmpeg's thread count follows the container's real CPU and memory limits
+  (cgroups), not the host's, including for decoding (`MEDIA_FFMPEG_THREADS`
+  overrides it).
+- The MP4 (index at the end, so every player can seek) uploads to R2 while it
+  is being encoded: FFmpeg only ever rewrites the first few bytes of an MP4, so
+  every later 32 MB part is final once written. If the disk is too small for
+  the whole rendition, each uploaded part's blocks are given back
+  (`fallocate --punch-hole`); without that, it falls back to a streamed
+  fragmented MP4.
+- The output is checked against the source (codec, container, and duration
+  within 1%, so a conversion that stopped early is never published).
+- Once both the MP4 and the audio-only M4A exist, `claim_media_original_deletion`
+  marks the original removed and the worker deletes it from
+  `chc-submissions`. Storage GC removes it later if that deletion failed.
 
 
 ## Unused storage garbage collection

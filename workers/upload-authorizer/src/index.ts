@@ -462,7 +462,9 @@ async function handleMultipartCreate(request: Request, env: Env, route: Multipar
     uploadId: multipart.uploadId,
     partSize: RECOMMENDED_MULTIPART_PART_BYTES,
     maxPartSize: MAX_MULTIPART_PART_BYTES,
-    maxParallel: 4,
+    // Enough parts in flight to keep a fast connection busy while one part
+    // waits on storage; clients may send fewer.
+    maxParallel: 6,
   }, env);
 }
 
@@ -677,6 +679,21 @@ function safeInlineFilename(filename: string): string {
   return filename.replace(/[\r\n"]/g, '_').slice(0, 180) || 'preview';
 }
 
+function previewBucketFor(env: Env, bucketName: string): R2Bucket {
+  switch (bucketName) {
+    case 'chc-submissions':
+      return env.SUBMISSIONS_BUCKET;
+    case 'chc-learning':
+      return env.LEARNING_BUCKET;
+    case 'chc-music':
+      return env.MUSIC_BUCKET;
+    case 'chc-images':
+      return env.IMAGES_BUCKET;
+    default:
+      throw new HttpError(409, 'unsupported_preview_bucket', 'This submission item is not stored in a Coptic Vine media bucket.');
+  }
+}
+
 async function handleAdminPreview(request: Request, env: Env, itemId: string): Promise<Response> {
   const bearerToken = requireBearerToken(request);
   const rows = await callSupabaseRpc<AdminPreviewItemRow>(
@@ -691,9 +708,9 @@ async function handleAdminPreview(request: Request, env: Env, itemId: string): P
     throw new HttpError(404, 'preview_item_not_found', 'Submission item is not available for preview.');
   }
 
-  if (item.bucket !== 'chc-submissions') {
-    throw new HttpError(409, 'unsupported_preview_bucket', 'This submission item is not stored in the private submissions bucket.');
-  }
+  // A processed video's original is removed once its delivery file exists;
+  // its preview then plays that delivery file instead.
+  const previewBucket = previewBucketFor(env, item.bucket);
 
   const headers = withCors(new Headers(), env);
   headers.set('content-type', item.content_type);
@@ -711,7 +728,7 @@ async function handleAdminPreview(request: Request, env: Env, itemId: string): P
   );
 
   if (request.method === 'HEAD') {
-    const object = await env.SUBMISSIONS_BUCKET.head(item.object_path);
+    const object = await previewBucket.head(item.object_path);
     if (!object) throw new HttpError(404, 'preview_object_not_found', 'The uploaded file could not be found.');
 
     if (object.httpEtag || object.etag) headers.set('etag', object.httpEtag ?? object.etag ?? '');
@@ -719,7 +736,7 @@ async function handleAdminPreview(request: Request, env: Env, itemId: string): P
     return new Response(null, { headers });
   }
 
-  const object = await env.SUBMISSIONS_BUCKET.get(item.object_path, { range: request.headers });
+  const object = await previewBucket.get(item.object_path, { range: request.headers });
   if (!object) throw new HttpError(404, 'preview_object_not_found', 'The uploaded file could not be found.');
   if (object.httpEtag || object.etag) headers.set('etag', object.httpEtag ?? object.etag ?? '');
 
