@@ -96,8 +96,12 @@ test('the drawers run to the edge with their rows and buttons clear of the notch
   // The document's date bar bleeds its strip as the pill bar does.
   const dateBar = read('src/components/vine/ui/DocumentDateBar.tsx');
   assert.match(dateBar, /marginLeft: -insets\.left,\n\s+marginRight: -insets\.right,\n\s+paddingLeft: SPACING\.md \+ insets\.left,\n\s+paddingRight: SPACING\.md \+ insets\.right,/);
-  // The tab bar's colour runs under the home indicator; its tabs stop at its edge.
-  assert.match(read('src/components/vine/ui/BottomTabBar.tsx'), /paddingBottom: tablet \? insets\.bottom \+ 14 : insets\.bottom,/);
+  // The tab bar's colour runs under the home indicator; its tabs stop at its
+  // edge, on the iPad as on a phone, with no padding of their own stacked on it.
+  const tabBar = read('src/components/vine/ui/BottomTabBar.tsx');
+  assert.match(tabBar, /const aboveHomeIndicator = insets\.bottom > 0;/);
+  assert.match(tabBar, /paddingBottom: tablet && !aboveHomeIndicator \? 6 : insets\.bottom,/);
+  assert.doesNotMatch(tabBar, /insets\.bottom \+ 14/);
 });
 
 test('every full-screen modal draws to the edges on Android as on iOS, and pads itself', () => {

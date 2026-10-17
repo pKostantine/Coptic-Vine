@@ -38,11 +38,12 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
     account: tr('Account', 'Compte', 'الحساب'),
   };
   const labelStyle = [styles.tabLabel, isCompactLandscape && styles.tabLabelLandscape, tablet && styles.tabLabelTablet, isArabic && styles.tabLabelArabic];
-  // A phone with a home indicator: the indicator's own band is the space
-  // under the labels, as under a native tab bar -- not that band on top of
-  // the tabs' own padding. The bar's colour runs down through it; the tabs
-  // stop at its edge.
-  const aboveHomeIndicator = !tablet && insets.bottom > 0;
+  // A phone or an iPad with a home indicator: the indicator's own band is the
+  // space under the labels, as under a native tab bar -- not that band on top
+  // of the tabs' own padding (the iPad's had a further 14pt besides, and stood
+  // nearly 100pt tall). The bar's colour runs down through it; the tabs stop
+  // at its edge.
+  const aboveHomeIndicator = insets.bottom > 0;
   const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape, tablet && styles.tabTablet, aboveHomeIndicator && styles.tabAboveHomeIndicator];
   const iconSize = isCompactLandscape ? 22 : tablet ? 24 : 23;
 
@@ -94,7 +95,8 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
         // rather than restyling its tabs in place (which iOS sized wrongly).
         key={tablet ? 'tablet' : isCompactLandscape ? 'sideways' : 'phone'}
         accessibilityRole="tablist"
-        style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet ? insets.bottom + 14 : insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}
+        // An iPad with a Home button has no band below: its row gets the 6pt it has above.
+        style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet && !aboveHomeIndicator ? 6 : insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}
       >
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'home' }} accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
         <Icon name="home-outline" size={iconSize} color={active === 'home' ? COLORS.gold : COLORS.muted} />
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   // The iPad's tabs: a centred row of 80pt items, 56pt apart.
-  barTablet: { gap: 56, justifyContent: 'center', paddingBottom: 14, paddingTop: 6 },
+  barTablet: { gap: 56, justifyContent: 'center', paddingTop: 6 },
   tabAboveHomeIndicator: { paddingBottom: 0 },
   tabTablet: { borderRadius: 16, flexBasis: 80, flexGrow: 0, flexShrink: 0, gap: 4, paddingVertical: 8, width: 80 },
   tabLabelTablet: { fontSize: 11.5 },
