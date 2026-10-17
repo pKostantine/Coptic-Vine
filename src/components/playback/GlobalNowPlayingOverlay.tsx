@@ -1,7 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { usePathname } from 'expo-router';
-import { type ReactNode, useEffect, useId, useState } from 'react';
-import { Alert, Animated, Easing, Pressable, StyleSheet } from 'react-native';
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Easing, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MusicNowPlayingScreen from '@/components/music/MusicNowPlayingScreen';
@@ -9,6 +9,7 @@ import Icon from '@/components/vine/ui/Icon';
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningNowPlayingScreen from '@/components/learning/LearningNowPlayingScreen';
 import MusicArtwork from '@/components/music/MusicArtwork';
+import type { DocumentTheme } from '@/constants/documentThemes';
 import { COLORS } from '@/constants/theme';
 import { useBottomChrome } from '@/context/BottomChromeContext';
 import { useAuth } from '@/context/AuthContext';
@@ -24,6 +25,9 @@ import MiniPlayerCard from './MiniPlayerCard';
 import { tr } from '../../utils/appText';
 // Same small gap whether the bar floats over a tab bar or the page edge.
 const FLOATING_GAP = 10;
+/** The hidden bar's round button, and how far a finger must travel before a press becomes a drag. */
+const BUTTON_SIZE = 42;
+const DRAG_SLOP = 6;
 
 const EXCLUDED_PATHS = new Set([
   '/season-selector',
@@ -48,7 +52,18 @@ const BOOK_PATH_PREFIXES = [
   '/search',
 ];
 
-export default function GlobalNowPlayingOverlay() {
+interface GlobalNowPlayingOverlayProps {
+  /** The page of the document this bar floats over, when its document mounts it (a subdocument). */
+  documentTheme?: DocumentTheme;
+  /**
+   * A touch landed on the hidden bar's button. A subdocument's edge swipes
+   * listen for it: dragging the button along the foot of the page moves it,
+   * and never closes the subdocument or opens its contents.
+   */
+  onButtonTouchStart?: () => void;
+}
+
+export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentTheme, onButtonTouchStart }: GlobalNowPlayingOverlayProps = {}) {
   const { user } = useAuth();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -58,11 +73,20 @@ export default function GlobalNowPlayingOverlay() {
     tabBarInset,
     reportNowPlayingInset,
     reportNowPlayingExpanded,
+    documentTheme: focusedDocumentTheme,
     nowPlayingCollapsed: isCollapsed,
     setNowPlayingCollapsed: setIsCollapsed,
   } = useBottomChrome();
   const overlayId = useId();
-  const { preferences } = useReadingPreferences();
+  const { preferences, setNowPlayingButtonSide } = useReadingPreferences();
+  // Over one of the three coloured pages -- Walnut, Vine, Sepia -- the button
+  // wears the page's own button colour, the one its subdocument buttons are
+  // drawn in (honey, celadon, oxblood). The gold stays on Night and Paper, and
+  // everywhere outside the documents.
+  const documentTheme = ownDocumentTheme ?? focusedDocumentTheme;
+  const colouredPage = documentTheme && documentTheme.id !== 'night' && documentTheme.id !== 'paper' ? documentTheme : null;
+  const buttonColor = colouredPage ? colouredPage.colors.subdoc : COLORS.gold;
+  const buttonIconColor = colouredPage ? colouredPage.colors.onAccent : COLORS.white;
   const music = useMusicPlayer();
   const learning = useLearningPlayer();
   const [expandedHeight, setExpandedHeight] = useState(60);
@@ -110,6 +134,59 @@ export default function GlobalNowPlayingOverlay() {
       useNativeDriver: true,
     }).start();
   }, [collapseAnimation, isCollapsed, reduced]);
+
+  // The hidden bar's button rests in either bottom corner, dragged there along
+  // the foot of the page. Where it sits is its corner's offset along that row
+  // (0 at the left end, `travel` at the right) plus any drag in progress, so a
+  // dropped button carries on from wherever the finger let it go.
+  const side = preferences.nowPlayingButtonSide;
+  const [rowWidth, setRowWidth] = useState(0);
+  const travel = Math.max(0, rowWidth - BUTTON_SIZE);
+  const cornerOffset = side === 'left' ? 0 : travel;
+  const [sideOffset] = useState(() => new Animated.Value(0));
+  const [dragOffset] = useState(() => new Animated.Value(0));
+  const lastSideRef = useRef(side);
+  useEffect(() => {
+    // Moved to the other corner, it glides there; a turn of the device, or
+    // the row's first measure, just puts it in its corner.
+    const moved = lastSideRef.current !== side;
+    lastSideRef.current = side;
+    if (moved && !reduced) {
+      Animated.spring(sideOffset, { toValue: cornerOffset, speed: 18, bounciness: 4, useNativeDriver: true }).start();
+    } else {
+      sideOffset.setValue(cornerOffset);
+    }
+  }, [cornerOffset, reduced, side, sideOffset]);
+
+  const buttonDrag = useMemo(() => {
+    const settle = () => {
+      if (reduced) sideOffset.setValue(cornerOffset);
+      else Animated.spring(sideOffset, { toValue: cornerOffset, speed: 18, bounciness: 4, useNativeDriver: true }).start();
+    };
+    return PanResponder.create({
+      // A tap stays the button's own; only a drag along the foot is taken from it.
+      onMoveShouldSetPanResponderCapture: (_, gesture) => Math.abs(gesture.dx) > DRAG_SLOP && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, gesture) => {
+        dragOffset.setValue(Math.min(Math.max(gesture.dx, -cornerOffset), travel - cornerOffset));
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const at = Math.min(Math.max(cornerOffset + gesture.dx, 0), travel);
+        // A flick goes the way it was thrown; a slower drag, to the nearer corner.
+        const next = Math.abs(gesture.vx) > 0.5
+          ? (gesture.vx < 0 ? 'left' : 'right')
+          : (at < travel / 2 ? 'left' : 'right');
+        sideOffset.setValue(at);
+        dragOffset.setValue(0);
+        if (next === side) settle();
+        else setNowPlayingButtonSide(next);
+      },
+      onPanResponderTerminate: () => {
+        sideOffset.setValue(cornerOffset);
+        dragOffset.setValue(0);
+      },
+    });
+  }, [cornerOffset, dragOffset, reduced, setNowPlayingButtonSide, side, sideOffset, travel]);
 
   // The desktop sidebar steps aside while a full player is open, so the player
   // gets the whole window. Reported per overlay and cleared on unmount, the
@@ -256,32 +333,56 @@ export default function GlobalNowPlayingOverlay() {
   const cardOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
   if (isCollapsed) {
+    const otherSide = side === 'left' ? 'right' : 'left';
     return (
-      <Animated.View
-        testID="global-now-playing-collapsed"
-        pointerEvents="box-none"
-        style={{
-          position: 'absolute',
-          right: 18 + insets.right,
-          bottom: overlayBottom,
-          width: 42,
-          height: 42,
-          backgroundColor: 'transparent',
-          opacity: collapsedOpacity,
-          transform: [{ translateY: lift }, { scale: collapsedScale }],
-          zIndex: 40,
-          elevation: 40,
-        }}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Show now playing"
-          onPress={() => setIsCollapsed(false)}
-          style={styles.collapsedButton}
+      <>
+        {/* The foot of the page the button travels along, clear of the notch
+            and the rounded corners on a phone on its side. No height, so it
+            covers nothing: the button stays its own small box. */}
+        <View
+          pointerEvents="none"
+          onLayout={(event) => setRowWidth(Math.round(event.nativeEvent.layout.width))}
+          style={{ position: 'absolute', left: 18 + insets.left, right: 18 + insets.right, bottom: 0, height: 0 }}
+        />
+        <Animated.View
+          testID="global-now-playing-collapsed"
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            left: 18 + insets.left,
+            bottom: overlayBottom,
+            width: BUTTON_SIZE,
+            height: BUTTON_SIZE,
+            backgroundColor: 'transparent',
+            // Shown once the foot is measured, so it never flashes in the wrong corner.
+            opacity: rowWidth > 0 ? collapsedOpacity : 0,
+            transform: [{ translateX: Animated.add(sideOffset, dragOffset) }, { translateY: lift }, { scale: collapsedScale }],
+            zIndex: 40,
+            elevation: 40,
+          }}
         >
-          <Icon name="chevron-down" size={18} color={COLORS.white} style={{ transform: [{ rotate: '180deg' }] }} />
-        </Pressable>
-      </Animated.View>
+          <View {...buttonDrag.panHandlers} onTouchStart={onButtonTouchStart}>
+              <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Show now playing"
+              accessibilityHint={tr('Drag to move it to the other corner', 'Faites glisser pour le placer dans l’autre coin', 'اسحبه لنقله إلى الزاوية الأخرى')}
+              accessibilityActions={[{
+                name: 'move',
+                label: otherSide === 'left'
+                  ? tr('Move to the left corner', 'Placer dans le coin gauche', 'انقله إلى الزاوية اليسرى')
+                  : tr('Move to the right corner', 'Placer dans le coin droit', 'انقله إلى الزاوية اليمنى'),
+              }]}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === 'move') setNowPlayingButtonSide(otherSide);
+              }}
+              onPress={() => setIsCollapsed(false)}
+              style={[styles.collapsedButton, { backgroundColor: buttonColor }]}
+            >
+              <Icon name="chevron-down" size={18} color={buttonIconColor} style={{ transform: [{ rotate: '180deg' }] }} />
+            </Pressable>
+          </View>
+        </Animated.View>
+      </>
     );
   }
 
@@ -366,9 +467,9 @@ const styles = StyleSheet.create({
     elevation: 40,
   },
   collapsedButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.gold,

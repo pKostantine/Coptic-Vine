@@ -64,7 +64,7 @@ export default function LearningLessonSetScreen() {
   };
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{lessonSet ? lessonSet.title + ' — Learn & Study' : 'Lesson Set'}</title></Head>
       <LearningBackHeader title={tr('Lesson Set', 'Série de leçons', 'مجموعة دروس')} isArabic={isArabic} />
       {!lessonSet && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}

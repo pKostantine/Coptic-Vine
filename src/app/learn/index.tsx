@@ -73,7 +73,8 @@ export default function LearningHomeScreen() {
 
   const continueLearning = library?.items.filter((item) => item.state === 'learning').slice(0, 4) ?? [];
   const gutter = wide ? 0 : 16;
-  const available = width - (wide ? 72 : 32);
+  // The page's content is inset from a phone's notch on its side; the tiles share what is left.
+  const available = width - (wide ? 72 : 32) - insets.left - insets.right;
   const columns = tileColumnsFor(available, wide);
   const tileGap = wide ? 16 : 10;
   const tileWidth = Math.floor((available - tileGap * (columns - 1)) / columns);

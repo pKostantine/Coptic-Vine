@@ -234,7 +234,7 @@ export default function ActionSheetFrame({ visible, onClose, closeLabel, childre
   }
 
   return (
-    <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <ModeContext.Provider value={mode}>
         <Animated.View style={[styles.dim, { opacity: progress }]}>
           <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} />

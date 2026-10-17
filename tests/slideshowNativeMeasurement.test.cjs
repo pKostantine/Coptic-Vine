@@ -30,9 +30,11 @@ test('collapsed Now Playing control cannot create a full-width slideshow mask', 
   const container = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
 
   assert.match(collapsedBranch, /pointerEvents="box-none"/);
-  assert.match(collapsedBranch, /width:\s*42/);
-  assert.match(collapsedBranch, /height:\s*42/);
+  assert.match(overlay, /const BUTTON_SIZE = 42;/);
+  assert.match(collapsedBranch, /width: BUTTON_SIZE,\s*height: BUTTON_SIZE,/);
   assert.match(collapsedBranch, /backgroundColor:\s*'transparent'/);
+  // The line the button is dragged along is measured, never drawn: no height, no touches.
+  assert.match(collapsedBranch, /pointerEvents="none"[\s\S]*?right: 18 \+ insets\.right, bottom: 0, height: 0/);
   for (const styleName of ['container', 'slide', 'slideDeck']) {
     const style = container.match(new RegExp(`${styleName}:\\s*\\{([^}]*)\\}`))?.[1] || '';
     assert.match(style, /overflow:\s*["']visible["']/);
@@ -47,6 +49,8 @@ test('hiding Now Playing is one app-wide state shared by every bar', () => {
   const chrome = fs.readFileSync('src/context/BottomChromeContext.tsx', 'utf8');
 
   assert.doesNotMatch(overlay, /\[isCollapsed, setIsCollapsed\]\s*=\s*useState/);
+  // So is the corner its button was dragged to, kept with the device's preferences.
+  assert.match(overlay, /const side = preferences\.nowPlayingButtonSide;/);
   assert.match(overlay, /nowPlayingCollapsed: isCollapsed,\s*setNowPlayingCollapsed: setIsCollapsed,\s*\} = useBottomChrome\(\)/);
   assert.match(chrome, /const \[nowPlayingCollapsed, setNowPlayingCollapsed\] = useState\(false\)/);
 });

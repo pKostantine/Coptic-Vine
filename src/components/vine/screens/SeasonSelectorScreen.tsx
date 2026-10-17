@@ -302,7 +302,8 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
       {year !== null ? (
         <View key={wide ? 'wide' : 'phone'} style={[
           styles.yearBar,
-          wide ? styles.yearBarWide : null,
+          // Across a phone, clear of its notch when it is on its side; the wider bar is centred.
+          wide ? styles.yearBarWide : { left: 16 + insets.left, right: 16 + insets.right },
           { bottom: (wide ? 28 : Math.max(24, insets.bottom)) + nowPlayingInset },
         ]}>
           <Pressable

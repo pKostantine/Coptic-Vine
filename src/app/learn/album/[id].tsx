@@ -51,7 +51,7 @@ export default function LearningAlbumScreen() {
   }, [albumId, locale]);
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{album ? album.title + ' — Learn & Study' : 'Learning Album'}</title></Head>
       <LearningBackHeader title={tr('Learning Album', 'Album d’apprentissage', 'ألبوم تعلّم')} isArabic={isArabic} />
       {!album && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}

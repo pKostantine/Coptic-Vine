@@ -40,7 +40,7 @@ export default function LearningHymnScreen() {
   }, [hymnId, locale]);
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{hymn ? hymn.title + ' — Learn & Study' : 'Hymn — Learn & Study'}</title></Head>
       <LearningBackHeader title={tr('Learn a Hymn', 'Apprendre une hymne', 'تعلّم اللحن')} isArabic={isArabic} />
       {!hymn && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}

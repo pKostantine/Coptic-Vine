@@ -184,7 +184,8 @@ const THEME_BY_INDICATOR_KEY: Record<string, SeasonThemeKey> = {
   'st-marys-feast': 'marian',
   annunciation: 'marian',
 
-  circumcision: 'gold',
+  // The Circumcision falls in the Nativity's days, and wears its scarlet.
+  circumcision: 'nativity',
   'wedding-at-cana': 'gold',
   'entry-into-temple': 'gold',
   transfiguration: 'gold',
@@ -249,8 +250,6 @@ export interface PageGlowPalette {
   light: { cx: string; cy: string; rx: string; ry: string };
   /** The radial light's stops: [offset, colour, opacity]. */
   stops: readonly (readonly [string, string, string])[];
-  /** A light that is white at the top: the page's title is set in dark ink over it. */
-  lightTop?: boolean;
 }
 
 /**
@@ -277,24 +276,13 @@ export const CRIMSON_GLOW: PageGlowPalette = {
 };
 
 /**
- * The Resurrection's white: a warm white at the top of the page, under the
- * title, falling through pearl to the black the library sits on. The one
- * light glow, so the title over it is set dark (lightTop).
- */
-export const RESURRECTION_GLOW: PageGlowPalette = {
-  fall: [['0', '#FBF8F0'], ['0.2', '#E7E0D1'], ['0.48', '#6F685C'], ['0.7', '#1A1814'], ['1', '#000000']],
-  light: { cx: '50%', cy: '0%', rx: '120%', ry: '45%' },
-  stops: [['0', '#FFFFFF', '0.85'], ['0.45', '#FBF6EA', '0.45'], ['1', '#FBF6EA', '0']],
-  lightTop: true,
-};
-
-/**
  * The glow the Books page wears for each season, under the day block's own
  * colours. Each is the vine glow (oklch 0.485 0.102 146 at its light) turned
  * to the season's hue, and kept about as dark as the vine is, so white text
  * reads the same over any of them: the bright blocks (gold, palm, sky blue)
  * do not make a bright page. The stops are given light / shade / deep / top,
- * the OKLCH source beside each. The Resurrection's alone is white (above).
+ * the OKLCH source beside each. The Resurrection's alone is brighter: its
+ * white day block sits on gold.
  */
 export const SEASON_GLOWS: Record<SeasonThemeKey, PageGlowPalette> = {
   annual: VINE_GLOW,
@@ -311,7 +299,8 @@ export const SEASON_GLOWS: Record<SeasonThemeKey, PageGlowPalette> = {
   /** A livelier, yellower green: oklch(0.505 0.117 132) → oklch(0.300 0.060 132). */
   palm: seasonGlow('#4B7222', '#345019', '#223412', '#2F4816'),
   holyweek: CRIMSON_GLOW,
-  resurrection: RESURRECTION_GLOW,
+  /** A true gold, lighter than the feasts' bronze, under the white block: oklch(0.62 0.12 86) → oklch(0.32 0.065 82). */
+  resurrection: seasonGlow('#A68018', '#745504', '#432F01', '#6D5005'),
   /** Navy: oklch(0.425 0.102 253) → oklch(0.220 0.052 253). */
   apostles: seasonGlow('#1F5084', '#113358', '#071B32', '#0D2C4D'),
   /** Royal blue: oklch(0.455 0.138 262) → oklch(0.251 0.070 262). */

@@ -65,3 +65,85 @@ test('the book pages run edge to edge with their content padded clear of the not
   const bleed = read('src/components/vine/ui/BleedPage.tsx');
   assert.match(bleed, /\{background\}\n\s+\{header\}\n\s+<SafeAreaView edges=\{\['left', 'right', \.\.\.edges\]\}/);
 });
+
+test('the sheets are centred between the notch and the far edge, never by their own auto margins', () => {
+  // React Native's layout gives an absolutely placed view's auto margins
+  // nothing: the calendar and the Book Settings sat against the left edge, under
+  // a phone's notch on its side, and off centre on the iPad.
+  for (const file of ['src/components/vine/ui/SheetFrame.tsx', 'src/components/vine/ui/CalendarSheet.tsx']) {
+    const source = read(file);
+    assert.doesNotMatch(source, /marginHorizontal: 'auto'/, file);
+    assert.match(source, /<View pointerEvents="box-none" style=\{\[styles\.sheetRow, \{ paddingLeft: insets\.left, paddingRight: insets\.right \}\]\}>/, file);
+    assert.match(source, /sheetRow: \{ alignItems: 'center', bottom: 0, left: 0, position: 'absolute', right: 0 \}/, file);
+    assert.match(source, /maxHeight: height - Math\.max\(insets\.top, 12\)/, file);
+  }
+  // The month and year picker keeps clear of every edge and shortens to fit a phone on its side.
+  const panel = read('src/components/vine/ui/CalendarPanel.tsx');
+  assert.match(panel, /paddingLeft: SPACING\.lg \+ insets\.left,\n\s+paddingRight: SPACING\.lg \+ insets\.right,/);
+  assert.match(panel, /maxHeight: pickerListsHeight/);
+});
+
+test('the drawers run to the edge with their rows and buttons clear of the notch and the home indicator', () => {
+  // The content list's Calendar and Settings buttons sat in the home indicator's strip, its rows under the notch.
+  for (const file of ['src/components/vine/ui/ContentSelectorDrawer.tsx', 'src/app/bible/[bookKey]/[chapter].tsx']) {
+    const source = read(file);
+    assert.match(source, /paddingRight: SPACING\.md \+ insets\.right,/, file);
+    assert.match(source, /marginRight: -\(SPACING\.md \+ insets\.right\),\n\s+paddingRight: SPACING\.xl \+ insets\.right,\n\s+paddingBottom: SPACING\.sm \+ insets\.bottom,/, file);
+  }
+  const sermon = read('src/components/vine/ui/SermonPlannerDrawer.tsx');
+  assert.match(sermon, /<View style=\{\[styles\.header, \{ paddingRight: SPACING\.md \+ insets\.right \}\]\}>/);
+  assert.match(sermon, /paddingRight: SPACING\.xl \+ insets\.right, paddingBottom: Math\.max\(insets\.bottom, SPACING\.sm\)/);
+  // The document's date bar bleeds its strip as the pill bar does.
+  const dateBar = read('src/components/vine/ui/DocumentDateBar.tsx');
+  assert.match(dateBar, /marginLeft: -insets\.left,\n\s+marginRight: -insets\.right,\n\s+paddingLeft: SPACING\.md \+ insets\.left,\n\s+paddingRight: SPACING\.md \+ insets\.right,/);
+  // The tab bar's colour runs under the home indicator; its tabs stop at its edge.
+  assert.match(read('src/components/vine/ui/BottomTabBar.tsx'), /paddingBottom: tablet \? insets\.bottom \+ 14 : insets\.bottom,/);
+});
+
+test('every full-screen modal draws to the edges on Android as on iOS, and pads itself', () => {
+  // An Android Modal is otherwise a dialog that keeps clear of the bars and
+  // the notch: the subdocument's page stopped short of the notch's strip.
+  const files = [
+    'src/components/vine/screens/DocumentModal.tsx',
+    'src/components/vine/ui/ContentSelectorDrawer.tsx',
+    'src/components/vine/ui/SermonPlannerDrawer.tsx',
+    'src/components/vine/ui/SaintHymnPicker.tsx',
+    'src/components/vine/ui/SheetFrame.tsx',
+    'src/components/vine/ui/CalendarSheet.tsx',
+    'src/components/vine/ui/CalendarPanel.tsx',
+    'src/components/playback/ActionSheetFrame.tsx',
+    'src/app/bible/[bookKey]/[chapter].tsx',
+  ];
+  for (const file of files) {
+    const source = read(file);
+    // The opening tag, reading past any arrow function among its props.
+    const modals = source.match(/<Modal\b(?:=>|[^>])*>/g) || [];
+    assert.ok(modals.length > 0, file);
+    for (const modal of modals) assert.match(modal, /statusBarTranslucent[\s\S]*navigationBarTranslucent/, `${file}: ${modal.slice(0, 60)}`);
+  }
+});
+
+test('headers and buttons keep below the status bar; tiles share the width inside the notch', () => {
+  const pages = ['learn/album/[id]', 'learn/cantors', 'learn/hymn/[id]', 'learn/lesson/[id]', 'learn/lesson-set/[id]', 'learn/playlist/[id]', 'learn/season/[id]', 'learn/seasons', 'music/playlist/[id]', 'music/release/[id]'];
+  for (const page of pages) assert.match(read(`src/app/${page}.tsx`), /<SafeAreaView edges=\{\['top', 'left', 'right'\]\} style=\{styles\.safeArea\}>/, page);
+  for (const page of ['music/artist/[id]', 'learn/cantor/[id]']) {
+    assert.match(read(`src/app/${page}.tsx`), /styles\.pending, \{ paddingTop: 12 \+ insets\.top,/, page);
+  }
+  for (const page of ['music/index', 'music/artist/[id]', 'learn/cantor/[id]', 'learn/index']) {
+    assert.match(read(`src/app/${page}.tsx`), /const available = width - [^;]+ - insets\.left - insets\.right;/, page);
+  }
+  // The notice (a page not found, a crash) scrolls rather than push its buttons under the home indicator.
+  const notice = read('src/components/vine/ui/NoticeScreen.tsx');
+  assert.match(notice, /<ScrollView/);
+  assert.match(notice, /paddingLeft: 24 \+ insets\.left,\n\s+paddingRight: 24 \+ insets\.right,/);
+  // The Bible chapter's loading splash stays under its bar, so Back can still be reached.
+  assert.match(read('src/app/bible/[bookKey]/[chapter].tsx'), /<LoadingScreen belowHeader \/>/);
+  // A light page runs up under the status bar, whose clock and battery turn
+  // dark over it -- a status bar of the document's own, mounted only while it shows.
+  const statusBar = read('src/components/vine/ui/DocumentStatusBar.tsx');
+  assert.match(statusBar, /return focused && !theme\.dark \? <StatusBar style="dark" \/> : null;/);
+  assert.match(read('src/components/vine/screens/ServiceDocument.tsx'), /<DocumentStatusBar theme=\{documentTheme\} \/>/);
+  assert.match(read('src/app/bible/[bookKey]/[chapter].tsx'), /<DocumentStatusBar theme=\{theme\} \/>/);
+  // The seasons' year bar, across a phone, keeps clear of its notch.
+  assert.match(read('src/components/vine/screens/SeasonSelectorScreen.tsx'), /wide \? styles\.yearBarWide : \{ left: 16 \+ insets\.left, right: 16 \+ insets\.right \}/);
+});

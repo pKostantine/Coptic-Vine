@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import ReleaseTile from '@/components/music/ReleaseTile';
@@ -46,6 +46,7 @@ export default function LearningCantorScreen() {
   const wide = layout !== 'phone';
   // The page and the hero's glow run to both edges; the content keeps clear of the notch.
   const sidePadding = useSidePadding(0);
+  const insets = useSafeAreaInsets();
   const cantorId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [cantor, setCantor] = useState<LearningCantorDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +92,8 @@ export default function LearningCantorScreen() {
 
   // The iPad's and desktop's 36pt margins are the sections' gutter, the hero's glow running past them to the edges.
   const gutter = wide ? 36 : 16;
-  const available = width - (wide ? 72 : 32);
+  // The page's content is inset from a phone's notch on its side; the tiles share what is left.
+  const available = width - (wide ? 72 : 32) - insets.left - insets.right;
   // A phone sets two 140pt covers side by side; the iPad and desktop three in each of two columns.
   const gap = wide ? GRID_GAP : 12;
   const tileWidth = wide ? Math.floor(((available - COLUMN_GAP) / 2 - GRID_GAP * 2) / 3) : 140;
@@ -176,7 +178,7 @@ export default function LearningCantorScreen() {
     <SafeAreaView edges={[]} style={styles.safeArea}>
       <Head><title>{cantor ? `${cantor.displayName} — ${tr('Learn & Study', 'Apprendre', 'تعلّم وادرس')}` : tr('Cantor — Learn & Study', 'Chantre — Apprendre', 'معلّم — تعلّم وادرس')}</title></Head>
       {!cantor ? (
-        <View style={[styles.pending, { paddingLeft: 16 + sidePadding.paddingLeft, paddingRight: 16 + sidePadding.paddingRight }]}>
+        <View style={[styles.pending, { paddingTop: 12 + insets.top, paddingLeft: 16 + sidePadding.paddingLeft, paddingRight: 16 + sidePadding.paddingRight }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} onPress={() => goBack(router, '/learn')} style={({ pressed }) => [styles.pendingBack, pressed && styles.pressed]}>
             <Icon name="chevron-back" size={20} color={COLORS.gold} />
           </Pressable>

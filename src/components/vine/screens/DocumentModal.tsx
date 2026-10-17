@@ -86,10 +86,9 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
  * in the inset (on the end of the Now Playing bar, say) still goes where it
  * was going. In portrait there is no side inset, so nothing changes there.
  *
- * An Android Modal is a dialog that pads its content itself, so there the
- * strip isn't the SafeAreaView's and this never sees it. Translucent bars
- * would hand it over, but the dialog then draws dark status bar icons on the
- * black page; a swipe starting just inside the text works on Android as is.
+ * On Android too: the Modal is drawn edge to edge (statusBarTranslucent and
+ * navigationBarTranslucent, below), so the strip is the SafeAreaView's there
+ * as well, rather than a dialog's own margin beside the page.
  */
 function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwipeFromRight?: () => void, ignoresTouch?: () => boolean) {
   const { left: leftInset, right: rightInset } = useSafeAreaInsets();
@@ -423,7 +422,18 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   }, [overlayStartsInInset, screenWidth]);
 
   return (
-    <Modal animationType="slide" visible={visible} onRequestClose={onClose} supportedOrientations={modalOrientations}>
+    <Modal
+      animationType="slide"
+      visible={visible}
+      onRequestClose={onClose}
+      supportedOrientations={modalOrientations}
+      // The page runs to every edge of the screen, the notch's strip
+      // included, on Android as on iOS: there a Modal is a dialog that kept
+      // itself clear of the bars and the notch, leaving black bands beside
+      // the page. The SafeAreaView below keeps the pills and the text clear.
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <SafeAreaView
         // Same split as ServiceDocument: on web the bar below supplies the top
         // inset itself, while the app has no bar and must inset for the notch.
@@ -520,7 +530,14 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             />
           </>
         )}
-        <GlobalNowPlayingOverlay />
+        {/* Its hidden button is a dead zone for the edge swipes, as the pill
+            bar is: dragging it along the foot moves it to the other corner. */}
+        <GlobalNowPlayingOverlay
+          documentTheme={documentTheme}
+          onButtonTouchStart={() => {
+            touchOnPillBarRef.current = true;
+          }}
+        />
         {/* Rendered from inside this document's own Modal, so Seasons
             appears OVER the subdocument instead of behind it, and closing it
             drops straight back into it. (The calendar and Book Settings are
@@ -530,6 +547,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           visible={overlayScreen === 'seasons'}
           onRequestClose={() => setOverlayScreen(null)}
           supportedOrientations={modalOrientations}
+          statusBarTranslucent
+          navigationBarTranslucent
         >
           <View
             style={[styles.overlayFrame, { backgroundColor: documentTheme.colors.page }]}

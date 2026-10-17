@@ -112,7 +112,14 @@ export interface ReadingPreferences {
    * a desk are read differently.
    */
   documentTheme: DocumentThemeId;
+  /**
+   * The bottom corner the hidden Now Playing bar's button sits in, where the
+   * reader dragged it. A device choice: it depends on the hand holding it.
+   */
+  nowPlayingButtonSide: NowPlayingButtonSide;
 }
+
+export type NowPlayingButtonSide = 'left' | 'right';
 
 export type SyncedReadingPreferences = Pick<ReadingPreferences,
   | 'visibleLanguages'
@@ -170,6 +177,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   saintPsalies: false,
   keepScreenAwake: true,
   documentTheme: DEFAULT_DOCUMENT_THEME_ID,
+  nowPlayingButtonSide: 'right',
 };
 
 let currentAppLanguage: AppLanguage = DEFAULT_READING_PREFERENCES.appLanguage;
@@ -282,6 +290,7 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   merged.saintPsalies = booleanValue(stored?.saintPsalies, DEFAULT_READING_PREFERENCES.saintPsalies);
   merged.keepScreenAwake = booleanValue(stored?.keepScreenAwake, DEFAULT_READING_PREFERENCES.keepScreenAwake);
   merged.documentTheme = isDocumentThemeId(stored?.documentTheme) ? stored.documentTheme : DEFAULT_DOCUMENT_THEME_ID;
+  merged.nowPlayingButtonSide = stored?.nowPlayingButtonSide === 'left' ? 'left' : 'right';
   return merged;
 }
 

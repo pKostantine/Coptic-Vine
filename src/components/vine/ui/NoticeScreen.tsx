@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
@@ -29,8 +29,20 @@ interface NoticeScreenProps {
  */
 export default function NoticeScreen({ title, body, detail, actions = [], arabic = false }: NoticeScreenProps) {
   const insets = useSafeAreaInsets();
+  // Scrolls when it is taller than the screen -- a phone on its side is
+  // shorter than the seal, the message and its buttons -- so nothing is pushed
+  // under the home indicator; and it keeps clear of every edge's inset.
   return (
-    <View style={[styles.screen, { paddingBottom: 24 + insets.bottom, paddingTop: 24 + insets.top }]}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={[styles.content, {
+        paddingBottom: 24 + insets.bottom,
+        paddingTop: 24 + insets.top,
+        paddingLeft: 24 + insets.left,
+        paddingRight: 24 + insets.right,
+      }]}
+      bounces={false}
+    >
       <View style={styles.column}>
         <Image
           accessible
@@ -71,12 +83,13 @@ export default function NoticeScreen({ title, body, detail, actions = [], arabic
           </View>
         ) : null}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { alignItems: 'center', backgroundColor: COLORS.black, flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
+  screen: { backgroundColor: COLORS.black, flex: 1 },
+  content: { alignItems: 'center', flexGrow: 1, justifyContent: 'center' },
   column: { alignItems: 'center', maxWidth: 420, width: '100%' },
   seal: { height: 112, resizeMode: 'contain', width: 112 },
   divider: { marginBottom: 18, marginTop: 14 },

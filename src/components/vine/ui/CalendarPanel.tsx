@@ -1,6 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DAY_BLOCK_THEMES } from '../../../constants/seasonAppearance';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -62,6 +63,11 @@ interface CalendarPanelProps {
  */
 export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelProps) {
   const modalOrientations = useModalOrientations();
+  // The month and year picker keeps clear of the notch, the status bar and
+  // the home indicator, and on a phone on its side its lists shorten to fit.
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const pickerListsHeight = Math.min(320, windowHeight - insets.top - insets.bottom - 2 * SPACING.lg - 50);
   const { rawDate, selectDate } = useCalendar();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
@@ -422,10 +428,20 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
         </>
       )}
 
-      <Modal supportedOrientations={modalOrientations} visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
-        <Pressable accessibilityRole="button" accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')} style={[styles.pickerBackdrop, DISABLED_TEXT_SELECTION_STYLE]} onPress={() => setPickerOpen(false)}>
+      <Modal supportedOrientations={modalOrientations} visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)} statusBarTranslucent navigationBarTranslucent>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')}
+          style={[styles.pickerBackdrop, {
+            paddingTop: SPACING.lg + insets.top,
+            paddingBottom: SPACING.lg + insets.bottom,
+            paddingLeft: SPACING.lg + insets.left,
+            paddingRight: SPACING.lg + insets.right,
+          }, DISABLED_TEXT_SELECTION_STYLE]}
+          onPress={() => setPickerOpen(false)}
+        >
           <Pressable accessible={false} style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
-            <View style={styles.pickerColumns}>
+            <View style={[styles.pickerColumns, { maxHeight: pickerListsHeight }]}>
               <View style={styles.pickerColumn}>
                 <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>{tr('Month', 'Mois', 'الشهر')}</Text>
                 <ScrollView ref={monthListRef} style={styles.pickerList} showsVerticalScrollIndicator={false} snapToInterval={PICKER_ROW_HEIGHT} decelerationRate="fast">

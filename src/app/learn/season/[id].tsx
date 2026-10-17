@@ -39,7 +39,7 @@ export default function LearningSeasonScreen() {
   }, [locale, seasonId]);
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{season ? season.title + ' — Learn & Study' : 'Season — Learn & Study'}</title></Head>
       <LearningBackHeader title={tr('Season', 'Temps liturgique', 'الموسم')} isArabic={isArabic} />
       {!season && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}

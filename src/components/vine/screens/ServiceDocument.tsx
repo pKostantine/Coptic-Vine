@@ -8,6 +8,7 @@ import DocumentPillBar from '../ui/DocumentPillBar';
 import DocumentTopBar from '../ui/DocumentTopBar';
 import CalendarSheet from '../ui/CalendarSheet';
 import DocumentDateBar from '../ui/DocumentDateBar';
+import DocumentStatusBar from '../ui/DocumentStatusBar';
 import InterpretationPicker from '../ui/InterpretationPicker';
 import { INTERPRETATION_CHOOSER_SECTION_ID, INTERPRETATION_CHOOSER_TITLE, withInterpretationChoices } from '../../../utils/kiahkInterpretations';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
@@ -30,6 +31,7 @@ import { COLORS } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useCalendar } from '../../../context/CalendarContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useReportDocumentTheme } from '../../../context/BottomChromeContext';
 import { useSermonPlanner } from '../../../hooks/useSermonPlanner';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { useReadingKeepAwake } from '../../../utils/useReadingKeepAwake';
@@ -181,6 +183,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // screen around the reader is painted with it too, so the page runs edge
   // to edge.
   const documentTheme = getDocumentTheme(preferences.documentTheme);
+  // The now-playing button floating over the page wears its colours.
+  useReportDocumentTheme(documentTheme);
   // Qualified by the entry point only where the document is reachable from
   // more than one, so bookmarks for every other document keep their existing
   // ids. Without this, a bookmark made in Vespers and one made in Matins were
@@ -1056,6 +1060,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           (gesturePanResponder), so the native one is both redundant and the
           source of that bug — disabled here in favor of it. */}
       <Stack.Screen options={{ gestureEnabled: false }} />
+      {/* The page runs up under the status bar; on a light one its clock and battery turn dark. */}
+      <DocumentStatusBar theme={documentTheme} />
       <Head>
         <title>{`Coptic Vine ${title}`}</title>
       </Head>

@@ -13,9 +13,9 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from '@/components/vine/ui/Icon';
+import BleedPage from '@/components/vine/ui/BleedPage';
 import SheetFrame from '@/components/vine/ui/SheetFrame';
 import ToggleRow from '@/components/vine/ui/ToggleRow';
 import SubPageHeader from '@/components/vine/ui/SubPageHeader';
@@ -484,54 +484,63 @@ export default function SaintHymnPicker({
       animationType="slide"
       onRequestClose={closeTopLayer}
       supportedOrientations={modalOrientations}
+      // Edge to edge on Android too, as on iOS: it pads itself clear of the bars and the notch.
+      statusBarTranslucent
+      navigationBarTranslucent
     >
-      <View style={[styles.page, DISABLED_TEXT_SELECTION_STYLE]} {...edgeSwipeHandlers}>
-        <PageGlow kind="green" tall={wide} />
-        <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.flex}>
-          <View style={wide ? styles.headerWide : null}>
-            <SubPageHeader title={label(LABELS.title)} arabic={isArabic} onBack={closePicker} backLabel={tr('Back', 'Retour', 'رجوع')} />
-          </View>
+      <BleedPage
+        // The glow runs to every edge; SubPageHeader keeps itself below the
+        // status bar, and the rest stays clear of the notch and the home indicator.
+        edges={['bottom']}
+        background={<PageGlow kind="green" tall={wide} />}
+        style={DISABLED_TEXT_SELECTION_STYLE}
+        footer={(
+          <>
+            {/* On a phone the saint's hymns and the preview rise as sheets inside
+                this modal: stacking native modals can leave iOS with an invisible
+                view that captures touches. The preview is declared last, so it
+                covers an open hymn menu. */}
+            {!wide ? (
+              <SheetFrame inline visible={Boolean(expanded)} onClose={() => setExpandedBase(null)} closeLabel={tr('Close the hymns', 'Fermer les hymnes', 'أغلق الألحان')}>
+                {chooser}
+              </SheetFrame>
+            ) : null}
+            {!wide ? (
+              <SheetFrame inline visible={Boolean(preview)} onClose={() => setPreview(null)} closeLabel={tr('Close preview', 'Fermer l’aperçu', 'أغلق المعاينة')} scroll={false}>
+                {previewPanel}
+              </SheetFrame>
+            ) : null}
+          </>
+        )}
+        {...edgeSwipeHandlers}
+      >
+        <View style={wide ? styles.headerWide : null}>
+          <SubPageHeader title={label(LABELS.title)} arabic={isArabic} onBack={closePicker} backLabel={tr('Back', 'Retour', 'رجوع')} />
+        </View>
 
-          {wide ? (
-            <View style={styles.columns}>
-              <View style={[styles.listColumn, layout === 'desktop' ? styles.listColumnDesktop : styles.listColumnTablet]}>
-                {psaliesSwitch}
-                {search}
-                {list}
-              </View>
-              {chooser ? <View style={layout === 'desktop' ? styles.chooserColumnDesktop : styles.chooserColumnTablet}>{chooser}</View> : null}
-              {previewPanel ? <View style={styles.previewColumn}>{previewPanel}</View> : null}
-            </View>
-          ) : (
-            <>
+        {wide ? (
+          <View style={styles.columns}>
+            <View style={[styles.listColumn, layout === 'desktop' ? styles.listColumnDesktop : styles.listColumnTablet]}>
               {psaliesSwitch}
               {search}
               {list}
-            </>
-          )}
-        </SafeAreaView>
-
-        {/* On a phone the saint's hymns and the preview rise as sheets inside
-            this modal: stacking native modals can leave iOS with an invisible
-            view that captures touches. The preview is declared last, so it
-            covers an open hymn menu. */}
-        {!wide ? (
-          <SheetFrame inline visible={Boolean(expanded)} onClose={() => setExpandedBase(null)} closeLabel={tr('Close the hymns', 'Fermer les hymnes', 'أغلق الألحان')}>
-            {chooser}
-          </SheetFrame>
-        ) : null}
-        {!wide ? (
-          <SheetFrame inline visible={Boolean(preview)} onClose={() => setPreview(null)} closeLabel={tr('Close preview', 'Fermer l’aperçu', 'أغلق المعاينة')} scroll={false}>
-            {previewPanel}
-          </SheetFrame>
-        ) : null}
-      </View>
+            </View>
+            {chooser ? <View style={layout === 'desktop' ? styles.chooserColumnDesktop : styles.chooserColumnTablet}>{chooser}</View> : null}
+            {previewPanel ? <View style={styles.previewColumn}>{previewPanel}</View> : null}
+          </View>
+        ) : (
+          <>
+            {psaliesSwitch}
+            {search}
+            {list}
+          </>
+        )}
+      </BleedPage>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { backgroundColor: COLORS.black, flex: 1 },
   flex: { flex: 1, minWidth: 0 },
   pressed: { opacity: 0.75 },
   psalies: { marginBottom: 10, marginHorizontal: 16 },

@@ -185,7 +185,7 @@ export default function MusicReleaseScreen() {
   ].filter(Boolean).join(' • ');
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <ShareMetadata
         title={release.title}
         description={release.primaryArtist?.displayName

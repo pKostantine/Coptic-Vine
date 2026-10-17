@@ -1,4 +1,7 @@
-import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { createContext, ReactNode, useCallback, useContext, useId, useMemo, useState } from 'react';
+
+import type { DocumentTheme } from '../constants/documentThemes';
 
 interface BottomChromeContextValue {
   /**
@@ -30,6 +33,13 @@ interface BottomChromeContextValue {
   nowPlayingExpanded: boolean;
   /** Each overlay reports its own state, for the same reason insets are per-overlay. */
   reportNowPlayingExpanded: (id: string, expanded: boolean) => void;
+  /**
+   * The page a document is read on, while a document is the screen showing
+   * (null elsewhere): the now-playing button floating over it takes the
+   * page's colours rather than the app's gold.
+   */
+  documentTheme: DocumentTheme | null;
+  reportDocumentTheme: (id: string, theme: DocumentTheme | null) => void;
 }
 
 const BottomChromeContext = createContext<BottomChromeContextValue>({
@@ -41,6 +51,8 @@ const BottomChromeContext = createContext<BottomChromeContextValue>({
   setNowPlayingCollapsed: () => undefined,
   nowPlayingExpanded: false,
   reportNowPlayingExpanded: () => undefined,
+  documentTheme: null,
+  reportDocumentTheme: () => undefined,
 });
 
 /**
@@ -54,6 +66,7 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
   const [nowPlayingInsets, setNowPlayingInsets] = useState<Record<string, number>>({});
   const [nowPlayingCollapsed, setNowPlayingCollapsed] = useState(false);
   const [expandedOverlays, setExpandedOverlays] = useState<Record<string, true>>({});
+  const [documentThemes, setDocumentThemes] = useState<Record<string, DocumentTheme>>({});
 
   const reportTabBar = useCallback((id: string, inset: number | null) => {
     setInsets((current) => {
@@ -95,8 +108,22 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const reportDocumentTheme = useCallback((id: string, theme: DocumentTheme | null) => {
+    setDocumentThemes((current) => {
+      if (theme == null) {
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      if (current[id] === theme) return current;
+      return { ...current, [id]: theme };
+    });
+  }, []);
+
   const nowPlayingInset = Math.max(0, ...Object.values(nowPlayingInsets));
   const nowPlayingExpanded = Object.keys(expandedOverlays).length > 0;
+  const documentTheme = Object.values(documentThemes).at(-1) ?? null;
   const value = useMemo(() => ({
     tabBarInset: Math.max(0, ...Object.values(insets)),
     nowPlayingInset,
@@ -106,11 +133,27 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
     setNowPlayingCollapsed,
     nowPlayingExpanded,
     reportNowPlayingExpanded,
-  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset, nowPlayingCollapsed, nowPlayingExpanded, reportNowPlayingExpanded]);
+    documentTheme,
+    reportDocumentTheme,
+  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset, nowPlayingCollapsed, nowPlayingExpanded, reportNowPlayingExpanded, documentTheme, reportDocumentTheme]);
 
   return <BottomChromeContext.Provider value={value}>{children}</BottomChromeContext.Provider>;
 }
 
 export function useBottomChrome(): BottomChromeContextValue {
   return useContext(BottomChromeContext);
+}
+
+/**
+ * A document screen says which page it is read on, while it is the screen
+ * showing. Only while focused, as the tab bars report themselves: a document
+ * left underneath in the stack is no longer what the reader sees.
+ */
+export function useReportDocumentTheme(theme: DocumentTheme): void {
+  const { reportDocumentTheme } = useBottomChrome();
+  const id = useId();
+  useFocusEffect(useCallback(() => {
+    reportDocumentTheme(id, theme);
+    return () => reportDocumentTheme(id, null);
+  }, [id, reportDocumentTheme, theme]));
 }

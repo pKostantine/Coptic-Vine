@@ -39,8 +39,9 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
   };
   const labelStyle = [styles.tabLabel, isCompactLandscape && styles.tabLabelLandscape, tablet && styles.tabLabelTablet, isArabic && styles.tabLabelArabic];
   // A phone with a home indicator: the indicator's own band is the space
-  // under the labels, as under a native tab bar, less the part the indicator
-  // doesn't need -- not that band on top of the tabs' own padding.
+  // under the labels, as under a native tab bar -- not that band on top of
+  // the tabs' own padding. The bar's colour runs down through it; the tabs
+  // stop at its edge.
   const aboveHomeIndicator = !tablet && insets.bottom > 0;
   const tabStyle = [styles.tab, isCompactLandscape && styles.tabLandscape, tablet && styles.tabTablet, aboveHomeIndicator && styles.tabAboveHomeIndicator];
   const iconSize = isCompactLandscape ? 22 : tablet ? 24 : 23;
@@ -93,7 +94,7 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
         // rather than restyling its tabs in place (which iOS sized wrongly).
         key={tablet ? 'tablet' : isCompactLandscape ? 'sideways' : 'phone'}
         accessibilityRole="tablist"
-        style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet ? insets.bottom + 14 : Math.max(insets.bottom - 8, 0), paddingLeft: insets.left, paddingRight: insets.right }]}
+        style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet ? insets.bottom + 14 : insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}
       >
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'home' }} accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
         <Icon name="home-outline" size={iconSize} color={active === 'home' ? COLORS.gold : COLORS.muted} />

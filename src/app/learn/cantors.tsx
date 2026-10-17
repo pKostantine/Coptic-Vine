@@ -36,7 +36,7 @@ export default function LearningCantorsScreen() {
   }, [locale]);
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{tr('Cantors — Learn & Study', 'Chantres — Apprendre', 'المعلّمون — تعلّم وادرس')}</title></Head>
       <LearningBackHeader title={tr('Cantors', 'Chantres', 'المعلّمون')} isArabic={isArabic} />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content}>

@@ -266,6 +266,9 @@ export default function SermonPlannerDrawer({
       visible={visible}
       onRequestClose={onClose}
       supportedOrientations={modalOrientations}
+      // Edge to edge on Android too, as on iOS: it pads itself clear of the bars and the notch.
+      statusBarTranslucent
+      navigationBarTranslucent
     >
       {/* The drawer runs up under the status bar, so on a light page the
           clock and battery over it turn dark to stay readable. */}
@@ -285,7 +288,9 @@ export default function SermonPlannerDrawer({
             },
           ]}
         >
-          <View style={styles.header}>
+          {/* The panel and its strips run to the screen's edge; what is on
+              them stops short of a phone's notch on its side. */}
+          <View style={[styles.header, { paddingRight: SPACING.md + insets.right }]}>
             <View>
               <Text style={styles.headerTitle}>Sermon Notes</Text>
               <Text style={styles.saveStatus}>{syncLabel(syncStatus, signedIn)}</Text>
@@ -295,7 +300,7 @@ export default function SermonPlannerDrawer({
             </Pressable>
           </View>
 
-          <View style={styles.languageBar}>
+          <View style={[styles.languageBar, { paddingRight: SPACING.md + insets.right }]}>
             {LANGUAGE_OPTIONS.map(({ key, label }) => {
               const selected = visibleLanguages[key];
               const isLastVisibleLanguage = selected && visibleLanguageCount === 1;
@@ -321,7 +326,7 @@ export default function SermonPlannerDrawer({
           <ScrollView
             ref={scrollRef}
             style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingRight: SPACING.md + insets.right }]}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.sectionHeadingRow}>
@@ -450,7 +455,7 @@ export default function SermonPlannerDrawer({
             })}
           </ScrollView>
 
-          <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, SPACING.sm) }]}>
+          <View style={[styles.actionRow, { paddingRight: SPACING.xl + insets.right, paddingBottom: Math.max(insets.bottom, SPACING.sm) }]}>
             {onToggleBookmark ? (
               <Pressable accessibilityLabel="Bookmark sermon planner" style={styles.actionButton} onPress={onToggleBookmark}>
                 <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={palette.accent} />

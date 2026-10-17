@@ -84,7 +84,8 @@ test('each season wears the colour the spec gives it', () => {
     'nativity-paramoun': 'lent',
     nativity: 'nativity',
     'nativity-period': 'nativity',
-    circumcision: 'gold',
+    // In the Nativity's days, in the Nativity's scarlet.
+    circumcision: 'nativity',
     'theophany-paramoun': 'lent',
     theophany: 'theophany',
     'second-day-of-theophany': 'theophany',

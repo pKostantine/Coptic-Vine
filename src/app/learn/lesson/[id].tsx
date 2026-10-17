@@ -95,7 +95,7 @@ export default function LearningLessonScreen() {
   };
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{data ? data.lesson.title + ' — Learn & Study' : 'Lesson — Learn & Study'}</title></Head>
       <LearningBackHeader title={tr('Lesson', 'Leçon', 'الدرس')} isArabic={isArabic} onBack={() => void leaveLesson()} />
       {!data && !error && !linkIncomplete ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}

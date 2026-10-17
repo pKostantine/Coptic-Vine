@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BibleWebView, { BibleWebViewHandle } from '@/components/vine/BibleWebView';
 import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/vine/bibleDocumentHtml';
 import BleedPage from '@/components/vine/ui/BleedPage';
+import DocumentStatusBar from '@/components/vine/ui/DocumentStatusBar';
 import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
@@ -17,7 +18,7 @@ import { documentSelectorColors } from '@/constants/documentSelectorColors';
 import { getDocumentTheme, withAlpha, type DocumentTheme } from '@/constants/documentThemes';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { useBottomChrome } from '@/context/BottomChromeContext';
+import { useBottomChrome, useReportDocumentTheme } from '@/context/BottomChromeContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useBibleHighlights } from '@/hooks/useBibleHighlights';
 import {
@@ -359,6 +360,8 @@ export default function BibleChapterDocument() {
   // The page the chapter is read on (constants/documentThemes.ts). The verse
   // selector is drawn in its colours too, so it opens as part of the page.
   const theme = getDocumentTheme(preferences.documentTheme);
+  // The now-playing button floating over the chapter wears its colours.
+  useReportDocumentTheme(theme);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const currentChapterNumber = Number(chapter);
   const headerTitleEnglish = getBibleChapterHeaderTitle(book, null, null, bookKey, currentChapterNumber, 'en');
@@ -515,6 +518,8 @@ export default function BibleChapterDocument() {
       )}
       {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}
     >
+      {/* The page runs up under the status bar; on a light one its clock and battery turn dark. */}
+      <DocumentStatusBar theme={theme} />
       <Head>
         <title>{`Coptic Vine ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
@@ -527,7 +532,7 @@ export default function BibleChapterDocument() {
           }}
         />
       ) : !chapterHtml ? (
-        <LoadingScreen />
+        <LoadingScreen belowHeader />
       ) : (
         <View style={styles.verseScreen}>
           <BibleWebView
@@ -585,14 +590,19 @@ export default function BibleChapterDocument() {
             visible={isSelectorOpen}
             onRequestClose={closeVerseSelector}
             supportedOrientations={modalOrientations}
+            // Edge to edge on Android too, as on iOS: it pads itself clear of the bars and the notch.
+            statusBarTranslucent
+            navigationBarTranslucent
           >
             {/* The drawer runs up under the status bar, so on a light page
                 the clock and battery over it turn dark to stay readable. */}
             <StatusBar style={theme.dark ? 'light' : 'dark'} />
             <View style={styles.selectorOverlay}>
               <Pressable accessibilityLabel={selectorText.closeSelector} style={styles.selectorBackdrop} onPress={closeVerseSelector} />
-              <Animated.View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top, transform: [{ translateX: selectorSlide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }] }]}>
-                <View style={styles.selectorHeader}>
+              {/* The panel runs to the screen's edge; its rows stop short of a
+                  phone's notch on its side, and its strips bleed out past them. */}
+              <Animated.View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top, paddingRight: SPACING.md + insets.right, transform: [{ translateX: selectorSlide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }] }]}>
+                <View style={[styles.selectorHeader, { marginRight: -(SPACING.md + insets.right), paddingRight: SPACING.md + insets.right }]}>
                   {preferences.appLanguage === 'ar' ? (
                     <Text style={[styles.selectorHeaderTitle, styles.selectorHeaderArabic]}>{selectorText.verses}</Text>
                   ) : (
@@ -694,7 +704,14 @@ export default function BibleChapterDocument() {
                   })}
                 </ScrollView>
 
-                <View style={styles.selectorActionRow}>
+                {/* Its strip runs down under the home indicator; its buttons sit above it. */}
+                <View
+                  style={[styles.selectorActionRow, {
+                    marginRight: -(SPACING.md + insets.right),
+                    paddingRight: SPACING.xl + insets.right,
+                    paddingBottom: SPACING.sm + insets.bottom,
+                  }]}
+                >
                   <Pressable accessibilityLabel={selectorText.bookmarkChapter} style={styles.selectorIconButton} onPress={() => toggleBookmark(bookmarkId)}>
                     <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={theme.colors.accent} />
                   </Pressable>

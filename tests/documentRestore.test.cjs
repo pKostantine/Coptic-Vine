@@ -307,7 +307,9 @@ test('a subdocument (and its Settings/Calendar) can be swiped out from a landsca
   assert.match(modal, /isStylusGestureEvent\(_\) \|\| startsInInset\(startX\) \|\| touchOnPillBarRef\.current\) return false;/);
   // The pill bar is a dead zone for every edge swipe: the mark is cleared as each touch goes down, set by the bar.
   assert.match(modal, /onTouchStartCapture: \(\) => \{\s*touchOnPillBarRef\.current = false;/);
-  assert.equal((modal.match(/onTouchStart=\{\(\) => \{\s*touchOnPillBarRef\.current = true;/g) || []).length, 2);
+  assert.equal((modal.match(/\bonTouchStart=\{\(\) => \{\s*touchOnPillBarRef\.current = true;/g) || []).length, 2);
+  // And so is the hidden now-playing bar's button, which drags along the foot of the page.
+  assert.match(modal, /onButtonTouchStart=\{\(\) => \{\s*touchOnPillBarRef\.current = true;/);
   assert.match(modal, /useInsetEdgeSwipe\(!isCovered, onClose, \(\) => setSelectorOpen\(true\), \(\) => touchOnPillBarRef\.current\)/);
 });
 

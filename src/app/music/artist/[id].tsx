@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MusicMiniPlayer from '@/components/music/MusicMiniPlayer';
 import ReleaseTile from '@/components/music/ReleaseTile';
@@ -77,6 +77,7 @@ export default function MusicArtistScreen() {
   const wide = layout !== 'phone';
   // The page and the hero's glow run to both edges; the content keeps clear of the notch.
   const sidePadding = useSidePadding(0);
+  const insets = useSafeAreaInsets();
   const { play, isPlaying } = usePlayRelease(locale);
   // Likes come from the listener's library, which also says whether they can follow.
   const likes = useReleaseLikes(locale);
@@ -170,7 +171,8 @@ export default function MusicArtistScreen() {
   const artistLinks = artist?.socialLinks ?? [];
   // The iPad's and desktop's 36pt margins are the sections' gutter, the hero's glow running past them to the edges.
   const gutter = wide ? 36 : 16;
-  const available = width - (wide ? 72 : 32);
+  // The page's content is inset from a phone's notch on its side; the tiles share what is left.
+  const available = width - (wide ? 72 : 32) - insets.left - insets.right;
   const gap = wide ? GRID_GAP : 12;
   const columns = wide ? Math.max(3, Math.floor((available + GRID_GAP) / (200 + GRID_GAP))) : 2;
   const tileWidth = Math.floor((available - gap * (columns - 1)) / columns);
@@ -189,7 +191,7 @@ export default function MusicArtistScreen() {
       ) : null}
 
       {!artist ? (
-        <View style={[styles.pending, { paddingLeft: 16 + sidePadding.paddingLeft, paddingRight: 16 + sidePadding.paddingRight }]}>
+        <View style={[styles.pending, { paddingTop: 12 + insets.top, paddingLeft: 16 + sidePadding.paddingLeft, paddingRight: 16 + sidePadding.paddingRight }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={tr('Go back', 'Retour', 'رجوع')} onPress={() => goBack(router, '/music')} style={({ pressed }) => [styles.pendingBack, pressed && styles.pressed]}>
             <Icon name="chevron-back" size={20} color={COLORS.gold} />
           </Pressable>

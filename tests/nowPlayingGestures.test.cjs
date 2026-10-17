@@ -35,6 +35,37 @@ test('pulled down, the mini player hides as its Hide button does; a short pull s
   assert.match(overlay, /onHide=\{\(\) => setIsCollapsed\(true\)\}/);
 });
 
+test('the hidden bar\'s button drags to either bottom corner and stays there', () => {
+  const overlay = fs.readFileSync('src/components/playback/GlobalNowPlayingOverlay.tsx', 'utf8');
+  // A tap still shows the bar; only a sideways drag is taken from the button.
+  assert.match(overlay, /onMoveShouldSetPanResponderCapture: \(_, gesture\) => Math\.abs\(gesture\.dx\) > DRAG_SLOP && Math\.abs\(gesture\.dx\) > Math\.abs\(gesture\.dy\)/);
+  assert.match(overlay, /: \(at < travel \/ 2 \? 'left' : 'right'\);/);
+  assert.match(overlay, /else setNowPlayingButtonSide\(next\);/);
+  assert.match(overlay, /translateX: Animated\.add\(sideOffset, dragOffset\)/);
+  // A screen reader moves it with an action instead.
+  assert.match(overlay, /if \(event\.nativeEvent\.actionName === 'move'\) setNowPlayingButtonSide\(otherSide\);/);
+  // A device choice, kept with the other preferences; anything unknown is the right corner.
+  const storage = fs.readFileSync('src/utils/preferencesStorage.ts', 'utf8');
+  assert.match(storage, /nowPlayingButtonSide: 'right',/);
+  assert.match(storage, /merged\.nowPlayingButtonSide = stored\?\.nowPlayingButtonSide === 'left' \? 'left' : 'right';/);
+  // In a subdocument the button is a dead zone for the edge swipes, as the pill bar is.
+  const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
+  assert.match(modal, /<GlobalNowPlayingOverlay\n\s+documentTheme=\{documentTheme\}\n\s+onButtonTouchStart=\{\(\) => \{\n\s+touchOnPillBarRef\.current = true;/);
+});
+
+test('over Walnut, Vine and Sepia the button wears the page\'s own button colour; Night and Paper keep the gold', () => {
+  const overlay = fs.readFileSync('src/components/playback/GlobalNowPlayingOverlay.tsx', 'utf8');
+  assert.match(overlay, /const documentTheme = ownDocumentTheme \?\? focusedDocumentTheme;/);
+  assert.match(overlay, /const colouredPage = documentTheme && documentTheme\.id !== 'night' && documentTheme\.id !== 'paper' \? documentTheme : null;/);
+  assert.match(overlay, /const buttonColor = colouredPage \? colouredPage\.colors\.subdoc : COLORS\.gold;/);
+  assert.match(overlay, /const buttonIconColor = colouredPage \? colouredPage\.colors\.onAccent : COLORS\.white;/);
+  // The services and the Bible's chapters say which page they are read on while they show.
+  assert.match(fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8'), /useReportDocumentTheme\(documentTheme\);/);
+  assert.match(fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8'), /useReportDocumentTheme\(theme\);/);
+  const chrome = fs.readFileSync('src/context/BottomChromeContext.tsx', 'utf8');
+  assert.match(chrome, /useFocusEffect\(useCallback\(\(\) => \{\n\s+reportDocumentTheme\(id, theme\);\n\s+return \(\) => reportDocumentTheme\(id, null\);/);
+});
+
 test('pulled down, the full-screen player goes away -- taken before its buttons can take the touch', () => {
   const hook = fs.readFileSync('src/components/playback/usePullDownToClose.ts', 'utf8');
   assert.match(hook, /onMoveShouldSetPanResponderCapture: \(_, gesture\) => gesture\.dy > 8 && Math\.abs\(gesture\.dy\) > Math\.abs\(gesture\.dx\) \* 1\.5/);

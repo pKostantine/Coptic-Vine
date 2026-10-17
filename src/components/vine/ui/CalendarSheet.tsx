@@ -35,7 +35,7 @@ interface CalendarSheetProps {
  */
 export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline = false }: CalendarSheetProps) {
   const modalOrientations = useModalOrientations();
-  const { height, width } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const dialog = useLayoutMode() === 'desktop';
   // A phone on its side: the sheet runs almost the whole height and as wide
@@ -83,7 +83,7 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
   /** The native modal, or inline a layer over the whole page. A plain function, so the calendar inside keeps its state between renders. */
   const layer = (children: ReactNode) => (inline
     ? <View style={styles.inlineLayer}>{children}</View>
-    : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>{children}</Modal>);
+    : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>{children}</Modal>);
 
   const panel = (
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
@@ -134,14 +134,18 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
   return layer(
     <>
       {backdrop}
-      <Animated.View
-        style={[styles.sheet, landscapePhone
-          ? { maxHeight: height - 12, maxWidth: Math.min(width - insets.left - insets.right, 760), paddingBottom: insets.bottom + 4, transform: [{ translateY }] }
-          : { maxHeight: height - insets.top - 60, paddingBottom: Math.max(insets.bottom + 8, 30), transform: [{ translateY }] }]}
-        {...sheetDrag.sheetHandlers}
-      >
-        {panel}
-      </Animated.View>
+      {/* Centred by the row it sits in, between the notch and the far edge --
+          see SheetFrame: its own auto margins left it against the left edge. */}
+      <View pointerEvents="box-none" style={[styles.sheetRow, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+        <Animated.View
+          style={[styles.sheet, landscapePhone
+            ? { maxHeight: height - Math.max(insets.top, 12), maxWidth: 760, paddingBottom: insets.bottom + 4, transform: [{ translateY }] }
+            : { maxHeight: height - insets.top - 60, paddingBottom: Math.max(insets.bottom + 8, 30), transform: [{ translateY }] }]}
+          {...sheetDrag.sheetHandlers}
+        >
+          {panel}
+        </Animated.View>
+      </View>
     </>,
   );
 }
@@ -149,20 +153,16 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
 const styles = StyleSheet.create({
   inlineLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 1000 },
   dim: { backgroundColor: 'rgba(0, 0, 0, 0.66)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  sheetRow: { alignItems: 'center', bottom: 0, left: 0, position: 'absolute', right: 0 },
   sheet: {
     backgroundColor: COLORS.surface,
     borderColor: COLORS.goldLine,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderTopWidth: 1,
-    bottom: 0,
     elevation: 20,
-    left: 0,
-    marginHorizontal: 'auto',
     maxWidth: 560,
     overflow: 'hidden',
-    position: 'absolute',
-    right: 0,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -20 },
     shadowOpacity: 0.6,

@@ -97,8 +97,12 @@ test('ornaments follow the season on Night and Paper and keep to the page on the
   assert.equal(documentOrnamentColor(page('night', '#FFFFFF'), 'lent'), '#4F9672');
   assert.equal(documentOrnamentColor(page('night', '#FFFFFF')), '#5FAE68');
   assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'holyweek'), '#A0202A');
-  // White on a white page would vanish: the Resurrection's ornaments there are gold.
+  // The Resurrection's ornaments are gold on either page, as its glow is.
   assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'resurrection'), '#966D00');
+  assert.equal(documentOrnamentColor(page('night', '#FFFFFF'), 'resurrection'), '#E3B53B');
+  // St Mary's fast and feast and the Annunciation: an azure on black, a cobalt on white.
+  assert.equal(documentOrnamentColor(page('night', '#FFFFFF'), 'marian'), '#5BA0FA');
+  assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'marian'), '#1D60BC');
   for (const [id, text] of [['walnut', '#F3E7D3'], ['vine', '#F1EAD6'], ['sepia', '#2F2219']]) {
     assert.equal(documentOrnamentColor(page(id, text), 'holyweek'), text, id);
   }

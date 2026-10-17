@@ -78,7 +78,8 @@ export default function MusicHomeScreen() {
   const openRelease = (release: MusicConsumerReleaseSummary) => router.push(`/music/release/${release.id}`);
   const gutter = wide ? 0 : 16;
   const rails = { paddingHorizontal: gutter };
-  const available = width - 72;
+  // The page's content is inset from a phone's notch on its side; the tiles share what is left.
+  const available = width - 72 - insets.left - insets.right;
   const columns = gridColumnsFor(available);
   const gridTile = Math.floor((available - GRID_GAP * (columns - 1)) / columns);
 

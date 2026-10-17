@@ -257,6 +257,9 @@ export default function ContentSelectorDrawer({
       visible={visible}
       onRequestClose={onClose}
       supportedOrientations={modalOrientations}
+      // Edge to edge on Android too, as on iOS: it pads itself clear of the bars and the notch.
+      statusBarTranslucent
+      navigationBarTranslucent
     >
       {/* The drawer runs up under the status bar, so on a light page the
           clock and battery over it turn dark to stay readable. */}
@@ -269,11 +272,14 @@ export default function ContentSelectorDrawer({
             {
               width: selectorPanelWidth,
               paddingTop: insets.top,
+              // The panel runs to the screen's edge; its rows stop short of a
+              // phone's notch on its side, and its strips bleed out past them.
+              paddingRight: SPACING.md + insets.right,
               transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }],
             },
           ]}
         >
-          <View style={styles.selectorHeader}>
+          <View style={[styles.selectorHeader, { marginRight: -(SPACING.md + insets.right), paddingRight: SPACING.md + insets.right }]}>
             <Text style={styles.actionLabel}>Content</Text>
           </View>
 
@@ -440,7 +446,14 @@ export default function ContentSelectorDrawer({
           ) : null}
 
           {onToggleBookmark || onOpenCalendar || onOpenSettings ? (
-            <View style={styles.selectorActionRow}>
+            // Its strip runs down under the home indicator; its buttons sit above it.
+            <View
+              style={[styles.selectorActionRow, {
+                marginRight: -(SPACING.md + insets.right),
+                paddingRight: SPACING.xl + insets.right,
+                paddingBottom: SPACING.sm + insets.bottom,
+              }]}
+            >
               {onToggleBookmark ? (
                 <Pressable accessibilityLabel="Bookmark hymn" style={styles.selectorIconButton} onPress={onToggleBookmark}>
                   <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={theme.colors.accent} />

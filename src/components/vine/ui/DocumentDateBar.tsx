@@ -1,5 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../../constants/documentThemes';
 import { SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -30,6 +31,7 @@ interface DocumentDateBarProps {
 export default function DocumentDateBar({ arabic, theme = NIGHT_DOCUMENT_THEME, onBeforeChange, onOpenCalendar }: DocumentDateBarProps) {
   const { rawDate, selectDate, liturgicalDayPeriod } = useCalendar();
   const day = useLiturgicalDay();
+  const insets = useSafeAreaInsets();
   const coptic = day.coptic ? formatCopticDayMonth(day.coptic.monthName, day.coptic.day, arabic) : null;
   const gregorian = formatDayMonthYearDate(rawDate, arabic);
   const eve = liturgicalDayPeriod === 'evening';
@@ -54,7 +56,19 @@ export default function DocumentDateBar({ arabic, theme = NIGHT_DOCUMENT_THEME, 
   );
 
   return (
-    <View style={[styles.bar, { backgroundColor: theme.colors.strip, borderBottomColor: theme.colors.border }]}>
+    <View
+      style={[styles.bar, {
+        backgroundColor: theme.colors.strip,
+        borderBottomColor: theme.colors.border,
+        // The bar sits in a page inset from a phone's notch on its side. Its
+        // strip runs out to the screen's edges, as the pill bar's does, while
+        // the arrows and the date stay within the inset.
+        marginLeft: -insets.left,
+        marginRight: -insets.right,
+        paddingLeft: SPACING.md + insets.left,
+        paddingRight: SPACING.md + insets.right,
+      }]}
+    >
       {arrow(-1)}
       <Pressable
         accessibilityRole="button"

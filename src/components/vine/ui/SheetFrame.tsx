@@ -41,7 +41,7 @@ export default function SheetFrame({
   visible, onClose, closeLabel, inline = false, dialogWidth = 440, dialogOnTablet = false, sheetMaxWidth = 560, scroll = true, children,
 }: SheetFrameProps) {
   const modalOrientations = useModalOrientations();
-  const { height, width } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const layout = useLayoutMode();
   // A phone on its side is as wide as an iPad but a postcard's height: a
@@ -90,7 +90,7 @@ export default function SheetFrame({
 
   const layer = (content: ReactNode) => (inline
     ? <View style={styles.inlineLayer}>{content}</View>
-    : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>{content}</Modal>);
+    : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>{content}</Modal>);
 
   const body = scroll ? (
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
@@ -128,17 +128,23 @@ export default function SheetFrame({
   return layer(
     <>
       {backdrop}
-      <Animated.View
-        style={[styles.sheet, landscapePhone
-          ? { maxHeight: height - 12, maxWidth: Math.min(width - insets.left - insets.right, Math.max(sheetMaxWidth, dialogWidth)), paddingBottom: insets.bottom + 8, transform: [{ translateY }] }
-          : { maxHeight: height - insets.top - 60, maxWidth: sheetMaxWidth, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]}
-        {...(scroll ? sheetDrag.sheetHandlers : {})}
-      >
-        <View style={styles.grabArea} {...sheetDrag.grabHandlers}>
-          <View style={styles.grab} />
-        </View>
-        {body}
-      </Animated.View>
+      {/* The sheet is centred in the foot of the screen between the notch and
+          the far edge, by the row it sits in: React Native's layout gives an
+          absolutely placed view's auto margins nothing, so a sheet centred by
+          its own margins sat against the left edge, under a phone's notch. */}
+      <View pointerEvents="box-none" style={[styles.sheetRow, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+        <Animated.View
+          style={[styles.sheet, landscapePhone
+            ? { maxHeight: height - Math.max(insets.top, 12), maxWidth: Math.max(sheetMaxWidth, dialogWidth), paddingBottom: insets.bottom + 8, transform: [{ translateY }] }
+            : { maxHeight: height - insets.top - 60, maxWidth: sheetMaxWidth, paddingBottom: insets.bottom + 22, transform: [{ translateY }] }]}
+          {...(scroll ? sheetDrag.sheetHandlers : {})}
+        >
+          <View style={styles.grabArea} {...sheetDrag.grabHandlers}>
+            <View style={styles.grab} />
+          </View>
+          {body}
+        </Animated.View>
+      </View>
     </>,
   );
 }
@@ -148,19 +154,15 @@ const styles = StyleSheet.create({
   dim: { backgroundColor: 'rgba(0, 0, 0, 0.66)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   fill: { flexShrink: 1 },
   scrollContent: { paddingHorizontal: 16 },
+  sheetRow: { alignItems: 'center', bottom: 0, left: 0, position: 'absolute', right: 0 },
   sheet: {
     backgroundColor: COLORS.surface,
     borderColor: COLORS.goldLine,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderTopWidth: 1,
-    bottom: 0,
     elevation: 20,
-    left: 0,
-    marginHorizontal: 'auto',
     overflow: 'hidden',
-    position: 'absolute',
-    right: 0,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -20 },
     shadowOpacity: 0.6,

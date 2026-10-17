@@ -122,7 +122,7 @@ export default function LearningPlaylistScreen() {
   };
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{playlist ? playlist.name + ' — Learn & Study' : 'Learning Playlist'}</title></Head>
       <LearningBackHeader title={tr('Learning Playlist', 'Playlist d’apprentissage', 'قائمة تعلّم')} isArabic={isArabic} />
       {!playlist && !error ? <ActivityIndicator color={COLORS.learning} style={styles.loader} /> : null}

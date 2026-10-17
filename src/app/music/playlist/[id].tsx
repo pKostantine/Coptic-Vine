@@ -236,7 +236,7 @@ export default function MusicPlaylistScreen() {
   };
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       {playlist?.visibility === 'public' ? (
         <ShareMetadata
           title={playlist.name}

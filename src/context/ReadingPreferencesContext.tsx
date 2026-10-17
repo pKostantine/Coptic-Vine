@@ -11,6 +11,7 @@ import {
     BibleVisibleLanguages,
     DEFAULT_READING_PREFERENCES,
     loadReadingPreferences,
+    NowPlayingButtonSide,
     OrientationMode,
     ReadingPreferences,
     saveReadingPreferences,
@@ -59,6 +60,8 @@ interface ReadingPreferencesContextValue {
   toggleKeepScreenAwake: () => void;
   /** Picks the page a document is read on — see constants/documentThemes.ts. */
   setDocumentTheme: (theme: DocumentThemeId) => void;
+  /** Moves the hidden Now Playing bar's button to the other bottom corner. */
+  setNowPlayingButtonSide: (side: NowPlayingButtonSide) => void;
   bookmarks: string[];
   isBookmarked: (id: string) => boolean;
   toggleBookmark: (id: string) => void;
@@ -363,6 +366,10 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => (prev.documentTheme === documentTheme ? prev : { ...prev, documentTheme }));
   }, []);
 
+  const setNowPlayingButtonSide = useCallback((nowPlayingButtonSide: NowPlayingButtonSide) => {
+    setPreferences((prev) => (prev.nowPlayingButtonSide === nowPlayingButtonSide ? prev : { ...prev, nowPlayingButtonSide }));
+  }, []);
+
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks]);
 
   const toggleBookmark = useCallback((id: string) => {
@@ -396,6 +403,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleInMonastery,
       toggleKeepScreenAwake,
       setDocumentTheme,
+      setNowPlayingButtonSide,
       bookmarks,
       isBookmarked,
       toggleBookmark,
@@ -426,6 +434,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleInMonastery,
       toggleKeepScreenAwake,
       setDocumentTheme,
+      setNowPlayingButtonSide,
       bookmarks,
       isBookmarked,
       toggleBookmark,

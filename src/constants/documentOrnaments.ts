@@ -37,7 +37,8 @@ export function isHeadpiece(ornament: DocumentOrnament | undefined): ornament is
 
 /**
  * Each season's ornament colour on black: the sheet's own, brightened from
- * the calendar's season colours so they read on a black page.
+ * the calendar's season colours so they read on a black page. The
+ * Resurrection's ornaments are gold, as its page's glow is.
  */
 const ON_BLACK: Record<SeasonThemeKey, string> = {
   annual: '#5FAE68',
@@ -48,15 +49,15 @@ const ON_BLACK: Record<SeasonThemeKey, string> = {
   lent: '#4F9672',
   palm: '#A4D24E',
   holyweek: '#B5272E',
-  resurrection: '#F7F4EA',
+  resurrection: '#E3B53B',
   apostles: '#4F85CC',
-  marian: '#4C6FEE',
+  // A clear azure, oklch(0.70 0.15 256): the royal blue's violet lean read as periwinkle in fine lines.
+  marian: '#5BA0FA',
 };
 
 /**
  * The same seasons deepened to read on white paper, each at least 4.5:1. The
- * Resurrection's white would vanish on a white page, so it takes the white
- * day block's gold instead.
+ * Resurrection takes the white day block's gold, as on black.
  */
 const ON_WHITE: Record<SeasonThemeKey, string> = {
   annual: '#3A8444',
@@ -69,7 +70,8 @@ const ON_WHITE: Record<SeasonThemeKey, string> = {
   holyweek: '#A0202A',
   resurrection: '#966D00',
   apostles: '#2F62A6',
-  marian: '#3555C8',
+  // A cobalt in the azure's hue, oklch(0.50 0.16 258): 6.1:1 on white.
+  marian: '#1D60BC',
 };
 
 /**

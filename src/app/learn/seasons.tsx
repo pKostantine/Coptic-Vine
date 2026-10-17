@@ -35,7 +35,7 @@ export default function LearningSeasonsScreen() {
   }, [locale]);
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <Head><title>{tr('Seasons — Learn & Study', 'Temps liturgiques — Apprendre', 'المواسم — تعلّم وادرس')}</title></Head>
       <LearningBackHeader title={tr('Seasons', 'Temps liturgiques', 'المواسم')} isArabic={isArabic} />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content}>
