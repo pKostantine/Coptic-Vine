@@ -31,6 +31,7 @@ import {
   localPlaybackUriExists,
   savePlaybackSnapshot,
 } from '@/utils/playbackStateStorage';
+import { addTrackControlListener, hasTrackControls, setTrackControls } from '@/utils/trackControls';
 
 export interface PlaybackContextValue {
   queue: PlaybackQueueEntry[];
@@ -340,9 +341,12 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       albumTitle: playable.albumTitle ?? undefined,
       artworkUrl: playable.artworkUri ?? undefined,
     };
+    // Coptic Vine is a queue player: where the build can show the lock
+    // screen's track buttons (iOS, trackControls.ts) they replace expo-audio's
+    // 10-second skips, as on the web below.
     player.setActiveForLockScreen(true, metadata, {
-      showSeekBackward: true,
-      showSeekForward: true,
+      showSeekBackward: !hasTrackControls,
+      showSeekForward: !hasTrackControls,
     });
     player.updateLockScreenMetadata(metadata);
 
@@ -446,6 +450,23 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     nextRef.current = next;
     previousRef.current = previous;
   }, [next, previous]);
+
+  // The lock screen's next button greys out at the end of the queue, as the
+  // player's own does; previous always works while something plays, going
+  // back to the start of the track if nothing comes before it.
+  const hasCurrentItem = currentItem != null;
+  const canGoNext = hasCurrentItem && getManualNextIndex(queue.length, currentIndex, repeatMode) !== currentIndex;
+  useEffect(() => {
+    setTrackControls(canGoNext, hasCurrentItem);
+  }, [canGoNext, hasCurrentItem]);
+
+  useEffect(() => {
+    const subscriptions = [
+      addTrackControlListener('onNextTrack', () => nextRef.current()),
+      addTrackControlListener('onPreviousTrack', () => previousRef.current()),
+    ];
+    return () => subscriptions.forEach((subscription) => subscription?.remove());
+  }, []);
 
   const value = useMemo<PlaybackContextValue>(() => ({
     queue,
