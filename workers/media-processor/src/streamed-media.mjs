@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
+import { describeFfmpegExit } from './runtime.mjs';
 
 // Sources at least this big are read straight from R2 instead of being
 // downloaded first: the Railway processor's scratch disk is small.
@@ -187,7 +188,7 @@ export function runFfmpeg(args, { signal } = {}) {
       signal?.removeEventListener('abort', onAbort);
       if (signal?.aborted) reject(signal.reason instanceof Error ? signal.reason : new Error('Aborted'));
       else if (code === 0) resolve();
-      else reject(new Error(`FFmpeg failed (${exitSignal || code}): ${stderr.trim() || 'no error output'}`));
+      else reject(new Error(`${describeFfmpegExit(code, exitSignal)}${stderr.trim() ? ` (${stderr.trim().slice(-1500)})` : ''}`));
     });
   });
 }

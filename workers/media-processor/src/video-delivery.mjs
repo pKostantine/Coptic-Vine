@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import ffmpegPath from 'ffmpeg-static';
 import { DELIVERY_PART_BYTES, GrowingFileUploader, sendWithRetry, streamToMultipart } from './growing-upload.mjs';
-import { canPunchHoles, containerResources, ffmpegFilters, freeDiskBytes } from './runtime.mjs';
+import { canPunchHoles, containerResources, describeFfmpegExit, ffmpegFilters, freeDiskBytes, threadsForAttempt } from './runtime.mjs';
 import { openR2RangeServer, probeUrl, sha256OfFile } from './streamed-media.mjs';
 
 /*
@@ -258,7 +258,9 @@ export async function convertVideo({
     await mkdir(jobDir, { recursive: true });
     const inputProbe = await probeUrl(source.url);
     const plan = planVideoDelivery(inputProbe, { filters: await ffmpegFilters() });
-    const { ffmpegThreads, cpus, memoryBytes } = await containerResources();
+    const resources = await containerResources();
+    const { cpus, memoryBytes } = resources;
+    const ffmpegThreads = threadsForAttempt(resources.ffmpegThreads, job.attempt_count);
     const makeAudio = wantsAudio && plan.companionAudioMode !== 'none';
     const mode = ['file', 'file-freeing', 'pipe'].includes(forceMode)
       ? forceMode
@@ -274,8 +276,11 @@ export async function convertVideo({
       durationSeconds: plan.durationSeconds,
       sourceBytes: Number(head.ContentLength),
       threads: ffmpegThreads,
+      attempt: job.attempt_count,
       cpus,
+      cpuLimitKnown: resources.cpuLimitKnown,
       memoryMiB: Math.round(memoryBytes / MIB),
+      memoryLimitKnown: resources.memoryLimitKnown,
     });
 
     const args = buildVideoFfmpegArgs({
@@ -347,8 +352,9 @@ export async function convertVideo({
     if (result.error || result.code !== 0) {
       if (uploader?.failure) throw uploader.failure;
       if (streamOutcome?.error && !/empty media/.test(streamOutcome.error.message)) throw streamOutcome.error;
-      const exit = result.exitSignal || (result.code ?? result.error?.message);
-      throw new Error(`FFmpeg video conversion failed (${exit}): ${stderr.trim() || 'no error output'}`);
+      if (result.error) throw new Error(`FFmpeg could not start: ${result.error.message}`);
+      const detail = stderr.trim();
+      throw new Error(`Video conversion failed: ${describeFfmpegExit(result.code, result.exitSignal)}${detail ? ` (${detail.slice(-1500)})` : ''}`);
     }
 
     let video;

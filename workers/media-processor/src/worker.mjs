@@ -1,4 +1,5 @@
 import { abortActiveJobs, claimAndProcessOne, getConfig } from './processor.mjs';
+import { containerResources } from './runtime.mjs';
 import { startAdminServer } from './admin-server.mjs';
 import { purgeUnusedStorage } from './storage-gc.mjs';
 
@@ -95,10 +96,13 @@ async function main() {
   void runAutomaticStorageGc(config);
   storageGcTimer = setInterval(() => void runAutomaticStorageGc(config), STORAGE_GC_INTERVAL_MS);
 
+  // What FFmpeg will be allowed to use, so Railway's logs show it at a glance.
+  const resources = await containerResources().catch(() => null);
   log({
     status: 'worker_started',
     workerId: config.mediaWorkerId,
     r2Driver: config.r2Driver,
+    resources,
     idlePollMs: IDLE_POLL_MS,
     storageGcIntervalMs: STORAGE_GC_INTERVAL_MS,
   });

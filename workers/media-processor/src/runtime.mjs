@@ -18,44 +18,77 @@ async function readNumberFile(file) {
   }
 }
 
+/** CPUs this container may use, and whether that is a real limit or just the host's core count. */
 export async function cpuBudget() {
   const cgroupV2 = await readNumberFile('/sys/fs/cgroup/cpu.max');
   if (cgroupV2) {
     const [quota, period] = cgroupV2.split(/\s+/);
-    if (quota !== 'max' && Number(quota) > 0 && Number(period) > 0) return Number(quota) / Number(period);
+    if (quota !== 'max' && Number(quota) > 0 && Number(period) > 0) return { cpus: Number(quota) / Number(period), known: true };
   }
   const quotaV1 = Number(await readNumberFile('/sys/fs/cgroup/cpu/cpu.cfs_quota_us'));
   const periodV1 = Number(await readNumberFile('/sys/fs/cgroup/cpu/cpu.cfs_period_us'));
-  if (quotaV1 > 0 && periodV1 > 0) return quotaV1 / periodV1;
-  return typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length;
+  if (quotaV1 > 0 && periodV1 > 0) return { cpus: quotaV1 / periodV1, known: true };
+  return { cpus: typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length, known: false };
 }
 
+/** Memory this container may use, and whether that is a real limit or just the host's RAM. */
 export async function memoryBudgetBytes() {
   const cgroupV2 = await readNumberFile('/sys/fs/cgroup/memory.max');
-  if (cgroupV2 && cgroupV2 !== 'max' && Number(cgroupV2) > 0) return Number(cgroupV2);
+  if (cgroupV2 && cgroupV2 !== 'max' && Number(cgroupV2) > 0) return { bytes: Number(cgroupV2), known: true };
   const v1 = Number(await readNumberFile('/sys/fs/cgroup/memory/memory.limit_in_bytes'));
   // cgroup v1 reports a huge sentinel when unlimited.
-  if (v1 > 0 && v1 < 2 ** 60) return v1;
-  return os.totalmem();
+  if (v1 > 0 && v1 < 2 ** 60) return { bytes: v1, known: true };
+  return { bytes: os.totalmem(), known: false };
 }
 
-/** Threads for one FFmpeg run: every core we are given, held back on small memory. */
-export function ffmpegThreadsFor(cpus, memoryBytes, override = process.env.MEDIA_FFMPEG_THREADS) {
+// With no visible memory limit, the host's RAM says nothing about what the
+// platform will let this service use before it kills FFmpeg.
+const UNKNOWN_LIMIT_MAX_THREADS = 4;
+
+/** Threads for one FFmpeg run: every core we are given, held back on small or unknown memory. */
+export function ffmpegThreadsFor(cpus, memoryBytes, { memoryKnown = true, override = process.env.MEDIA_FFMPEG_THREADS } = {}) {
   if (override && Number(override) > 0) return Math.floor(Number(override));
   let threads = Math.max(1, Math.round(cpus));
   const gib = memoryBytes / 1024 ** 3;
-  if (gib < 1.5) threads = Math.min(threads, 3);
+  if (!memoryKnown) threads = Math.min(threads, UNKNOWN_LIMIT_MAX_THREADS);
+  else if (gib < 1.5) threads = Math.min(threads, 3);
   else if (gib < 3) threads = Math.min(threads, 6);
   return Math.min(threads, 16);
+}
+
+/**
+ * Each retry of a job uses fewer threads (half, then at most two): if the
+ * last attempt was killed for using too much memory, the next one fits.
+ */
+export function threadsForAttempt(threads, attempt) {
+  const tries = Math.max(1, Number(attempt) || 1);
+  if (tries === 1) return threads;
+  if (tries === 2) return Math.max(1, Math.ceil(threads / 2));
+  return Math.max(1, Math.min(2, Math.ceil(threads / 2)));
 }
 
 let resourcesPromise = null;
 export function containerResources() {
   resourcesPromise ??= (async () => {
-    const [cpus, memoryBytes] = await Promise.all([cpuBudget(), memoryBudgetBytes()]);
-    return { cpus, memoryBytes, ffmpegThreads: ffmpegThreadsFor(cpus, memoryBytes) };
+    const [cpu, memory] = await Promise.all([cpuBudget(), memoryBudgetBytes()]);
+    return {
+      cpus: cpu.cpus,
+      cpuLimitKnown: cpu.known,
+      memoryBytes: memory.bytes,
+      memoryLimitKnown: memory.known,
+      ffmpegThreads: ffmpegThreadsFor(cpu.cpus, memory.bytes, { memoryKnown: memory.known }),
+    };
   })();
   return resourcesPromise;
+}
+
+/** What a run that ended on a signal most likely means, for the error shown to admins. */
+export function describeFfmpegExit(code, signal) {
+  if (signal === 'SIGKILL' || (code === null && !signal)) {
+    return 'FFmpeg was stopped by the server, almost always for using too much memory; the next attempt uses fewer threads';
+  }
+  if (signal) return `FFmpeg was stopped by ${signal}`;
+  return `FFmpeg exited with code ${code}`;
 }
 
 export async function freeDiskBytes(directory) {
