@@ -5,7 +5,9 @@ import { pipeline } from 'node:stream/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { maybeRunStreamedMediaJob } from './streamed-media.mjs';
+import { maybeRunStreamedMediaJob, NoAudioTrackError } from './streamed-media.mjs';
+import { convertVideo, JobAbortError, videoTranscodeSummary } from './video-delivery.mjs';
+import { containerResources } from './runtime.mjs';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
 import { AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3';
@@ -13,8 +15,8 @@ import { AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMult
 const AUDIO_OUTPUT_MIME_TYPE = 'audio/mp4';
 const AUDIO_BITRATE = '256k';
 const VIDEO_OUTPUT_MIME_TYPE = 'video/mp4';
-const VIDEO_AUDIO_BITRATE = '192k';
-const VIDEO_CRF = '20';
+const VIDEO_AUDIO_BITRATE = '160k';
+const VIDEO_CRF = '23';
 const VIDEO_MAX_HEIGHT = 1080;
 const IMAGE_OUTPUT_MIME_TYPE = 'image/jpeg';
 const IMAGE_MAX_EDGE = 3000;
@@ -138,7 +140,14 @@ function getWranglerCommand() {
     : { command: 'npx', prefix: ['wrangler'] };
 }
 
+let s3ClientFactory = null;
+/** Tests stand a fake R2 in for the real one. */
+export function setS3ClientFactoryForTests(factory) {
+  s3ClientFactory = factory;
+}
+
 export function getS3Client() {
+  if (s3ClientFactory) return s3ClientFactory();
   const accountId = requireEnv('R2_ACCOUNT_ID');
 
   return new S3Client({
@@ -447,30 +456,35 @@ async function remuxAacToM4a(inputPath, outputPath) {
 }
 
 async function transcodeToMp4(inputPath, outputPath) {
+  const { ffmpegThreads: threads } = await containerResources();
   await spawnChecked(ffmpegPath, [
     '-y',
     '-hide_banner',
     '-loglevel',
     'error',
+    '-threads',
+    String(threads),
     '-i',
     inputPath,
     '-c:v',
     'libx264',
     '-preset',
-    'fast',
+    'veryfast',
     '-threads',
-    '2',
-    '-filter_threads',
-    '1',
+    String(threads),
     '-crf',
     VIDEO_CRF,
+    '-maxrate',
+    '6M',
+    '-bufsize',
+    '12M',
     '-profile:v',
     'high',
     '-pix_fmt',
     'yuv420p',
-    // Cap the height at 1080p without ever upscaling a smaller source.
+    // Cap the short edge at 1080 without ever upscaling a smaller source.
     '-vf',
-    `scale=w=-2:h='min(${VIDEO_MAX_HEIGHT},ih)':flags=lanczos,setsar=1`,
+    `scale=w='if(gte(iw,ih),-2,min(${VIDEO_MAX_HEIGHT},iw))':h='if(gte(iw,ih),min(${VIDEO_MAX_HEIGHT},ih),-2)':flags=bicubic,setsar=1`,
     '-c:a',
     'aac',
     '-b:a',
@@ -623,20 +637,312 @@ export function isSupportedJobType(jobType) {
   return Object.hasOwn(JOB_HANDLERS, jobType);
 }
 
-async function runJob(config, job) {
+// ---------------------------------------------------------------------------
+// Job lifecycle helpers. The RPCs below arrived with the heartbeat migration;
+// a worker deployed before that migration simply runs without them.
+// ---------------------------------------------------------------------------
+
+function isMissingRpc(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /failed with 404|PGRST202|Could not find the function/i.test(message);
+}
+
+async function rpcIfAvailable(config, name, payload) {
+  try {
+    return await callRpc(config, name, payload);
+  } catch (error) {
+    if (isMissingRpc(error)) return null;
+    throw error;
+  }
+}
+
+const activeControls = new Set();
+
+/** Stops the job in flight: `shutdown` hands it back to the queue, `cancelled` just stops. */
+export function abortActiveJobs(kind = 'shutdown') {
+  for (const control of activeControls) {
+    if (!control.signal.aborted) {
+      control.abort(new JobAbortError(kind, kind === 'shutdown' ? 'The media worker is shutting down' : 'Processing was stopped'));
+    }
+  }
+}
+
+const HEARTBEAT_MS = Number(process.env.MEDIA_HEARTBEAT_MS || 20_000);
+
+/**
+ * Proves to Supabase, every 20 seconds, that this worker is still working on
+ * its jobs (so a dead worker's job is retried within minutes), reports
+ * progress, and stops the work if an admin cancelled or deleted it.
+ */
+function startLease(config, control, jobIds) {
+  const ids = new Set(jobIds);
+  let progress = 0;
+  let supported = true;
+  let stopped = false;
+
+  const beat = async () => {
+    if (stopped || !supported || !ids.size) return;
+    const watched = [...ids];
+    try {
+      const rows = await rpcIfAvailable(config, 'heartbeat_media_processing_jobs', {
+        p_worker_token: config.mediaWorkerToken,
+        p_job_ids: watched,
+        p_progress: Math.round(progress * 1000) / 1000,
+      });
+      if (rows === null) {
+        supported = false;
+        return;
+      }
+      if (stopped) return;
+      const live = new Set(rows.filter((row) => row.status === 'processing').map((row) => row.job_id));
+      const lost = watched.filter((id) => ids.has(id) && !live.has(id));
+      if (lost.length && !control.signal.aborted) {
+        control.abort(new JobAbortError('cancelled', 'The job was cancelled or deleted while it was processing'));
+      }
+    } catch {
+      // A missed heartbeat is harmless; five minutes of them would be noticed.
+    }
+  };
+
+  void beat();
+  const timer = setInterval(() => void beat(), HEARTBEAT_MS);
+  return {
+    setProgress(value) {
+      progress = value;
+    },
+    drop(id) {
+      ids.delete(id);
+    },
+    stop() {
+      stopped = true;
+      clearInterval(timer);
+    },
+  };
+}
+
+/**
+ * Removes a video's original once its MP4 and audio-only copy both exist.
+ * Never fails the job: storage GC removes an original whose deletion failed.
+ */
+async function deleteOriginalIfDone(config, uploadIntentId) {
+  if (config.r2Driver !== 's3' || !uploadIntentId) return null;
+  try {
+    const rows = await rpcIfAvailable(config, 'claim_media_original_deletion', {
+      p_worker_token: config.mediaWorkerToken,
+      p_upload_intent_id: uploadIntentId,
+    });
+    const target = rows?.[0];
+    if (!target?.bucket || !target?.path) return null;
+    const client = getS3Client();
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await client.send(new DeleteObjectCommand({ Bucket: target.bucket, Key: target.path }));
+        return { deleted: true, bucket: target.bucket, path: target.path };
+      } catch (error) {
+        lastError = error;
+        await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+      }
+    }
+    return { deleted: false, error: lastError instanceof Error ? lastError.message : String(lastError) };
+  } catch (error) {
+    return { deleted: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function completeJob(config, jobId, output) {
+  const rows = await callRpc(config, 'complete_media_processing_job', {
+    p_worker_token: config.mediaWorkerToken,
+    p_job_id: jobId,
+    p_output_mime_type: output.mimeType,
+    p_output_size_bytes: output.sizeBytes,
+    p_output_checksum_sha256: output.sha256,
+    p_probe: output.probe,
+  });
+  return rows[0] ?? null;
+}
+
+async function skipSilentAudioJob(config, jobId, reason) {
+  const rows = await rpcIfAvailable(config, 'skip_media_processing_job', {
+    p_worker_token: config.mediaWorkerToken,
+    p_job_id: jobId,
+    p_reason: reason,
+  });
+  return rows !== null;
+}
+
+async function claimCompanion(config, job) {
+  try {
+    const rows = await rpcIfAvailable(config, 'claim_companion_media_processing_job', {
+      p_worker_token: config.mediaWorkerToken,
+      p_job_id: job.job_id,
+      p_worker_id: config.mediaWorkerId,
+    });
+    return rows?.[0] ?? null;
+  } catch {
+    // Without its companion the video still converts; the audio-only job then
+    // runs on its own afterwards, as it did before.
+    return null;
+  }
+}
+
+/**
+ * A video job, and its audio-only companion, in one FFmpeg pass. The MP4 is
+ * uploaded while it is encoded; the original is removed once both exist.
+ */
+async function runVideoJob(config, job, control) {
+  const client = getS3Client();
+  const companion = await claimCompanion(config, job);
+  if (companion) control.jobIds.push(companion.job_id);
+  const lease = startLease(config, control, control.jobIds);
+  let companionSettled = !companion;
+  let conversion = null;
+
+  try {
+    conversion = await convertVideo({
+      client,
+      job,
+      wantsAudio: Boolean(companion),
+      workDir: config.workDir,
+      signal: control.signal,
+      onProgress: (value) => lease.setProgress(value),
+      log: (entry) => console.log(JSON.stringify({ at: new Date().toISOString(), ...entry })),
+    });
+    lease.stop();
+
+    let audioOnly = null;
+    if (companion) {
+      const audio = conversion.audio;
+      if (audio?.silent) {
+        const skipped = await skipSilentAudioJob(config, companion.job_id, 'the video has no sound, so there is no audio-only version');
+        if (!skipped) await reportFailure(config, { ...companion, upload_intent_id: job.upload_intent_id }, new NoAudioTrackError('Cannot extract audio: the source has no audio stream'));
+        audioOnly = { status: skipped ? 'skipped_silent' : 'failed' };
+      } else if (audio?.error || !audio?.path) {
+        await reportFailure(config, { ...companion, upload_intent_id: job.upload_intent_id }, audio?.error || new Error('The audio-only copy was not produced'));
+        audioOnly = { status: 'failed', error: audio?.error?.message };
+      } else {
+        try {
+          await uploadObject(config, companion.output_bucket, companion.output_path, audio.path, AUDIO_OUTPUT_MIME_TYPE);
+          try {
+            await completeJob(config, companion.job_id, {
+              mimeType: AUDIO_OUTPUT_MIME_TYPE,
+              sizeBytes: audio.sizeBytes,
+              sha256: audio.sha256,
+              probe: {
+                input: conversion.inputProbe,
+                output: audio.probe,
+                transcode: {
+                  audioCodec: 'aac',
+                  container: 'm4a',
+                  mode: audio.mode === 'copy' ? 'stream_copy' : 'encode',
+                  madeWith: 'video_pass',
+                },
+              },
+            });
+          } catch (error) {
+            await deleteObject(config, companion.output_bucket, companion.output_path).catch(() => undefined);
+            throw error;
+          }
+          audioOnly = { status: 'completed', outputSizeBytes: audio.sizeBytes };
+        } catch (error) {
+          await reportFailure(config, { ...companion, upload_intent_id: job.upload_intent_id }, error);
+          audioOnly = { status: 'failed', error: error instanceof Error ? error.message : String(error) };
+        }
+      }
+      companionSettled = true;
+    }
+
+    let completion;
+    try {
+      completion = await completeJob(config, job.job_id, {
+        mimeType: VIDEO_OUTPUT_MIME_TYPE,
+        sizeBytes: conversion.video.sizeBytes,
+        sha256: conversion.video.sha256,
+        probe: {
+          input: conversion.inputProbe,
+          output: conversion.video.probe,
+          transcode: videoTranscodeSummary(conversion.plan, conversion.mode),
+        },
+      });
+    } catch (error) {
+      // An admin deleted the file while it was finishing: leave nothing behind.
+      await deleteObject(config, job.output_bucket, job.output_path).catch(() => undefined);
+      throw error;
+    }
+
+    const original = await deleteOriginalIfDone(config, job.upload_intent_id);
+    return {
+      status: 'completed',
+      jobId: job.job_id,
+      jobType: job.job_type,
+      uploadIntentId: job.upload_intent_id,
+      outputBucket: job.output_bucket,
+      outputPath: job.output_path,
+      outputMimeType: VIDEO_OUTPUT_MIME_TYPE,
+      outputSizeBytes: conversion.video.sizeBytes,
+      outputChecksumSha256: conversion.video.sha256,
+      outputMode: conversion.mode,
+      copiedVideo: conversion.plan.copyVideo,
+      audioOnly,
+      originalDeleted: original?.deleted ?? false,
+      completion,
+    };
+  } catch (error) {
+    if (companion && !companionSettled && !(error instanceof JobAbortError)) {
+      await reportFailure(config, { ...companion, upload_intent_id: job.upload_intent_id }, error);
+      control.jobIds = control.jobIds.filter((id) => id !== companion.job_id);
+    }
+    throw error;
+  } finally {
+    lease.stop();
+    await conversion?.cleanup();
+  }
+}
+
+async function runJob(config, job, control) {
   const handler = JOB_HANDLERS[job.job_type];
 
   if (!handler) {
     throw new Error(`No handler for job type ${job.job_type}`);
   }
 
-  // R2 HTTP Range input and stdout multipart output bypass the 1 GB Railway
-  // scratch-disk and RAM limits for multi-hour video and extracted audio.
-  const streamed = await maybeRunStreamedMediaJob(config, job, {
-    getS3Client, callRpc, deleteObject,
-  });
-  if (streamed) return streamed;
+  if (job.job_type === 'video_delivery' && config.r2Driver === 's3') {
+    return runVideoJob(config, job, control);
+  }
 
+  const lease = startLease(config, control, control.jobIds);
+  try {
+    let result;
+    try {
+      // R2 HTTP Range input bypasses the Railway scratch-disk limit for long
+      // recordings and for a video's audio-only copy made on its own.
+      result = await maybeRunStreamedMediaJob(config, job, {
+        getS3Client,
+        callRpc,
+        deleteObject,
+        uploadFile: (bucket, key, filePath, contentType) => uploadObject(config, bucket, key, filePath, contentType),
+        signal: control.signal,
+      });
+    } catch (error) {
+      if (error instanceof NoAudioTrackError && job.job_type === 'audio_delivery' && job.media_type === 'video') {
+        if (await skipSilentAudioJob(config, job.job_id, 'the video has no sound, so there is no audio-only version')) {
+          await deleteOriginalIfDone(config, job.upload_intent_id);
+          return { status: 'skipped_silent', jobId: job.job_id, jobType: job.job_type, uploadIntentId: job.upload_intent_id };
+        }
+      }
+      throw error;
+    }
+    result ??= await runDownloadedJob(config, job, handler);
+    if (job.media_type === 'video') {
+      result.originalDeleted = (await deleteOriginalIfDone(config, job.upload_intent_id))?.deleted ?? false;
+    }
+    return result;
+  } finally {
+    lease.stop();
+  }
+}
+
+async function runDownloadedJob(config, job, handler) {
   const jobDir = path.join(config.workDir, `coptic-vine-media-job-${job.job_id}`);
   const inputPath = path.join(jobDir, `input${sourceExtension(job.input_path)}`);
 
@@ -730,6 +1036,20 @@ async function reportFailure(config, job, error) {
   }
 }
 
+/** Hands jobs a stopping worker was holding straight back to the queue. */
+async function releaseJobs(config, jobIds, reason) {
+  try {
+    const released = await rpcIfAvailable(config, 'release_media_processing_jobs', {
+      p_worker_token: config.mediaWorkerToken,
+      p_job_ids: jobIds,
+      p_reason: reason,
+    });
+    return released !== null;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Claims one queued job and processes it.
  *
@@ -753,9 +1073,23 @@ export async function claimAndProcessOne(config) {
     return reportFailure(config, job, new Error(`Unsupported job type ${job.job_type}`));
   }
 
+  const control = new AbortController();
+  control.jobIds = [job.job_id];
+  activeControls.add(control);
   try {
-    return await runJob(config, job);
+    return await runJob(config, job, control);
   } catch (error) {
+    const reason = control.signal.aborted ? control.signal.reason : error;
+    if (reason instanceof JobAbortError && reason.kind === 'shutdown') {
+      const released = await releaseJobs(config, control.jobIds, 'Released by a media worker that was shutting down');
+      if (released) return { status: 'released', jobId: job.job_id, jobType: job.job_type, jobIds: control.jobIds };
+      return reportFailure(config, job, reason);
+    }
+    if (reason instanceof JobAbortError && reason.kind === 'cancelled') {
+      return { status: 'cancelled', jobId: job.job_id, jobType: job.job_type };
+    }
     return reportFailure(config, job, error);
+  } finally {
+    activeControls.delete(control);
   }
 }

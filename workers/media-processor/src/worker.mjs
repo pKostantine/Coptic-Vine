@@ -1,4 +1,4 @@
-import { claimAndProcessOne, getConfig } from './processor.mjs';
+import { abortActiveJobs, claimAndProcessOne, getConfig } from './processor.mjs';
 import { startAdminServer } from './admin-server.mjs';
 import { purgeUnusedStorage } from './storage-gc.mjs';
 
@@ -46,6 +46,9 @@ function requestShutdown(signal) {
 
   shuttingDown = true;
   log({ status: 'shutdown_requested', signal });
+  // A redeploy must not cost an hour-long encode an attempt: stop it now and
+  // hand it straight back to the queue for the next worker.
+  abortActiveJobs('shutdown');
   adminServer?.close();
   if (storageGcTimer) clearInterval(storageGcTimer);
   wakeUp?.();

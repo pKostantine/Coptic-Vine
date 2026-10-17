@@ -130,38 +130,16 @@ test('R2 localhost range server supports FFprobe seek and private byte ranges', 
   }
 });
 
-test('streaming video job transcodes directly to R2 and completes without scratch files', async () => {
-  const client = fakeR2();
-  const payloads = [];
-  const config = { r2Driver: 's3', mediaWorkerToken: 'test-only' };
-  const job = {
-    job_id: 'video-123', upload_intent_id: 'intent-123',
-    job_type: 'video_delivery',
-    input_bucket: 'chc-submissions', input_path: 'source.m4v',
-    output_bucket: 'chc-learning', output_path: 'processed/video.mp4',
-  };
-  const result = await maybeRunStreamedMediaJob(config, job, {
-    getS3Client: () => client,
-    callRpc: async (_config, name, payload) => {
-      assert.equal(name, 'complete_media_processing_job');
-      payloads.push(payload);
-      return [{ status: 'completed' }];
-    },
-    deleteObject: async () => { throw Error('no cleanup expected'); },
+test('video jobs are not handled here: they go through the one-pass video pipeline', async () => {
+  const result = await maybeRunStreamedMediaJob({ r2Driver: 's3' }, { job_type: 'video_delivery' }, {
+    getS3Client: () => { throw Error('no R2 access expected'); },
   }, 0);
-  assert.equal(result.streamed, true);
-  assert.equal(result.status, 'completed');
-  assert.equal(result.outputMimeType, 'video/mp4');
-  assert.ok(result.outputSizeBytes > 0);
-  assert.ok(client.objects.get('chc-learning/processed/video.mp4'));
-  assert.equal(payloads[0].p_output_size_bytes, result.outputSizeBytes);
-  assert.equal(payloads[0].p_probe.transcode.mode, 'streamed');
-  assert.equal(payloads[0].p_probe.output.streams.find(s=>s.codec_type==='video').codec_name, 'h264');
+  assert.equal(result, null);
 });
 
 test('audio-only from a video uses the same private R2 original, with zero re-upload', async () => {
   const client = fakeR2();
-  const config = { r2Driver: 's3', mediaWorkerToken: 'test-only' };
+  const config = { r2Driver: 's3', mediaWorkerToken: 'test-only', workDir: dir };
   const job = {
     job_id: 'audio-123', upload_intent_id: 'intent-123',
     job_type: 'audio_delivery',
@@ -176,11 +154,21 @@ test('audio-only from a video uses the same private R2 original, with zero re-up
       return [{ status: 'completed' }];
     },
     deleteObject: async () => { throw Error('no cleanup expected'); },
+    uploadFile: async (bucket, key, filePath, contentType) => {
+      assert.equal(contentType, 'audio/mp4');
+      client.objects.set(bucket + '/' + key, await readFile(filePath));
+    },
   }, 0);
   assert.equal(result.status, 'completed');
   assert.equal(result.outputMimeType, 'audio/mp4');
   assert.equal(probe.output.streams.find(s=>s.codec_type==='audio').codec_name, 'aac');
   assert.equal(probe.transcode.sourceCodec, 'aac');
   assert.equal(probe.transcode.mode, 'streamed');
-  assert.ok(client.objects.get('chc-learning/processed/audio.m4a').length > 0);
+  const stored = client.objects.get('chc-learning/processed/audio.m4a');
+  assert.equal(stored.length, result.outputSizeBytes);
+  // A normal M4A with its index first, so every player can seek in it.
+  assert.equal(stored.subarray(4, 8).toString(), 'ftyp');
+  const moov = stored.indexOf('moov');
+  const mdat = stored.indexOf('mdat');
+  assert.ok(moov > 0 && moov < mdat, 'moov comes before mdat');
 });
