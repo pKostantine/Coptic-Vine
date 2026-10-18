@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -32,7 +33,7 @@ async function startFakeSupabase(handlers) {
   const server = http.createServer(async (request, response) => {
     const name = request.url.replace('/rest/v1/rpc/', '');
     const payload = await readBody(request);
-    calls.push({ name, payload });
+    calls.push({ name, payload, at: Date.now() });
 
     const handler = handlers[name];
 
@@ -59,7 +60,16 @@ async function startFakeSupabase(handlers) {
   };
 }
 
-function startWorker(supabaseUrl, env = {}) {
+/** A port nothing is listening on, for the worker's admin API (3000 may be taken). */
+async function freePort() {
+  const server = net.createServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  await new Promise((resolve) => server.close(resolve));
+  return port;
+}
+
+async function startWorker(supabaseUrl, env = {}) {
   const child = spawn(process.execPath, [workerEntry], {
     env: {
       ...process.env,
@@ -70,6 +80,8 @@ function startWorker(supabaseUrl, env = {}) {
       MEDIA_POLL_INTERVAL_MS: '100',
       MEDIA_ERROR_BACKOFF_MS: '50',
       MEDIA_MAX_ERROR_BACKOFF_MS: '200',
+      ADMIN_API_PORT: String(await freePort()),
+      ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -154,7 +166,10 @@ describe('worker loop', () => {
       }],
     });
 
-    const { child, lines } = startWorker(supabase.url);
+    // A long idle poll, so a claim made straight after a job stands apart from one made after a wait.
+    const idlePollMs = 1500;
+    const { child, lines } = await startWorker(supabase.url, { MEDIA_POLL_INTERVAL_MS: String(idlePollMs) });
+    const claims = () => supabase.calls.filter((call) => call.name === 'claim_media_processing_job');
 
     try {
       await waitFor(() => lines.filter((line) => line.status === 'failed').length === 2);
@@ -171,19 +186,19 @@ describe('worker loop', () => {
       assert.equal(failures[0].willRetry, true);
       assert.equal(failures[0].retryAt, '2026-01-01T00:00:00Z');
 
-      // Both jobs were claimed back to back, without an idle wait in between.
-      const claimsBeforeDrain = supabase.calls.filter(
-        (call) => call.name === 'claim_media_processing_job',
-      ).length;
-      assert.ok(claimsBeforeDrain >= 3, `expected the queue to be drained, saw ${claimsBeforeDrain} claims`);
+      // Each job is followed straight away by the next claim, with no idle wait
+      // in between: the second job, then the one that finds the queue empty.
+      // (The worker prints a job's result just before that claim reaches the
+      // fake, so it is waited for rather than counted at once.)
+      await waitFor(() => claims().length >= 3);
+      const reported = supabase.calls.filter((call) => call.name === 'fail_media_processing_job');
+      for (const [index, report] of reported.entries()) {
+        const gapMs = claims()[index + 1].at - report.at;
+        assert.ok(gapMs < idlePollMs / 2, `claim ${index + 2} came ${gapMs} ms after job ${index + 1} was reported`);
+      }
 
       // And the worker keeps polling an empty queue instead of exiting.
-      const claimsAtDrain = supabase.calls.filter(
-        (call) => call.name === 'claim_media_processing_job',
-      ).length;
-      await waitFor(() => supabase.calls.filter(
-        (call) => call.name === 'claim_media_processing_job',
-      ).length > claimsAtDrain);
+      await waitFor(() => claims().length > 3);
 
       const claim = supabase.calls.find((call) => call.name === 'claim_media_processing_job');
       assert.equal(claim.payload.p_worker_token, 'test-worker-token');
@@ -212,7 +227,7 @@ describe('worker loop', () => {
       },
     });
 
-    const { child, lines } = startWorker(supabase.url);
+    const { child, lines } = await startWorker(supabase.url);
 
     try {
       await waitFor(() => lines.filter((line) => line.status === 'queue_unavailable').length === 3);
