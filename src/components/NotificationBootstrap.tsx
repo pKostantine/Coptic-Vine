@@ -20,10 +20,11 @@ export default function NotificationBootstrap() {
         console.warn('Unable to synchronize Coptic Vine web notifications:', error);
       });
 
-      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (!session) return;
+      // Signing in moves this browser to the account; signing out, back to no account.
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (!session && event !== 'SIGNED_OUT') return;
         void syncWebPushDevice({ requestPermission: false }).catch((error) => {
-          console.warn('Unable to synchronize Coptic Vine web notifications after sign-in:', error);
+          console.warn('Unable to synchronize Coptic Vine web notifications after signing in or out:', error);
         });
       });
 
@@ -55,10 +56,13 @@ export default function NotificationBootstrap() {
       });
     }, FIRST_LAUNCH_ASK_DELAY_MS);
 
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) return;
+    // Signing in moves this install to the account; signing out (which first
+    // detaches it from the account) registers it again with no account, so
+    // what is sent to everyone still reaches it.
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session && event !== 'SIGNED_OUT') return;
       void syncNativeNotificationDevice({ requestPermission: false }).catch((error) => {
-        console.warn('Unable to synchronize Coptic Vine notifications after sign-in:', error);
+        console.warn('Unable to synchronize Coptic Vine notifications after signing in or out:', error);
       });
     });
 

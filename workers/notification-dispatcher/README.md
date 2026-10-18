@@ -33,3 +33,20 @@ push service.
 
 Do not put Apple, Firebase, Expo, Supabase service-role, VAPID private, or WNS
 secrets in the repository.
+
+## Before a notification reaches a phone
+
+The dispatcher sends through Expo Push, which needs the app's own credentials:
+
+- **iPhone and iPad:** the build must carry the Push Notifications entitlement
+  (`aps-environment`). The `expo-notifications` plugin in `app.json` adds it
+  when the native project is generated — run `npx expo prebuild -p ios` (the
+  `ios/` folder is not in git) before building. Expo also needs the app's APNs
+  key: `eas credentials -p ios` → Push Notifications.
+- **Android:** Expo Push goes through Firebase Cloud Messaging. Add the
+  Firebase project's `google-services.json` (`android.googleServicesFile` in
+  `app.json`) and upload its FCM V1 service-account key to Expo
+  (`eas credentials -p android`).
+
+CV Admin's Notifications page says when deliveries are waiting and nothing is
+sending them: that is this Worker not running.

@@ -81,11 +81,12 @@ export async function localNotificationPermission(requestPermission = false): Pr
   return permission.canAskAgain ? 'undetermined' : 'denied';
 }
 
+/**
+ * Registers this install for notifications: under the account signed in, or
+ * — signed out — as an install with no account, which still receives what
+ * CV Admin sends to everyone (feast greetings, announcements).
+ */
 async function registerExpoToken(expoPushToken: string) {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!user) return 'signed_out' as const;
-
   const { error } = await supabase.rpc('register_notification_device', {
     p_app_key: APP_KEY,
     p_platform: Platform.OS,

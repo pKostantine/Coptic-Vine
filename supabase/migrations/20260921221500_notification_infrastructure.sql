@@ -428,7 +428,7 @@ create or replace function public.claim_web_push_deliveries(
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 begin
   return query
   with picked as (
@@ -469,7 +469,7 @@ begin
   join public.notifications n on n.id = c.notification_id
   where dev.enabled = true;
 end;
-$;
+$$;
 
 revoke all on function public.claim_web_push_deliveries(integer) from public, anon, authenticated;
 grant execute on function public.claim_web_push_deliveries(integer) to service_role;
