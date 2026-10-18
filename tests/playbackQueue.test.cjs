@@ -159,7 +159,7 @@ test('one list shows the mixed queue in both players, each row by its kind, and 
   assert.match(read('src/components/learning/LearningNowPlayingScreen.tsx'), /tone: 'learning' as const/);
   // Every place a Learn & Study item is listed offers to queue it.
   for (const screen of ['src/app/learn/album/[id].tsx', 'src/app/learn/lesson-set/[id].tsx', 'src/app/learn/playlist/[id].tsx', 'src/app/learn/library.tsx', 'src/app/learn/lesson/[id].tsx']) {
-    assert.match(read(screen), /<LearningItemActionsMenu item=\{/, screen);
+    assert.match(read(screen), /<LearningItemActionsMenu\s+item=\{/, screen);
   }
   const menu = read('src/components/learning/LearningItemActionsMenu.tsx');
   assert.match(menu, /addNext\(item\)/);

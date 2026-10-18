@@ -11,10 +11,10 @@ import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
-import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { learningLessonSetQueue, lessonHasVideo, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { useLearningItemLikes } from '@/hooks/useLearningItemLikes';
 import { learningService } from '@/services/learningService';
 import {
   learningLessonDownloadRequest,
@@ -49,6 +49,7 @@ export default function LearningLessonSetScreen() {
   const [error, setError] = useState<string | null>(null);
   const [resume, setResume] = useState<LearningResumeMap>(() => peekLearningResume());
   const player = useLearningPlayer();
+  const likes = useLearningItemLikes(locale);
   const { currentItem, playQueue, playing, lessonVideoMode } = player;
   const queue = useMemo(() => (lessonSet ? learningLessonSetQueue(lessonSet) : []), [lessonSet]);
   const downloadRequest = useMemo(
@@ -150,7 +151,6 @@ export default function LearningLessonSetScreen() {
           </View>
           <View style={styles.mediaList}>
             {lessonSet.lessons.map((lesson, index) => {
-              const lessonDownload = learningLessonDownloadRequest(lessonSet, lesson, locale);
               const item = queue[index];
               const active = currentItem?.id === lesson.id;
               return (
@@ -166,32 +166,18 @@ export default function LearningLessonSetScreen() {
                   progress={rowProgress(resume, lesson)}
                   isArabic={isArabic}
                   onPress={() => playLesson(index)}
-                  trailing={(
-                    <View style={styles.rowActions}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={tr('Open the lesson', 'Ouvrir la leçon', 'افتح الدرس')}
-                        hitSlop={6}
-                        onPress={() => openLessonPage(lesson.id)}
-                        style={({ pressed }) => [styles.openButton, pressed && styles.pressed]}
-                      >
-                        <Text style={styles.openText}>›</Text>
-                      </Pressable>
-                      {item ? <LearningItemActionsMenu item={item} isArabic={isArabic} size={32} /> : null}
-                      <LearningDownloadButton
-                        packageKey={lessonDownload.packageKey}
-                        request={lessonDownload}
-                        isArabic={isArabic}
-                        compact
-                      />
-                      <LearningPlaylistPicker
-                        itemKind="lesson"
-                        itemId={lesson.id}
-                        locale={locale}
-                        isArabic={isArabic}
-                      />
-                    </View>
-                  )}
+                  // As a song's title opens its page: the lesson's own page, with its picture and words.
+                  onTitlePress={() => openLessonPage(lesson.id)}
+                  liked={likes.isLiked(lesson.id)}
+                  onToggleLike={() => likes.toggle('lesson', lesson.id)}
+                  trailing={item ? (
+                    <LearningItemActionsMenu
+                      item={item}
+                      isArabic={isArabic}
+                      size={32}
+                      download={learningLessonDownloadRequest(lessonSet, lesson, locale)}
+                    />
+                  ) : undefined}
                 />
               );
             })}
@@ -225,9 +211,6 @@ const styles = StyleSheet.create({
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   sectionMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
   mediaList: { overflow: 'hidden', borderRadius: RADII.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  rowActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
-  openButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
-  openText: { color: COLORS.learningBright, fontSize: 24, lineHeight: 26, fontWeight: '700' },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center', padding: SPACING.lg },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },

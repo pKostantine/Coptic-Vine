@@ -66,6 +66,8 @@ export interface LearningAlbumDetail {
   season: Pick<LearningSeasonSummary, 'id' | 'slug' | 'title'> | null;
   coverAsset: LearningMediaAsset | null;
   recordings: LearningAlbumRecording[];
+  /** When the album was first released (YYYY-MM-DD), for its year. */
+  originalReleaseDate?: string | null;
 }
 
 export interface LearningLessonSetSummary {

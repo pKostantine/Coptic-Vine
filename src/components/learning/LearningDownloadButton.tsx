@@ -7,12 +7,17 @@ export default function LearningDownloadButton({
   label,
   isArabic = false,
   compact = false,
+  menuRow = false,
+  onAction,
 }: {
   packageKey?: string;
   request?: OfflineDownloadRequest | (() => Promise<OfflineDownloadRequest>);
   label?: string;
   isArabic?: boolean;
   compact?: boolean;
+  /** Drawn as a row of a More menu, as a song's Download is. */
+  menuRow?: boolean;
+  onAction?: () => void;
 }) {
   // Collection/detail screens provide the complete offline package. The
   // now-playing surface predates Phase 13 and does not carry enough collection
@@ -27,6 +32,8 @@ export default function LearningDownloadButton({
       label={label}
       isArabic={isArabic}
       compact={compact}
+      menuRow={menuRow}
+      onAction={onAction}
     />
   );
 }
