@@ -108,9 +108,14 @@ export interface CustomCanonItem extends CanonItemBase {
 
 export type CanonItem = AgpeyaCanonItem | BibleCanonItem | MetaniaCanonItem | CustomCanonItem;
 
-/** A task ticked off (or unticked, which is kept so the account's older tick doesn't come back). */
+/**
+ * A task ticked off (or unticked, which is kept so the account's older tick
+ * doesn't come back), or skipped: taken off that one day's list.
+ */
 export interface CanonMark {
   done: boolean;
+  /** Left out of this day: not asked, not counted, not reminded of. */
+  skipped?: boolean;
   /** When it was last changed: the newest change wins a merge. */
   at: string;
 }
@@ -495,7 +500,7 @@ export function normalizeCanonDayMarks(value: unknown): CanonDayMarks {
     if (!key || key.length > 200 || !entry || typeof entry !== 'object') continue;
     const mark = entry as Partial<CanonMark>;
     if (typeof mark.at !== 'string' || Number.isNaN(Date.parse(mark.at))) continue;
-    marks[key] = { done: Boolean(mark.done), at: mark.at };
+    marks[key] = mark.skipped === true && !mark.done ? { done: false, skipped: true, at: mark.at } : { done: Boolean(mark.done), at: mark.at };
     if (Object.keys(marks).length >= MAX_MARKS_PER_DAY) break;
   }
   return marks;
@@ -623,6 +628,8 @@ export interface CanonTask {
   /** How often the task is kept, as the item says (an Agpeya item that varies by day: on the days it has the hour). */
   frequency: CanonFrequency | { kind: 'byDay' };
   done: boolean;
+  /** Taken off this day's list (canonSkippedTasksForDay lists them, to be restored). */
+  skipped: boolean;
   /** For a task kept a number of times a week: how many this week so far, of how many. */
   weekly: { done: number; target: number } | null;
 }
@@ -631,20 +638,48 @@ export function canonTaskKey(itemId: string, hourId?: string | null): string {
   return hourId ? `${itemId}:${hourId}` : itemId;
 }
 
-/** A day as the calendar has it for metanias: METANIA_CONDITION and METANIA_FASTING_CONDITION against its flags. */
-export interface MetaniaDay {
+/**
+ * The Agpeya in the canon through Pascha: none from Monday Eve to Bright
+ * Saturday. Monday Eve begins on Palm Sunday evening, so that day keeps the
+ * morning's hours and leaves out those from the Eleventh Hour on; Holy Monday
+ * to Bright Saturday leave out every one. By the day's flags: HolyWeek (Holy
+ * Monday to Bright Saturday) and PalmSunday.
+ */
+export const AGPEYA_NONE_CONDITION = 'HolyWeek';
+export const AGPEYA_MORNING_ONLY_CONDITION = 'PalmSunday';
+export type CanonAgpeyaDay = 'all' | 'beforeEve' | 'none';
+
+/** A day as the calendar has it for the canon: metanias' two conditions against its flags, and the Agpeya through Pascha. */
+export interface CanonCalendarDay {
   applicable: boolean;
   fasting: boolean;
+  agpeya: CanonAgpeyaDay;
 }
 
-/** What the canon knows of the Church's calendar: each day's MetaniaDay, or null while its flags have still to be read. */
+/** What the canon knows of the Church's calendar: each day, or null while its flags have still to be read. */
 export interface CanonCalendar {
-  metaniaDay: (day: string) => MetaniaDay | null;
+  calendarDay: (day: string) => CanonCalendarDay | null;
 }
 
 /** Whether an item is kept on days the calendar decides, and so needs it read. */
 export function keptByCalendar(frequency: CanonFrequency): boolean {
   return frequency.kind === 'applicable' || frequency.kind === 'fastingDays';
+}
+
+/** Whether a canon needs the calendar read: metanias kept by it, and any Agpeya (Pascha leaves it out). */
+export function canonNeedsCalendar(items: readonly CanonItem[]): boolean {
+  return items.some((item) => item.kind === 'agpeya' || keptByCalendar(item.frequency));
+}
+
+/** The prayers said from the Eleventh Hour on: those Monday Eve, begun on Palm Sunday evening, takes the place of. */
+const EVENING_PRAYERS = new Set(['eleventh_hour', 'twelfth_hour', 'prayer_of_the_veil', ...MIDNIGHT_WATCHES]);
+
+/** Whether a prayer of the Agpeya is asked on a day, by the calendar; a day not yet read keeps them all. */
+export function agpeyaPrayerKeptOn(hourId: string, day: string, calendar?: CanonCalendar): boolean {
+  const agpeya = calendar?.calendarDay(day)?.agpeya ?? 'all';
+  if (agpeya === 'none') return false;
+  if (agpeya === 'beforeEve') return !EVENING_PRAYERS.has(hourId);
+  return true;
 }
 
 /** Until a day's flags are read: no metanias on a Saturday or a Sunday; a feast is not yet known. */
@@ -655,9 +690,9 @@ export function provisionalMetaniaDay(day: string): boolean {
 
 function keptOn(frequency: CanonFrequency, day: string, calendar?: CanonCalendar): boolean {
   if (frequency.kind === 'weekdays') return frequency.days.includes(canonWeekday(day));
-  if (frequency.kind === 'applicable') return calendar?.metaniaDay(day)?.applicable ?? provisionalMetaniaDay(day);
+  if (frequency.kind === 'applicable') return calendar?.calendarDay(day)?.applicable ?? provisionalMetaniaDay(day);
   // A fasting day is the calendar's to say: none is assumed before it is read.
-  if (frequency.kind === 'fastingDays') return calendar?.metaniaDay(day)?.fasting ?? false;
+  if (frequency.kind === 'fastingDays') return calendar?.calendarDay(day)?.fasting ?? false;
   return true;
 }
 
@@ -678,7 +713,8 @@ function templatesFor(items: CanonItem[], day: string, calendar?: CanonCalendar)
   for (const item of items) {
     if (item.kind === 'agpeya') {
       const byDay = item.pattern === 'byDay';
-      const plans = byDay ? item.days[weekday] ?? [] : keptOn(item.frequency, day, calendar) ? item.hours : [];
+      const plans = (byDay ? item.days[weekday] ?? [] : keptOn(item.frequency, day, calendar) ? item.hours : [])
+        .filter((plan) => agpeyaPrayerKeptOn(plan.hourId, day, calendar));
       for (const plan of plans) {
         templates.push({
           key: canonTaskKey(item.id, plan.hourId),
@@ -724,18 +760,29 @@ function taskOrder(template: Pick<TaskTemplate, 'time' | 'hourId'>): number {
 /**
  * The tasks a day asks for, in the order of the day. A task kept a number of
  * times a week is asked for on each day of the week until it has been done
- * that many times; on a day it was done, it stays, ticked.
+ * that many times; on a day it was done, it stays, ticked. A task skipped
+ * that day is left out (canonSkippedTasksForDay has it).
  */
 export function canonTasksForDay(document: Pick<CanonDocument, 'items' | 'days'>, day: string, calendar?: CanonCalendar): CanonTask[] {
+  return everyTaskForDay(document, day, calendar).filter((task) => !task.skipped);
+}
+
+/** The tasks skipped on a day, in the order of the day, to be restored. */
+export function canonSkippedTasksForDay(document: Pick<CanonDocument, 'items' | 'days'>, day: string, calendar?: CanonCalendar): CanonTask[] {
+  return everyTaskForDay(document, day, calendar).filter((task) => task.skipped);
+}
+
+function everyTaskForDay(document: Pick<CanonDocument, 'items' | 'days'>, day: string, calendar?: CanonCalendar): CanonTask[] {
   const templates = templatesFor(document.items, day, calendar);
   const tasks: CanonTask[] = [];
   for (const template of templates) {
     const done = isDone(document, day, template.key);
+    const skipped = !done && Boolean(document.days[day]?.[template.key]?.skipped);
     let weekly: CanonTask['weekly'] = null;
     if (template.frequency.kind === 'perWeek') {
       const total = weeklyCompletions(document, day, template.key);
       const target = template.frequency.times;
-      if (!done && total >= target) continue;
+      if (!done && !skipped && total >= target) continue;
       weekly = { done: total, target };
     }
     tasks.push({
@@ -750,6 +797,7 @@ export function canonTasksForDay(document: Pick<CanonDocument, 'items' | 'days'>
       remind: template.remind,
       frequency: template.frequency,
       done,
+      skipped,
       weekly,
     });
   }
@@ -760,9 +808,16 @@ export function canonDayProgress(tasks: readonly CanonTask[]): { done: number; t
   return { done: tasks.filter((task) => task.done).length, total: tasks.length };
 }
 
-/** A day's marks with one task ticked or unticked. */
+/** A day's marks with one task ticked or unticked (either way, no longer skipped). */
 export function withCanonMark(document: CanonDocument, day: string, key: string, done: boolean, now = new Date()): CanonDocument {
   const marks = { ...(document.days[day] ?? {}), [key]: { done, at: now.toISOString() } };
+  return { ...document, days: { ...document.days, [day]: marks }, updatedAt: now.toISOString() };
+}
+
+/** A day's marks with one task skipped, or put back on the day's list. */
+export function withCanonSkip(document: CanonDocument, day: string, key: string, skipped: boolean, now = new Date()): CanonDocument {
+  const mark: CanonMark = skipped ? { done: false, skipped: true, at: now.toISOString() } : { done: false, at: now.toISOString() };
+  const marks = { ...(document.days[day] ?? {}), [key]: mark };
   return { ...document, days: { ...document.days, [day]: marks }, updatedAt: now.toISOString() };
 }
 

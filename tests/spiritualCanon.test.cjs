@@ -371,7 +371,7 @@ test('metanias are kept on the days they are made: not on Saturdays, Sundays or 
   const asked = (calendar) => week.filter((day) => canon.canonTasksForDay(doc([item]), day, calendar).length);
   assert.deepEqual(asked(undefined), week.slice(1, 6));
   // …and the calendar then has the last word: a feast on the Wednesday takes it away.
-  const calendar = { metaniaDay: (day) => (day === '2026-10-21' ? { applicable: false, fasting: false } : null) };
+  const calendar = { calendarDay: (day) => (day === '2026-10-21' ? { applicable: false, fasting: false, agpeya: 'all' } : null) };
   assert.deepEqual(asked(calendar), ['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-23']);
   // The days the reminders go out on follow the same calendar.
   const reminding = { ...item, time: '07:00', remind: true };
@@ -413,7 +413,7 @@ test('the metania rule reads the day’s own flags, by the same engine the books
   assert.equal(fasting({ Feasts: true, Fasts: true }), false);
   const calendarSource = read('src/services/canonCalendar.ts');
   // The day itself: not CalendarContext's date (the Books screen's), no evening rollover.
-  assert.match(calendarSource, /const flags = await getContextFlags\(day\);\n\s+return \{\n\s+applicable: Boolean\(evaluateCondition\(METANIA_CONDITION, flags\)\),\n\s+fasting: Boolean\(evaluateCondition\(METANIA_FASTING_CONDITION, flags\)\),/);
+  assert.match(calendarSource, /const flags = await getContextFlags\(day\);\n\s+const met = \(condition: string\) => Boolean\(evaluateCondition\(condition, flags\)\);\n\s+return \{\n\s+applicable: met\(METANIA_CONDITION\),\n\s+fasting: met\(METANIA_FASTING_CONDITION\),\n\s+agpeya: met\(AGPEYA_NONE_CONDITION\) \? 'none' : met\(AGPEYA_MORNING_ONLY_CONDITION\) \? 'beforeEve' : 'all',/);
   assert.doesNotMatch(calendarSource, /CalendarContext|useCalendar/);
 });
 
@@ -438,8 +438,8 @@ test('metanias on fasting days only: the calendar’s fasting days that are not 
   const asked = (calendar) => week.filter((day) => canon.canonTasksForDay(doc([item]), day, calendar).length);
   // A fasting day is never assumed: before the calendar is read, none is asked.
   assert.deepEqual(asked(undefined), []);
-  const flags = { '2026-10-21': { applicable: true, fasting: true }, '2026-10-23': { applicable: true, fasting: true } };
-  const calendar = { metaniaDay: (day) => flags[day] ?? { applicable: canon.provisionalMetaniaDay(day), fasting: false } };
+  const flags = { '2026-10-21': { applicable: true, fasting: true, agpeya: 'all' }, '2026-10-23': { applicable: true, fasting: true, agpeya: 'all' } };
+  const calendar = { calendarDay: (day) => flags[day] ?? { applicable: canon.provisionalMetaniaDay(day), fasting: false, agpeya: 'all' } };
   assert.deepEqual(asked(calendar), ['2026-10-21', '2026-10-23']);
   assert.equal(canon.keptByCalendar(item.frequency), true);
   assert.equal(canon.keptByCalendar({ kind: 'daily' }), false);
@@ -480,4 +480,58 @@ test('a document opens at a section named by hymn key, as it does at a reading',
   const reader = read('src/components/vine/screens/ServiceDocument.tsx');
   assert.match(reader, /reading: openAtReading, at: openAtHymnKey \} = useLocalSearchParams<\{ sub\?: string; reading\?: string; at\?: string \}>\(\);/);
   assert.match(reader, /: newSections\.find\(\(section\) => section\.hymnKey === hymnKeyTarget\)\?\.id \?\? null;/);
+});
+
+test('no Agpeya from Monday Eve to Bright Saturday: Palm Sunday keeps its morning, Holy Week none, by the day’s own flags', () => {
+  assert.equal(canon.AGPEYA_NONE_CONDITION, 'HolyWeek');
+  assert.equal(canon.AGPEYA_MORNING_ONLY_CONDITION, 'PalmSunday');
+  const every = canon.CANON_AGPEYA_PRAYERS.map((prayer) => plan(prayer.id));
+  const items = [agpeya({ hours: every }), bible()];
+  // Coptic Pascha 2027: Palm Sunday 25 April, Holy Monday to Bright Saturday 26 April – 1 May.
+  const days = { '2027-04-25': 'beforeEve', '2027-04-26': 'none', '2027-05-01': 'none', '2027-05-02': 'all' };
+  const calendar = { calendarDay: (day) => (days[day] ? { applicable: false, fasting: false, agpeya: days[day] } : null) };
+  const agpeyaOn = (day) => canon.canonTasksForDay(doc(items), day, calendar).filter((task) => task.kind === 'agpeya').map((task) => task.hourId);
+  assert.deepEqual(agpeyaOn('2027-04-25'), ['first_hour', 'third_hour', 'sixth_hour', 'ninth_hour']);
+  assert.deepEqual(agpeyaOn('2027-04-26'), []);
+  assert.deepEqual(agpeyaOn('2027-05-01'), []);
+  assert.equal(agpeyaOn('2027-05-02').length, 10); // the Resurrection: all of it again
+  // The rest of the canon is kept through Pascha.
+  assert.ok(canon.canonTasksForDay(doc(items), '2027-04-26', calendar).some((task) => task.kind === 'bible'));
+  // A day whose flags aren't read yet keeps the Agpeya: nothing is left out on a guess.
+  assert.equal(agpeyaOn('2027-04-27').length, 10);
+  // Reminders follow.
+  const reminding = agpeya({ hours: [plan('first_hour', { time: '07:00', remind: true }), plan('twelfth_hour', { time: '18:30', remind: true })] });
+  const reminders = canon.upcomingCanonReminders(doc([reminding]), new Date(2027, 3, 25, 6, 0), { horizonDays: 2, calendar }).map((entry) => `${entry.day} ${entry.task.hourId}`);
+  assert.deepEqual(reminders, ['2027-04-25 first_hour']);
+  // Any Agpeya item needs the calendar read, as metanias kept by it do.
+  assert.equal(canon.canonNeedsCalendar([agpeya()]), true);
+  assert.equal(canon.canonNeedsCalendar([bible()]), false);
+  assert.equal(canon.canonNeedsCalendar([{ ...canon.newCanonItem('metania') }]), true);
+});
+
+test('a task skipped is off that day’s list, out of its count and its reminders, and comes back when restored', () => {
+  const items = [bible({ time: '08:00', remind: true }), custom({ frequency: { kind: 'perWeek', times: 1 } })];
+  let document = doc(items);
+  document = canon.withCanonSkip(document, '2026-10-19', 'bible-1', true, new Date('2026-10-18T10:00:00Z'));
+  assert.deepEqual(canon.canonTasksForDay(document, '2026-10-19').map((task) => task.key), ['custom-1']);
+  assert.deepEqual(canon.canonSkippedTasksForDay(document, '2026-10-19').map((task) => task.key), ['bible-1']);
+  // Only that day.
+  assert.deepEqual(canon.canonTasksForDay(document, '2026-10-20').map((task) => task.key), ['bible-1', 'custom-1']);
+  assert.deepEqual(canon.canonDayProgress(canon.canonTasksForDay(document, '2026-10-19')), { done: 0, total: 1 });
+  // No reminder on the day it was skipped.
+  const reminded = canon.upcomingCanonReminders(document, new Date(2026, 9, 19, 6, 0), { horizonDays: 2 }).map((entry) => entry.day);
+  assert.deepEqual(reminded, ['2026-10-20']);
+  // A weekly task skipped one day isn't counted done; it is still asked for the next day.
+  document = canon.withCanonSkip(document, '2026-10-19', 'custom-1', true);
+  assert.equal(canon.canonTasksForDay(document, '2026-10-20').filter((task) => task.key === 'custom-1').length, 1);
+  // Restored, or ticked, it is back on the day's list.
+  const restored = canon.withCanonSkip(document, '2026-10-19', 'bible-1', false);
+  assert.ok(canon.canonTasksForDay(restored, '2026-10-19').some((task) => task.key === 'bible-1'));
+  const ticked = canon.withCanonMark(document, '2026-10-19', 'bible-1', true);
+  assert.equal(canon.canonTasksForDay(ticked, '2026-10-19').find((task) => task.key === 'bible-1').done, true);
+  // Read back and merged like any mark; a skip on another device that is newer wins.
+  const marks = canon.normalizeCanonDayMarks({ a: { done: false, skipped: true, at: STAMP }, b: { done: true, skipped: true, at: STAMP } });
+  assert.deepEqual(marks, { a: { done: false, skipped: true, at: STAMP }, b: { done: true, at: STAMP } });
+  const merged = canon.mergeCanonDayMarks({ a: { done: false, at: '2026-10-19T08:00:00Z' } }, { a: { done: false, skipped: true, at: '2026-10-19T09:00:00Z' } });
+  assert.equal(merged.a.skipped, true);
 });

@@ -5,8 +5,8 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { CanonProgressBar, CanonTaskRow, CanonWeekStrip, type CanonDayState } from '@/components/canon/CanonParts';
-import { dayProgressLabel } from '@/components/canon/canonText';
+import { CanonProgressBar, CanonSkippedRow, CanonTaskRow, CanonWeekStrip, type CanonDayState } from '@/components/canon/CanonParts';
+import { dayProgressLabel, paschaAgpeyaNote } from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow } from '@/components/vine/screens/BookPage';
 import BleedPage from '@/components/vine/ui/BleedPage';
@@ -19,7 +19,7 @@ import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
 import { tr } from '@/utils/appText';
 import { formatDayMonthDate, formatDayMonthRange } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
-import { addCanonDays, canonDayDate, canonDayProgress, canonTaskRoute, canonWeekStart, keptByCalendar } from '@/utils/spiritualCanon';
+import { addCanonDays, canonDayDate, canonDayProgress, canonNeedsCalendar, canonTaskRoute, canonWeekStart } from '@/utils/spiritualCanon';
 
 const MAX_FONT_SCALE = 1.3;
 
@@ -38,13 +38,15 @@ export default function CanonScreen() {
   const day = chosen ?? canon.today;
   const weekStart = canonWeekStart(day);
   const weekDays = Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset));
-  // Metanias kept on the days they are made: the week shown is read from the calendar.
-  const keepsApplicableDays = canon.items.some((item) => keptByCalendar(item.frequency));
+  // Metanias kept by the calendar, and the Agpeya (Pascha): the week shown is read from the calendar.
+  const keepsApplicableDays = canonNeedsCalendar(canon.items);
   const { ensureCalendarDays } = canon;
   useEffect(() => {
     if (keepsApplicableDays) ensureCalendarDays(Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset)));
   }, [ensureCalendarDays, keepsApplicableDays, weekStart]);
   const tasks = canon.tasksFor(day);
+  const skipped = canon.skippedFor(day);
+  const pascha = canon.items.some((item) => item.kind === 'agpeya') && canon.agpeyaOn(day) !== 'all';
   const progress = canonDayProgress(tasks);
   const future = day > canon.today;
   const allDone = progress.total > 0 && progress.done === progress.total;
@@ -147,6 +149,7 @@ export default function CanonScreen() {
                       disabled={future}
                       onToggle={(done) => canon.setTaskDone(day, task.key, done)}
                       onOpen={() => router.push(canonTaskRoute(task) as never)}
+                      onSkip={() => canon.setTaskSkipped(day, task.key, true)}
                     />
                   ))}
                 </View>
@@ -159,6 +162,15 @@ export default function CanonScreen() {
                 </View>
               )}
 
+              {skipped.length ? (
+                <View style={styles.skipped}>
+                  <Text style={[styles.skippedHeading, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Skipped', 'Passés', 'متخطّاة')}</Text>
+                  {skipped.map((task, index) => (
+                    <CanonSkippedRow key={task.key} task={task} arabic={arabic} first={index === 0} onRestore={() => canon.setTaskSkipped(day, task.key, false)} />
+                  ))}
+                </View>
+              ) : null}
+              {pascha ? <Text style={[styles.quiet, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{paschaAgpeyaNote()}</Text> : null}
               {future && tasks.length ? (
                 <Text style={[styles.quiet, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
                   {tr('These can be ticked off on the day.', 'Vous pourrez les cocher le jour venu.', 'يمكنك تعليمها في يومها.')}
@@ -249,6 +261,8 @@ const styles = StyleSheet.create({
   rows: { gap: 8 },
   note: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
   noteText: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14.5 },
+  skipped: { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },
+  skippedHeading: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.2, paddingTop: 4, textTransform: 'uppercase' },
   quiet: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, paddingHorizontal: 4 },
   glory: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontStyle: 'italic', paddingVertical: 6, textAlign: 'center' },
 
