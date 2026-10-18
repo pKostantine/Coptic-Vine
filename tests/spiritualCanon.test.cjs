@@ -50,22 +50,22 @@ test('days are the device’s calendar days, and the week starts on Sunday', () 
 });
 
 test('an Agpeya item asks for each of its hours, in the order of the praying day', () => {
-  const item = agpeya({ hours: [plan('midnight_hour'), plan('first_hour', { goal: { kind: 'psalms', count: 6 } }), plan('twelfth_hour', { time: '21:30' })] });
+  const item = agpeya({ hours: [plan('midnight_third_watch'), plan('first_hour', { goal: { kind: 'psalms', count: 6 } }), plan('twelfth_hour', { time: '21:30' })] });
   const tasks = canon.canonTasksForDay(doc([item]), '2026-10-18');
   // Midnight belongs to the end of the praying day, not its start.
-  assert.deepEqual(tasks.map((task) => task.hourId), ['first_hour', 'twelfth_hour', 'midnight_hour']);
+  assert.deepEqual(tasks.map((task) => task.hourId), ['first_hour', 'twelfth_hour', 'midnight_third_watch']);
   assert.equal(tasks[0].key, 'agpeya-1:first_hour');
   assert.deepEqual(tasks[0].goal, { kind: 'psalms', count: 6 });
 });
 
 test('chosen days, and an Agpeya that varies by day, ask only on their days', () => {
   const reading = bible({ frequency: { kind: 'weekdays', days: [3, 5] } });
-  const varying = agpeya({ pattern: 'byDay', days: [[plan('first_hour')], [], [], [plan('ninth_hour')], [], [], [plan('first_hour'), plan('midnight_hour')]] });
+  const varying = agpeya({ pattern: 'byDay', days: [[plan('first_hour')], [], [], [plan('ninth_hour')], [], [], [plan('first_hour'), plan('midnight_first_watch')]] });
   const tasksOn = (day) => canon.canonTasksForDay(doc([reading, varying]), day).map((task) => task.key);
   assert.deepEqual(tasksOn('2026-10-18'), ['agpeya-1:first_hour']); // Sunday
   assert.deepEqual(tasksOn('2026-10-19'), []); // Monday: a day off
   assert.deepEqual(tasksOn('2026-10-21'), ['agpeya-1:ninth_hour', 'bible-1']); // Wednesday
-  assert.deepEqual(tasksOn('2026-10-24'), ['agpeya-1:first_hour', 'agpeya-1:midnight_hour']); // Saturday
+  assert.deepEqual(tasksOn('2026-10-24'), ['agpeya-1:first_hour', 'agpeya-1:midnight_first_watch']); // Saturday
   assert.equal(canon.canonTasksForDay(doc([varying]), '2026-10-18')[0].frequency.kind, 'byDay');
 });
 
@@ -104,7 +104,7 @@ test('what is read back is cleaned: unknown hours, too many psalms, reminders wi
     items: [
       agpeya({ hours: [
         plan('first_hour', { goal: { kind: 'psalms', count: 40 }, remind: true }),
-        plan('midnight_hour', { goal: { kind: 'psalms', count: 40 }, time: '00:00', remind: true }),
+        plan('midnight_second_watch', { goal: { kind: 'psalms', count: 40 }, time: '00:00', remind: true }),
         plan('first_hour'),
         plan('tenth_hour'),
       ] }),
@@ -117,9 +117,9 @@ test('what is read back is cleaned: unknown hours, too many psalms, reminders wi
   });
   const [prayer, reading] = clean.items;
   assert.equal(clean.items.length, 2);
-  assert.deepEqual(prayer.hours.map((entry) => entry.hourId), ['first_hour', 'midnight_hour']);
+  assert.deepEqual(prayer.hours.map((entry) => entry.hourId), ['first_hour', 'midnight_second_watch']);
   assert.deepEqual(prayer.hours[0].goal, { kind: 'psalms', count: 19 }); // Prime holds nineteen
-  assert.deepEqual(prayer.hours[1].goal, { kind: 'psalms', count: 31 }); // the three watches, thirty-one
+  assert.deepEqual(prayer.hours[1].goal, { kind: 'psalms', count: 10 }); // the second watch, ten
   assert.equal(prayer.hours[0].remind, false); // no time, no reminder
   assert.equal(prayer.hours[1].remind, true);
   assert.deepEqual(reading.goal, { kind: 'none' }); // psalms are the Agpeya's measure
@@ -437,4 +437,41 @@ test('metanias on fasting days only: the calendar’s fasting days that are not 
   assert.deepEqual(asked(calendar), ['2026-10-21', '2026-10-23']);
   assert.equal(canon.keptByCalendar(item.frequency), true);
   assert.equal(canon.keptByCalendar({ kind: 'daily' }), false);
+});
+
+test('the Midnight hour is kept as its three watches, and the Prayer of the Veil as a prayer of its own', () => {
+  assert.deepEqual(canon.CANON_AGPEYA_PRAYERS.map((prayer) => prayer.id), [
+    'first_hour', 'third_hour', 'sixth_hour', 'ninth_hour', 'eleventh_hour', 'twelfth_hour',
+    'prayer_of_the_veil', 'midnight_first_watch', 'midnight_second_watch', 'midnight_third_watch',
+  ]);
+  // Each with the psalms the Agpeya gives it.
+  assert.deepEqual(
+    Object.fromEntries(canon.CANON_AGPEYA_PRAYERS.map((prayer) => [prayer.id, prayer.psalms])),
+    { first_hour: 19, third_hour: 12, sixth_hour: 12, ninth_hour: 12, eleventh_hour: 12, twelfth_hour: 12, prayer_of_the_veil: 29, midnight_first_watch: 9, midnight_second_watch: 10, midnight_third_watch: 12 },
+  );
+  // A watch opens at its own beginning; the first, and the Veil, at the top.
+  assert.equal(canon.canonTaskRoute({ kind: 'agpeya', hourId: 'midnight_first_watch' }), '/agpeya/midnight_hour');
+  assert.equal(canon.canonTaskRoute({ kind: 'agpeya', hourId: 'midnight_second_watch' }), '/agpeya/midnight_hour?at=introductionSecondWatch');
+  assert.equal(canon.canonTaskRoute({ kind: 'agpeya', hourId: 'midnight_third_watch' }), '/agpeya/midnight_hour?at=introductionThirdWatch');
+  assert.equal(canon.canonTaskRoute({ kind: 'agpeya', hourId: 'prayer_of_the_veil' }), '/agpeya/prayer_of_the_veil');
+  // In the praying day: the Veil after the Twelfth Hour, the watches after it, in order.
+  const item = agpeya({ hours: ['midnight_third_watch', 'prayer_of_the_veil', 'midnight_first_watch', 'twelfth_hour', 'midnight_second_watch'].map((id) => plan(id)) });
+  assert.deepEqual(canon.canonTasksForDay(doc([item]), '2026-10-18').map((task) => task.hourId), ['twelfth_hour', 'prayer_of_the_veil', 'midnight_first_watch', 'midnight_second_watch', 'midnight_third_watch']);
+  // A canon saved with the whole Midnight hour reads back as its three watches, time and reminder kept, measure held to each.
+  const legacy = canon.normalizeCanonItem(agpeya({ hours: [plan('first_hour'), plan('midnight_hour', { goal: { kind: 'psalms', count: 31 }, time: '23:30', remind: true })] }));
+  assert.deepEqual(legacy.hours.map((entry) => `${entry.hourId}:${entry.goal.count}:${entry.time}:${entry.remind}`), [
+    'first_hour:undefined:null:false',
+    'midnight_first_watch:9:23:30:true',
+    'midnight_second_watch:10:23:30:true',
+    'midnight_third_watch:12:23:30:true',
+  ]);
+  // A Midnight hour saved alongside a watch it already had keeps that watch's own settings.
+  const both = canon.normalizeCanonItem(agpeya({ hours: [plan('midnight_second_watch', { time: '01:00' }), plan('midnight_hour', { time: '23:30' })] }));
+  assert.deepEqual(both.hours.map((entry) => `${entry.hourId}:${entry.time}`), ['midnight_first_watch:23:30', 'midnight_second_watch:01:00', 'midnight_third_watch:23:30']);
+});
+
+test('a document opens at a section named by hymn key, as it does at a reading', () => {
+  const reader = read('src/components/vine/screens/ServiceDocument.tsx');
+  assert.match(reader, /reading: openAtReading, at: openAtHymnKey \} = useLocalSearchParams<\{ sub\?: string; reading\?: string; at\?: string \}>\(\);/);
+  assert.match(reader, /: newSections\.find\(\(section\) => section\.hymnKey === hymnKeyTarget\)\?\.id \?\? null;/);
 });

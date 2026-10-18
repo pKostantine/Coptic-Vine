@@ -25,12 +25,12 @@ import SubPageHeader from '@/components/vine/ui/SubPageHeader';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
-import { AGPEYA_HOURS } from '@/utils/agpeyaHours';
 import { tr } from '@/utils/appText';
 import { goBack } from '@/utils/navigation';
 import {
   AGPEYA_PSALM_COUNTS,
   agpeyaHourDefaultTime,
+  CANON_AGPEYA_PRAYERS,
   canonGoalStep,
   canonHasReminders,
   canonItemProblem,
@@ -481,16 +481,16 @@ function AgpeyaEditor({ item, today, arabic, remindersNote, onChange }: {
       </EditorCard>
 
       <View style={styles.hours}>
-        {AGPEYA_HOURS.map((hour) => {
-          const plan = plans.find((candidate) => candidate.hourId === hour.id) ?? null;
+        {CANON_AGPEYA_PRAYERS.map((prayer) => {
+          const plan = plans.find((candidate) => candidate.hourId === prayer.id) ?? null;
           return (
             <HourCard
-              key={`${byDay ? editDay : 'same'}-${hour.id}`}
-              hourId={hour.id}
+              key={`${byDay ? editDay : 'same'}-${prayer.id}`}
+              hourId={prayer.id}
               plan={plan}
               arabic={arabic}
               remindersNote={remindersNote}
-              onToggle={() => toggleHour(hour.id)}
+              onToggle={() => toggleHour(prayer.id)}
               onChange={changePlan}
             />
           );
@@ -527,7 +527,8 @@ function HourCard({ hourId, plan, arabic, remindersNote, onToggle, onChange }: {
         <View style={styles.flex}>
           <Text style={[styles.hourName, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{agpeyaHourName(hourId)}</Text>
           <Text style={[styles.hourSub, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-            {[agpeyaHourName(hourId, 'traditional'), psalms ? psalmsLabel(psalms) : null].filter(Boolean).join(' · ')}
+            {/* The short name only where the full one doesn't already say it ("Prime", not "Second Watch" again). */}
+            {[agpeyaHourName(hourId).includes(agpeyaHourName(hourId, 'traditional')) ? null : agpeyaHourName(hourId, 'traditional'), psalms ? psalmsLabel(psalms) : null].filter(Boolean).join(' · ')}
           </Text>
         </View>
       </Pressable>

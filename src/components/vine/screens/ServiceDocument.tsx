@@ -410,7 +410,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
   // to a saved subdocument bookmark) and ?reading=Psalm (lectionaryHref, from
   // a list of the day's readings) — each acted on once, when sections first load.
-  const { sub: initialSubdocumentKey, reading: openAtReading } = useLocalSearchParams<{ sub?: string; reading?: string }>();
+  const { sub: initialSubdocumentKey, reading: openAtReading, at: openAtHymnKey } = useLocalSearchParams<{ sub?: string; reading?: string; at?: string }>();
   // Hyperlinks replace only the source document. The route underneath is still
   // the place from which that source document was opened (its submenu,
   // Bookmarks, and so on), so every exit should pop back to that existing route.
@@ -494,12 +494,17 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           // leaves the reader where they are — and not when coming back from
           // Settings or the Calendar, which restores their place instead (the
           // pending restore the effect below consumes).
+          // Or opened at a section of its own (?at=introductionSecondWatch, a
+          // watch of the Midnight hour from the spiritual canon), by hymn key.
           const readingTarget = openedAtReadingRef.current ? null : parseReadingParam(openAtReading);
-          if (readingTarget) {
+          const hymnKeyTarget = openedAtReadingRef.current || readingTarget ? null : openAtHymnKey?.trim() || null;
+          if (readingTarget || hymnKeyTarget) {
             openedAtReadingRef.current = true;
             const sectionId = getPendingDocumentRestore(documentPositionKey)
               ? null
-              : findReadingSectionId(newSections, readingTarget, readingVisibilityRef.current);
+              : readingTarget
+                ? findReadingSectionId(newSections, readingTarget, readingVisibilityRef.current)
+                : newSections.find((section) => section.hymnKey === hymnKeyTarget)?.id ?? null;
             if (sectionId) {
               // The reader's own first report, from before it lands there,
               // must not overwrite it (see pendingScrollRestoreSectionIdRef).
@@ -540,7 +545,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     return () => {
       cancelled = true;
     };
-  }, [schema, table, title, arabic, french, isSermonPlanner, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, documentPositionKey]);
+  }, [schema, table, title, arabic, french, isSermonPlanner, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, openAtHymnKey, documentPositionKey]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle
