@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Icon from '@/components/vine/ui/Icon';
@@ -104,8 +104,36 @@ export function Stepper({ value, min, max, step, label, format, onChange }: {
   format: (value: number) => string;
   onChange: (value: number) => void;
 }) {
-  const down = Math.max(min, typeof step === 'function' ? step(value, false) : value - step);
-  const up = Math.min(max, typeof step === 'function' ? step(value, true) : value + step);
+  const move = (from: number, upward: boolean) => (upward
+    ? Math.min(max, typeof step === 'function' ? step(from, true) : from + step)
+    : Math.max(min, typeof step === 'function' ? step(from, false) : from - step));
+  const down = move(value, false);
+  const up = move(value, true);
+  // Held, a button keeps counting, one step at a time, until it is let go or
+  // the count reaches its end.
+  const latest = useRef({ value, onChange, move });
+  useEffect(() => {
+    latest.current = { value, onChange, move };
+  });
+  const repeat = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stop = () => {
+    if (repeat.current) clearInterval(repeat.current);
+    repeat.current = null;
+  };
+  useEffect(() => stop, []);
+  const hold = (upward: boolean) => {
+    stop();
+    repeat.current = setInterval(() => {
+      const { value: current, onChange: change, move: next } = latest.current;
+      const target = next(current, upward);
+      if (target === current) {
+        stop();
+        return;
+      }
+      latest.current = { ...latest.current, value: target };
+      change(target);
+    }, 70);
+  };
   return (
     <View style={styles.stepper}>
       <Pressable
@@ -114,6 +142,9 @@ export function Stepper({ value, min, max, step, label, format, onChange }: {
         disabled={value <= min}
         hitSlop={6}
         onPress={() => onChange(down)}
+        onLongPress={() => hold(false)}
+        onPressOut={stop}
+        delayLongPress={350}
         style={({ pressed }) => [styles.stepButton, value <= min && styles.stepButtonOff, pressed && styles.pressed]}
       >
         <Icon name="remove" size={18} color={COLORS.gold} />
@@ -125,6 +156,9 @@ export function Stepper({ value, min, max, step, label, format, onChange }: {
         disabled={value >= max}
         hitSlop={6}
         onPress={() => onChange(up)}
+        onLongPress={() => hold(true)}
+        onPressOut={stop}
+        delayLongPress={350}
         style={({ pressed }) => [styles.stepButton, value >= max && styles.stepButtonOff, pressed && styles.pressed]}
       >
         <Icon name="add" size={18} color={COLORS.gold} />

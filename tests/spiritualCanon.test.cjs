@@ -359,13 +359,13 @@ test('the Bible is measured in chapters, verses, time, or not at all; verses ste
 test('metanias are kept on the days they are made: not on Saturdays, Sundays or feasts, as the calendar says', () => {
   const item = canon.newCanonItem('metania');
   assert.deepEqual(item.frequency, { kind: 'applicable' });
-  assert.deepEqual(item.goal, { kind: 'metanias', count: 50 });
+  assert.deepEqual(item.goal, { kind: 'metanias', count: 10 });
   // Before the calendar is read, a weekday is assumed to be one (a feast is not yet known)…
   const week = ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24'];
   const asked = (calendar) => week.filter((day) => canon.canonTasksForDay(doc([item]), day, calendar).length);
   assert.deepEqual(asked(undefined), week.slice(1, 6));
   // …and the calendar then has the last word: a feast on the Wednesday takes it away.
-  const calendar = { isMetaniaDay: (day) => (day === '2026-10-21' ? false : null) };
+  const calendar = { metaniaDay: (day) => (day === '2026-10-21' ? { applicable: false, fasting: false } : null) };
   assert.deepEqual(asked(calendar), ['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-23']);
   // The days the reminders go out on follow the same calendar.
   const reminding = { ...item, time: '07:00', remind: true };
@@ -374,14 +374,17 @@ test('metanias are kept on the days they are made: not on Saturdays, Sundays or 
   // "All applicable days" belongs to metanias; read back on anything else it is every day.
   assert.deepEqual(canon.normalizeCanonFrequency({ kind: 'applicable' }, 'bible'), { kind: 'daily' });
   assert.deepEqual(canon.normalizeCanonFrequency(undefined, 'metania'), { kind: 'applicable' });
-  assert.deepEqual([...canon.FREQUENCY_KINDS.metania], ['applicable', 'daily', 'weekdays', 'perWeek']);
+  assert.deepEqual([...canon.FREQUENCY_KINDS.metania], ['applicable', 'fastingDays', 'daily', 'weekdays', 'perWeek']);
+  assert.deepEqual(canon.normalizeCanonFrequency({ kind: 'fastingDays' }, 'metania'), { kind: 'fastingDays' });
+  assert.deepEqual(canon.normalizeCanonFrequency({ kind: 'fastingDays' }, 'custom'), { kind: 'daily' });
   assert.equal(canon.normalizeCanonItem({ ...item, goal: { kind: 'metanias', count: 5000 } }).goal.count, 1000);
   assert.equal(canon.canonTaskRoute({ kind: 'metania', hourId: null }), '/canon');
-  // Counted by ones to ten, fives to a hundred, tens beyond.
+  // Counted one at a time, whatever the count: any number can be chosen.
   const up = (value) => canon.canonGoalStep('metanias', value, true);
   const down = (value) => canon.canonGoalStep('metanias', value, false);
-  assert.deepEqual([1, 9, 10, 12, 95, 100, 105, 990, 1000].map(up), [2, 10, 15, 15, 100, 110, 110, 1000, 1000]);
-  assert.deepEqual([2, 10, 11, 15, 100, 101, 110].map(down), [1, 9, 10, 10, 95, 100, 100]);
+  assert.deepEqual([1, 9, 10, 11, 47, 100, 999, 1000].map(up), [2, 10, 11, 12, 48, 101, 1000, 1000]);
+  assert.deepEqual([1, 2, 10, 11, 48, 101].map(down), [1, 1, 9, 10, 47, 100]);
+  assert.equal(canon.GOAL_LIMITS.metanias.initial, 10);
 });
 
 test('the metania rule reads the day’s own flags, by the same engine the books are read with', async () => {
@@ -393,11 +396,18 @@ test('the metania rule reads the day’s own flags, by the same engine the books
   const made = (flags) => engine.evaluateCondition(canon.METANIA_CONDITION, flags);
   assert.equal(made({ Weekdays: true }), true); // an ordinary Tuesday
   assert.equal(made({ Weekends: true, Sunday: true }), false);
-  assert.equal(made({ Feasts: true, GreatFeasts: true, NativityFeast: true }), false); // Nativity, a Thursday
-  assert.equal(made({ Feasts: true, Weekdays: true }), false); // a Wednesday of the Holy Fifty Days
+  assert.equal(made({ Feasts: true, GreatFeasts: true }), false); // a feast
+  assert.equal(made({ Feasts: true, Weekdays: true }), false); // a feast on a weekday
+  assert.equal(canon.METANIA_FASTING_CONDITION, '!(Feasts || Weekends) && Fasts');
+  const fasting = (flags) => engine.evaluateCondition(canon.METANIA_FASTING_CONDITION, flags);
+  assert.equal(fasting({ Weekdays: true }), false); // not a fasting day
+  assert.equal(fasting({ Weekdays: true, Fasts: true, NormalFastingDays: true }), true); // a Wednesday
+  assert.equal(fasting({ Weekdays: true, Fasts: true, GreatFast: true }), true); // a weekday of Great Lent
+  assert.equal(fasting({ Weekends: true, Fasts: true }), false);
+  assert.equal(fasting({ Feasts: true, Fasts: true }), false);
   const calendarSource = read('src/services/canonCalendar.ts');
   // The day itself: not CalendarContext's date (the Books screen's), no evening rollover.
-  assert.match(calendarSource, /const flags = await getContextFlags\(day\);\n\s+return Boolean\(evaluateCondition\(METANIA_CONDITION, flags\)\);/);
+  assert.match(calendarSource, /const flags = await getContextFlags\(day\);\n\s+return \{\n\s+applicable: Boolean\(evaluateCondition\(METANIA_CONDITION, flags\)\),\n\s+fasting: Boolean\(evaluateCondition\(METANIA_FASTING_CONDITION, flags\)\),/);
   assert.doesNotMatch(calendarSource, /CalendarContext|useCalendar/);
 });
 
@@ -414,4 +424,17 @@ test('the time of day is set on wheels: the system’s own on iOS, scrolling col
   // Turning a wheel never drags the sheet closed.
   assert.match(parts, /dialogWidth=\{400\} scroll=\{false\}>/);
   assert.doesNotMatch(parts, /const MINUTES = /);
+});
+
+test('metanias on fasting days only: the calendar’s fasting days that are not weekends or feasts', () => {
+  const item = { ...canon.newCanonItem('metania'), frequency: { kind: 'fastingDays' } };
+  const week = ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24'];
+  const asked = (calendar) => week.filter((day) => canon.canonTasksForDay(doc([item]), day, calendar).length);
+  // A fasting day is never assumed: before the calendar is read, none is asked.
+  assert.deepEqual(asked(undefined), []);
+  const flags = { '2026-10-21': { applicable: true, fasting: true }, '2026-10-23': { applicable: true, fasting: true } };
+  const calendar = { metaniaDay: (day) => flags[day] ?? { applicable: canon.provisionalMetaniaDay(day), fasting: false } };
+  assert.deepEqual(asked(calendar), ['2026-10-21', '2026-10-23']);
+  assert.equal(canon.keptByCalendar(item.frequency), true);
+  assert.equal(canon.keptByCalendar({ kind: 'daily' }), false);
 });

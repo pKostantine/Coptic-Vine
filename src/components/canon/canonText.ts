@@ -153,6 +153,7 @@ function sameDays(days: readonly number[], expected: readonly number[]): boolean
 export function canonFrequencyLabel(frequency: CanonFrequency | { kind: 'byDay' }): string {
   if (frequency.kind === 'daily') return tr('Every day', 'Chaque jour', 'كل يوم');
   if (frequency.kind === 'applicable') return tr('All applicable days', 'Tous les jours prévus', 'كل الأيام المسموح بها');
+  if (frequency.kind === 'fastingDays') return tr('Fasting days', 'Jours de jeûne', 'أيام الصوم');
   if (frequency.kind === 'byDay') return tr('Varies by day', 'Selon le jour', 'حسب اليوم');
   if (frequency.kind === 'perWeek') {
     const times = frequency.times;
@@ -174,13 +175,9 @@ export function canonFrequencyLabel(frequency: CanonFrequency | { kind: 'byDay' 
   return days.map((day) => weekdayShort(day)).join(arabic() ? '، ' : ', ');
 }
 
-/** What "all applicable days" means, said once where it is chosen. */
-export function applicableDaysExplanation(): string {
-  return tr(
-    'Every day metanias are made: not on Saturdays, Sundays or feasts (the Holy Fifty Days and Nativity to Theophany among them), as the Church’s calendar has them.',
-    'Chaque jour où l’on fait les métanies : ni le samedi, ni le dimanche, ni aux fêtes (dont les cinquante jours saints et de Noël à l’Épiphanie), selon le calendrier de l’Église.',
-    'كل يوم تُصنع فيه المطانيات: ليس في السبت والأحد والأعياد (ومنها الخماسين المقدسة ومن الميلاد إلى الغطاس)، حسب تقويم الكنيسة.',
-  );
+/** What the metanias' calendar choices leave out, in a few words, where they are chosen. */
+export function calendarDaysExplanation(): string {
+  return tr('Not weekends or feasts', 'Sauf le week-end et les fêtes', 'ما عدا عطلة نهاية الأسبوع والأعياد');
 }
 
 /** "7:30 AM", "7 h 30", "٧:٣٠ ص": the time of day as the App Language tells it. */

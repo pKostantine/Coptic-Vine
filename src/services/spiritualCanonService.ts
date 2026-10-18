@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 import {
   emptyCanonDocument,
+  type MetaniaDay,
   normalizeCanonDayMarks,
   normalizeCanonDocument,
   normalizeCanonItem,
@@ -26,7 +27,7 @@ function storageKey(identity: string) {
 /** The device's preference for canon reminders here (not the account's: each device decides). */
 const REMINDERS_KEY = 'cv-spiritual-canon-reminders-v1';
 /** The days metanias are made, as last read from the calendar: the canon shows them at once, offline too. */
-const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v1';
+const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v2';
 
 async function readText(key: string): Promise<string | null> {
   if (Platform.OS === 'web') return globalThis.localStorage?.getItem(key) ?? null;
@@ -96,18 +97,20 @@ export async function saveCanonRemindersEnabled(enabled: boolean): Promise<void>
   }
 }
 
-export async function loadCanonCalendarCache(): Promise<Record<string, boolean>> {
+export async function loadCanonCalendarCache(): Promise<Record<string, MetaniaDay>> {
   try {
     const raw = await readText(CALENDAR_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, boolean] => /^\d{4}-\d{2}-\d{2}$/.test(entry[0]) && typeof entry[1] === 'boolean'));
+    return Object.fromEntries(Object.entries(parsed as Record<string, Partial<MetaniaDay>>)
+      .filter(([day, entry]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && typeof entry?.applicable === 'boolean' && typeof entry?.fasting === 'boolean')
+      .map(([day, entry]) => [day, { applicable: Boolean(entry.applicable), fasting: Boolean(entry.fasting) }]));
   } catch {
     return {};
   }
 }
 
-export async function saveCanonCalendarCache(days: Record<string, boolean>): Promise<void> {
+export async function saveCanonCalendarCache(days: Record<string, MetaniaDay>): Promise<void> {
   try {
     await writeText(CALENDAR_KEY, JSON.stringify(days));
   } catch {

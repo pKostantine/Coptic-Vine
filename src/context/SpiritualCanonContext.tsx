@@ -33,6 +33,7 @@ import {
   canonTaskRoute,
   canonTasksForDay,
   canonWeekStart,
+  keptByCalendar,
   changedCanonDays,
   emptyCanonDocument,
   mergeCanonDayMarks,
@@ -48,6 +49,7 @@ import {
   type CanonDocument,
   type CanonItem,
   type CanonTask,
+  type MetaniaDay,
 } from '@/utils/spiritualCanon';
 
 /** How far back the account's marks are read: the weeks the canon shows. */
@@ -114,7 +116,7 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
   // Bumped to send what is waiting for the account again (after it couldn't be reached).
   const [retryTick, setRetryTick] = useState(0);
   // The days metanias are made (canonCalendar.ts), as the calendar has been read so far.
-  const [metaniaDays, setMetaniaDays] = useState<Record<string, boolean>>({});
+  const [metaniaDays, setMetaniaDays] = useState<Record<string, MetaniaDay>>({});
   const calendarRequested = useRef(new Set<string>());
 
   const loaded = state.identity === identity;
@@ -181,15 +183,18 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
       if (calendarRequested.current.has(day)) continue;
       calendarRequested.current.add(day);
       readMetaniaDay(day)
-        .then((made) => setMetaniaDays((current) => (current[day] === made ? current : { ...current, [day]: made })))
+        .then((read) => setMetaniaDays((current) => {
+          const known = current[day];
+          return known && known.applicable === read.applicable && known.fasting === read.fasting ? current : { ...current, [day]: read };
+        }))
         .catch(() => { calendarRequested.current.delete(day); });
     }
   }, []);
-  const calendar = useMemo<CanonCalendar>(() => ({ isMetaniaDay: (day) => metaniaDays[day] ?? null }), [metaniaDays]);
+  const calendar = useMemo<CanonCalendar>(() => ({ metaniaDay: (day) => metaniaDays[day] ?? null }), [metaniaDays]);
 
   // Metanias kept on the days they are made need the calendar: the weeks the
   // Home card, the canon page and the reminders look at.
-  const keepsApplicableDays = document.items.some((item) => item.frequency.kind === 'applicable');
+  const keepsApplicableDays = document.items.some((item) => keptByCalendar(item.frequency));
   useEffect(() => {
     if (!loaded || !keepsApplicableDays) return;
     const from = addCanonDays(canonWeekStart(today), -7);

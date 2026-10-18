@@ -11,8 +11,8 @@ import { AGPEYA_HOURS } from './agpeyaHours';
  *   anything else the believer names (a custom item).
  * - Each is kept every day, on chosen days of the week, or a number of times
  *   a week. The Agpeya can instead keep different hours on each day, and
- *   metanias can be kept on every day the Church makes them: not on
- *   Saturdays, Sundays or feasts (METANIA_CONDITION, from the real calendar).
+ *   metanias can be kept on all applicable days (METANIA_CONDITION) or on
+ *   fasting days only (METANIA_FASTING_CONDITION), from the real calendar.
  * - Each can ask for a measure: a number of psalms (the Agpeya), of chapters
  *   or verses (the Bible), of minutes, or of the believer's own unit ("50
  *   metanias").
@@ -42,16 +42,19 @@ export type CanonFrequency =
   | { kind: 'weekdays'; days: Weekday[] }
   | { kind: 'perWeek'; times: number }
   /** Metanias only: every day they are made, as the calendar says (METANIA_CONDITION). */
-  | { kind: 'applicable' };
+  | { kind: 'applicable' }
+  /** Metanias only: those days that are fasting days (METANIA_FASTING_CONDITION). */
+  | { kind: 'fastingDays' };
 export type CanonFrequencyKind = CanonFrequency['kind'];
 
 /**
- * The days metanias are made: never on a Saturday or a Sunday, nor on a feast
- * (which takes in the Holy Fifty Days, Nativity to Theophany and the rest),
- * as calendar.get_context_flags says of the day — the real day, never the
- * date the Books screen has been moved to.
+ * The days metanias are made: not on a weekend, nor on a feast — the Feasts
+ * and Weekends flags calendar.get_context_flags gives the day, the real day,
+ * never the date the Books screen has been moved to.
  */
 export const METANIA_CONDITION = '!(Feasts || Weekends)';
+/** The same days, the fasting days among them only. */
+export const METANIA_FASTING_CONDITION = '!(Feasts || Weekends) && Fasts';
 
 /** One hour of the Agpeya in an Agpeya item: how much of it, and when. */
 export interface CanonHourPlan {
@@ -148,8 +151,8 @@ export const GOAL_LIMITS: Record<Exclude<CanonGoalKind, 'none'>, { min: number; 
   chapters: { min: 1, max: 150, step: 1, initial: 1 },
   // One at a time up to ten, then by fives (canonGoalStep).
   verses: { min: 1, max: 500, step: 5, initial: 10 },
-  // By ones to ten, fives to a hundred, tens beyond (canonGoalStep).
-  metanias: { min: 1, max: 1000, step: 10, initial: 50 },
+  // One at a time, whatever the count; held, the stepper runs (CanonEditorParts, Stepper).
+  metanias: { min: 1, max: 1000, step: 1, initial: 10 },
   minutes: { min: 5, max: 600, step: 5, initial: 15 },
   times: { min: 1, max: 1000, step: 1, initial: 10 },
 };
@@ -166,7 +169,7 @@ export const GOAL_KINDS: Record<CanonKind, readonly CanonGoalKind[]> = {
 export const FREQUENCY_KINDS: Record<CanonKind, readonly CanonFrequencyKind[]> = {
   agpeya: ['daily', 'weekdays', 'perWeek'],
   bible: ['daily', 'weekdays', 'perWeek'],
-  metania: ['applicable', 'daily', 'weekdays', 'perWeek'],
+  metania: ['applicable', 'fastingDays', 'daily', 'weekdays', 'perWeek'],
   custom: ['daily', 'weekdays', 'perWeek'],
 };
 
@@ -287,16 +290,6 @@ export function canonGoalStep(kind: Exclude<CanonGoalKind, 'none'>, value: numbe
     if (up) return Math.min(max, value < 10 ? value + 1 : Math.floor(value / 5) * 5 + 5);
     return Math.max(min, value <= 10 ? value - 1 : Math.ceil(value / 5) * 5 - 5);
   }
-  if (kind === 'metanias') {
-    // The step for the band the count is moving into: ones, fives, then tens.
-    const band = (count: number) => (count < 10 ? 1 : count < 100 ? 5 : 10);
-    if (up) {
-      const size = band(value);
-      return Math.min(max, Math.floor(value / size) * size + size);
-    }
-    const size = band(value - 1);
-    return Math.max(min, Math.ceil(value / size) * size - size);
-  }
   return Math.max(min, Math.min(max, value + (up ? step : -step)));
 }
 
@@ -330,7 +323,7 @@ export function normalizeCanonGoal(value: unknown, kind: CanonKind, hourId?: str
 export function normalizeCanonFrequency(value: unknown, kind: CanonKind = 'custom'): CanonFrequency {
   if (!value || typeof value !== 'object') return { kind: kind === 'metania' ? 'applicable' : 'daily' };
   const frequency = value as { kind?: unknown; days?: unknown; times?: unknown };
-  if (frequency.kind === 'applicable') return kind === 'metania' ? { kind: 'applicable' } : { kind: 'daily' };
+  if (frequency.kind === 'applicable' || frequency.kind === 'fastingDays') return kind === 'metania' ? { kind: frequency.kind } : { kind: 'daily' };
   if (frequency.kind === 'weekdays') {
     const days = Array.isArray(frequency.days)
       ? [...new Set(frequency.days.map(Number).filter((day): day is Weekday => Number.isInteger(day) && day >= 0 && day <= 6))].sort()
@@ -546,13 +539,20 @@ export function canonTaskKey(itemId: string, hourId?: string | null): string {
   return hourId ? `${itemId}:${hourId}` : itemId;
 }
 
-/**
- * What the canon knows of the Church's calendar: whether metanias are made on
- * a day (METANIA_CONDITION against the day's flags), or null while that day's
- * flags have still to be read.
- */
+/** A day as the calendar has it for metanias: METANIA_CONDITION and METANIA_FASTING_CONDITION against its flags. */
+export interface MetaniaDay {
+  applicable: boolean;
+  fasting: boolean;
+}
+
+/** What the canon knows of the Church's calendar: each day's MetaniaDay, or null while its flags have still to be read. */
 export interface CanonCalendar {
-  isMetaniaDay: (day: string) => boolean | null;
+  metaniaDay: (day: string) => MetaniaDay | null;
+}
+
+/** Whether an item is kept on days the calendar decides, and so needs it read. */
+export function keptByCalendar(frequency: CanonFrequency): boolean {
+  return frequency.kind === 'applicable' || frequency.kind === 'fastingDays';
 }
 
 /** Until a day's flags are read: no metanias on a Saturday or a Sunday; a feast is not yet known. */
@@ -563,7 +563,9 @@ export function provisionalMetaniaDay(day: string): boolean {
 
 function keptOn(frequency: CanonFrequency, day: string, calendar?: CanonCalendar): boolean {
   if (frequency.kind === 'weekdays') return frequency.days.includes(canonWeekday(day));
-  if (frequency.kind === 'applicable') return calendar?.isMetaniaDay(day) ?? provisionalMetaniaDay(day);
+  if (frequency.kind === 'applicable') return calendar?.metaniaDay(day)?.applicable ?? provisionalMetaniaDay(day);
+  // A fasting day is the calendar's to say: none is assumed before it is read.
+  if (frequency.kind === 'fastingDays') return calendar?.metaniaDay(day)?.fasting ?? false;
   return true;
 }
 
