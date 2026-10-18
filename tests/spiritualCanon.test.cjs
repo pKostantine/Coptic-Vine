@@ -398,8 +398,8 @@ test('metanias are kept on the days they are made: not on Saturdays, Sundays or 
 });
 
 test('the metania rule reads the day’s own flags, by the same engine the books are read with', async () => {
-  // Holy Week isn't a feast here, though the calendar marks Pascha week Feasts.
-  assert.equal(canon.METANIA_CONDITION, '!((Feasts && !PaschaWeek) || Weekends)');
+  // Holy Week isn't a feast here, though the calendar marks it Feasts.
+  assert.equal(canon.METANIA_CONDITION, '!((Feasts && !HolyWeek) || Weekends)');
   const engine = load('src/utils/conditionEngine.js', {
     './dateUtils': { toIsoDate: (value) => String(value).slice(0, 10) },
     '../services/contentDataClient': { contentDataClient: {} },
@@ -409,17 +409,22 @@ test('the metania rule reads the day’s own flags, by the same engine the books
   assert.equal(made({ Weekends: true, Sunday: true }), false);
   assert.equal(made({ Feasts: true, GreatFeasts: true }), false); // a feast
   assert.equal(made({ Feasts: true, Weekdays: true }), false); // a feast on a weekday
-  // Holy Week's Monday to Friday, as the calendar has them (Feasts and PaschaWeek): metanias are made.
-  assert.equal(made({ Feasts: true, Pascha: true, PaschaWeek: true, Weekdays: true, Tuesday: true }), true);
-  assert.equal(made({ Feasts: true, Pascha: true, PaschaWeek: true, GoodFriday: true, Weekdays: true }), true);
-  // Its weekends still not: Palm Sunday, Bright Saturday.
-  assert.equal(made({ Feasts: true, PalmSunday: true, PaschaWeek: true, Weekends: true }), false);
-  assert.equal(made({ Feasts: true, BrightSaturday: true, PaschaWeek: true, Weekends: true }), false);
-  assert.equal(canon.METANIA_FASTING_CONDITION, '!((Feasts && !PaschaWeek) || Weekends) && Fasts');
+  // Holy Week's Monday to Friday, as the calendar has them (Feasts and HolyWeek): metanias are made.
+  assert.equal(made({ Feasts: true, Pascha: true, HolyWeek: true, Weekdays: true, Tuesday: true }), true);
+  assert.equal(made({ Feasts: true, Pascha: true, HolyWeek: true, GoodFriday: true, Weekdays: true }), true);
+  // Its weekends still not: Bright Saturday; nor Lazarus Saturday and Palm Sunday, feasts outside HolyWeek.
+  assert.equal(made({ Feasts: true, BrightSaturday: true, HolyWeek: true, Pascha: true, Weekends: true }), false);
+  assert.equal(made({ Feasts: true, LazarusSaturday: true, Pascha: true, Weekends: true }), false);
+  assert.equal(made({ Feasts: true, PalmSunday: true, Pascha: true, Weekends: true }), false);
+  assert.equal(canon.METANIA_FASTING_CONDITION, '!((Feasts && !HolyWeek) || Weekends) && (Fasts || HolyWeek)');
   const fasting = (flags) => engine.evaluateCondition(canon.METANIA_FASTING_CONDITION, flags);
   assert.equal(fasting({ Weekdays: true }), false); // not a fasting day
   assert.equal(fasting({ Weekdays: true, Fasts: true, NormalFastingDays: true }), true); // a Wednesday
   assert.equal(fasting({ Weekdays: true, Fasts: true, GreatFast: true }), true); // a weekday of Great Lent
+  // Holy Week's Monday to Friday are fasting days, though the calendar doesn't mark them Fasts.
+  assert.equal(fasting({ Feasts: true, Pascha: true, HolyWeek: true, Weekdays: true, Monday: true }), true);
+  assert.equal(fasting({ Feasts: true, Pascha: true, HolyWeek: true, GoodFriday: true, Weekdays: true }), true);
+  assert.equal(fasting({ Feasts: true, BrightSaturday: true, HolyWeek: true, Pascha: true, Weekends: true }), false);
   assert.equal(fasting({ Weekends: true, Fasts: true }), false);
   assert.equal(fasting({ Feasts: true, Fasts: true }), false);
   const calendarSource = read('src/services/canonCalendar.ts');
