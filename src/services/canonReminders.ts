@@ -12,9 +12,27 @@ import type { CanonReminderOccurrence } from '@/utils/spiritualCanon';
  * back, so the fortnight keeps rolling forward.
  *
  * Only the canon's are touched: theirs are the identifiers that begin
- * `canon_` (utils/spiritualCanon.ts, upcomingCanonReminders).
+ * `canon_` (utils/spiritualCanon.ts, upcomingCanonReminders). A reminder put
+ * off an hour from the notification itself ("Remind me in an hour",
+ * canonNotificationActions.ts) begins `canonsnooze_`: rescheduling leaves it
+ * be, and it goes when its task is done or the reminders are cleared.
+ *
+ * Each reminder carries the category whose buttons the notification shows
+ * when held — Mark as done, Remind me in an hour — and the canon (account,
+ * or none) it belongs to, so a button pressed with the app closed marks the
+ * right one.
  */
 const PREFIX = 'canon_';
+export const CANON_SNOOZE_PREFIX = 'canonsnooze_';
+/** The category of a canon reminder (no ':' or '-', as expo-notifications asks). */
+export const CANON_REMINDER_CATEGORY = 'canon_reminder';
+export const CANON_ACTION_DONE = 'canon_done';
+export const CANON_ACTION_SNOOZE = 'canon_snooze';
+
+/** A canon reminder, first or put off: every one of them the canon may take away. */
+function isCanonReminder(identifier: string): boolean {
+  return identifier.startsWith(PREFIX) || identifier.startsWith(CANON_SNOOZE_PREFIX);
+}
 
 export interface CanonReminderContent {
   title: string;
@@ -37,6 +55,8 @@ export type CanonReminderResult = 'scheduled' | 'permission_required' | 'unsuppo
 export function scheduleCanonReminders(
   occurrences: CanonReminderOccurrence[],
   describe: (occurrence: CanonReminderOccurrence) => CanonReminderContent,
+  /** The canon these belong to: "user-…", or "local" with no account. */
+  identity: string,
 ): Promise<CanonReminderResult> {
   if (Platform.OS === 'web') return Promise.resolve('unsupported');
   return serial(async () => {
@@ -52,7 +72,7 @@ export function scheduleCanonReminders(
     const wanted = new Map(occurrences.map((occurrence) => {
       const content = describe(occurrence);
       // What the notification says and when: a change to either schedules it afresh.
-      const signature = `${occurrence.at.getTime()}|${content.title}|${content.body}|${content.deepLink}`;
+      const signature = `${occurrence.at.getTime()}|${content.title}|${content.body}|${content.deepLink}|${identity}|${CANON_REMINDER_CATEGORY}`;
       return [occurrence.identifier, { occurrence, content, signature }] as const;
     }));
 
@@ -75,7 +95,8 @@ export function scheduleCanonReminders(
           title: content.title,
           body: content.body,
           sound: 'default',
-          data: { deep_link: content.deepLink, canon: true, taskKey: occurrence.task.key, day: occurrence.day, signature },
+          categoryIdentifier: CANON_REMINDER_CATEGORY,
+          data: { deep_link: content.deepLink, canon: true, taskKey: occurrence.task.key, day: occurrence.day, identity, signature },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -95,7 +116,7 @@ export function clearCanonReminders(): Promise<void> {
     const Notifications = await import('expo-notifications');
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     await Promise.all(scheduled
-      .filter((request) => request.identifier.startsWith(PREFIX))
+      .filter((request) => isCanonReminder(request.identifier))
       .map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)));
   });
 }
@@ -109,7 +130,7 @@ export function cancelCanonRemindersFor(day: string, taskKey: string): Promise<v
     await Promise.all(scheduled
       .filter((request) => {
         const data = request.content.data as Record<string, unknown> | undefined;
-        return request.identifier.startsWith(PREFIX) && data?.day === day && data?.taskKey === taskKey;
+        return isCanonReminder(request.identifier) && data?.day === day && data?.taskKey === taskKey;
       })
       .map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)));
   });

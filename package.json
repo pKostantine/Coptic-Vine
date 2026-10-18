@@ -1,6 +1,6 @@
 {
   "name": "coptic-vine",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "version": "1.0.0",
   "dependencies": {
     "@expo-google-fonts/amiri": "^0.4.1",
@@ -35,6 +35,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
     "expo-system-ui": "~57.0.3",
+    "expo-task-manager": "~57.0.21",
     "expo-updates": "~57.0.26",
     "expo-video": "~57.0.4",
     "expo-web-browser": "~57.0.2",
@@ -74,7 +75,7 @@
     "test:playback": "node --test tests/playbackEngine.test.cjs tests/playbackQueue.test.cjs tests/trackControls.test.cjs tests/lessonPlayback.test.cjs",
     "test:music-ui": "node --test tests/musicLibraryPlaylistUi.test.cjs tests/searchBack.test.cjs tests/learningSeasonLook.test.cjs tests/nowPlayingGestures.test.cjs tests/playerSheets.test.cjs tests/learnAlbumRows.test.cjs",
     "test:share": "node --test tests/shareWorker.test.mjs tests/webManifest.test.cjs tests/screenSeal.test.cjs tests/webHeaders.test.cjs",
-    "test:canon": "node --test tests/spiritualCanon.test.cjs",
+    "test:canon": "node --test tests/spiritualCanon.test.cjs tests/canonNotificationActions.test.cjs",
     "build": "expo export -p web",
     "postbuild": "node scripts/verify-cloudflare-share-worker.mjs",
     "deploy": "npm run build && wrangler deploy",
