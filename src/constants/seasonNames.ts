@@ -165,6 +165,8 @@ const EVENT_INDICATOR_PRIORITIES: Record<string, number> = {
   'bright-saturday': 80,
   ascension: 70,
   pentecost: 70,
+  // Above the Holy Fifty Days' 60, so its Sunday names the day rather than the season.
+  'thomas-sunday': 70,
   annunciation: 70,
   'palm-sunday': 80,
   'feast-of-the-cross': 50,
