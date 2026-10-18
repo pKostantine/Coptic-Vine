@@ -48,7 +48,8 @@ test('a citation reads in the App Language, with Eastern digits in Arabic', () =
   assert.equal(loadOutline('en').citationText(citation, false), 'Luke 4:1-13');
   assert.equal(loadOutline('fr').citationText(citation, false), 'Luc 4,1-13');
   assert.equal(loadOutline('fr').citationText({ ...citation, french: undefined }, false), 'Luke 4:1-13');
-  assert.equal(loadOutline('ar').citationText(citation, true), 'لوقا ٤:١-١٣');
+  // With a right-to-left mark after each separator, so the numbers read in order (localeFormat.ts).
+  assert.equal(loadOutline('ar').citationText(citation, true), 'لوقا ٤:\u200F١-\u200F١٣');
   const { numberedLabel, READING_LABELS } = loadOutline();
   assert.deepEqual(numberedLabel(READING_LABELS.Prophecy, 2), { english: 'Prophecy 2', arabic: 'النبوة ٢', french: 'Prophétie 2' });
   assert.equal(numberedLabel(READING_LABELS.Prophecy, null), READING_LABELS.Prophecy);
@@ -72,7 +73,7 @@ test('a service’s lines are its readings in order: the prophecies first and nu
   ]);
   assert.deepEqual(readingLinesFor('Vespers', undefined, false).map((line) => line.key), ['Psalm', 'Gospel']);
   // In Arabic the citations carry Eastern digits.
-  assert.equal(loadOutline('ar').readingLinesFor('Vespers', [psalm, gospel], true)[1].value, 'لوقا ٤:١-١٣');
+  assert.equal(loadOutline('ar').readingLinesFor('Vespers', [psalm, gospel], true)[1].value, 'لوقا ٤:\u200F١-\u200F١٣');
 });
 
 test('Home folds several prophecies into one line that opens at the first', () => {
