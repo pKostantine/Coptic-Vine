@@ -81,7 +81,7 @@ interface SpiritualCanonValue {
   skippedFor: (day: string) => CanonTask[];
   /** Takes a task off one day's list (any day, ahead too), or puts it back. */
   setTaskSkipped: (day: string, key: string, skipped: boolean) => void;
-  /** How much of the Agpeya the calendar keeps on a day: all of it, the morning's hours only (Palm Sunday), or none (Holy Week). */
+  /** How much of the Agpeya the calendar keeps on a day: all of it, the First, Third and Sixth Hours only (Palm Sunday), or none (Holy Week). */
   agpeyaOn: (day: string) => 'all' | 'beforeEve' | 'none';
   saveItem: (item: CanonItem) => void;
   deleteItem: (id: string) => void;
