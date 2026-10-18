@@ -48,6 +48,7 @@ function plural(count: number, english: [string, string], french: [string, strin
 export function canonKindLabel(kind: CanonKind): string {
   if (kind === 'agpeya') return tr('Agpeya', 'Agpia', 'الأجبية');
   if (kind === 'bible') return tr('Bible', 'Bible', 'الكتاب المقدس');
+  if (kind === 'metania') return tr('Metanias', 'Métanies', 'المطانيات');
   return tr('Custom', 'Personnalisé', 'خاص');
 }
 
@@ -58,10 +59,11 @@ export function agpeyaHourName(hourId: string, form: 'prayer' | 'traditional' | 
   return tr(name.english, name.french, name.arabic);
 }
 
-/** "The First Hour", "Bible reading", or the custom item's own name. */
+/** "The First Hour", "Bible reading", "Metanias", or the custom item's own name. */
 export function canonTaskTitle(task: Pick<CanonTask, 'kind' | 'hourId' | 'title'>): string {
   if (task.kind === 'agpeya' && task.hourId) return agpeyaHourName(task.hourId);
   if (task.kind === 'bible') return tr('Bible reading', 'Lecture de la Bible', 'قراءة الكتاب المقدس');
+  if (task.kind === 'metania') return tr('Metanias', 'Métanies', 'المطانيات');
   return task.title ?? '';
 }
 
@@ -69,6 +71,7 @@ export function canonTaskTitle(task: Pick<CanonTask, 'kind' | 'hourId' | 'title'
 export function canonItemTitle(item: CanonItem): string {
   if (item.kind === 'custom') return item.title;
   if (item.kind === 'bible') return tr('Bible reading', 'Lecture de la Bible', 'قراءة الكتاب المقدس');
+  if (item.kind === 'metania') return tr('Metanias', 'Métanies', 'المطانيات');
   return tr('Agpeya', 'Agpia', 'الأجبية');
 }
 
@@ -91,7 +94,7 @@ export function psalmsLabel(count: number): string {
   return plural(count, ['psalm', 'psalms'], ['psaume', 'psaumes'], { one: 'مزمور واحد', two: 'مزموران', few: 'مزامير', many: 'مزمورًا' });
 }
 
-/** "6 psalms", "All psalms", "2 chapters", "15 min", "50 metanias" — or null for no measure. */
+/** "6 psalms", "All psalms", "2 chapters", "20 verses", "15 min", "50 metanias" — or null for no measure. */
 export function canonGoalLabel(goal: CanonGoal, hourId?: string | null): string | null {
   switch (goal.kind) {
     case 'none':
@@ -101,6 +104,10 @@ export function canonGoalLabel(goal: CanonGoal, hourId?: string | null): string 
       return psalmsLabel(goal.count);
     case 'chapters':
       return plural(goal.count, ['chapter', 'chapters'], ['chapitre', 'chapitres'], { one: 'إصحاح واحد', two: 'إصحاحان', few: 'إصحاحات', many: 'إصحاحًا' });
+    case 'verses':
+      return plural(goal.count, ['verse', 'verses'], ['verset', 'versets'], { one: 'آية واحدة', two: 'آيتان', few: 'آيات', many: 'آية' });
+    case 'metanias':
+      return plural(goal.count, ['metania', 'metanias'], ['métanie', 'métanies'], { one: 'مطانية واحدة', two: 'مطانيتان', few: 'مطانيات', many: 'مطانية' });
     case 'minutes':
       return minutesLabel(goal.count);
     case 'times':
@@ -142,9 +149,10 @@ function sameDays(days: readonly number[], expected: readonly number[]): boolean
   return days.length === expected.length && expected.every((day) => days.includes(day));
 }
 
-/** "Every day", "Mon, Wed, Fri", "3 times a week", "Varies by day". */
+/** "Every day", "Mon, Wed, Fri", "3 times a week", "Varies by day", "Days metanias are made". */
 export function canonFrequencyLabel(frequency: CanonFrequency | { kind: 'byDay' }): string {
   if (frequency.kind === 'daily') return tr('Every day', 'Chaque jour', 'كل يوم');
+  if (frequency.kind === 'applicable') return tr('All applicable days', 'Tous les jours prévus', 'كل الأيام المسموح بها');
   if (frequency.kind === 'byDay') return tr('Varies by day', 'Selon le jour', 'حسب اليوم');
   if (frequency.kind === 'perWeek') {
     const times = frequency.times;
@@ -164,6 +172,15 @@ export function canonFrequencyLabel(frequency: CanonFrequency | { kind: 'byDay' 
   if (sameDays(days, [1, 2, 3, 4, 5])) return tr('Weekdays', 'En semaine', 'أيام العمل');
   if (sameDays(days, [0, 6])) return tr('Weekends', 'Le week-end', 'نهاية الأسبوع');
   return days.map((day) => weekdayShort(day)).join(arabic() ? '، ' : ', ');
+}
+
+/** What "all applicable days" means, said once where it is chosen. */
+export function applicableDaysExplanation(): string {
+  return tr(
+    'Every day metanias are made: not on Saturdays, Sundays or feasts (the Holy Fifty Days and Nativity to Theophany among them), as the Church’s calendar has them.',
+    'Chaque jour où l’on fait les métanies : ni le samedi, ni le dimanche, ni aux fêtes (dont les cinquante jours saints et de Noël à l’Épiphanie), selon le calendrier de l’Église.',
+    'كل يوم تُصنع فيه المطانيات: ليس في السبت والأحد والأعياد (ومنها الخماسين المقدسة ومن الميلاد إلى الغطاس)، حسب تقويم الكنيسة.',
+  );
 }
 
 /** "7:30 AM", "7 h 30", "٧:٣٠ ص": the time of day as the App Language tells it. */

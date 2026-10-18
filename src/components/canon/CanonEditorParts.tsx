@@ -8,11 +8,10 @@ import SheetFrame from '@/components/vine/ui/SheetFrame';
 import { Switch } from '@/components/vine/ui/ToggleRow';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { tr } from '@/utils/appText';
-import { toEasternArabicDigits } from '@/utils/localeFormat';
-import { getCurrentAppLanguage } from '@/utils/preferencesStorage';
-import { canonTime, parseCanonTime, WEEKDAYS, type Weekday } from '@/utils/spiritualCanon';
+import { WEEKDAYS, type Weekday } from '@/utils/spiritualCanon';
 
 import { canonTimeLabel, weekdayInitial, weekdayShort } from './canonText';
+import TimeWheel from './TimeWheel';
 
 const MAX_FONT_SCALE = 1.3;
 
@@ -61,19 +60,52 @@ export function ChoiceSegment<T extends string>({ options, selected, onSelect, a
   );
 }
 
+/** Choices one under another, a gold ring for each and the chosen one filled: for more than a pill holds, or choices that need a word of explanation. */
+export function ChoiceList<T extends string>({ options, selected, onSelect, arabic }: {
+  options: { key: T; label: string; detail?: string | null }[];
+  selected: T;
+  onSelect: (key: T) => void;
+  arabic: boolean;
+}) {
+  return (
+    <View accessibilityRole="radiogroup">
+      {options.map((option, index) => {
+        const active = option.key === selected;
+        return (
+          <Pressable
+            key={option.key}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: active }}
+            aria-checked={active}
+            onPress={() => onSelect(option.key)}
+            style={({ pressed }) => [styles.choice, index > 0 && styles.choiceRule, pressed && styles.pressed]}
+          >
+            <View style={[styles.radio, active && styles.radioOn]}>{active ? <View style={styles.radioDot} /> : null}</View>
+            <View style={styles.flex}>
+              <Text style={[styles.choiceLabel, active && styles.choiceLabelOn, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{option.label}</Text>
+              {option.detail ? <Text style={[styles.inlineDetail, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{option.detail}</Text> : null}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 /** A number with round − and + either side of it. */
 export function Stepper({ value, min, max, step, label, format, onChange }: {
   value: number;
   min: number;
   max: number;
-  step: number;
+  /** How far one tap moves: a fixed amount, or worked out from where it stands (verses: by ones, then by fives). */
+  step: number | ((value: number, up: boolean) => number);
   /** What the number counts, for a screen reader: "Psalms". */
   label: string;
   format: (value: number) => string;
   onChange: (value: number) => void;
 }) {
-  const down = Math.max(min, value - step);
-  const up = Math.min(max, value + step);
+  const down = Math.max(min, typeof step === 'function' ? step(value, false) : value - step);
+  const up = Math.min(max, typeof step === 'function' ? step(value, true) : value + step);
   return (
     <View style={styles.stepper}>
       <Pressable
@@ -239,9 +271,11 @@ export function TimeAndReminder({ time, remind, suggestedTime, arabic, reminders
   );
 }
 
-const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
-
-/** The time of day, chosen on a sheet: the hour, then the minutes, then morning or evening (24 hours in French). */
+/**
+ * The time of day, chosen on a sheet: the wheels of TimeWheel (the system's
+ * own on the iPhone and iPad), then Set. The sheet is dragged closed by its
+ * handle alone, so turning a wheel never closes it.
+ */
 function TimeSheet({ visible, initial, arabic, onClose, onDone }: {
   visible: boolean;
   initial: string;
@@ -258,72 +292,20 @@ function TimeSheet({ visible, initial, arabic, onClose, onDone }: {
   }
   if (!visible && shownFor !== null) setShownFor(null);
 
-  const { hour, minute } = parseCanonTime(draft);
-  const twentyFour = getCurrentAppLanguage() === 'fr';
-  const evening = hour >= 12;
-  const hours = twentyFour ? Array.from({ length: 24 }, (_, index) => index) : [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  const digits = (value: number | string) => (arabic ? toEasternArabicDigits(value) : String(value));
-  const minuteText = (value: number) => digits(`:${String(value).padStart(2, '0')}`);
-  const shownHour = twentyFour ? hour : hour % 12;
-  // A time set to the minute (not on a five) keeps its minute among the choices.
-  const minutes = MINUTES.includes(minute) ? MINUTES : [...MINUTES, minute].sort((a, b) => a - b);
-
   return (
-    <SheetFrame visible={visible} onClose={onClose} closeLabel={tr('Close', 'Fermer', 'إغلاق')} dialogWidth={400}>
+    <SheetFrame visible={visible} onClose={onClose} closeLabel={tr('Close', 'Fermer', 'إغلاق')} dialogWidth={400} scroll={false}>
       <View style={styles.sheet}>
-        <Text style={[styles.sheetKicker, arabic && styles.arabicTight]}>{tr('Time of day', 'Heure', 'الوقت')}</Text>
-        <Text style={styles.sheetTime} accessibilityLiveRegion="polite">{canonTimeLabel(draft)}</Text>
-
-        <FieldLabel arabic={arabic}>{tr('Hour', 'Heure', 'الساعة')}</FieldLabel>
-        <View style={styles.grid}>
-          {hours.map((value) => {
-            const active = twentyFour ? value === hour : value % 12 === shownHour;
-            return (
-              <Pressable
-                key={value}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => setDraft(canonTime(twentyFour ? value : (value % 12) + (evening ? 12 : 0), minute))}
-                style={({ pressed }) => [styles.gridCell, twentyFour && styles.gridCellSmall, active && styles.gridCellActive, pressed && styles.pressed]}
-              >
-                <Text style={[styles.gridText, active && styles.gridTextActive]}>{digits(value)}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.sheetHead}>
+          <Pressable accessibilityRole="button" hitSlop={8} onPress={onClose} style={({ pressed }) => [styles.sheetSide, pressed && styles.pressed]}>
+            <Text style={[styles.sheetCancel, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Cancel', 'Annuler', 'إلغاء')}</Text>
+          </Pressable>
+          <Text style={[styles.sheetKicker, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Time of day', 'Heure', 'الوقت')}</Text>
+          <View style={styles.sheetSide} />
         </View>
-
-        <FieldLabel arabic={arabic}>{tr('Minutes', 'Minutes', 'الدقائق')}</FieldLabel>
-        <View style={styles.grid}>
-          {minutes.map((value) => {
-            const active = value === minute;
-            return (
-              <Pressable
-                key={value}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => setDraft(canonTime(hour, value))}
-                style={({ pressed }) => [styles.gridCell, active && styles.gridCellActive, pressed && styles.pressed]}
-              >
-                <Text style={[styles.gridText, active && styles.gridTextActive]}>{minuteText(value)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {twentyFour ? null : (
-          <ChoiceSegment
-            arabic={arabic}
-            options={[
-              { key: 'am', label: tr('AM', 'Matin', 'صباحًا') },
-              { key: 'pm', label: tr('PM', 'Soir', 'مساءً') },
-            ]}
-            selected={evening ? 'pm' : 'am'}
-            onSelect={(key) => setDraft(canonTime((hour % 12) + (key === 'pm' ? 12 : 0), minute))}
-          />
-        )}
-
+        {/* Mounted afresh on each opening, on the task's own time. */}
+        {visible ? <TimeWheel key={shownFor ?? initial} time={draft} arabic={arabic} onChange={setDraft} /> : null}
         <Pressable accessibilityRole="button" onPress={() => onDone(draft)} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-          <Text style={[styles.primaryText, arabic && styles.arabicTight]}>{tr('Set time', 'Choisir cette heure', 'اختر هذا الوقت')}</Text>
+          <Text style={[styles.primaryText, arabic && styles.arabicTight]}>{`${tr('Set', 'Choisir', 'اختر')} ${canonTimeLabel(draft)}`}</Text>
         </Pressable>
       </View>
     </SheetFrame>
@@ -359,6 +341,14 @@ const styles = StyleSheet.create({
   segmentText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '600' },
   segmentTextActive: { color: COLORS.greenDeep },
 
+  choice: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 46, paddingVertical: 9 },
+  choiceRule: { borderTopColor: 'rgba(255, 255, 255, 0.07)', borderTopWidth: 1 },
+  radio: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 11, borderWidth: 1.5, height: 22, justifyContent: 'center', width: 22 },
+  radioOn: { borderColor: COLORS.gold },
+  radioDot: { backgroundColor: COLORS.gold, borderRadius: 5, height: 10, width: 10 },
+  choiceLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
+  choiceLabelOn: { color: COLORS.white },
+
   stepper: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: 14, flexDirection: 'row', gap: 10, justifyContent: 'space-between', padding: 6 },
   stepButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 18, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
   stepButtonOff: { opacity: 0.35 },
@@ -384,14 +374,10 @@ const styles = StyleSheet.create({
   clear: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 14, height: 28, justifyContent: 'center', width: 28 },
 
   sheet: { gap: 12, paddingBottom: 8, paddingHorizontal: 20, paddingTop: 6 },
+  sheetHead: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  sheetSide: { minWidth: 72 },
+  sheetCancel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
   sheetKicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 1.7, textAlign: 'center', textTransform: 'uppercase' },
-  sheetTime: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 34, fontWeight: '700', marginBottom: 4, textAlign: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  gridCell: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 12, flexBasis: '14.5%', flexGrow: 1, height: 40, justifyContent: 'center' },
-  gridCellSmall: { flexBasis: '14%', height: 36 },
-  gridCellActive: { backgroundColor: COLORS.gold },
-  gridText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
-  gridTextActive: { color: COLORS.greenDeep, fontWeight: '800' },
 
   primary: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 14, height: 48, justifyContent: 'center', marginTop: 4 },
   primaryText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '700' },

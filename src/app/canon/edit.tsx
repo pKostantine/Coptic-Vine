@@ -24,6 +24,7 @@ const MAX_FONT_SCALE = 1.3;
 const CANON_KIND_ICONS: Record<CanonKind, IconName> = {
   agpeya: 'sunrise',
   bible: 'book-outline',
+  metania: 'arrow-down-circle-outline',
   custom: 'checkmark-done',
 };
 
@@ -73,12 +74,21 @@ export default function CanonEditScreen() {
     {
       kind: 'bible',
       title: tr('Bible reading', 'Lecture de la Bible', 'قراءة الكتاب المقدس'),
-      detail: tr('A number of chapters, or a time in the Scriptures', 'Un nombre de chapitres, ou un temps dans les Écritures', 'عدد من الإصحاحات، أو وقت في الكتاب المقدس'),
+      detail: tr('A number of chapters or verses, or a time in the Scriptures', 'Un nombre de chapitres ou de versets, ou un temps dans les Écritures', 'عدد من الإصحاحات أو الآيات، أو وقت في الكتاب المقدس'),
+    },
+    {
+      kind: 'metania',
+      title: tr('Metanias', 'Métanies', 'المطانيات'),
+      detail: tr(
+        'A number of metanias, on every day they are made — never on Saturdays, Sundays or feasts',
+        'Un nombre de métanies, chaque jour où on les fait — jamais le samedi, le dimanche ni aux fêtes',
+        'عدد من المطانيات، في كل يوم تُصنع فيه — ليس في السبت والأحد والأعياد',
+      ),
     },
     {
       kind: 'custom',
       title: tr('Something else', 'Autre chose', 'شيء آخر'),
-      detail: tr('Metanias, a prayer, a fast — anything you keep', 'Métanies, une prière, un jeûne — tout ce que vous gardez', 'مطانيات، صلاة، صوم — كل ما تحافظ عليه'),
+      detail: tr('A prayer, a fast, a spiritual reading — anything you keep', 'Une prière, un jeûne, une lecture spirituelle — tout ce que vous gardez', 'صلاة، صوم، قراءة روحية — كل ما تحافظ عليه'),
     },
   ];
 

@@ -60,7 +60,8 @@ export function CanonTaskRow({ task, arabic, variant, first = false, disabled = 
 }) {
   const title = canonTaskTitle(task);
   const detail = canonTaskDetail(task);
-  const opens = task.kind !== 'custom' && onOpen;
+  // The Agpeya's hours and the Bible open from their rows; metanias and custom items have no page.
+  const opens = (task.kind === 'agpeya' || task.kind === 'bible') && onOpen;
   const action = task.kind === 'agpeya' ? tr('Pray', 'Prier', 'صلِّ') : tr('Read', 'Lire', 'اقرأ');
   const body = (
     <>

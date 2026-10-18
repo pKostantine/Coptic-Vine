@@ -7,19 +7,22 @@ import { AGPEYA_HOURS } from './agpeyaHours';
  * keeps the document on the device and the account, and schedules the
  * reminders from it.
  *
- * - An item is the Agpeya (some of its hours), the Bible, or anything else
- *   the believer names (a custom item).
+ * - An item is the Agpeya (some of its hours), the Bible, metanias, or
+ *   anything else the believer names (a custom item).
  * - Each is kept every day, on chosen days of the week, or a number of times
- *   a week. The Agpeya can instead keep different hours on each day.
+ *   a week. The Agpeya can instead keep different hours on each day, and
+ *   metanias can be kept on every day the Church makes them: not on
+ *   Saturdays, Sundays or feasts (METANIA_CONDITION, from the real calendar).
  * - Each can ask for a measure: a number of psalms (the Agpeya), of chapters
- *   (the Bible), of minutes, or of the believer's own unit ("50 metanias").
+ *   or verses (the Bible), of minutes, or of the believer's own unit ("50
+ *   metanias").
  * - Each task can have a time of day, and a reminder then.
  *
  * A day's tasks are the items due that day; an Agpeya item is one task per
  * hour. Ticking one off is a mark on that day.
  */
 
-export type CanonKind = 'agpeya' | 'bible' | 'custom';
+export type CanonKind = 'agpeya' | 'bible' | 'metania' | 'custom';
 /** 0 is Sunday, as `Date.getUTCDay` counts. The week starts on Sunday. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export const WEEKDAYS: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
@@ -28,6 +31,8 @@ export type CanonGoal =
   | { kind: 'none' }
   | { kind: 'psalms'; count: number }
   | { kind: 'chapters'; count: number }
+  | { kind: 'verses'; count: number }
+  | { kind: 'metanias'; count: number }
   | { kind: 'minutes'; count: number }
   | { kind: 'times'; count: number; unit: string };
 export type CanonGoalKind = CanonGoal['kind'];
@@ -35,7 +40,18 @@ export type CanonGoalKind = CanonGoal['kind'];
 export type CanonFrequency =
   | { kind: 'daily' }
   | { kind: 'weekdays'; days: Weekday[] }
-  | { kind: 'perWeek'; times: number };
+  | { kind: 'perWeek'; times: number }
+  /** Metanias only: every day they are made, as the calendar says (METANIA_CONDITION). */
+  | { kind: 'applicable' };
+export type CanonFrequencyKind = CanonFrequency['kind'];
+
+/**
+ * The days metanias are made: never on a Saturday or a Sunday, nor on a feast
+ * (which takes in the Holy Fifty Days, Nativity to Theophany and the rest),
+ * as calendar.get_context_flags says of the day — the real day, never the
+ * date the Books screen has been moved to.
+ */
+export const METANIA_CONDITION = '!(Feasts || Weekends)';
 
 /** One hour of the Agpeya in an Agpeya item: how much of it, and when. */
 export interface CanonHourPlan {
@@ -71,6 +87,13 @@ export interface BibleCanonItem extends CanonItemBase {
   remind: boolean;
 }
 
+export interface MetaniaCanonItem extends CanonItemBase {
+  kind: 'metania';
+  goal: CanonGoal;
+  time: string | null;
+  remind: boolean;
+}
+
 export interface CustomCanonItem extends CanonItemBase {
   kind: 'custom';
   title: string;
@@ -80,7 +103,7 @@ export interface CustomCanonItem extends CanonItemBase {
   remind: boolean;
 }
 
-export type CanonItem = AgpeyaCanonItem | BibleCanonItem | CustomCanonItem;
+export type CanonItem = AgpeyaCanonItem | BibleCanonItem | MetaniaCanonItem | CustomCanonItem;
 
 /** A task ticked off (or unticked, which is kept so the account's older tick doesn't come back). */
 export interface CanonMark {
@@ -123,6 +146,10 @@ export const AGPEYA_PSALM_COUNTS: Record<string, number> = {
 export const GOAL_LIMITS: Record<Exclude<CanonGoalKind, 'none'>, { min: number; max: number; step: number; initial: number }> = {
   psalms: { min: 1, max: 31, step: 1, initial: 3 },
   chapters: { min: 1, max: 150, step: 1, initial: 1 },
+  // One at a time up to ten, then by fives (canonGoalStep).
+  verses: { min: 1, max: 500, step: 5, initial: 10 },
+  // By ones to ten, fives to a hundred, tens beyond (canonGoalStep).
+  metanias: { min: 1, max: 1000, step: 10, initial: 50 },
   minutes: { min: 5, max: 600, step: 5, initial: 15 },
   times: { min: 1, max: 1000, step: 1, initial: 10 },
 };
@@ -130,8 +157,17 @@ export const GOAL_LIMITS: Record<Exclude<CanonGoalKind, 'none'>, { min: number; 
 /** The goals each kind of item may set. */
 export const GOAL_KINDS: Record<CanonKind, readonly CanonGoalKind[]> = {
   agpeya: ['none', 'psalms', 'minutes'],
-  bible: ['none', 'chapters', 'minutes'],
+  bible: ['none', 'chapters', 'verses', 'minutes'],
+  metania: ['none', 'metanias', 'minutes'],
   custom: ['none', 'minutes', 'times'],
+};
+
+/** How often each kind may be kept: metanias also on every day they are made. */
+export const FREQUENCY_KINDS: Record<CanonKind, readonly CanonFrequencyKind[]> = {
+  agpeya: ['daily', 'weekdays', 'perWeek'],
+  bible: ['daily', 'weekdays', 'perWeek'],
+  metania: ['applicable', 'daily', 'weekdays', 'perWeek'],
+  custom: ['daily', 'weekdays', 'perWeek'],
 };
 
 const HOUR_IDS = new Set(AGPEYA_HOURS.map((hour) => hour.id));
@@ -223,6 +259,9 @@ export function newCanonItem(kind: CanonKind, now = new Date()): CanonItem {
     return { ...base, kind, pattern: 'same', hours: [newHourPlan('first_hour')], days: WEEKDAYS.map(() => []) };
   }
   if (kind === 'bible') return { ...base, kind, goal: { kind: 'chapters', count: 1 }, time: null, remind: false };
+  if (kind === 'metania') {
+    return { ...base, kind, frequency: { kind: 'applicable' }, goal: { kind: 'metanias', count: GOAL_LIMITS.metanias.initial }, time: null, remind: false };
+  }
   return { ...base, kind, title: '', note: '', goal: { kind: 'none' }, time: null, remind: false };
 }
 
@@ -236,6 +275,29 @@ export function canonItemProblem(item: CanonItem): 'title' | 'hours' | 'days' | 
   const usesFrequency = item.kind !== 'agpeya' || item.pattern === 'same';
   if (usesFrequency && item.frequency.kind === 'weekdays' && !item.frequency.days.length) return 'days';
   return null;
+}
+
+/**
+ * The next count a stepper moves to: verses go one at a time up to ten and
+ * by fives after, so a single verse and fifty are both a few taps away.
+ */
+export function canonGoalStep(kind: Exclude<CanonGoalKind, 'none'>, value: number, up: boolean): number {
+  const { min, max, step } = GOAL_LIMITS[kind];
+  if (kind === 'verses') {
+    if (up) return Math.min(max, value < 10 ? value + 1 : Math.floor(value / 5) * 5 + 5);
+    return Math.max(min, value <= 10 ? value - 1 : Math.ceil(value / 5) * 5 - 5);
+  }
+  if (kind === 'metanias') {
+    // The step for the band the count is moving into: ones, fives, then tens.
+    const band = (count: number) => (count < 10 ? 1 : count < 100 ? 5 : 10);
+    if (up) {
+      const size = band(value);
+      return Math.min(max, Math.floor(value / size) * size + size);
+    }
+    const size = band(value - 1);
+    return Math.max(min, Math.ceil(value / size) * size - size);
+  }
+  return Math.max(min, Math.min(max, value + (up ? step : -step)));
 }
 
 // —— Reading back what was stored ——————————————————————————————————————————
@@ -265,9 +327,10 @@ export function normalizeCanonGoal(value: unknown, kind: CanonKind, hourId?: str
   return { kind: goalKind, count } as CanonGoal;
 }
 
-export function normalizeCanonFrequency(value: unknown): CanonFrequency {
-  if (!value || typeof value !== 'object') return { kind: 'daily' };
+export function normalizeCanonFrequency(value: unknown, kind: CanonKind = 'custom'): CanonFrequency {
+  if (!value || typeof value !== 'object') return { kind: kind === 'metania' ? 'applicable' : 'daily' };
   const frequency = value as { kind?: unknown; days?: unknown; times?: unknown };
+  if (frequency.kind === 'applicable') return kind === 'metania' ? { kind: 'applicable' } : { kind: 'daily' };
   if (frequency.kind === 'weekdays') {
     const days = Array.isArray(frequency.days)
       ? [...new Set(frequency.days.map(Number).filter((day): day is Weekday => Number.isInteger(day) && day >= 0 && day <= 6))].sort()
@@ -302,11 +365,11 @@ export function normalizeCanonItem(value: unknown): CanonItem | null {
   if (!value || typeof value !== 'object') return null;
   const item = value as Partial<CanonItem> & Record<string, unknown>;
   if (typeof item.id !== 'string' || !item.id || item.id.length > 120) return null;
-  if (item.kind !== 'agpeya' && item.kind !== 'bible' && item.kind !== 'custom') return null;
+  if (item.kind !== 'agpeya' && item.kind !== 'bible' && item.kind !== 'metania' && item.kind !== 'custom') return null;
   const now = new Date().toISOString();
   const base = {
     id: item.id,
-    frequency: normalizeCanonFrequency(item.frequency),
+    frequency: normalizeCanonFrequency(item.frequency, item.kind),
     createdAt: cleanIso(item.createdAt, now),
     updatedAt: cleanIso(item.updatedAt, now),
   };
@@ -323,6 +386,7 @@ export function normalizeCanonItem(value: unknown): CanonItem | null {
   const time = isCanonTime(item.time) ? item.time : null;
   const remind = Boolean(item.remind) && time != null;
   if (item.kind === 'bible') return { ...base, kind: 'bible', goal: normalizeCanonGoal(item.goal, 'bible'), time, remind };
+  if (item.kind === 'metania') return { ...base, kind: 'metania', goal: normalizeCanonGoal(item.goal, 'metania'), time, remind };
   const title = typeof item.title === 'string' ? item.title.trim().slice(0, MAX_TITLE_LENGTH) : '';
   if (!title) return null;
   const note = typeof item.note === 'string' ? item.note.trim().slice(0, MAX_NOTE_LENGTH) : '';
@@ -482,8 +546,24 @@ export function canonTaskKey(itemId: string, hourId?: string | null): string {
   return hourId ? `${itemId}:${hourId}` : itemId;
 }
 
-function keptOn(frequency: CanonFrequency, weekday: Weekday): boolean {
-  if (frequency.kind === 'weekdays') return frequency.days.includes(weekday);
+/**
+ * What the canon knows of the Church's calendar: whether metanias are made on
+ * a day (METANIA_CONDITION against the day's flags), or null while that day's
+ * flags have still to be read.
+ */
+export interface CanonCalendar {
+  isMetaniaDay: (day: string) => boolean | null;
+}
+
+/** Until a day's flags are read: no metanias on a Saturday or a Sunday; a feast is not yet known. */
+export function provisionalMetaniaDay(day: string): boolean {
+  const weekday = canonWeekday(day);
+  return weekday !== 0 && weekday !== 6;
+}
+
+function keptOn(frequency: CanonFrequency, day: string, calendar?: CanonCalendar): boolean {
+  if (frequency.kind === 'weekdays') return frequency.days.includes(canonWeekday(day));
+  if (frequency.kind === 'applicable') return calendar?.isMetaniaDay(day) ?? provisionalMetaniaDay(day);
   return true;
 }
 
@@ -497,13 +577,14 @@ interface TaskTemplate {
   frequency: CanonFrequency | { kind: 'byDay' };
 }
 
-/** What each item asks of a day of the week, before anything is ticked off. */
-function templatesFor(items: CanonItem[], weekday: Weekday): TaskTemplate[] {
+/** What each item asks of a day, before anything is ticked off. */
+function templatesFor(items: CanonItem[], day: string, calendar?: CanonCalendar): TaskTemplate[] {
+  const weekday = canonWeekday(day);
   const templates: TaskTemplate[] = [];
   for (const item of items) {
     if (item.kind === 'agpeya') {
       const byDay = item.pattern === 'byDay';
-      const plans = byDay ? item.days[weekday] ?? [] : keptOn(item.frequency, weekday) ? item.hours : [];
+      const plans = byDay ? item.days[weekday] ?? [] : keptOn(item.frequency, day, calendar) ? item.hours : [];
       for (const plan of plans) {
         templates.push({
           key: canonTaskKey(item.id, plan.hourId),
@@ -517,7 +598,7 @@ function templatesFor(items: CanonItem[], weekday: Weekday): TaskTemplate[] {
       }
       continue;
     }
-    if (!keptOn(item.frequency, weekday)) continue;
+    if (!keptOn(item.frequency, day, calendar)) continue;
     templates.push({ key: canonTaskKey(item.id), item, hourId: null, goal: item.goal, time: item.time, remind: item.remind, frequency: item.frequency });
   }
   return templates;
@@ -547,8 +628,8 @@ function taskOrder(template: Pick<TaskTemplate, 'time' | 'hourId'>): number {
  * times a week is asked for on each day of the week until it has been done
  * that many times; on a day it was done, it stays, ticked.
  */
-export function canonTasksForDay(document: Pick<CanonDocument, 'items' | 'days'>, day: string): CanonTask[] {
-  const templates = templatesFor(document.items, canonWeekday(day));
+export function canonTasksForDay(document: Pick<CanonDocument, 'items' | 'days'>, day: string, calendar?: CanonCalendar): CanonTask[] {
+  const templates = templatesFor(document.items, day, calendar);
   const tasks: CanonTask[] = [];
   for (const template of templates) {
     const done = isDone(document, day, template.key);
@@ -638,7 +719,7 @@ export function canonMoment(day: string, time: string): Date {
 export function upcomingCanonReminders(
   document: Pick<CanonDocument, 'items' | 'days'>,
   now: Date,
-  options: { horizonDays?: number; limit?: number } = {},
+  options: { horizonDays?: number; limit?: number; calendar?: CanonCalendar } = {},
 ): CanonReminderOccurrence[] {
   const horizon = options.horizonDays ?? REMINDER_HORIZON_DAYS;
   const limit = options.limit ?? MAX_SCHEDULED_REMINDERS;
@@ -646,7 +727,7 @@ export function upcomingCanonReminders(
   const occurrences: CanonReminderOccurrence[] = [];
   for (let offset = 0; offset < horizon; offset += 1) {
     const day = addCanonDays(today, offset);
-    for (const task of canonTasksForDay(document, day)) {
+    for (const task of canonTasksForDay(document, day, options.calendar)) {
       if (!task.remind || !task.time || task.done) continue;
       const at = canonMoment(day, task.time);
       if (at.getTime() <= now.getTime()) continue;

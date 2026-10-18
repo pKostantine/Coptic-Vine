@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
+  ChoiceList,
   ChoiceSegment,
   EditorCard,
   FieldLabel,
@@ -14,7 +15,7 @@ import {
   TimeAndReminder,
   WeekdayChips,
 } from '@/components/canon/CanonEditorParts';
-import { agpeyaHourName, canonFrequencyLabel, canonGoalLabel, canonItemTitle, psalmsLabel, weekdayName } from '@/components/canon/canonText';
+import { agpeyaHourName, applicableDaysExplanation, canonFrequencyLabel, canonGoalLabel, canonItemTitle, psalmsLabel, weekdayName } from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow, SectionHeading } from '@/components/vine/screens/BookPage';
 import BleedPage from '@/components/vine/ui/BleedPage';
@@ -30,9 +31,11 @@ import { goBack } from '@/utils/navigation';
 import {
   AGPEYA_PSALM_COUNTS,
   agpeyaHourDefaultTime,
+  canonGoalStep,
   canonHasReminders,
   canonItemProblem,
   canonWeekday,
+  FREQUENCY_KINDS,
   GOAL_KINDS,
   GOAL_LIMITS,
   MAX_NOTE_LENGTH,
@@ -58,13 +61,16 @@ const PLACEHOLDER = 'rgba(205, 216, 203, 0.55)';
 /** A custom item's reminder, before it has a time of its own, suggests the morning. */
 const MORNING = '07:00';
 
-function goalKindLabel(kind: CanonGoalKind): string {
+function goalKindLabel(kind: CanonGoalKind, short = false): string {
   switch (kind) {
     case 'psalms': return tr('Psalms', 'Psaumes', 'مزامير');
     case 'chapters': return tr('Chapters', 'Chapitres', 'إصحاحات');
+    case 'verses': return tr('Verses', 'Versets', 'آيات');
+    case 'metanias': return tr('Count', 'Nombre', 'العدد');
     case 'minutes': return tr('Time', 'Durée', 'المدة');
     case 'times': return tr('Count', 'Nombre', 'العدد');
-    default: return tr('No measure', 'Sans mesure', 'بلا تحديد');
+    // Four choices in the pill leave room for a short word only.
+    default: return short ? tr('None', 'Aucune', 'بلا') : tr('No measure', 'Sans mesure', 'بلا تحديد');
   }
 }
 
@@ -93,7 +99,7 @@ export default function CanonItemScreen() {
   const arabic = preferences.appLanguage === 'ar';
   const canon = useSpiritualCanon();
   const isNew = params.id === 'new';
-  const kind: CanonKind = params.kind === 'bible' || params.kind === 'custom' ? params.kind : 'agpeya';
+  const kind: CanonKind = params.kind === 'bible' || params.kind === 'metania' || params.kind === 'custom' ? params.kind : 'agpeya';
   const existing = isNew ? null : canon.items.find((item) => item.id === params.id) ?? null;
   const [draft, setDraft] = useState<CanonItem | null>(() => (isNew ? newCanonItem(kind) : existing));
   const [problem, setProblem] = useState<string | null>(null);
@@ -171,7 +177,7 @@ export default function CanonItemScreen() {
                       value={draft.title}
                       onChangeText={(title) => update({ ...draft, title })}
                       maxLength={MAX_TITLE_LENGTH}
-                      placeholder={tr('Metanias, the Jesus Prayer, fasting…', 'Métanies, la prière de Jésus, le jeûne…', 'مطانيات، صلاة يسوع، الصوم…')}
+                      placeholder={tr('The Jesus Prayer, fasting, a spiritual reading…', 'La prière de Jésus, le jeûne, une lecture spirituelle…', 'صلاة يسوع، الصوم، قراءة روحية…')}
                       placeholderTextColor={PLACEHOLDER}
                       returnKeyType="done"
                       style={[styles.input, arabic && styles.arabic]}
@@ -194,7 +200,7 @@ export default function CanonItemScreen() {
                 <AgpeyaEditor item={draft} today={canon.today} arabic={arabic} remindersNote={remindersNote} onChange={update} />
               ) : (
                 <>
-                  <View style={draft.kind === 'bible' ? styles.firstSection : null}>
+                  <View style={draft.kind === 'bible' || draft.kind === 'metania' ? styles.firstSection : null}>
                     <SectionHeading size="page" title={tr('How much', 'Combien', 'المقدار')} arabic={arabic} />
                   </View>
                   <EditorCard>
@@ -207,7 +213,7 @@ export default function CanonItemScreen() {
                 <>
                   <SectionHeading size="page" title={tr('How often', 'À quelle fréquence', 'كم مرة')} arabic={arabic} />
                   <EditorCard>
-                    <FrequencyEditor frequency={draft.frequency} today={canon.today} arabic={arabic} onChange={(frequency) => update({ ...draft, frequency })} />
+                    <FrequencyEditor kind={draft.kind} frequency={draft.frequency} today={canon.today} arabic={arabic} onChange={(frequency) => update({ ...draft, frequency })} />
                   </EditorCard>
                 </>
               ) : null}
@@ -272,7 +278,7 @@ function GoalEditor({ kind, goal, hourId, arabic, onChange }: {
     <View style={styles.goal}>
       <ChoiceSegment
         arabic={arabic}
-        options={GOAL_KINDS[kind].map((option) => ({ key: option, label: goalKindLabel(option) }))}
+        options={GOAL_KINDS[kind].map((option) => ({ key: option, label: goalKindLabel(option, GOAL_KINDS[kind].length > 3) }))}
         selected={goal.kind}
         onSelect={select}
       />
@@ -281,7 +287,7 @@ function GoalEditor({ kind, goal, hourId, arabic, onChange }: {
           value={goal.count}
           min={GOAL_LIMITS[goal.kind].min}
           max={maxFor(goal.kind)}
-          step={GOAL_LIMITS[goal.kind].step}
+          step={(value, up) => canonGoalStep(goal.kind as Exclude<CanonGoalKind, 'none'>, value, up)}
           label={goalKindLabel(goal.kind)}
           format={(count) => canonGoalLabel({ ...goal, count } as CanonGoal, hourId) ?? String(count)}
           onChange={(count) => onChange({ ...goal, count } as CanonGoal)}
@@ -302,32 +308,53 @@ function GoalEditor({ kind, goal, hourId, arabic, onChange }: {
   );
 }
 
-/** Every day, on chosen days of the week, or a number of times a week. */
-function FrequencyEditor({ frequency, today, arabic, onChange }: {
+function frequencyKindLabel(kind: CanonFrequency['kind'], long = false): string {
+  switch (kind) {
+    case 'applicable': return tr('All applicable days', 'Tous les jours prévus', 'كل الأيام المسموح بها');
+    case 'weekdays': return long ? tr('On certain days of the week', 'Certains jours de la semaine', 'في أيام معيّنة من الأسبوع') : tr('Some days', 'Certains jours', 'أيام معيّنة');
+    case 'perWeek': return long ? tr('A number of times a week', 'Un nombre de fois par semaine', 'عددًا من المرات في الأسبوع') : tr('Per week', 'Par semaine', 'في الأسبوع');
+    default: return tr('Every day', 'Chaque jour', 'كل يوم');
+  }
+}
+
+/** Every day, on chosen days of the week, a number of times a week — and for metanias, every day they are made. */
+function FrequencyEditor({ kind, frequency, today, arabic, onChange }: {
+  kind: CanonKind;
   frequency: CanonFrequency;
   today: string;
   arabic: boolean;
   onChange: (frequency: CanonFrequency) => void;
 }) {
-  const select = (kind: CanonFrequency['kind']) => {
-    if (kind === frequency.kind) return;
-    if (kind === 'daily') onChange({ kind: 'daily' });
+  const select = (next: CanonFrequency['kind']) => {
+    if (next === frequency.kind) return;
+    if (next === 'daily') onChange({ kind: 'daily' });
+    else if (next === 'applicable') onChange({ kind: 'applicable' });
     // Chosen days start from today's.
-    else if (kind === 'weekdays') onChange({ kind: 'weekdays', days: [canonWeekday(today)] });
+    else if (next === 'weekdays') onChange({ kind: 'weekdays', days: [canonWeekday(today)] });
     else onChange({ kind: 'perWeek', times: 3 });
   };
   return (
     <View style={styles.goal}>
-      <ChoiceSegment
-        arabic={arabic}
-        options={[
-          { key: 'daily', label: tr('Every day', 'Chaque jour', 'كل يوم') },
-          { key: 'weekdays', label: tr('Some days', 'Certains jours', 'أيام معيّنة') },
-          { key: 'perWeek', label: tr('Per week', 'Par semaine', 'في الأسبوع') },
-        ]}
-        selected={frequency.kind}
-        onSelect={select}
-      />
+      {FREQUENCY_KINDS[kind].length > 3 ? (
+        // Metanias' four choices, the first explained where it is chosen.
+        <ChoiceList
+          arabic={arabic}
+          options={FREQUENCY_KINDS[kind].map((option) => ({
+            key: option,
+            label: frequencyKindLabel(option, true),
+            detail: option === 'applicable' ? applicableDaysExplanation() : null,
+          }))}
+          selected={frequency.kind}
+          onSelect={select}
+        />
+      ) : (
+        <ChoiceSegment
+          arabic={arabic}
+          options={FREQUENCY_KINDS[kind].map((option) => ({ key: option, label: frequencyKindLabel(option) }))}
+          selected={frequency.kind}
+          onSelect={select}
+        />
+      )}
       {frequency.kind === 'weekdays' ? (
         <>
           <WeekdayChips
