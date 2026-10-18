@@ -1,18 +1,26 @@
+import Foundation
 import ExpoModulesCore
 import MediaPlayer
 
 /**
  * The lock screen's and Control Center's next and previous track buttons.
- * expo-audio offers only its 10-second skips there, while Coptic Vine plays
- * a queue: this turns the track buttons on in their place and passes each
- * press to JavaScript, which moves through the queue (PlaybackContext.tsx).
+ * expo-audio and expo-video offer only their 10-second skips there, while
+ * Coptic Vine plays a queue: this turns the track buttons on in their place
+ * and passes each press to JavaScript, which moves through the queue
+ * (PlaybackContext.tsx).
  *
- * expo-audio never touches these two commands, so the two can share the
- * remote command center; with its skips switched off, iOS shows these.
+ * Neither player touches these two commands, so they can share the remote
+ * command center; iOS shows them once the skips are off. expo-audio leaves its
+ * skips off when asked to, but expo-video turns its skips back on every time
+ * a lesson loads, plays or becomes ready (its NowPlayingManager), so while
+ * anything plays this keeps the skips off, whoever turned them on.
  */
 public class TrackControlsModule: Module {
   private var nextTarget: Any?
   private var previousTarget: Any?
+  private var skipObservers: [NSKeyValueObservation] = []
+  // While anything plays the track buttons stand in for the skips.
+  private var holdingSkipsOff = false
 
   public func definition() -> ModuleDefinition {
     Name("TrackControls")
@@ -50,10 +58,55 @@ public class TrackControlsModule: Module {
     }
     commands.nextTrackCommand.isEnabled = canGoNext
     commands.previousTrackCommand.isEnabled = canGoPrevious
+
+    holdingSkipsOff = canGoPrevious
+    guard holdingSkipsOff else {
+      return
+    }
+    observeSkips(commands)
+    turnSkipsOff()
+    // expo-video turns its skips on from a block it queues on the main thread;
+    // one queued just before this call runs after it, so look once more.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+      self?.turnSkipsOff()
+    }
+  }
+
+  // Turns a skip off again as soon as anything turns it on.
+  private func observeSkips(_ commands: MPRemoteCommandCenter) {
+    guard skipObservers.isEmpty else {
+      return
+    }
+    skipObservers = [commands.skipForwardCommand, commands.skipBackwardCommand].map { command in
+      command.observe(\.isEnabled, options: [.new]) { [weak self] _, change in
+        guard change.newValue == true else {
+          return
+        }
+        DispatchQueue.main.async {
+          self?.turnSkipsOff()
+        }
+      }
+    }
+  }
+
+  private func turnSkipsOff() {
+    guard holdingSkipsOff else {
+      return
+    }
+    let commands = MPRemoteCommandCenter.shared()
+    if commands.skipForwardCommand.isEnabled {
+      commands.skipForwardCommand.isEnabled = false
+    }
+    if commands.skipBackwardCommand.isEnabled {
+      commands.skipBackwardCommand.isEnabled = false
+    }
   }
 
   private func removeTargets() {
     let commands = MPRemoteCommandCenter.shared()
+    holdingSkipsOff = false
+    skipObservers.forEach { $0.invalidate() }
+    skipObservers = []
     if let target = nextTarget {
       commands.nextTrackCommand.removeTarget(target)
     }
