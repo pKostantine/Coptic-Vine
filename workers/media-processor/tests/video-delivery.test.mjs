@@ -157,7 +157,7 @@ test('the FFmpeg command bounds decoder threads, strips metadata and makes the a
   assert.ok(!piped.includes('/tmp/audio.m4a'));
 });
 
-test('a file uploaded while FFmpeg writes it arrives byte-for-byte, first part last', async () => {
+test('a file uploaded while FFmpeg writes it arrives byte-for-byte, its first part once FFmpeg is done', async () => {
   const client = fakeR2();
   const output = path.join(dir, 'growing.mp4');
   const uploader = new GrowingFileUploader({
@@ -176,7 +176,9 @@ test('a file uploaded while FFmpeg writes it arrives byte-for-byte, first part l
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
   })();
+  const partUploads = () => client.log.filter((entry) => entry.command === 'UploadPartCommand').map((entry) => entry.partNumber);
   await encode;
+  const duringEncode = partUploads();
   running = false;
   await pumping;
   const result = await uploader.finish();
@@ -184,9 +186,11 @@ test('a file uploaded while FFmpeg writes it arrives byte-for-byte, first part l
   const stored = client.objects.get('chc-learning/growing.mp4');
   assert.deepEqual(stored, await readFile(output));
   assert.ok(result.partsCount > 10, `expected many parts, got ${result.partsCount}`);
-  const partUploads = client.log.filter((entry) => entry.command === 'UploadPartCommand').map((entry) => entry.partNumber);
-  assert.equal(partUploads.at(-1), 1, 'the first part, holding the patched header, uploads last');
-  assert.ok(partUploads.indexOf(2) < partUploads.length - 2, 'later parts uploaded during the encode');
+  assert.ok(duringEncode.includes(2), 'later parts uploaded during the encode');
+  // The first part holds the header FFmpeg patches as it exits. finish() sends
+  // it alongside the last few parts, so which of them reaches R2 first varies.
+  assert.ok(!duringEncode.includes(1), 'the first part waits for FFmpeg to exit');
+  assert.deepEqual(partUploads().filter((part) => part === 1), [1], 'the first part uploads exactly once');
 });
 
 test('freeing uploaded parts never touches bytes FFmpeg still needs', async () => {

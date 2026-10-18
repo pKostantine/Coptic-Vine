@@ -49,9 +49,9 @@ async function readExactly(handle, offset, length) {
  * FFmpeg writes an MP4 front to back and, when it finishes, goes back only to
  * the first few dozen bytes to record the media data's size (then appends the
  * index at the end). So every part after the first is final the moment it has
- * been written: those parts upload during the encode, and the first part is
- * uploaded last. With `freeUploadedBytes`, each uploaded part's disk blocks
- * are given back, so a multi-GB rendition needs only a few parts of disk.
+ * been written: those parts upload during the encode, and the first part
+ * once FFmpeg has exited. With `freeUploadedBytes`, each uploaded part's disk
+ * blocks are given back, so a multi-GB rendition needs only a few parts of disk.
  */
 export class GrowingFileUploader {
   constructor({
