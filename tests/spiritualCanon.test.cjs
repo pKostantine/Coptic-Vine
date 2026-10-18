@@ -18,7 +18,12 @@ function load(path, stubs = {}) {
   return moduleObject.exports;
 }
 
-const localeStub = { toEasternArabicDigits: (value) => String(value).replace(/\d/g, (digit) => '٠١٢٣٤٥٦٧٨٩'[digit]) };
+const localeStub = {
+  toEasternArabicDigits: (value) => String(value).replace(/\d/g, (digit) => '٠١٢٣٤٥٦٧٨٩'[digit]),
+  WEEKDAYS_EN: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  WEEKDAYS_FR: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
+  WEEKDAYS_AR: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
+};
 const agpeyaHours = load('src/utils/agpeyaHours.ts', { './localeFormat': localeStub });
 const canon = load('src/utils/spiritualCanon.ts', { './agpeyaHours': agpeyaHours });
 
@@ -215,6 +220,11 @@ test('the canon speaks each App Language, Arabic counting as Arabic counts', () 
   assert.equal(text.canonGoalLabel({ kind: 'psalms', count: 1 }), '1 psalm');
   assert.equal(text.canonGoalLabel({ kind: 'psalms', count: 12 }, 'third_hour'), 'All psalms');
   assert.equal(text.canonGoalLabel({ kind: 'minutes', count: 90 }), '1 hr 30 min');
+  assert.equal(text.canonGoalLabel({ kind: 'verses', count: 1 }), '1 verse');
+  assert.equal(text.canonGoalLabel({ kind: 'verses', count: 20 }), '20 verses');
+  assert.equal(text.canonGoalLabel({ kind: 'metanias', count: 1 }), '1 metania');
+  assert.equal(text.canonFrequencyLabel({ kind: 'applicable' }), 'All applicable days');
+  assert.equal(text.canonTaskTitle({ kind: 'metania', hourId: null, title: null }), 'Metanias');
   assert.equal(text.canonGoalLabel({ kind: 'times', count: 50, unit: 'metanias' }), '50 metanias');
   assert.equal(text.canonFrequencyLabel({ kind: 'weekdays', days: [1, 2, 3, 4, 5] }), 'Weekdays');
   assert.equal(text.canonFrequencyLabel({ kind: 'weekdays', days: [0, 3, 5] }), 'Sun, Wed, Fri');
@@ -231,6 +241,10 @@ test('the canon speaks each App Language, Arabic counting as Arabic counts', () 
   assert.equal(text.canonGoalLabel({ kind: 'psalms', count: 6 }), '٦ مزامير');
   assert.equal(text.canonGoalLabel({ kind: 'psalms', count: 11 }), '١١ مزمورًا');
   assert.equal(text.canonGoalLabel({ kind: 'chapters', count: 3 }), '٣ إصحاحات');
+  assert.equal(text.canonGoalLabel({ kind: 'verses', count: 2 }), 'آيتان');
+  assert.equal(text.canonGoalLabel({ kind: 'metanias', count: 50 }), '٥٠ مطانية');
+  assert.equal(text.canonGoalLabel({ kind: 'metanias', count: 7 }), '٧ مطانيات');
+  assert.equal(text.canonGoalLabel({ kind: 'verses', count: 15 }), '١٥ آية');
   assert.equal(text.canonTimeLabel('18:00'), '٦:٠٠ م');
   assert.equal(text.weeklyProgressLabel(1, 3), '١ من ٣ هذا الأسبوع');
 });
@@ -326,4 +340,78 @@ test('rescheduling keeps what is unchanged, replaces what moved, and never touch
     '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'chc-default' },
   });
   assert.equal(await web.scheduleCanonReminders([occurrence('canon_new')], describe), 'unsupported');
+});
+
+test('the Bible is measured in chapters, verses, time, or not at all; verses step by ones, then fives', () => {
+  assert.deepEqual([...canon.GOAL_KINDS.bible], ['none', 'chapters', 'verses', 'minutes']);
+  assert.deepEqual(canon.normalizeCanonGoal({ kind: 'verses', count: 20 }, 'bible'), { kind: 'verses', count: 20 });
+  assert.deepEqual(canon.normalizeCanonGoal({ kind: 'verses', count: 9000 }, 'bible'), { kind: 'verses', count: 500 });
+  // Verses are the Bible's measure only.
+  assert.deepEqual(canon.normalizeCanonGoal({ kind: 'verses', count: 5 }, 'agpeya', 'first_hour'), { kind: 'none' });
+  const up = (value) => canon.canonGoalStep('verses', value, true);
+  const down = (value) => canon.canonGoalStep('verses', value, false);
+  assert.deepEqual([1, 9, 10, 12, 15, 495, 500].map(up), [2, 10, 15, 15, 20, 500, 500]);
+  assert.deepEqual([1, 2, 10, 12, 15, 20].map(down), [1, 1, 9, 10, 10, 15]);
+  assert.equal(canon.canonGoalStep('chapters', 3, true), 4);
+  assert.equal(canon.canonGoalStep('minutes', 5, false), 5);
+});
+
+test('metanias are kept on the days they are made: not on Saturdays, Sundays or feasts, as the calendar says', () => {
+  const item = canon.newCanonItem('metania');
+  assert.deepEqual(item.frequency, { kind: 'applicable' });
+  assert.deepEqual(item.goal, { kind: 'metanias', count: 50 });
+  // Before the calendar is read, a weekday is assumed to be one (a feast is not yet known)…
+  const week = ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24'];
+  const asked = (calendar) => week.filter((day) => canon.canonTasksForDay(doc([item]), day, calendar).length);
+  assert.deepEqual(asked(undefined), week.slice(1, 6));
+  // …and the calendar then has the last word: a feast on the Wednesday takes it away.
+  const calendar = { isMetaniaDay: (day) => (day === '2026-10-21' ? false : null) };
+  assert.deepEqual(asked(calendar), ['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-23']);
+  // The days the reminders go out on follow the same calendar.
+  const reminding = { ...item, time: '07:00', remind: true };
+  const days = canon.upcomingCanonReminders(doc([reminding]), new Date(2026, 9, 18, 8, 0), { horizonDays: 7, calendar }).map((entry) => entry.day);
+  assert.deepEqual(days, ['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-23']);
+  // "All applicable days" belongs to metanias; read back on anything else it is every day.
+  assert.deepEqual(canon.normalizeCanonFrequency({ kind: 'applicable' }, 'bible'), { kind: 'daily' });
+  assert.deepEqual(canon.normalizeCanonFrequency(undefined, 'metania'), { kind: 'applicable' });
+  assert.deepEqual([...canon.FREQUENCY_KINDS.metania], ['applicable', 'daily', 'weekdays', 'perWeek']);
+  assert.equal(canon.normalizeCanonItem({ ...item, goal: { kind: 'metanias', count: 5000 } }).goal.count, 1000);
+  assert.equal(canon.canonTaskRoute({ kind: 'metania', hourId: null }), '/canon');
+  // Counted by ones to ten, fives to a hundred, tens beyond.
+  const up = (value) => canon.canonGoalStep('metanias', value, true);
+  const down = (value) => canon.canonGoalStep('metanias', value, false);
+  assert.deepEqual([1, 9, 10, 12, 95, 100, 105, 990, 1000].map(up), [2, 10, 15, 15, 100, 110, 110, 1000, 1000]);
+  assert.deepEqual([2, 10, 11, 15, 100, 101, 110].map(down), [1, 9, 10, 10, 95, 100, 100]);
+});
+
+test('the metania rule reads the day’s own flags, by the same engine the books are read with', async () => {
+  assert.equal(canon.METANIA_CONDITION, '!(Feasts || Weekends)');
+  const engine = load('src/utils/conditionEngine.js', {
+    './dateUtils': { toIsoDate: (value) => String(value).slice(0, 10) },
+    '../services/contentDataClient': { contentDataClient: {} },
+  });
+  const made = (flags) => engine.evaluateCondition(canon.METANIA_CONDITION, flags);
+  assert.equal(made({ Weekdays: true }), true); // an ordinary Tuesday
+  assert.equal(made({ Weekends: true, Sunday: true }), false);
+  assert.equal(made({ Feasts: true, GreatFeasts: true, NativityFeast: true }), false); // Nativity, a Thursday
+  assert.equal(made({ Feasts: true, Weekdays: true }), false); // a Wednesday of the Holy Fifty Days
+  const calendarSource = read('src/services/canonCalendar.ts');
+  // The day itself: not CalendarContext's date (the Books screen's), no evening rollover.
+  assert.match(calendarSource, /const flags = await getContextFlags\(day\);\n\s+return Boolean\(evaluateCondition\(METANIA_CONDITION, flags\)\);/);
+  assert.doesNotMatch(calendarSource, /CalendarContext|useCalendar/);
+});
+
+test('the time of day is set on wheels: the system’s own on iOS, scrolling columns elsewhere', () => {
+  const ios = read('src/components/canon/TimeWheel.ios.tsx');
+  assert.match(ios, /<Host colorScheme="dark" style=\{styles\.host\}>/);
+  assert.match(ios, /displayedComponents=\{\['hourAndMinute'\]\}/);
+  assert.match(ios, /modifiers=\{\[datePickerStyle\('wheel'\), labelsHidden\(\)/);
+  const wheel = read('src/components/canon/TimeWheel.tsx');
+  assert.match(wheel, /snapToInterval=\{ROW\}/);
+  assert.match(wheel, /scrollSnapType: 'y mandatory'/);
+  assert.match(wheel, /accessibilityRole="adjustable"/);
+  const parts = read('src/components/canon/CanonEditorParts.tsx');
+  // Turning a wheel never drags the sheet closed.
+  assert.match(parts, /dialogWidth=\{400\} scroll=\{false\}>/);
+  assert.doesNotMatch(parts, /const MINUTES = /);
 });

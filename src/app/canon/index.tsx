@@ -2,7 +2,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import Head from 'expo-router/head';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CanonProgressBar, CanonTaskRow, CanonWeekStrip, type CanonDayState } from '@/components/canon/CanonParts';
@@ -38,6 +38,12 @@ export default function CanonScreen() {
   const day = chosen ?? canon.today;
   const weekStart = canonWeekStart(day);
   const weekDays = Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset));
+  // Metanias kept on the days they are made: the week shown is read from the calendar.
+  const keepsApplicableDays = canon.items.some((item) => item.frequency.kind === 'applicable');
+  const { ensureCalendarDays } = canon;
+  useEffect(() => {
+    if (keepsApplicableDays) ensureCalendarDays(Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset)));
+  }, [ensureCalendarDays, keepsApplicableDays, weekStart]);
   const tasks = canon.tasksFor(day);
   const progress = canonDayProgress(tasks);
   const future = day > canon.today;

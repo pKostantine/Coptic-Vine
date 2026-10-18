@@ -25,6 +25,8 @@ function storageKey(identity: string) {
 
 /** The device's preference for canon reminders here (not the account's: each device decides). */
 const REMINDERS_KEY = 'cv-spiritual-canon-reminders-v1';
+/** The days metanias are made, as last read from the calendar: the canon shows them at once, offline too. */
+const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v1';
 
 async function readText(key: string): Promise<string | null> {
   if (Platform.OS === 'web') return globalThis.localStorage?.getItem(key) ?? null;
@@ -91,6 +93,25 @@ export async function saveCanonRemindersEnabled(enabled: boolean): Promise<void>
     await writeText(REMINDERS_KEY, enabled ? 'on' : 'off');
   } catch {
     // The choice holds for this session.
+  }
+}
+
+export async function loadCanonCalendarCache(): Promise<Record<string, boolean>> {
+  try {
+    const raw = await readText(CALENDAR_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, boolean] => /^\d{4}-\d{2}-\d{2}$/.test(entry[0]) && typeof entry[1] === 'boolean'));
+  } catch {
+    return {};
+  }
+}
+
+export async function saveCanonCalendarCache(days: Record<string, boolean>): Promise<void> {
+  try {
+    await writeText(CALENDAR_KEY, JSON.stringify(days));
+  } catch {
+    // Read again from the calendar next time.
   }
 }
 

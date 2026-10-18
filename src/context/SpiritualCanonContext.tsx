@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { canonReminderText } from '@/components/canon/canonText';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { readMetaniaDay } from '@/services/canonCalendar';
 import {
   cancelCanonRemindersFor,
   clearCanonReminders,
@@ -12,11 +13,13 @@ import {
 import { localNotificationPermission, type LocalNotificationPermission } from '@/services/notificationService';
 import {
   clearLocalCanon,
+  loadCanonCalendarCache,
   loadCanonRemindersEnabled,
   loadCloudCanon,
   loadCloudCanonDays,
   loadCloudCanonDefinition,
   loadLocalCanon,
+  saveCanonCalendarCache,
   saveCanonRemindersEnabled,
   saveCloudCanonDays,
   saveCloudCanonDefinition,
@@ -29,15 +32,18 @@ import {
   canonHasReminders,
   canonTaskRoute,
   canonTasksForDay,
+  canonWeekStart,
   changedCanonDays,
   emptyCanonDocument,
   mergeCanonDayMarks,
   mergeCanonDocuments,
   pruneCanonDays,
+  REMINDER_HORIZON_DAYS,
   upcomingCanonReminders,
   withCanonItem,
   withCanonMark,
   withoutCanonItem,
+  type CanonCalendar,
   type CanonDayMarks,
   type CanonDocument,
   type CanonItem,
@@ -47,6 +53,8 @@ import {
 /** How far back the account's marks are read: the weeks the canon shows. */
 const CLOUD_DAYS_BACK = 42;
 const CLOUD_SAVE_DELAY_MS = 800;
+/** The days of the calendar the canon keeps: the weeks either side of today. */
+const CALENDAR_DAYS_KEPT = 60;
 const REMINDER_DELAY_MS = 600;
 
 interface SpiritualCanonValue {
@@ -57,6 +65,8 @@ interface SpiritualCanonValue {
   /** The device's calendar day, "YYYY-MM-DD"; it turns at midnight. */
   today: string;
   tasksFor: (day: string) => CanonTask[];
+  /** Reads from the calendar whether metanias are made on these days (the week the canon page shows). */
+  ensureCalendarDays: (days: string[]) => void;
   /** Ticks a task off for a day, or unticks it. A day still to come can't be ticked. */
   setTaskDone: (day: string, key: string, done: boolean) => void;
   saveItem: (item: CanonItem) => void;
@@ -103,6 +113,9 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
   const [foregroundTick, setForegroundTick] = useState(0);
   // Bumped to send what is waiting for the account again (after it couldn't be reached).
   const [retryTick, setRetryTick] = useState(0);
+  // The days metanias are made (canonCalendar.ts), as the calendar has been read so far.
+  const [metaniaDays, setMetaniaDays] = useState<Record<string, boolean>>({});
+  const calendarRequested = useRef(new Set<string>());
 
   const loaded = state.identity === identity;
   const document = loaded ? state.document : EMPTY_DOCUMENT;
@@ -157,8 +170,44 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     void loadCanonRemindersEnabled().then((enabled) => { if (active) setRemindersEnabledState(enabled); });
+    // What the calendar said last time, until it is read again.
+    void loadCanonCalendarCache().then((cached) => { if (active) setMetaniaDays((current) => ({ ...cached, ...current })); });
     return () => { active = false; };
   }, []);
+
+  // Each day is read from the calendar once a session; one that could not be read is tried again later.
+  const ensureCalendarDays = useCallback((days: string[]) => {
+    for (const day of days) {
+      if (calendarRequested.current.has(day)) continue;
+      calendarRequested.current.add(day);
+      readMetaniaDay(day)
+        .then((made) => setMetaniaDays((current) => (current[day] === made ? current : { ...current, [day]: made })))
+        .catch(() => { calendarRequested.current.delete(day); });
+    }
+  }, []);
+  const calendar = useMemo<CanonCalendar>(() => ({ isMetaniaDay: (day) => metaniaDays[day] ?? null }), [metaniaDays]);
+
+  // Metanias kept on the days they are made need the calendar: the weeks the
+  // Home card, the canon page and the reminders look at.
+  const keepsApplicableDays = document.items.some((item) => item.frequency.kind === 'applicable');
+  useEffect(() => {
+    if (!loaded || !keepsApplicableDays) return;
+    const from = addCanonDays(canonWeekStart(today), -7);
+    const to = addCanonDays(today, REMINDER_HORIZON_DAYS);
+    const days: string[] = [];
+    for (let day = from; day <= to; day = addCanonDays(day, 1)) days.push(day);
+    ensureCalendarDays(days);
+  }, [ensureCalendarDays, foregroundTick, keepsApplicableDays, loaded, today]);
+
+  useEffect(() => {
+    if (!Object.keys(metaniaDays).length) return undefined;
+    const timer = setTimeout(() => {
+      const oldest = addCanonDays(today, -CALENDAR_DAYS_KEPT);
+      const newest = addCanonDays(today, CALENDAR_DAYS_KEPT);
+      void saveCanonCalendarCache(Object.fromEntries(Object.entries(metaniaDays).filter(([day]) => day >= oldest && day <= newest)));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [metaniaDays, today]);
 
   useEffect(() => {
     let active = true;
@@ -280,7 +329,7 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
         void clearCanonReminders().catch(() => undefined);
         return;
       }
-      const occurrences = upcomingCanonReminders(document, new Date());
+      const occurrences = upcomingCanonReminders(document, new Date(), { calendar });
       void scheduleCanonReminders(occurrences, (occurrence) => ({
         ...canonReminderText(occurrence.task),
         deepLink: canonTaskRoute(occurrence.task),
@@ -291,7 +340,7 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
         .catch((error) => console.warn('Unable to schedule the spiritual canon’s reminders:', error));
     }, REMINDER_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [document, foregroundTick, language, loaded, remindersEnabled, reminderPermission, today]);
+  }, [calendar, document, foregroundTick, language, loaded, remindersEnabled, reminderPermission, today]);
 
   const setTaskDone = useCallback((day: string, key: string, done: boolean) => {
     if (day > canonDayKey(new Date())) return;
@@ -321,7 +370,7 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     return permission;
   }, []);
 
-  const tasksFor = useCallback((day: string) => canonTasksForDay(document, day), [document]);
+  const tasksFor = useCallback((day: string) => canonTasksForDay(document, day, calendar), [calendar, document]);
 
   const value = useMemo<SpiritualCanonValue>(() => ({
     loaded,
@@ -329,6 +378,7 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     items: document.items,
     today,
     tasksFor,
+    ensureCalendarDays,
     setTaskDone,
     saveItem,
     deleteItem,
@@ -337,7 +387,7 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     reminderPermission,
     requestReminderPermission,
     syncFailed,
-  }), [deleteItem, document.items, loaded, reminderPermission, remindersEnabled, requestReminderPermission, saveItem, setRemindersEnabled, setTaskDone, syncFailed, tasksFor, today, userId]);
+  }), [deleteItem, document.items, ensureCalendarDays, loaded, reminderPermission, remindersEnabled, requestReminderPermission, saveItem, setRemindersEnabled, setTaskDone, syncFailed, tasksFor, today, userId]);
 
   return <SpiritualCanonContext.Provider value={value}>{children}</SpiritualCanonContext.Provider>;
 }
