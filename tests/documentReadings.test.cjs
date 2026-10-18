@@ -136,14 +136,16 @@ test('every citation line hymnLibrary builds says which reading it is', () => {
 
 test('the service document opens at the reading its URL names, once, and not when coming back from Settings', () => {
   const source = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
-  assert.match(source, /useLocalSearchParams<\{ sub\?: string; reading\?: string \}>\(\)/);
+  assert.match(source, /useLocalSearchParams<\{ sub\?: string; reading\?: string; at\?: string \}>\(\)/);
   // Decided as the sections arrive, so the reader mounts knowing where to land.
   const start = source.indexOf('setLoadedConditionsKey(conditionsKey);');
   const end = source.indexOf('setSubdocumentModal((current) =>', start);
   assert.ok(start > 0 && end > start);
   const arrival = source.slice(start, end);
   assert.match(arrival, /const readingTarget = openedAtReadingRef\.current \? null : parseReadingParam\(openAtReading\);/);
-  assert.match(arrival, /openedAtReadingRef\.current = true;\s+const sectionId = getPendingDocumentRestore\(documentPositionKey\)\s+\? null\s+: findReadingSectionId\(newSections, readingTarget, readingVisibilityRef\.current\);/);
+  assert.match(arrival, /openedAtReadingRef\.current = true;\s+const sectionId = getPendingDocumentRestore\(documentPositionKey\)\s+\? null\s+: readingTarget\s+\? findReadingSectionId\(newSections, readingTarget, readingVisibilityRef\.current\)\s+: newSections\.find\(\(section\) => section\.hymnKey === hymnKeyTarget\)\?\.id \?\? null;/);
+  // Or at a section of its own by hymn key (?at=, a watch of the Midnight hour): the same landing, once, a reading first.
+  assert.match(arrival, /const hymnKeyTarget = openedAtReadingRef\.current \|\| readingTarget \? null : openAtHymnKey\?\.trim\(\) \|\| null;\s+if \(readingTarget \|\| hymnKeyTarget\) \{/);
   // Both readers: the slideshow's selected slide, the scrolling reader's first-load section, the remembered place.
   assert.match(arrival, /setCurrentSectionId\(sectionId\);\s+setSelectedSlideSectionId\(sectionId\);\s+setLastDocumentPosition\(documentPositionKey, sectionId\);/);
   assert.match(arrival, /pendingScrollRestoreSectionIdRef\.current = sectionId;/);
