@@ -82,8 +82,11 @@ test('artist artwork is circular and tab headers no longer carry the logo', () =
   assert.doesNotMatch(books, /CHC_sm/);
   // The hero draws the seal at its on-screen size (scripts/build-screen-seal.mjs), not the 800KB original.
   assert.match(home, /assets\/images\/coptic-vine-seal-screen\.png/);
-  // The Coptic Vine hero: the seal at 188 in a 212 halo, its shadow cast by a
-  // circle behind it rather than by the square image.
-  assert.match(home, /logo: \{ height: 188, resizeMode: 'contain', width: 188 \}/);
-  assert.match(home, /sealShadow: \{[^}]*borderRadius: 92,[^}]*boxShadow:/);
+  // The Coptic Vine hero (Home v2): the seal at 184 on a phone, 210 on an
+  // iPad, 230 on the desktop and 66 beside the date on a phone on its side,
+  // its shadow cast by a circle behind it rather than by the square image.
+  assert.match(home, /seal\(layoutMode === 'desktop' \? 230 : wide \? 210 : 184\)/);
+  assert.match(home, /seal\(66\)/);
+  assert.match(home, /styles\.sealShadow, \{ borderRadius: size \/ 2,/);
+  assert.match(home, /sealShadow: \{[^}]*boxShadow:/);
 });

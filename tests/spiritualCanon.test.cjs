@@ -285,9 +285,11 @@ test('reminders touch only the canon’s own notifications and open the task’s
   assert.match(provider, /if \(day > canonDayKey\(new Date\(\)\)\) return;/);
 });
 
-test('Home shows today’s canon in every layout, under the prayer of the hour', () => {
+test('Home shows today’s canon in every layout, after the prayer of the hour', () => {
   const home = read('src/components/vine/screens/HomeScreen.tsx');
-  assert.equal((home.match(/\{prayCard\}\n\s+\{canonCard\}/g) || []).length, 3);
+  // A phone sets it under Pray now; on its side, an iPad and the desktop, beside it (Home v2).
+  assert.equal((home.match(/\{canonCard\}/g) || []).length, 4);
+  assert.equal((home.match(/\{prayCard\}\n\s+\{canonCard\}/g) || []).length, 1);
   assert.match(home, /onToggle=\{\(done\) => canon\.setTaskDone\(canon\.today, task\.key, done\)\}/);
   assert.match(home, /router\.push\('\/canon\/edit' as never\)/);
   // Skipping is done on the canon's own page, not on Home's card.
@@ -297,6 +299,8 @@ test('Home shows today’s canon in every layout, under the prayer of the hour',
   // The tick and the way into the prayer are side by side, never one inside the other (a button may not hold a button on the web).
   const parts = read('src/components/canon/CanonParts.tsx');
   assert.match(parts, /<CanonCheck done=\{task\.done\} disabled=\{disabled\} label=\{checkLabel\} onPress=\{\(\) => onToggle\(!task\.done\)\} \/>\n\s+\{opens \? \(/);
+  // So on Home's timeline: the dot on the rail, then the task and its Pray or Read.
+  assert.match(parts, /onPress=\{\(\) => onToggle\(!task\.done\)\}[^]*?<\/Pressable>\n\s+<\/View>\n\s+<Pressable\n\s+accessibilityRole="button"/);
 });
 
 test('rescheduling keeps what is unchanged, replaces what moved, and never touches other notifications', async () => {

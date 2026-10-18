@@ -32,8 +32,8 @@ function dayDifference(from: Date, to: Date): number {
 }
 
 /**
- * Which day or eve is being prayed at a liturgical moment. After 5pm the
- * app's effective date has already rolled to tomorrow, and the service being
+ * Which day or eve is being prayed at a liturgical moment. On the eve (from
+ * 6 PM, utils/liturgicalDay.ts) the app's effective date has already rolled to tomorrow, and the service being
  * prayed that night is tomorrow's eve (Sunday night → Monday Eve).
  */
 export function currentHolyWeekDayId(palmSunday: Date, effectiveDate: Date, isEvening: boolean): string | null {

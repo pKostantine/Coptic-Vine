@@ -15,6 +15,7 @@ import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
 import { BottomChromeProvider, useBottomChrome } from '@/context/BottomChromeContext';
 import { CalendarProvider } from '@/context/CalendarContext';
+import { LiturgicalClockProvider } from '@/context/LiturgicalClockContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { SpiritualCanonProvider } from '@/context/SpiritualCanonContext';
@@ -164,16 +165,18 @@ export default function RootLayout() {
         <BookSyncBootstrap />
         <ReadingPreferencesProvider>
           <SpiritualCanonProvider>
-            <CalendarProvider>
-              <MusicPlayerProvider>
-                <VideoStageProvider>
-                  <StatusBar style="light" />
-                  <BottomChromeProvider>
-                    <AppFrame />
-                  </BottomChromeProvider>
-                </VideoStageProvider>
-              </MusicPlayerProvider>
-            </CalendarProvider>
+            <LiturgicalClockProvider>
+              <CalendarProvider>
+                <MusicPlayerProvider>
+                  <VideoStageProvider>
+                    <StatusBar style="light" />
+                    <BottomChromeProvider>
+                      <AppFrame />
+                    </BottomChromeProvider>
+                  </VideoStageProvider>
+                </MusicPlayerProvider>
+              </CalendarProvider>
+            </LiturgicalClockProvider>
           </SpiritualCanonProvider>
         </ReadingPreferencesProvider>
       </AuthProvider>

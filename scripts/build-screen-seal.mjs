@@ -6,7 +6,8 @@
  *
  * The full seal (coptic-vine-seal.png, 1024px, ~800KB) stays the source for
  * the splash screen and the share card, where its size is wanted. On screen
- * it is never drawn larger than 188 points, so 600px covers a 3x display,
+ * it is drawn at most 184 points on a phone and 230 on the desktop's Home,
+ * so 600px covers a 3x phone and a 2x desktop,
  * and a palette PNG brings it to a tenth of the download — which, on the
  * website, was the single largest file on the first load.
  */

@@ -1,14 +1,12 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { Image, Pressable, type PressableStateCallbackType, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
+import { useLiturgicalNow } from '../../../hooks/useLiturgicalNow';
 import { tr } from '../../../utils/appText';
-import { getCopticDate, type CopticDate } from '../../../utils/calendarService';
-import { localDateAtUtcMidnight } from '../../../utils/dateUtils';
 import { formatCopticDayMonth, formatCopticYear, formatDayMonthDate } from '../../../utils/localeFormat';
 import { SIDEBAR_WIDTH } from '../../../utils/useLayoutMode';
 import Icon, { type IconName } from './Icon';
@@ -44,7 +42,8 @@ export function sectionForPath(pathname: string): AppSection {
 /**
  * The desktop's left sidebar (Coptic Vine design system, "Layout and
  * spacing"): the seal and wordmark, the five sections — the current one in
- * gold on a gold wash — and today's date in both calendars at its foot. It
+ * gold on a gold wash — and today's date in both calendars at its foot, the
+ * Coptic one the liturgical day's, which begins the evening before. It
  * takes the place of the bottom tab bar, and like it, switching sections
  * replaces the page rather than stacking it.
  */
@@ -54,26 +53,8 @@ export default function SideBar({ pathname }: { pathname: string }) {
   const { preferences } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
   const active = sectionForPath(pathname);
-  const [today, setToday] = useState(() => localDateAtUtcMidnight(new Date()));
-  const [coptic, setCoptic] = useState<{ key: string; value: CopticDate | null } | null>(null);
-  const todayKey = today.toISOString().slice(0, 10);
-
-  useEffect(() => {
-    // Rolls over at midnight with the page left open.
-    const timer = setInterval(() => {
-      const now = localDateAtUtcMidnight(new Date());
-      if (now.toISOString().slice(0, 10) !== todayKey) setToday(now);
-    }, 60_000);
-    return () => clearInterval(timer);
-  }, [todayKey]);
-
-  useEffect(() => {
-    let live = true;
-    void getCopticDate(new Date(`${todayKey}T00:00:00Z`)).then((value) => { if (live) setCoptic({ key: todayKey, value }); });
-    return () => { live = false; };
-  }, [todayKey]);
-
-  const copticToday = coptic?.key === todayKey ? coptic.value : null;
+  // Rolls over with the page left open: the Coptic date on the eve, the civil one at midnight.
+  const { today, coptic: copticToday } = useLiturgicalNow();
 
   return (
     <View style={[styles.side, { paddingTop: insets.top + 24 }]}>

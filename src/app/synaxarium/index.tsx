@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -19,9 +19,9 @@ import LoadFailure from '@/components/vine/ui/LoadFailure';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import BleedPage from '@/components/vine/ui/BleedPage';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useLiturgicalClock } from '@/context/LiturgicalClockContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type SynaxariumYearRow } from '@/services/homeService';
-import { localDateAtUtcMidnight } from '@/utils/dateUtils';
 import { goBack } from '@/utils/navigation';
 
 import { appLocale, tr } from '../../utils/appText';
@@ -40,10 +40,6 @@ interface SynaxariumDay {
   copticDay: number;
   weekdayNumber: number;
   entries: SynaxariumEntry[];
-}
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
 }
 
 function groupRows(rows: SynaxariumYearRow[]): SynaxariumDay[] {
@@ -113,8 +109,13 @@ export default function SynaxariumBrowserScreen() {
   const isArabic = locale === 'ar';
 
   // This page is intentionally independent from the Books calendar picker.
-  const liveDate = useMemo(() => localDateAtUtcMidnight(new Date()), []);
-  const liveIso = isoDate(liveDate);
+  // Its today is the liturgical day, which begins the evening before
+  // (utils/liturgicalDay.ts); the year around it is read once, as the page opens.
+  const { liturgicalIso: liveIso } = useLiturgicalClock();
+  const [yearIso] = useState(liveIso);
+  // Home opens the page on the day of the saints it listed: today's or tomorrow's.
+  const { day: dayParam } = useLocalSearchParams<{ day?: string }>();
+  const focusIso = typeof dayParam === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : liveIso;
 
   const [rows, setRows] = useState<SynaxariumYearRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +129,7 @@ export default function SynaxariumBrowserScreen() {
     setLoading(true);
     setError(null);
 
-    homeService.getSynaxariumYear(liveIso)
+    homeService.getSynaxariumYear(yearIso)
       .then((payload) => {
         if (active) setRows(payload);
       })
@@ -142,7 +143,7 @@ export default function SynaxariumBrowserScreen() {
       });
 
     return () => { active = false; };
-  }, [liveIso, attempt]);
+  }, [yearIso, attempt]);
 
   const days = useMemo(() => groupRows(rows), [rows]);
   const normalizedQuery = useMemo(() => normalizeSearch(query), [query]);
@@ -261,7 +262,7 @@ export default function SynaxariumBrowserScreen() {
               <View
                 key={day.gregorianDate}
                 onLayout={(event) => {
-                  if (!isToday || normalizedQuery || didAutoScroll.current) return;
+                  if (day.gregorianDate !== focusIso || normalizedQuery || didAutoScroll.current) return;
                   didAutoScroll.current = true;
                   const y = event.nativeEvent.layout.y;
                   setTimeout(() => {

@@ -145,7 +145,6 @@ export default function CanonScreen() {
                       key={task.key}
                       task={task}
                       arabic={arabic}
-                      variant="card"
                       disabled={future}
                       onToggle={(done) => canon.setTaskDone(day, task.key, done)}
                       onOpen={() => router.push(canonTaskRoute(task) as never)}

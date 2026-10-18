@@ -188,13 +188,23 @@ export function paschaAgpeyaNote(): string {
 
 /** "7:30 AM", "7 h 30", "٧:٣٠ ص": the time of day as the App Language tells it. */
 export function canonTimeLabel(time: string): string {
+  const { clock, period } = canonTimeParts(time);
+  return period ? `${clock} ${period}` : clock;
+}
+
+/**
+ * The same, split for Home's timeline, which sets the period under the
+ * clock: "7:30" over "AM", "٧:٣٠" over "ص". French tells the hour on the
+ * 24-hour clock and has no period.
+ */
+export function canonTimeParts(time: string): { clock: string; period: string | null } {
   const { hour, minute } = parseCanonTime(time);
   const language = getCurrentAppLanguage();
-  if (language === 'fr') return minute ? `${hour} h ${String(minute).padStart(2, '0')}` : `${hour} h`;
+  if (language === 'fr') return { clock: minute ? `${hour} h ${String(minute).padStart(2, '0')}` : `${hour} h`, period: null };
   const twelve = hour % 12 === 0 ? 12 : hour % 12;
   const clock = `${twelve}:${String(minute).padStart(2, '0')}`;
-  if (language === 'ar') return `${toEasternArabicDigits(clock)} ${hour < 12 ? 'ص' : 'م'}`;
-  return `${clock} ${hour < 12 ? 'AM' : 'PM'}`;
+  if (language === 'ar') return { clock: toEasternArabicDigits(clock), period: hour < 12 ? 'ص' : 'م' };
+  return { clock, period: hour < 12 ? 'AM' : 'PM' };
 }
 
 /** "2 of 3 this week". */
@@ -212,11 +222,11 @@ export function dayProgressLabel(done: number, total: number): string {
 }
 
 /** The line under a task's name: how much, how often this week, and when. */
-export function canonTaskDetail(task: CanonTask): string {
+export function canonTaskDetail(task: CanonTask, { withTime = true }: { withTime?: boolean } = {}): string {
   const parts = [
     canonGoalLabel(task.goal, task.hourId),
     task.weekly ? weeklyProgressLabel(task.weekly.done, task.weekly.target) : null,
-    task.time ? canonTimeLabel(task.time) : null,
+    withTime && task.time ? canonTimeLabel(task.time) : null,
   ].filter((part): part is string => Boolean(part));
   if (!parts.length && task.note) return task.note;
   return parts.join(' · ');
