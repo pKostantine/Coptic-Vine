@@ -11,6 +11,13 @@ const DOWNLOAD_DIRECTORY = new Directory(Paths.document, 'chc-offline', 'files')
 // How many of a package's files are fetched at once. A book resource is many
 // small chunks, and fetched one by one each paid a whole round trip.
 const FILE_CONCURRENCY = 6;
+/**
+ * A transfer that fails is tried again after each of these before its
+ * package fails: a dropped connection, or a book chunk's foreground transfer
+ * cut off while the app was put away, no longer fails a whole book's update
+ * for one chunk in a hundred.
+ */
+const TRANSFER_RETRY_DELAYS_MS = [1000, 4000];
 // Progress is saved and announced at most this often while files download:
 // each announcement re-reads the Downloads page and every book waiting on it.
 const PROGRESS_INTERVAL_MS = 250;
@@ -165,11 +172,25 @@ class NativeDownloadManager implements OfflineDownloadManager {
       await forEachLimited(waiting, FILE_CONCURRENCY, async (row) => {
         const resource = resources.get(row.file_key); if (!resource) throw new Error(`Missing resource metadata for ${row.file_key}.`);
         if (row.status === 'complete') await updateOfflineFile(row.file_key, { localUri: null, status: 'queued', bytesWritten: 0, resumeJson: null });
-        await this.downloadFile(run, row, resource, sessionTypeFor(request, resource));
+        await this.downloadFileWithRetries(run, row, resource, sessionTypeFor(request, resource));
       }, () => run.stopped);
     } finally { await run.report.stop(); }
     if (run.stopped) return;
     await setPackageState(packageKey, 'complete'); await refreshPackageProgress(packageKey); this.emit();
+  }
+  private async downloadFileWithRetries(run: PackageRun, row: OfflineFileRow, resource: OfflineDownloadResource, sessionType: NonNullable<DownloadTaskOptions['sessionType']>): Promise<void> {
+    for (let attempt = 0; ; attempt += 1) {
+      try { await this.downloadFile(run, row, resource, sessionType); return; }
+      catch (cause) {
+        const delay = TRANSFER_RETRY_DELAYS_MS[attempt];
+        if (run.stopped || delay === undefined) throw cause;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        // Paused or cancelled meanwhile: that records the state, as for a transfer in flight.
+        if (run.stopped) return;
+        // downloadFile recorded the failure; the next try starts the file afresh.
+        row = { ...row, status: 'failed', bytes_written: 0, resume_json: null };
+      }
+    }
   }
   private async downloadFile(run: PackageRun, row: OfflineFileRow, resource: OfflineDownloadResource, sessionType: NonNullable<DownloadTaskOptions['sessionType']>): Promise<void> {
     const destination = destinationFor(resource); if (destination.exists && row.status !== 'paused') try { destination.delete(); } catch { /* transfer will report failure */ }
