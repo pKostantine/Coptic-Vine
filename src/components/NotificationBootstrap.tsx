@@ -4,10 +4,14 @@ import { Platform } from 'react-native';
 
 import {
   installNativeNotificationRuntime,
+  requestNotificationsOnFirstLaunch,
   syncNativeNotificationDevice,
 } from '@/services/notificationService';
 import { syncWebPushDevice } from '@/services/webPushService';
 import { supabase } from '@/utils/supabase';
+
+/** How long after the app appears its first launch asks for notifications: over Home, not the splash screen. */
+const FIRST_LAUNCH_ASK_DELAY_MS = 1200;
 
 export default function NotificationBootstrap() {
   useEffect(() => {
@@ -45,6 +49,12 @@ export default function NotificationBootstrap() {
       console.warn('Unable to synchronize Coptic Vine notifications:', error);
     });
 
+    const firstLaunchAsk = setTimeout(() => {
+      void requestNotificationsOnFirstLaunch().catch((error) => {
+        console.warn('Unable to ask for Coptic Vine notifications:', error);
+      });
+    }, FIRST_LAUNCH_ASK_DELAY_MS);
+
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) return;
       void syncNativeNotificationDevice({ requestPermission: false }).catch((error) => {
@@ -54,6 +64,7 @@ export default function NotificationBootstrap() {
 
     return () => {
       active = false;
+      clearTimeout(firstLaunchAsk);
       removeRuntime();
       data.subscription.unsubscribe();
     };

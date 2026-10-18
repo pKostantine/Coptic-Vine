@@ -11,6 +11,8 @@ const APP_KEY = 'chc';
 const PROVIDER = 'expo';
 const CHANNEL_ID = 'chc-default';
 const LAST_TOKEN_KEY = '@chc/notification-token/chc';
+/** Set once this device has been asked to allow notifications on its first launch. */
+const FIRST_LAUNCH_ASKED_KEY = '@chc/notification-permission-asked/chc';
 
 let handlerConfigured = false;
 
@@ -118,6 +120,21 @@ export async function syncNativeNotificationDevice(options: {
   });
 
   return registerExpoToken(token.data);
+}
+
+/**
+ * The first time the app opens on a device, it asks to send notifications —
+ * once: the answer stands, and a later launch never asks again (the system's
+ * Settings change it after). Then the device registers for them as on every
+ * launch. The web asks only from a tap, so it is not asked here.
+ */
+export async function requestNotificationsOnFirstLaunch(): Promise<NotificationSyncResult | 'already_asked'> {
+  if (Platform.OS === 'web') return 'unsupported';
+  const store = storage();
+  if (!store || store.getItem(FIRST_LAUNCH_ASKED_KEY)) return 'already_asked';
+  // Kept before asking, so a launch cut short by the prompt doesn't ask twice.
+  store.setItem(FIRST_LAUNCH_ASKED_KEY, new Date().toISOString());
+  return syncNativeNotificationDevice({ requestPermission: true });
 }
 
 export async function disableNativeNotificationDevice(): Promise<void> {
