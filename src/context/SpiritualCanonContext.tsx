@@ -4,7 +4,9 @@ import { AppState } from 'react-native';
 import { canonReminderText } from '@/components/canon/canonText';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { tr } from '@/utils/appText';
 import { readMetaniaDay } from '@/services/canonCalendar';
+import { onCanonDoneAction, registerCanonNotificationActions, takeCanonDoneActions } from '@/services/canonNotificationActions';
 import {
   cancelCanonRemindersFor,
   clearCanonReminders,
@@ -232,6 +234,12 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     dirtyDays.current = new Set();
     const load = async () => {
       let document = await loadLocalCanon(identity);
+      // Ticks pressed on a reminder while this canon wasn't running
+      // (canonNotificationActions.ts): applied first, and sent with the rest.
+      for (const action of await takeCanonDoneActions(identity)) {
+        document = withCanonMark(document, action.day, action.taskKey, true, new Date(action.at));
+        dirtyDays.current.add(action.day);
+      }
       let adopted = false;
       if (userId) {
         const signedOut = await loadLocalCanon('local');
@@ -286,6 +294,40 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [absorb, foregroundTick, identity, userId]);
 
+  // A reminder's "Mark as done", pressed while this canon is running (or, on
+  // Android, while the app was in the background, which a separate headless
+  // run handled): applied as a tick of its own time, and sent to the account.
+  useEffect(() => {
+    if (!loaded) return undefined;
+    let active = true;
+    const apply = () => {
+      void takeCanonDoneActions(identity).then((actions) => {
+        if (!active || !actions.length) return;
+        actions.forEach((action) => dirtyDays.current.add(action.day));
+        setState((current) => {
+          if (current.identity !== identity) return current;
+          const document = actions.reduce((doc, action) => withCanonMark(doc, action.day, action.taskKey, true, new Date(action.at)), current.document);
+          return { ...current, document };
+        });
+      }).catch(() => undefined);
+    };
+    apply();
+    const unsubscribe = onCanonDoneAction(apply);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [foregroundTick, identity, loaded]);
+
+  // The reminders' buttons, in the App Language.
+  const buttonLanguage = preferences.appLanguage;
+  useEffect(() => {
+    void registerCanonNotificationActions({
+      done: tr('Mark as done', 'Marquer comme accompli', 'علّم كمكتمل', buttonLanguage),
+      snooze: tr('Remind me in an hour', 'Me le rappeler dans une heure', 'ذكّرني بعد ساعة', buttonLanguage),
+    }).catch((error) => console.warn('Unable to set up the canon reminder buttons:', error));
+  }, [buttonLanguage]);
+
   // Every change is kept on the device at once and sent to the account a
   // moment later, merged with whatever the account has by then.
   useEffect(() => {
@@ -338,14 +380,14 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
       void scheduleCanonReminders(occurrences, (occurrence) => ({
         ...canonReminderText(occurrence.task),
         deepLink: canonTaskRoute(occurrence.task),
-      }))
+      }), identity)
         .then((result) => {
           if (result === 'permission_required') setReminderPermission((current) => (current === 'granted' ? 'undetermined' : current));
         })
         .catch((error) => console.warn('Unable to schedule the spiritual canon’s reminders:', error));
     }, REMINDER_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [calendar, document, foregroundTick, language, loaded, remindersEnabled, reminderPermission, today]);
+  }, [calendar, document, foregroundTick, identity, language, loaded, remindersEnabled, reminderPermission, today]);
 
   const setTaskDone = useCallback((day: string, key: string, done: boolean) => {
     if (day > canonDayKey(new Date())) return;

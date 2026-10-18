@@ -152,7 +152,13 @@ export async function disableNativeNotificationDevice(): Promise<void> {
   storage()?.removeItem(LAST_TOKEN_KEY);
 }
 
-function routeFromResponse(response: NotificationResponse): string | null {
+/**
+ * Where a tap on a notification opens. Only a tap on the notification itself
+ * opens anything: its buttons (a canon reminder's Mark as done, Remind me in
+ * an hour) do their work without the app (canonNotificationActions.ts).
+ */
+function routeFromResponse(response: NotificationResponse, defaultAction: string): string | null {
+  if (response.actionIdentifier !== defaultAction) return null;
   const data = response.notification.request.content.data as Record<string, unknown> | undefined;
   const route = data?.deep_link ?? data?.url;
   return typeof route === 'string' && route.startsWith('/') ? route : null;
@@ -167,7 +173,7 @@ export async function installNativeNotificationRuntime(
   if (!Notifications) return () => {};
 
   const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-    const route = routeFromResponse(response);
+    const route = routeFromResponse(response, Notifications.DEFAULT_ACTION_IDENTIFIER);
     if (route) onDeepLink(route);
   });
 
@@ -177,9 +183,11 @@ export async function installNativeNotificationRuntime(
     });
   });
 
+  // The tap that opened the app, if one did. A button's press is left for
+  // canonNotificationActions.ts, which reads it as it starts.
   const initialResponse = await Notifications.getLastNotificationResponseAsync();
-  if (initialResponse) {
-    const route = routeFromResponse(initialResponse);
+  if (initialResponse && initialResponse.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+    const route = routeFromResponse(initialResponse, Notifications.DEFAULT_ACTION_IDENTIFIER);
     if (route) onDeepLink(route);
     await Notifications.clearLastNotificationResponseAsync();
   }

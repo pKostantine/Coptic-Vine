@@ -272,7 +272,10 @@ test('reminders touch only the canon’s own notifications and open the task’s
   const reminders = read('src/services/canonReminders.ts');
   assert.match(reminders, /const PREFIX = 'canon_';/);
   assert.equal((reminders.match(/cancelScheduledNotificationAsync/g) || []).length, 4);
-  assert.equal((reminders.match(/request\.identifier\.startsWith\(PREFIX\)/g) || []).length, 3);
+  // Rescheduling touches only first reminders; clearing and finishing take put-off ones too — and nothing else.
+  assert.equal((reminders.match(/request\.identifier\.startsWith\(PREFIX\)/g) || []).length, 1);
+  assert.match(reminders, /return identifier\.startsWith\(PREFIX\) \|\| identifier\.startsWith\(CANON_SNOOZE_PREFIX\);/);
+  assert.equal((reminders.match(/isCanonReminder\(request\.identifier\)/g) || []).length, 2);
   assert.match(reminders, /data: \{ deep_link: content\.deepLink, canon: true/);
   assert.match(reminders, /type: Notifications\.SchedulableTriggerInputTypes\.DATE,/);
   const provider = read('src/context/SpiritualCanonContext.tsx');
@@ -316,22 +319,25 @@ test('rescheduling keeps what is unchanged, replaces what moved, and never touch
   const at = new Date('2026-10-19T11:00:00.000Z');
   const occurrence = (identifier) => ({ identifier, day: '2026-10-19', at, task: { key: identifier } });
   const describe = (entry) => ({ title: 'The First Hour', body: 'Your spiritual canon', deepLink: '/agpeya/first_hour', identifier: entry.identifier });
-  const signatureOf = `${at.getTime()}|The First Hour|Your spiritual canon|/agpeya/first_hour`;
+  const signatureOf = `${at.getTime()}|The First Hour|Your spiritual canon|/agpeya/first_hour|user-1|canon_reminder`;
   scheduled[1].content.data.signature = signatureOf;
 
-  assert.equal(await reminders.scheduleCanonReminders([occurrence('canon_keep'), occurrence('canon_moved'), occurrence('canon_new')], describe), 'scheduled');
+  assert.equal(await reminders.scheduleCanonReminders([occurrence('canon_keep'), occurrence('canon_moved'), occurrence('canon_new')], describe, 'user-1'), 'scheduled');
   assert.deepEqual(calls.cancelled.sort(), ['canon_moved', 'canon_stale']);
   assert.deepEqual(calls.added.map((request) => request.identifier).sort(), ['canon_moved', 'canon_new']);
   const added = calls.added[0];
   assert.deepEqual(added.trigger, { type: 'date', date: at, channelId: 'chc-default' });
   assert.equal(added.content.data.deep_link, '/agpeya/first_hour');
   assert.equal(added.content.data.signature, signatureOf);
+  // Held down, it shows the canon's buttons; pressed with the app closed, they know whose canon it is.
+  assert.equal(added.content.categoryIdentifier, 'canon_reminder');
+  assert.equal(added.content.data.identity, 'user-1');
 
   // Without permission, the canon's are taken off (the system would not show them) and nothing is added.
   calls.cancelled = [];
   calls.added = [];
   granted = false;
-  assert.equal(await reminders.scheduleCanonReminders([occurrence('canon_new')], describe), 'permission_required');
+  assert.equal(await reminders.scheduleCanonReminders([occurrence('canon_new')], describe, 'user-1'), 'permission_required');
   assert.deepEqual(calls.cancelled.sort(), ['canon_keep', 'canon_moved', 'canon_stale']);
   assert.deepEqual(calls.added, []);
   // The web schedules nothing.
@@ -339,7 +345,7 @@ test('rescheduling keeps what is unchanged, replaces what moved, and never touch
     'react-native': { Platform: { OS: 'web' } },
     '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'chc-default' },
   });
-  assert.equal(await web.scheduleCanonReminders([occurrence('canon_new')], describe), 'unsupported');
+  assert.equal(await web.scheduleCanonReminders([occurrence('canon_new')], describe, 'user-1'), 'unsupported');
 });
 
 test('the Bible is measured in chapters, verses, time, or not at all; verses step by ones, then fives', () => {
