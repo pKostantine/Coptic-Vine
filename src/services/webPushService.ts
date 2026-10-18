@@ -39,10 +39,7 @@ export async function syncWebPushDevice(options: {
   const publicKey = vapidPublicKey();
   if (!publicKey) return 'unconfigured';
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!user) return 'signed_out';
-
+  // Signed in or not: a browser with no account still receives what CV Admin sends to everyone.
   if (Notification.permission === 'denied') return 'denied';
   if (Notification.permission === 'default' && !options.requestPermission) {
     return 'permission_required';
