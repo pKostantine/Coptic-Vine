@@ -1,6 +1,6 @@
 import { tr } from './appText';
 import { readingParam, type ReadingTarget } from './documentReadings';
-import { toEasternArabicDigits } from './localeFormat';
+import { toArabicReferenceDigits, toEasternArabicDigits } from './localeFormat';
 import type { LectionaryReadingKind, LectionaryService, ReadingCitation } from './readingsService';
 
 export type ReadingName = { english: string; arabic: string; french?: string };
@@ -46,7 +46,7 @@ export function numberedLabel(label: ReadingName, number: number | null): Readin
 
 /** A citation as the reader sees it: Eastern digits in Arabic, the French where there is one, else the English. */
 export function citationText(citation: ReadingCitation, arabic: boolean): string {
-  return arabic ? toEasternArabicDigits(citation.arabic) : tr(citation.english, citation.french || citation.english, citation.arabic);
+  return arabic ? toArabicReferenceDigits(citation.arabic) : tr(citation.english, citation.french || citation.english, citation.arabic);
 }
 
 /** One line of a service's readings as a list shows it: the reading (a ReadingTarget), what it is called, and its citation when known. */

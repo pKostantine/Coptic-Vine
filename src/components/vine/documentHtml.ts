@@ -1635,7 +1635,12 @@ const EASTERN_ARABIC_DIGITS: Record<string, string> = {
 };
 
 function formatArabicDigits(text: string) {
-  return String(text || '').replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
+  // A right-to-left mark after each colon, comma or dash between two digits
+  // keeps a reference's numbers in reading order, "١١ : ٥٣ - ٥٤" rather than
+  // "٥٣ : ١١ - ٥٤" (toArabicReferenceDigits in utils/localeFormat.ts says why).
+  return String(text || '')
+    .replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit)
+    .replace(/([٠-٩][:,،\-–])(?=[٠-٩])/g, '$1\u200F');
 }
 
 const COPTIC_DIGITS: Record<number, string> = { 1: 'ⲁ̅', 2: 'ⲃ̅', 3: 'ⲅ̅', 4: 'ⲇ̅', 5: 'ⲉ̅', 6: 'ⲋ', 7: 'ⲍ̅', 8: 'ⲏ̅', 9: 'ⲑ̅' };

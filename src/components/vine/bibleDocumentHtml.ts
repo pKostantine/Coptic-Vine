@@ -1136,7 +1136,12 @@ const EASTERN_ARABIC_DIGITS: Record<string, string> = {
 };
 
 function formatArabicDigits(text: string) {
-  return String(text || '').replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
+  // A right-to-left mark after each colon, comma or dash between two digits
+  // keeps a reference's numbers in reading order, "١١ : ٥٣ - ٥٤" rather than
+  // "٥٣ : ١١ - ٥٤" (toArabicReferenceDigits in utils/localeFormat.ts says why).
+  return String(text || '')
+    .replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit)
+    .replace(/([٠-٩][:,،\-–])(?=[٠-٩])/g, '$1\u200F');
 }
 
 const ARABIC_LETTER_SUFFIXES = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];

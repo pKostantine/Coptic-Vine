@@ -146,6 +146,25 @@ export function toEasternArabicDigits(value: number | string) {
   return String(value).replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[digit] || digit);
 }
 
+/** A colon, comma or dash with an Eastern Arabic digit on either side. */
+const ARABIC_REFERENCE_SEPARATOR = /([٠-٩][:,،\-–])(?=[٠-٩])/g;
+const RIGHT_TO_LEFT_MARK = '\u200F';
+
+/**
+ * Eastern Arabic digits for a Bible reference ("لوقا 11:53-54, 12:1-12").
+ * Unicode joins Eastern digits across a colon or comma into one
+ * left-to-right number ("١١:٥٣") but parts them at a dash, so read right to
+ * left the reference came out "٥٣ : ١١ - ٥٤", the verse before the chapter.
+ * A right-to-left mark after each colon, comma or dash between two digits
+ * gives every number its own place in the right-to-left line:
+ * "١١ : ٥٣ - ٥٤ , ١٢ : ١ - ١٢". Not for a time or a date, which reads left
+ * to right as a whole. The reader's HTML builders (documentHtml.ts,
+ * bibleDocumentHtml.ts) do the same in their own formatArabicDigits.
+ */
+export function toArabicReferenceDigits(value: string) {
+  return toEasternArabicDigits(value).replace(ARABIC_REFERENCE_SEPARATOR, `$1${RIGHT_TO_LEFT_MARK}`);
+}
+
 export function formatGregorianMonthTitle(month: number, year: number, isArabic: boolean) {
   const monthName = isArabic
     ? GREGORIAN_MONTHS_AR[month - 1]
