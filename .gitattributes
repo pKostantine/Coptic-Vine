@@ -1,0 +1,4 @@
+# Keep every text file on LF in the repository, whatever the editor or OS
+# writes: the source-shape tests read files with "\n", and Windows line
+# endings (CRLF) broke them.
+* text=auto eol=lf
