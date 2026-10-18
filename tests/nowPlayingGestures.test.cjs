@@ -50,7 +50,8 @@ test('the hidden bar\'s button drags to either bottom corner and stays there', (
   assert.match(storage, /merged\.nowPlayingButtonSide = stored\?\.nowPlayingButtonSide === 'left' \? 'left' : 'right';/);
   // In a subdocument the button is a dead zone for the edge swipes, as the pill bar is.
   const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
-  assert.match(modal, /<GlobalNowPlayingOverlay\n\s+documentTheme=\{documentTheme\}\n\s+onButtonTouchStart=\{\(\) => \{\n\s+touchOnPillBarRef\.current = true;/);
+  // (It covers the subdocument, so it takes `covering` as well.)
+  assert.match(modal, /<GlobalNowPlayingOverlay\n\s+documentTheme=\{documentTheme\}\n\s+covering\n\s+onButtonTouchStart=\{\(\) => \{\n\s+touchOnPillBarRef\.current = true;/);
 });
 
 test('over Walnut, Vine and Sepia the button wears the page\'s own button colour; Night and Paper keep the gold', () => {
