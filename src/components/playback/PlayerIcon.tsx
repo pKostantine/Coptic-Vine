@@ -23,7 +23,8 @@ export type PlayerIconName =
   | 'school'
   | 'lyrics-expand'
   | 'lyrics-collapse'
-  | 'drag-dots';
+  | 'drag-dots'
+  | 'videocam-outline';
 
 interface PlayerIconProps {
   name: PlayerIconName;
@@ -34,6 +35,14 @@ interface PlayerIconProps {
 
 export default function PlayerIcon({ name, size = 24, color = '#FFFFFF', style }: PlayerIconProps) {
   switch (name) {
+    case 'videocam-outline':
+      // Ionicons' outlined camera: the lesson's picture, from the sound-only player.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M374.79 308.78L457.5 367a16 16 0 0022.5-14.62V159.62A16 16 0 00457.5 145l-82.71 58.22A16 16 0 00368 216.3v79.4a16 16 0 006.79 13.08z" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={32} />
+          <Path d="M268 384H84a52.15 52.15 0 01-52-52V180a52.15 52.15 0 0152-52h184.48A51.68 51.68 0 01320 179.52V332a52.15 52.15 0 01-52 52z" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={32} />
+        </Svg>
+      );
     case 'reader-outline':
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>

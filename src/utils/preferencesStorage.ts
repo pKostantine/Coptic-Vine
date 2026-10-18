@@ -117,9 +117,18 @@ export interface ReadingPreferences {
    * reader dragged it. A device choice: it depends on the hand holding it.
    */
   nowPlayingButtonSide: NowPlayingButtonSide;
+  /**
+   * How a lesson with a video is played: with its picture, or as sound alone
+   * (the smaller audio rendition). A device choice: it is about this
+   * device's screen and its data plan (utils/lessonPlayback.ts).
+   */
+  lessonVideoMode: LessonVideoMode;
+  /** Whether a lesson's video may stream over cellular data; off, it plays as sound alone until Wi-Fi. */
+  lessonVideoOnCellular: boolean;
 }
 
 export type NowPlayingButtonSide = 'left' | 'right';
+export type LessonVideoMode = 'video' | 'audio';
 
 export type SyncedReadingPreferences = Pick<ReadingPreferences,
   | 'visibleLanguages'
@@ -178,6 +187,8 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   keepScreenAwake: true,
   documentTheme: DEFAULT_DOCUMENT_THEME_ID,
   nowPlayingButtonSide: 'right',
+  lessonVideoMode: 'video',
+  lessonVideoOnCellular: false,
 };
 
 let currentAppLanguage: AppLanguage = DEFAULT_READING_PREFERENCES.appLanguage;
@@ -291,6 +302,8 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   merged.keepScreenAwake = booleanValue(stored?.keepScreenAwake, DEFAULT_READING_PREFERENCES.keepScreenAwake);
   merged.documentTheme = isDocumentThemeId(stored?.documentTheme) ? stored.documentTheme : DEFAULT_DOCUMENT_THEME_ID;
   merged.nowPlayingButtonSide = stored?.nowPlayingButtonSide === 'left' ? 'left' : 'right';
+  merged.lessonVideoMode = stored?.lessonVideoMode === 'audio' ? 'audio' : 'video';
+  merged.lessonVideoOnCellular = booleanValue(stored?.lessonVideoOnCellular, DEFAULT_READING_PREFERENCES.lessonVideoOnCellular);
   return merged;
 }
 

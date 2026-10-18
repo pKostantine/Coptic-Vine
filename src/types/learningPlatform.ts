@@ -11,6 +11,9 @@ export interface LearningMediaAsset extends MediaAssetReference {
   durationMs?: number | null;
   fileSizeBytes?: number | null;
   checksum?: string | null;
+  /** A video's picture size, when the catalogue knows it. */
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface LearningCantorSummary {
@@ -174,6 +177,8 @@ export interface LearningPlaylistLessonItem {
   lesson: Omit<LearningLesson, 'sortOrder'> & {
     lessonSetId: string;
     lessonSetTitle: string;
+    cantorName?: string | null;
+    coverAsset?: LearningMediaAsset | null;
   };
 }
 
@@ -207,6 +212,8 @@ export interface LearningLibraryItem {
   cantorName: string;
   hymnId: string | null;
   mediaAsset: LearningMediaAsset;
+  /** A video lesson's audio-only rendition, when the catalogue sends it. */
+  audioAsset?: LearningMediaAsset | null;
   coverAsset: LearningMediaAsset | null;
 }
 
@@ -249,6 +256,7 @@ export interface LearningLessonSearchResult extends Omit<LearningLesson, 'sortOr
   cantorId: string;
   cantorName: string;
   hymnId: string;
+  coverAsset?: LearningMediaAsset | null;
 }
 
 export interface LearningSearchPayload {

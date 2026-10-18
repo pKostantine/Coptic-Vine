@@ -5,10 +5,13 @@ import { describeQueue, isLearningQueueItem, type QueueEntryView } from '@/conte
 import { learningService } from '@/services/learningService';
 import type {
   LearningAlbumDetail,
+  LearningLesson,
+  LearningLessonMediaType,
   LearningLessonSetDetail,
   LearningMediaAsset,
 } from '@/types/learningPlatform';
 import type { PlaybackQueueEntry, PlaybackRepeatMode } from '@/types/playback';
+import type { LessonRendition, LessonVideoMode } from '@/utils/lessonPlayback';
 
 export interface LearningQueueItem {
   kind: 'recording' | 'lesson';
@@ -16,7 +19,11 @@ export interface LearningQueueItem {
   title: string;
   subtitle: string | null;
   durationMs: number | null;
+  /** The item's own file: a recording, an audio lesson, or a video lesson's picture. */
   mediaAsset: LearningMediaAsset;
+  /** A video lesson's sound alone (the smaller rendition), when it has been made. */
+  audioAsset?: LearningMediaAsset | null;
+  mediaType?: LearningLessonMediaType;
   containerId: string;
   containerTitle: string;
   cantorName: string;
@@ -51,11 +58,33 @@ interface LearningPlayerContextValue {
   selectQueueIndex: (index: number) => void;
   moveQueueItem: (fromIndex: number, toIndex: number) => void;
   clearUpcoming: () => void;
+  clearQueue: () => void;
   cycleRepeatMode: () => void;
   toggleShuffle: () => void;
   /** The listening speed, 1 for as recorded. */
   playbackRate: number;
   setPlaybackRate: (rate: number) => void;
+  /** Lessons with a picture: watch it, or listen to the sound alone (a device choice). */
+  lessonVideoMode: LessonVideoMode;
+  setLessonVideoMode: (mode: LessonVideoMode) => void;
+  /** The item playing is a lesson with a picture. */
+  currentHasVideo: boolean;
+  /** What is loaded for it right now: the picture, or the sound alone. */
+  videoRendition: LessonRendition | null;
+  videoSwitching: boolean;
+  /** Cellular data is keeping the picture back (utils/lessonPlayback.ts). */
+  cellularBlocked: boolean;
+  allowVideoOverCellularNow: () => void;
+}
+
+/** Whether a lesson has a picture to show (its sound alone comes from the audio rendition when there is one). */
+export function lessonHasVideo(item: Pick<LearningQueueItem, 'mediaType'>): boolean {
+  return item.mediaType === 'video';
+}
+
+/** Whether a video lesson has its smaller audio rendition yet (sound alone saves data only when it has). */
+export function lessonHasAudioRendition(item: Pick<LearningQueueItem, 'mediaType' | 'audioAsset'>): boolean {
+  return item.mediaType !== 'video' || Boolean(item.audioAsset);
 }
 
 export function learningAlbumQueue(album: LearningAlbumDetail): LearningQueueItem[] {
@@ -66,6 +95,7 @@ export function learningAlbumQueue(album: LearningAlbumDetail): LearningQueueIte
     subtitle: recording.subtitle,
     durationMs: recording.durationMs,
     mediaAsset: recording.mediaAsset,
+    mediaType: 'audio',
     containerId: album.id,
     containerTitle: album.title,
     cantorName: album.cantor.displayName,
@@ -74,25 +104,44 @@ export function learningAlbumQueue(album: LearningAlbumDetail): LearningQueueIte
   }));
 }
 
-export function learningLessonSetAudioQueue(lessonSet: LearningLessonSetDetail): LearningQueueItem[] {
-  return lessonSet.lessons
-    .filter((lesson) => lesson.mediaType === 'audio' || lesson.audioAsset)
-    .map((lesson) => ({
-      kind: 'lesson',
-      id: lesson.id,
-      title: lesson.title,
-      subtitle: lesson.description,
-      durationMs: lesson.durationMs,
-      mediaAsset: lesson.audioAsset ?? lesson.mediaAsset,
-      containerId: lessonSet.id,
-      containerTitle: lessonSet.title,
-      cantorName: lessonSet.cantor.displayName,
-      coverAsset: lessonSet.coverAsset,
-      hymnId: lessonSet.hymn.id,
-    }));
+/** One lesson of a set as the queue holds it. */
+export function learningLessonQueueItem(lessonSet: LearningLessonSetDetail, lesson: LearningLesson): LearningQueueItem {
+  return {
+    kind: 'lesson',
+    id: lesson.id,
+    title: lesson.title,
+    subtitle: lesson.description,
+    durationMs: lesson.durationMs,
+    mediaAsset: lesson.mediaAsset,
+    audioAsset: lesson.audioAsset ?? null,
+    mediaType: lesson.mediaType,
+    containerId: lessonSet.id,
+    containerTitle: lessonSet.title,
+    cantorName: lessonSet.cantor.displayName,
+    coverAsset: lessonSet.coverAsset,
+    hymnId: lessonSet.hymn.id,
+  };
+}
+
+/**
+ * Every lesson of a set, in order, whatever it is made of: a video lesson
+ * plays on the one queue like an audio lesson, as its picture or as sound
+ * alone by the listener's choice (PlaybackContext).
+ */
+export function learningLessonSetQueue(lessonSet: LearningLessonSetDetail): LearningQueueItem[] {
+  return lessonSet.lessons.map((lesson) => learningLessonQueueItem(lessonSet, lesson));
+}
+
+function aspectRatioOf(asset: LearningMediaAsset | null | undefined): number | null {
+  if (!asset?.width || !asset.height || asset.width <= 0 || asset.height <= 0) return null;
+  return asset.width / asset.height;
 }
 
 function toPlaybackEntry(item: LearningQueueItem, occurrence: number): PlaybackQueueEntry<LearningQueueItem> {
+  const video = lessonHasVideo(item);
+  // A video lesson's sound alone is its audio rendition; until that exists,
+  // the picture's own file carries the sound.
+  const audioAsset = video ? item.audioAsset ?? item.mediaAsset : item.mediaAsset;
   return {
     key: ['learning', item.kind, item.id, occurrence].join(':'),
     payload: item,
@@ -106,8 +155,10 @@ function toPlaybackEntry(item: LearningQueueItem, occurrence: number): PlaybackQ
       durationMs: item.durationMs,
       source: {
         localUri: item.localUri ?? null,
-        remoteUri: learningService.resolveAsset(item.mediaAsset),
+        remoteUri: learningService.resolveAsset(audioAsset),
       },
+      video: video ? { remoteUri: learningService.resolveAsset(item.mediaAsset) } : null,
+      videoAspectRatio: video ? aspectRatioOf(item.mediaAsset) : null,
     },
   };
 }
@@ -152,6 +203,8 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     addPlaybackToEnd(nextQueuedEntry(item));
   }, [addPlaybackToEnd, nextQueuedEntry]);
 
+  const noop = useCallback(() => undefined, []);
+
   return {
     entries,
     currentIndex: playback.currentIndex,
@@ -174,9 +227,17 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     selectQueueIndex: playback.selectQueueIndex,
     moveQueueItem: playback.moveQueueItem,
     clearUpcoming: playback.clearUpcoming,
+    clearQueue: playback.clearQueue,
     cycleRepeatMode: playback.cycleRepeatMode,
     toggleShuffle: playback.toggleShuffle,
     playbackRate: playback.learningRate ?? 1,
     setPlaybackRate: playback.setLearningRate,
+    lessonVideoMode: playback.lessonVideoMode ?? 'video',
+    setLessonVideoMode: playback.setLessonVideoMode ?? noop,
+    currentHasVideo: currentItem ? Boolean(playback.currentHasVideo) : false,
+    videoRendition: currentItem ? playback.videoRendition ?? null : null,
+    videoSwitching: currentItem ? Boolean(playback.videoSwitching) : false,
+    cellularBlocked: Boolean(playback.cellularBlocked),
+    allowVideoOverCellularNow: playback.allowVideoOverCellularNow ?? noop,
   };
 }

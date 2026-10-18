@@ -26,7 +26,16 @@ export interface PlayableEntity {
   albumTitle?: string | null;
   artworkUri?: string | null;
   durationMs?: number | null;
+  /** What plays as sound: for a lesson with video, its audio-only rendition (or the video file when none exists yet). */
   source: PlaybackSource;
+  /**
+   * The video rendition of a lesson, when it has one. An entry with a video
+   * plays on the video engine for both renditions, so showing or hiding the
+   * picture never changes players (PlaybackContext).
+   */
+  video?: PlaybackSource | null;
+  /** The picture's shape, when known, so a surface can be laid out before the first frame. */
+  videoAspectRatio?: number | null;
   lyrics?: PlaybackLyricReference | null;
 }
 

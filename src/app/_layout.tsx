@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
 import NotificationBootstrap from '@/components/NotificationBootstrap';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
+import LessonVideoStage from '@/components/playback/LessonVideoStage';
 import SideBar from '@/components/vine/ui/SideBar';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
@@ -16,6 +17,7 @@ import { BottomChromeProvider, useBottomChrome } from '@/context/BottomChromeCon
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { VideoStageProvider } from '@/context/VideoStageContext';
 import { keepsWholeWindow } from '@/utils/desktopChrome';
 import type { OrientationMode } from '@/utils/preferencesStorage';
 import { useLayoutMode } from '@/utils/useLayoutMode';
@@ -124,6 +126,10 @@ function AppFrame() {
         <AppStack />
         <GlobalNowPlayingOverlay />
       </View>
+      {/* The one video surface, over the whole window: it is measured against
+          the window, so it can lie over a lesson page's slot as much as sit in
+          a corner, beside the sidebar on a desktop. */}
+      <LessonVideoStage />
     </View>
   );
 }
@@ -158,10 +164,12 @@ export default function RootLayout() {
         <ReadingPreferencesProvider>
           <CalendarProvider>
             <MusicPlayerProvider>
-              <StatusBar style="light" />
-              <BottomChromeProvider>
-                <AppFrame />
-              </BottomChromeProvider>
+              <VideoStageProvider>
+                <StatusBar style="light" />
+                <BottomChromeProvider>
+                  <AppFrame />
+                </BottomChromeProvider>
+              </VideoStageProvider>
             </MusicPlayerProvider>
           </CalendarProvider>
         </ReadingPreferencesProvider>

@@ -1,7 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { usePathname } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, BackHandler, Easing, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Animated, BackHandler, Easing, PanResponder, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MusicNowPlayingScreen from '@/components/music/MusicNowPlayingScreen';
@@ -16,9 +16,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { useVideoStage } from '@/context/VideoStageContext';
 import { learningService } from '@/services/learningService';
 import { musicService } from '@/services/musicService';
+import { floatingWindowLayout } from '@/utils/lessonPlayback';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
+import { SIDEBAR_WIDTH, useLayoutMode } from '@/utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 import MiniPlayerCard from './MiniPlayerCard';
 
@@ -61,12 +64,22 @@ interface GlobalNowPlayingOverlayProps {
    * and never closes the subdocument or opens its contents.
    */
   onButtonTouchStart?: () => void;
+  /**
+   * This bar is a subdocument's, drawn inside its Modal over the whole app —
+   * the video surface included, which cannot show there: the bar stands in
+   * for it, and tells the stage it is covered (utils/lessonPlayback.ts).
+   */
+  covering?: boolean;
 }
 
-export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentTheme, onButtonTouchStart }: GlobalNowPlayingOverlayProps = {}) {
+export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentTheme, onButtonTouchStart, covering = false }: GlobalNowPlayingOverlayProps = {}) {
   const { user } = useAuth();
+  const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const layoutMode = useLayoutMode();
+  const stage = useVideoStage();
   // Hidden or shown is one app-wide choice, not each bar's own: a subdocument
   // mounts a bar of its own, and it must open the way the reader left it.
   const {
@@ -99,8 +112,22 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
   const normalizedPath = pathname.replace(/\?.*$/, '');
   const isBookRoute = BOOK_PATH_PREFIXES.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`));
   const isExcludedRoute = EXCLUDED_PATHS.has(normalizedPath) || EXCLUDED_PATHS.has(pathname);
-  const allowDisplay = Boolean(currentItem) && !isExcludedRoute && (!isBookRoute || preferences.displayNowPlayingBar);
+  // A lesson's own page is its player: the bar stays out of its way there.
+  const onCurrentLessonPage = !covering && stage.currentItemOnPage;
+  const allowDisplay = Boolean(currentItem) && !isExcludedRoute && !onCurrentLessonPage && (!isBookRoute || preferences.displayNowPlayingBar);
   const [collapseAnimation] = useState(() => new Animated.Value(isCollapsed ? 1 : 0));
+  // A lesson watched as video floats as a small window (LessonVideoStage)
+  // where the bar would be; the bar comes back for the sound alone.
+  const floatingVideo = !covering && stage.placement === 'floating';
+  const floatingWindow = floatingWindowLayout({
+    windowWidth,
+    windowHeight,
+    insets,
+    side: preferences.nowPlayingButtonSide,
+    tabBarInset,
+    aspectRatio: null,
+    sidebarWidth: layoutMode === 'desktop' ? SIDEBAR_WIDTH : 0,
+  });
 
   // The bar is anchored to the bottom of the page and lifted above the tab bar
   // when the focused screen has one. Animating the lift (rather than jumping
@@ -197,6 +224,19 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
     return () => reportNowPlayingExpanded(overlayId, false);
   }, [allowDisplay, isPopupOpen, overlayId, reportNowPlayingExpanded]);
 
+  // Where the bar would show, the video's floating window may; a subdocument's
+  // bar instead reports that it covers the stage.
+  const { reportFloatingSlot, reportCovering } = stage;
+  const floatingSlotAvailable = !covering && allowDisplay && !isCollapsed && !isPopupOpen;
+  useEffect(() => {
+    reportFloatingSlot(overlayId, floatingSlotAvailable);
+    return () => reportFloatingSlot(overlayId, false);
+  }, [floatingSlotAvailable, overlayId, reportFloatingSlot]);
+  useEffect(() => {
+    reportCovering(overlayId, covering);
+    return () => reportCovering(overlayId, false);
+  }, [covering, overlayId, reportCovering]);
+
   // The full player is drawn over the page rather than in a modal, so Android's
   // back would otherwise go to the page beneath it. It closes the player.
   useEffect(() => {
@@ -222,13 +262,15 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
     // so only the floating card itself + its gap needs reserving there. On a
     // nested screen with no tab bar, include the device bottom safe area too.
     const safeAreaClearance = tabBarInset > 0 ? 0 : insets.bottom;
-    const visibleHeight = isCollapsed ? 42 : expandedHeight;
+    const visibleHeight = isCollapsed ? 42 : floatingVideo ? floatingWindow.height : expandedHeight;
     reportNowPlayingInset(overlayId, visibleHeight + FLOATING_GAP + safeAreaClearance);
 
     return () => reportNowPlayingInset(overlayId, null);
   }, [
     allowDisplay,
     expandedHeight,
+    floatingVideo,
+    floatingWindow.height,
     insets.bottom,
     isCollapsed,
     overlayId,
@@ -295,11 +337,21 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
     );
   }
 
-  const onOpen = () => setIsPopupOpen(true);
+  // A lesson watched as video opens on its own page, where the picture is;
+  // everything else opens the full player.
+  const onOpen = () => {
+    const lesson = learning.currentItem;
+    if (lesson && learning.currentHasVideo && learning.lessonVideoMode === 'video' && lesson.kind === 'lesson') {
+      router.push({ pathname: '/learn/lesson/[id]', params: { id: lesson.id, setId: lesson.containerId } });
+      return;
+    }
+    setIsPopupOpen(true);
+  };
   const onTogglePlayback = isMusic ? music.togglePlayback : learning.togglePlayback;
   const onNext = isMusic ? music.next : learning.next;
   const onPrevious = isMusic ? music.previous : learning.previous;
-  const accentColor = isMusic ? COLORS.gold : COLORS.learning;
+  // One gold bar for everything that plays: a song, a recording, a lesson.
+  const accentColor = COLORS.gold;
 
   let title = 'Now playing';
   let titleSuffix: string | null = null;
@@ -337,6 +389,9 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
 
   const overlayBottom = insets.bottom + FLOATING_GAP;
   const lift = Animated.multiply(liftAnimation, -1);
+
+  // The floating window is the stage's to draw; the bar's place is reserved above.
+  if (floatingVideo) return null;
 
   const collapsedScale = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] });
   const collapsedOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.92] });

@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
@@ -57,7 +56,6 @@ export default function LearningSeasonsScreen() {
           ))}
         </View>
       </NowPlayingAwareScrollView>
-      <LearningMiniPlayer />
     </SafeAreaView>
   );
 }

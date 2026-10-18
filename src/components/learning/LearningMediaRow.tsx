@@ -19,6 +19,8 @@ export default function LearningMediaRow({
   index,
   mediaType = 'audio',
   active = false,
+  playing = false,
+  progress = 0,
   onPress,
   trailing,
   isArabic = false,
@@ -29,10 +31,15 @@ export default function LearningMediaRow({
   index: number;
   mediaType?: LearningLessonMediaType;
   active?: boolean;
+  /** The active row is sounding now (a pause glyph instead of play). */
+  playing?: boolean;
+  /** How far through it the listener got, 0–1, as a hairline along the foot. */
+  progress?: number;
   onPress: () => void;
   trailing?: ReactNode;
   isArabic?: boolean;
 }) {
+  const watched = Math.max(0, Math.min(1, progress));
   return (
     <View style={[styles.row, active && styles.rowActive]}>
       <Pressable accessibilityRole="button" style={styles.main} onPress={onPress}>
@@ -47,9 +54,14 @@ export default function LearningMediaRow({
           {mediaType === 'video' ? <Text style={styles.type}>VIDEO</Text> : null}
           <Text style={styles.duration}>{formatDuration(durationMs)}</Text>
         </View>
-        <Text style={[styles.play, active && styles.activeText]}>{mediaType === 'video' ? '▣' : '▶'}</Text>
+        <Text style={[styles.play, active && styles.activeText]}>{active && playing ? '❚❚' : '▶'}</Text>
       </Pressable>
       {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
+      {watched > 0 ? (
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${watched * 100}%` }]} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -89,6 +101,8 @@ const styles = StyleSheet.create({
   type: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
   duration: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontVariant: ['tabular-nums'] },
   play: { width: 22, textAlign: 'center', color: COLORS.learningBright, fontSize: 12 },
+  progressTrack: { position: 'absolute', left: SPACING.md, right: SPACING.md, bottom: 0, height: 2, pointerEvents: 'none', backgroundColor: 'transparent' },
+  progressFill: { height: 2, borderRadius: 1, backgroundColor: COLORS.gold },
   trailing: { paddingRight: SPACING.sm },
   activeText: { color: COLORS.learningBright },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },

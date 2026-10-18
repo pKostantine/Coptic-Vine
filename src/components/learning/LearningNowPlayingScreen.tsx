@@ -49,6 +49,8 @@ import { tr } from '../../utils/appText';
 // How far the lesson player's step buttons move through a lesson.
 const STEP_MS = 10000;
 
+const EMPTY_LYRIC_SETS: PublishedLyricSet[] = [];
+
 function itemKind(item: LearningQueueItem): 'album_recording' | 'lesson' {
   return item.kind === 'recording' ? 'album_recording' : 'lesson';
 }
@@ -89,9 +91,16 @@ export default function LearningNowPlayingScreen({
   // The desktop's Lyrics and Queue buttons put their panels away and back.
   const [lyricsPanelHidden, setLyricsPanelHidden] = useState(false);
   const [queuePanelHidden, setQueuePanelHidden] = useState(false);
-  const [lyricSets, setLyricSets] = useState<PublishedLyricSet[]>([]);
-  const [selectedLyricSetId, setSelectedLyricSetId] = useState<string | null>(null);
-  const [lyricsLoading, setLyricsLoading] = useState(false);
+  // The lyrics loaded, with the item they belong to: another item's lyrics
+  // are never shown while its own are on the way.
+  const [lyricsState, setLyricsState] = useState<{ itemId: string | null; sets: PublishedLyricSet[]; selectedId: string | null }>({ itemId: null, sets: [], selectedId: null });
+  const currentItemId = currentItem?.id ?? null;
+  const currentItemKind = currentItem ? itemKind(currentItem) : null;
+  const lyricsCurrent = lyricsState.itemId === currentItemId;
+  const lyricSets = lyricsCurrent ? lyricsState.sets : EMPTY_LYRIC_SETS;
+  const selectedLyricSetId = lyricsCurrent ? lyricsState.selectedId : null;
+  const lyricsLoading = currentItemId != null && !lyricsCurrent;
+  const setSelectedLyricSetId = (selectedId: string | null) => setLyricsState((current) => ({ ...current, selectedId }));
   const [likedItemIds, setLikedItemIds] = useState<Set<string>>(new Set());
   const [libraryAuthenticated, setLibraryAuthenticated] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
@@ -100,18 +109,21 @@ export default function LearningNowPlayingScreen({
     if (embedded && onClose) onClose();
     else goBack(router, '/learn');
   };
+  // The picture lives on the lesson's own page: watching it means going there.
+  const watchVideo = () => {
+    const item = player.currentItem;
+    if (!item || item.kind !== 'lesson') return;
+    player.setLessonVideoMode('video');
+    closePlayer();
+    router.push({ pathname: '/learn/lesson/[id]', params: { id: item.id, setId: item.containerId } });
+  };
   // Pulled down, the player goes away, as the music player does.
   const pullDown = usePullDownToClose(closePlayer);
 
   useEffect(() => {
-    if (!currentItem) {
-      setLyricSets([]);
-      setSelectedLyricSetId(null);
-      return;
-    }
+    if (!currentItemId || !currentItemKind) return;
     let active = true;
-    setLyricsLoading(true);
-    learningService.getLyrics(itemKind(currentItem), currentItem.id)
+    learningService.getLyrics(currentItemKind, currentItemId)
       .then((payload) => {
         if (!active) return;
         const sets: PublishedLyricSet[] = payload.lyricSets.map((set) => ({
@@ -125,21 +137,18 @@ export default function LearningNowPlayingScreen({
           publicationStatus: set.publicationStatus,
           lines: set.lines.map((line) => ({ ...line, words: line.words ?? [] })),
         }));
-        setLyricSets(sets);
         const preferred = sets.find((set) => set.locale === locale) ?? sets[0] ?? null;
-        setSelectedLyricSetId(preferred?.id ?? null);
+        setLyricsState({ itemId: currentItemId, sets, selectedId: preferred?.id ?? null });
       })
       .catch(() => {
         if (!active) return;
-        setLyricSets([]);
-        setSelectedLyricSetId(null);
-      })
-      .finally(() => { if (active) setLyricsLoading(false); });
+        setLyricsState({ itemId: currentItemId, sets: [], selectedId: null });
+      });
     return () => { active = false; };
-  }, [currentItem?.id, currentItem?.kind, locale]);
+  }, [currentItemId, currentItemKind, locale]);
 
   useEffect(() => {
-    if (!currentItem) return;
+    if (!currentItemId) return;
     let active = true;
     learningService.getItemLibrary(locale)
       .then((library) => {
@@ -153,7 +162,7 @@ export default function LearningNowPlayingScreen({
         setLikedItemIds(new Set());
       });
     return () => { active = false; };
-  }, [currentItem?.id, locale]);
+  }, [currentItemId, locale]);
 
   const selectedSet = lyricSets.find((set) => set.id === selectedLyricSetId) ?? null;
   const activeLineId = useMemo(() => {
@@ -299,6 +308,14 @@ export default function LearningNowPlayingScreen({
     ),
     bar: (size) => (
       <>
+        {player.currentHasVideo && currentItem.kind === 'lesson' ? (
+          <PlayerBarButton
+            icon="videocam-outline"
+            accessibilityLabel={tr('Watch the video', 'Regarder la vidéo', 'مشاهدة الفيديو')}
+            onPress={watchVideo}
+            size={size}
+          />
+        ) : null}
         <PlayerBarButton
           icon="reader-outline"
           accessibilityLabel={tr('Lyrics', 'Paroles', 'الكلمات')}

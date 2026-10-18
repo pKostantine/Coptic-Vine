@@ -8,7 +8,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningCollectionCard from '@/components/learning/LearningCollectionCard';
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningProgressControl from '@/components/learning/LearningProgressControl';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -107,7 +106,6 @@ export default function LearningHymnScreen() {
           ) : null}
         </NowPlayingAwareScrollView>
       ) : null}
-      <LearningMiniPlayer />
     </SafeAreaView>
   );
 }

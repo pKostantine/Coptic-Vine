@@ -84,6 +84,8 @@ export interface UnifiedSearchLessonMetadata {
   mediaType: 'audio' | 'video';
   durationMs: number | null;
   mediaAsset: UnifiedSearchAsset;
+  /** A video lesson's audio-only rendition, once the search index carries it. */
+  audioAsset?: UnifiedSearchAsset | null;
   lessonSetId: string;
   lessonSetTitle: string;
   cantorId: string;

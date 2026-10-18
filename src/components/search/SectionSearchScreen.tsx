@@ -337,13 +337,6 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
         router.push({ pathname: '/learn/album/[id]', params: { id: result.entityId } });
         return;
       case 'learning_lesson': {
-        if (result.metadata.mediaType === 'video') {
-          router.push({
-            pathname: '/learn/lesson/[id]',
-            params: { id: result.entityId, setId: result.metadata.lessonSetId },
-          });
-          return;
-        }
         if (learningPlayer.currentItem?.id === result.entityId) {
           learningPlayer.togglePlayback();
           return;
@@ -355,6 +348,8 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
           subtitle: result.body,
           durationMs: result.metadata.durationMs,
           mediaAsset: result.metadata.mediaAsset,
+          audioAsset: result.metadata.audioAsset ?? null,
+          mediaType: result.metadata.mediaType,
           containerId: result.metadata.lessonSetId,
           containerTitle: result.metadata.lessonSetTitle,
           cantorName: result.metadata.cantorName,
@@ -362,6 +357,13 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
           hymnId: result.metadata.hymnId,
         };
         learningPlayer.playItem(item);
+        // Watched as video, the lesson opens where its picture is.
+        if (result.metadata.mediaType === 'video' && learningPlayer.lessonVideoMode === 'video') {
+          router.push({
+            pathname: '/learn/lesson/[id]',
+            params: { id: result.entityId, setId: result.metadata.lessonSetId },
+          });
+        }
       }
     }
   };

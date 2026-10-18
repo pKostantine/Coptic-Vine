@@ -10,6 +10,7 @@ import {
     AppLanguage,
     BibleVisibleLanguages,
     DEFAULT_READING_PREFERENCES,
+    LessonVideoMode,
     loadReadingPreferences,
     NowPlayingButtonSide,
     OrientationMode,
@@ -62,6 +63,9 @@ interface ReadingPreferencesContextValue {
   setDocumentTheme: (theme: DocumentThemeId) => void;
   /** Moves the hidden Now Playing bar's button to the other bottom corner. */
   setNowPlayingButtonSide: (side: NowPlayingButtonSide) => void;
+  /** Lessons with a video: play the picture, or the sound alone (utils/lessonPlayback.ts). */
+  setLessonVideoMode: (mode: LessonVideoMode) => void;
+  toggleLessonVideoOnCellular: () => void;
   bookmarks: string[];
   isBookmarked: (id: string) => boolean;
   toggleBookmark: (id: string) => void;
@@ -370,6 +374,14 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => (prev.nowPlayingButtonSide === nowPlayingButtonSide ? prev : { ...prev, nowPlayingButtonSide }));
   }, []);
 
+  const setLessonVideoMode = useCallback((lessonVideoMode: LessonVideoMode) => {
+    setPreferences((prev) => (prev.lessonVideoMode === lessonVideoMode ? prev : { ...prev, lessonVideoMode }));
+  }, []);
+
+  const toggleLessonVideoOnCellular = useCallback(() => {
+    setPreferences((prev) => ({ ...prev, lessonVideoOnCellular: !prev.lessonVideoOnCellular }));
+  }, []);
+
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks]);
 
   const toggleBookmark = useCallback((id: string) => {
@@ -404,6 +416,8 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleKeepScreenAwake,
       setDocumentTheme,
       setNowPlayingButtonSide,
+      setLessonVideoMode,
+      toggleLessonVideoOnCellular,
       bookmarks,
       isBookmarked,
       toggleBookmark,
@@ -435,6 +449,8 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       toggleKeepScreenAwake,
       setDocumentTheme,
       setNowPlayingButtonSide,
+      setLessonVideoMode,
+      toggleLessonVideoOnCellular,
       bookmarks,
       isBookmarked,
       toggleBookmark,

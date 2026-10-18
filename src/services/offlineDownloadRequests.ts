@@ -24,7 +24,7 @@ import type { PlaybackEntityKind } from '@/types/playback';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 
 type DownloadableAsset = MusicConsumerAsset | LearningMediaAsset;
-type LearningDownloadableLesson = Pick<LearningLesson, 'id' | 'mediaType' | 'mediaAsset'>;
+type LearningDownloadableLesson = Pick<LearningLesson, 'id' | 'mediaType' | 'mediaAsset' | 'audioAsset'>;
 
 function entityKey(entityType: string, entityId: string, locale: string): string {
   return `${entityType}:${entityId}:${locale}`;
@@ -216,8 +216,18 @@ function learningRecordingResource(recording: LearningAlbumRecording): OfflineDo
   return mediaResource(recording.mediaAsset, 'learning_audio', recording.id);
 }
 
-function learningLessonResource(lesson: LearningDownloadableLesson): OfflineDownloadResource | null {
-  return mediaResource(lesson.mediaAsset, learningMediaKind(lesson), lesson.id);
+/**
+ * A lesson's files: its own (the picture, for a video lesson, under the
+ * `learning_video_audio` key the player looks the picture up by) and, for a
+ * video lesson, its audio-only rendition too, so "Audio only" works offline
+ * at the audio rendition's size (PlaybackContext resolves either).
+ */
+function learningLessonResources(lesson: LearningDownloadableLesson): (OfflineDownloadResource | null)[] {
+  const resources = [mediaResource(lesson.mediaAsset, learningMediaKind(lesson), lesson.id)];
+  if (lesson.mediaType === 'video' && lesson.audioAsset) {
+    resources.push(mediaResource(lesson.audioAsset, 'learning_audio', lesson.id));
+  }
+  return resources;
 }
 
 export function learningRecordingDownloadRequest(
@@ -274,10 +284,12 @@ export function learningLessonDownloadRequest(
     locale,
     title: lesson.title,
     subtitle: lessonSet.cantor.displayName,
-    resources: compactResources([learningLessonResource(lesson), artworkResource(lessonSet.coverAsset)]),
+    resources: compactResources([...learningLessonResources(lesson), artworkResource(lessonSet.coverAsset)]),
     snapshots: [
       snapshot('learning_lesson', lesson.id, locale, lesson),
-      snapshot('learning_lesson_set', lessonSet.id, locale, { ...lessonSet, lessons: [lesson] }),
+      // The whole set, as the set page and the lesson page read it offline:
+      // one lesson's package must not shrink the set to that lesson.
+      snapshot('learning_lesson_set', lessonSet.id, locale, lessonSet),
     ],
   };
 }
@@ -293,7 +305,7 @@ export function learningLessonSetDownloadRequest(lessonSet: LearningLessonSetDet
     subtitle: lessonSet.cantor.displayName,
     resources: compactResources([
       artworkResource(lessonSet.coverAsset),
-      ...lessonSet.lessons.map(learningLessonResource),
+      ...lessonSet.lessons.flatMap(learningLessonResources),
     ]),
     snapshots: [
       snapshot('learning_lesson_set', lessonSet.id, locale, lessonSet),
@@ -311,7 +323,7 @@ export function learningPlaylistDownloadRequest(playlist: LearningPlaylistDetail
       resources.push(learningRecordingResource(item.recording));
       snapshots.push(snapshot('learning_recording', item.recording.id, locale, item.recording));
     } else {
-      resources.push(learningLessonResource(item.lesson));
+      resources.push(...learningLessonResources(item.lesson));
       snapshots.push(snapshot('learning_lesson', item.lesson.id, locale, item.lesson));
     }
   }

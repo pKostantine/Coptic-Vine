@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import ReleaseTile from '@/components/music/ReleaseTile';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
@@ -220,7 +219,6 @@ export default function LearningCantorScreen() {
           </PageGutterProvider>
         </NowPlayingAwareScrollView>
       )}
-      <LearningMiniPlayer />
       <BottomTabBar active="learn" />
     </SafeAreaView>
   );

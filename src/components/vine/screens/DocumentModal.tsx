@@ -534,6 +534,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             bar is: dragging it along the foot moves it to the other corner. */}
         <GlobalNowPlayingOverlay
           documentTheme={documentTheme}
+          covering
           onButtonTouchStart={() => {
             touchOnPillBarRef.current = true;
           }}

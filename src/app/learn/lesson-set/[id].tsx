@@ -11,19 +11,33 @@ import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { learningLessonSetAudioQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
+import { learningLessonSetQueue, lessonHasVideo, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import {
   learningLessonDownloadRequest,
   learningLessonSetDownloadRequest,
 } from '@/services/offlineDownloadRequests';
-import type { LearningLessonSetDetail } from '@/types/learningPlatform';
+import type { LearningLesson, LearningLessonSetDetail } from '@/types/learningPlatform';
+import { loadLearningResume, peekLearningResume, subscribeLearningResume, type LearningResumeMap } from '@/utils/learningResume';
 
 import { tr } from '../../../utils/appText';
+
+function rowProgress(resume: LearningResumeMap, lesson: LearningLesson): number {
+  const entry = resume[lesson.id];
+  const duration = entry?.durationMs ?? lesson.durationMs;
+  if (!entry || !duration || duration <= 0) return 0;
+  return Math.max(0, Math.min(1, entry.positionMs / duration));
+}
+
+/**
+ * A lesson set: its cover and its words, then its lessons in order. Play
+ * plays them all, video and audio lessons alike, on the one queue; a lesson
+ * with a picture, watched as video, opens on its own page where the picture
+ * is, and plays in place as sound alone.
+ */
 export default function LearningLessonSetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
@@ -33,10 +47,12 @@ export default function LearningLessonSetScreen() {
   const lessonSetId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [lessonSet, setLessonSet] = useState<LearningLessonSetDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { currentItem, playQueue } = useLearningPlayer();
-  const audioQueue = useMemo(() => lessonSet ? learningLessonSetAudioQueue(lessonSet) : [], [lessonSet]);
+  const [resume, setResume] = useState<LearningResumeMap>(() => peekLearningResume());
+  const player = useLearningPlayer();
+  const { currentItem, playQueue, playing, lessonVideoMode } = player;
+  const queue = useMemo(() => (lessonSet ? learningLessonSetQueue(lessonSet) : []), [lessonSet]);
   const downloadRequest = useMemo(
-    () => lessonSet ? learningLessonSetDownloadRequest(lessonSet, locale) : null,
+    () => (lessonSet ? learningLessonSetDownloadRequest(lessonSet, locale) : null),
     [lessonSet, locale],
   );
 
@@ -53,15 +69,36 @@ export default function LearningLessonSetScreen() {
     return () => { active = false; };
   }, [lessonSetId, locale]);
 
-  const openLesson = (lessonId: string, mediaType: 'audio' | 'video') => {
+  useEffect(() => {
+    let active = true;
+    void loadLearningResume().then((map) => { if (active) setResume(map); });
+    const unsubscribe = subscribeLearningResume(() => setResume(peekLearningResume()));
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const openLessonPage = (lessonId: string) => {
     if (!lessonSet) return;
-    if (mediaType === 'video') {
-      router.push({ pathname: '/learn/lesson/[id]', params: { id: lessonId, setId: lessonSet.id } });
+    router.push({ pathname: '/learn/lesson/[id]', params: { id: lessonId, setId: lessonSet.id } });
+  };
+
+  // Plays the lesson in the set's order. Watched as video, it opens its page
+  // where the picture shows; as sound, it plays where the listener stands.
+  const playLesson = (index: number) => {
+    if (!lessonSet || index < 0 || index >= queue.length) return;
+    const item = queue[index];
+    if (currentItem?.id === item.id) {
+      player.togglePlayback();
       return;
     }
-    const audioIndex = audioQueue.findIndex((item) => item.id === lessonId);
-    if (audioIndex >= 0) playQueue(audioQueue, audioIndex);
+    playQueue(queue, index);
+    if (lessonHasVideo(item) && lessonVideoMode === 'video') openLessonPage(item.id);
   };
+
+  const count = lessonSet?.lessons.length ?? 0;
+  const videoCount = lessonSet?.lessons.filter((lesson) => lesson.mediaType === 'video').length ?? 0;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -89,8 +126,13 @@ export default function LearningLessonSetScreen() {
               ) : null}
               {lessonSet.description ? <Text style={[styles.description, isArabic && styles.arabicCentered]}>{lessonSet.description}</Text> : null}
               <View style={styles.actions}>
-                <Pressable accessibilityRole="button" disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
-                  <Text style={styles.playAllText}>▶  {tr('Play Audio Lessons', 'Lire les leçons audio', 'تشغيل الدروس الصوتية')}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={!queue.length}
+                  style={({ pressed }) => [styles.playAll, !queue.length && styles.disabled, pressed && styles.pressed]}
+                  onPress={() => queue.length && playLesson(0)}
+                >
+                  <Text style={styles.playAllText}>▶  {tr('Play Lessons', 'Lire les leçons', 'تشغيل الدروس')}</Text>
                 </Pressable>
                 {downloadRequest ? (
                   <LearningDownloadButton packageKey={downloadRequest.packageKey} request={downloadRequest} isArabic={isArabic} />
@@ -102,13 +144,15 @@ export default function LearningLessonSetScreen() {
           <View style={styles.headingRow}>
             <Text style={[styles.sectionTitle, isArabic && styles.arabic]}>{tr('Lessons', 'Leçons', 'الدروس')}</Text>
             <Text style={[styles.sectionMeta, isArabic && styles.arabic]}>
-              {lessonSet.lessons.length + tr(lessonSet.lessons.length === 1 ? ' lesson' : ' lessons', lessonSet.lessons.length === 1 ? ' leçon' : ' leçons', ' درس')}
+              {count + tr(count === 1 ? ' lesson' : ' lessons', count === 1 ? ' leçon' : ' leçons', ' درس')}
+              {videoCount ? `  ·  ${videoCount} ${tr('video', 'vidéo', 'فيديو')}` : ''}
             </Text>
           </View>
           <View style={styles.mediaList}>
             {lessonSet.lessons.map((lesson, index) => {
               const lessonDownload = learningLessonDownloadRequest(lessonSet, lesson, locale);
-              const audioItem = audioQueue.find((entry) => entry.id === lesson.id);
+              const item = queue[index];
+              const active = currentItem?.id === lesson.id;
               return (
                 <LearningMediaRow
                   key={lesson.id}
@@ -117,18 +161,28 @@ export default function LearningLessonSetScreen() {
                   durationMs={lesson.durationMs}
                   index={index}
                   mediaType={lesson.mediaType}
-                  active={lesson.mediaType === 'audio' && currentItem?.id === lesson.id}
+                  active={active}
+                  playing={active && playing}
+                  progress={rowProgress(resume, lesson)}
                   isArabic={isArabic}
-                  onPress={() => openLesson(lesson.id, lesson.mediaType)}
+                  onPress={() => playLesson(index)}
                   trailing={(
                     <View style={styles.rowActions}>
-                      {audioItem ? <LearningItemActionsMenu item={audioItem} isArabic={isArabic} size={32} /> : null}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={tr('Open the lesson', 'Ouvrir la leçon', 'افتح الدرس')}
+                        hitSlop={6}
+                        onPress={() => openLessonPage(lesson.id)}
+                        style={({ pressed }) => [styles.openButton, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.openText}>›</Text>
+                      </Pressable>
+                      {item ? <LearningItemActionsMenu item={item} isArabic={isArabic} size={32} /> : null}
                       <LearningDownloadButton
                         packageKey={lessonDownload.packageKey}
                         request={lessonDownload}
                         isArabic={isArabic}
                         compact
-                        label=""
                       />
                       <LearningPlaylistPicker
                         itemKind="lesson"
@@ -145,7 +199,6 @@ export default function LearningLessonSetScreen() {
           </View>
         </NowPlayingAwareScrollView>
       ) : null}
-      <LearningMiniPlayer />
     </SafeAreaView>
   );
 }
@@ -164,14 +217,17 @@ const styles = StyleSheet.create({
   season: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: SPACING.xs },
   description: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: SPACING.md },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
-  playAll: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SPACING.lg, borderRadius: RADII.pill, backgroundColor: COLORS.learning },
-  playAllText: { color: COLORS.learningDeep, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
+  playAll: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SPACING.lg, borderRadius: RADII.pill, backgroundColor: COLORS.gold },
+  playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
   disabled: { opacity: 0.45 },
+  pressed: { opacity: 0.75 },
   headingRow: { marginTop: SPACING.xl, marginBottom: SPACING.md },
   sectionTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '700' },
   sectionMeta: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, marginTop: 3 },
   mediaList: { overflow: 'hidden', borderRadius: RADII.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  openButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  openText: { color: COLORS.learningBright, fontSize: 24, lineHeight: 26, fontWeight: '700' },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, textAlign: 'center', padding: SPACING.lg },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },

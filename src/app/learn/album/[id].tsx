@@ -11,7 +11,6 @@ import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { learningAlbumQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
@@ -133,7 +132,6 @@ export default function LearningAlbumScreen() {
           </View>
         </NowPlayingAwareScrollView>
       ) : null}
-      <LearningMiniPlayer />
     </SafeAreaView>
   );
 }

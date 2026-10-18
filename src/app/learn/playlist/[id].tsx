@@ -10,7 +10,6 @@ import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -36,7 +35,6 @@ function toQueueItem(item: LearningPlaylistItem): LearningQueueItem | null {
       hymnId: item.recording.hymnId ?? null,
     };
   }
-  if (item.lesson.mediaType === 'video') return null;
   return {
     kind: 'lesson',
     id: item.lesson.id,
@@ -44,10 +42,12 @@ function toQueueItem(item: LearningPlaylistItem): LearningQueueItem | null {
     subtitle: item.lesson.description,
     durationMs: item.lesson.durationMs,
     mediaAsset: item.lesson.mediaAsset,
+    audioAsset: item.lesson.audioAsset ?? null,
+    mediaType: item.lesson.mediaType,
     containerId: item.lesson.lessonSetId,
     containerTitle: item.lesson.lessonSetTitle,
-    cantorName: 'Coptic Vine',
-    coverAsset: null,
+    cantorName: item.lesson.cantorName ?? 'Coptic Vine',
+    coverAsset: item.lesson.coverAsset ?? null,
     hymnId: null,
   };
 }
@@ -63,7 +63,7 @@ export default function LearningPlaylistScreen() {
   const [owned, setOwned] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { currentItem, playQueue } = useLearningPlayer();
+  const { currentItem, playQueue, playing, lessonVideoMode } = useLearningPlayer();
   const audioQueue = useMemo(() => (
     playlist?.items.map(toQueueItem).filter((item): item is LearningQueueItem => Boolean(item)) ?? []
   ), [playlist]);
@@ -92,17 +92,18 @@ export default function LearningPlaylistScreen() {
     return () => { active = false; };
   }, [locale, playlistId]);
 
+  // Every item plays on the one queue; a lesson with a picture, watched as
+  // video, also opens on its own page where the picture shows.
   const openItem = (item: LearningPlaylistItem) => {
-    if (item.kind === 'lesson' && item.lesson.mediaType === 'video') {
+    const id = item.kind === 'album_recording' ? item.recording.id : item.lesson.id;
+    const index = audioQueue.findIndex((entry) => entry.id === id);
+    if (index >= 0) playQueue(audioQueue, index);
+    if (item.kind === 'lesson' && item.lesson.mediaType === 'video' && lessonVideoMode === 'video') {
       router.push({
         pathname: '/learn/lesson/[id]',
         params: { id: item.lesson.id, setId: item.lesson.lessonSetId },
       });
-      return;
     }
-    const id = item.kind === 'album_recording' ? item.recording.id : item.lesson.id;
-    const index = audioQueue.findIndex((entry) => entry.id === id);
-    if (index >= 0) playQueue(audioQueue, index);
   };
 
   const removeItem = async (item: LearningPlaylistItem) => {
@@ -173,7 +174,8 @@ export default function LearningPlaylistScreen() {
                   durationMs={content.durationMs}
                   index={index}
                   mediaType={mediaType}
-                  active={mediaType === 'audio' && currentItem?.id === content.id}
+                  active={currentItem?.id === content.id}
+                  playing={currentItem?.id === content.id && playing}
                   isArabic={isArabic}
                   onPress={() => openItem(item)}
                   trailing={(
@@ -207,7 +209,6 @@ export default function LearningPlaylistScreen() {
           </View>
         </NowPlayingAwareScrollView>
       ) : null}
-      <LearningMiniPlayer />
     </SafeAreaView>
   );
 }

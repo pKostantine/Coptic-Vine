@@ -88,7 +88,7 @@ type MediaDetails = Record<string, { artworkUri: string | null; mediaCount: numb
  */
 function NativeDownloadsScreen() {
   const router = useRouter();
-  const { preferences: reading } = useReadingPreferences();
+  const { preferences: reading, toggleLessonVideoOnCellular } = useReadingPreferences();
   const arabic = reading.appLanguage === 'ar';
   const wide = useLayoutMode() !== 'phone';
   const currentRevision = useSyncExternalStore(subscribe, revision, revision);
@@ -284,6 +284,13 @@ function NativeDownloadsScreen() {
         on={cellularOn && prefs.allowVideoOnCellular}
         disabled={!cellularOn}
         onPress={() => void patchPreferences({ allowVideoOnCellular: !prefs.allowVideoOnCellular })}
+      />
+      <SwitchRow
+        label={tr('Watch lesson videos over cellular', 'Regarder les vidéos de leçons en données cellulaires', 'مشاهدة فيديو الدروس عبر بيانات الجوال')}
+        detail={tr('Off, a video lesson plays as audio until Wi‑Fi', 'Désactivé : la leçon est lue en audio jusqu’au Wi‑Fi', 'عند الإيقاف يُشغَّل الدرس صوتاً فقط حتى الاتصال بالواي فاي')}
+        arabic={arabic}
+        on={reading.lessonVideoOnCellular}
+        onPress={toggleLessonVideoOnCellular}
       />
     </Section>
   );

@@ -17,7 +17,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import LearningArtwork from '@/components/learning/LearningArtwork';
 import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
-import LearningMiniPlayer from '@/components/learning/LearningMiniPlayer';
 import LearningSectionNav from '@/components/learning/LearningSectionNav';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow, PageGutterProvider, SectionHeading } from '@/components/vine/screens/BookPage';
@@ -52,6 +51,8 @@ function toQueueItem(item: LearningLibraryItem): LearningQueueItem {
     subtitle: item.subtitle,
     durationMs: item.durationMs,
     mediaAsset: item.mediaAsset,
+    audioAsset: item.audioAsset ?? null,
+    mediaType: item.mediaType,
     containerId: item.containerId,
     containerTitle: item.containerTitle,
     cantorName: item.cantorName,
@@ -71,7 +72,7 @@ export default function LearningLibraryScreen() {
   const insets = useSafeAreaInsets();
   const layout = useLayoutMode();
   const { preferences } = useReadingPreferences();
-  const { currentItem, playQueue } = useLearningPlayer();
+  const { currentItem, playQueue, lessonVideoMode } = useLearningPlayer();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const arabic = locale === 'ar';
   const wide = layout !== 'phone';
@@ -114,10 +115,8 @@ export default function LearningLibraryScreen() {
     () => library.items.filter((item) => item.state === activeState),
     [activeState, library.items],
   );
-  const audioQueue = useMemo(
-    () => stateItems.filter((item) => item.mediaType === 'audio').map(toQueueItem),
-    [stateItems],
-  );
+  // Every item of the list, video lessons too: they play on the one queue.
+  const audioQueue = useMemo(() => stateItems.map(toQueueItem), [stateItems]);
 
   const labels: Record<LearningProgressState, { title: string; empty: string }> = {
     will_learn: { title: tr('Will Learn', 'À apprendre', 'سأتعلم'), empty: tr('Add a recording or lesson you want to learn.', 'Ajoutez un enregistrement ou une leçon à apprendre.', 'أضف درساً أو تسجيلاً تريد تعلّمه.') },
@@ -126,15 +125,15 @@ export default function LearningLibraryScreen() {
   };
 
   const openItem = (item: LearningLibraryItem) => {
-    if (item.mediaType === 'video') {
+    const index = audioQueue.findIndex((entry) => entry.id === item.itemId);
+    if (index >= 0) playQueue(audioQueue, index);
+    // A lesson with a picture, watched as video, opens where the picture is.
+    if (item.mediaType === 'video' && lessonVideoMode === 'video') {
       router.push({
         pathname: '/learn/lesson/[id]',
         params: { id: item.itemId, setId: item.containerId },
       });
-      return;
     }
-    const index = audioQueue.findIndex((entry) => entry.id === item.itemId);
-    if (index >= 0) playQueue(audioQueue, index);
   };
 
   const moveItem = async (item: LearningLibraryItem, nextState: LearningProgressState) => {
@@ -264,7 +263,7 @@ export default function LearningLibraryScreen() {
                 <View style={styles.thumb}>
                   <LearningArtwork asset={item.coverAsset} size={68} radius={14} label={item.containerTitle} />
                   <View style={styles.thumbBadge}>
-                    <Icon name={item.mediaType === 'video' ? 'eye-outline' : isPlaying ? 'pause' : 'play'} size={13} color={COLORS.greenDeep} />
+                    <Icon name={isPlaying ? 'pause' : 'play'} size={13} color={COLORS.greenDeep} />
                   </View>
                 </View>
                 <View style={styles.itemCopy}>
@@ -411,7 +410,6 @@ export default function LearningLibraryScreen() {
           )}
         </PageGutterProvider>
       </NowPlayingAwareScrollView>
-      <LearningMiniPlayer />
       <BottomTabBar active="learn" />
     </SafeAreaView>
   );

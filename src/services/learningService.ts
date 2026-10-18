@@ -312,6 +312,8 @@ export async function searchLearning(query: string, locale = 'en'): Promise<Lear
       description: result.body,
       durationMs: result.metadata.durationMs,
       mediaAsset: result.metadata.mediaAsset,
+      audioAsset: result.metadata.audioAsset ?? null,
+      coverAsset: result.metadata.coverAsset ?? null,
       lessonSetId: result.metadata.lessonSetId,
       lessonSetTitle: result.metadata.lessonSetTitle,
       cantorId: result.metadata.cantorId,
