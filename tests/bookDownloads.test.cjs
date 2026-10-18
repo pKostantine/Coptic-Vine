@@ -574,6 +574,14 @@ test('an update in progress survives the app closing, and another book never cle
   // failure saving it is reported with its own cause.
   assert.match(manager, /if \(\/\^Package row count is \\d\+; expected \\d\+\\\.\$\/\.test\(message\)\) \{\n\s+await invalidateDownloadedChunk/);
   assert.match(manager, /throw new Error\(`Couldn't save \$\{resource\.id\}: \$\{message\}`\);/);
+  // Books installing together, and the calendar meanwhile, work from one manifest.
+  assert.match(manager, /if \(this\.installsRunning > 1 && this\.installManifest\) return this\.installManifest;/);
+  assert.match(manager, /const manifest = await this\.manifestForInstall\(\);/);
+  assert.match(manager, /const manifest = this\.installsRunning && this\.installManifest \? this\.installManifest : await this\.fetchManifest\(\);/);
+  // A version staged and waiting for the rest of its book is spared too.
+  assert.match(manager, /if \(!this\.bookWorkers\.has\(book\)\) continue;\n\s+for \(const resource of resources\) if \(resource\.id === resourceId\) versions\.add\(resource\.version\);/);
+  // Once its content is activated a book is installed, whatever the cleanup after meets.
+  assert.match(manager, /activateBookResources\(bookKey,[\s\S]*?try \{\n\s+for \(const resource of resources\) await this\.removeObsoleteVersions[\s\S]*?\} catch \(cause\) \{\n\s+console\.warn\('Cleaning up after installing a book failed:'/);
 });
 
 test('cancelling cancels every transfer in flight', async () => {
