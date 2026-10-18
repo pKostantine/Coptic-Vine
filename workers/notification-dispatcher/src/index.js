@@ -23,6 +23,10 @@ async function rpc(env, name, body = {}) {
     headers: {
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
       authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      // graphql_public is the project's first exposed schema, so without a
+      // profile PostgREST looks for these functions there and answers 404.
+      'accept-profile': 'public',
+      'content-profile': 'public',
       'content-type': 'application/json',
     },
     body: JSON.stringify(body),
