@@ -35,3 +35,9 @@ test('outside Holy Week the Annunciation shows as before', () => {
   assert.equal(pill(['holy-50-days'], ['annunciation']), 'Annunciation');
   assert.equal(pill([], []), 'Annual');
 });
+
+test('on Thomas Sunday the pill names the Sunday, not the Holy Fifty Days around it', () => {
+  assert.equal(pill(['holy-50-days'], ['thomas-sunday']), 'Thomas Sunday');
+  assert.equal(pill(['holy-50-days'], ['ascension']), 'Ascension');
+  assert.equal(pill(['holy-50-days'], []), 'Holy Fifty Days');
+});
