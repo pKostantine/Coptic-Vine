@@ -3,10 +3,12 @@ import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 
 import LearningArtwork from '@/components/learning/LearningArtwork';
+import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import { LearningPlaylistPanel } from '@/components/learning/LearningPlaylistPicker';
 import ActionsSheet, { ActionRow, ActionsMenuTrigger } from '@/components/playback/ActionsSheet';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import type { OfflineDownloadRequest } from '@/types/offlineDownloads';
 import { publicUrl } from '@/utils/publicUrl';
 import { shareLink } from '@/utils/shareLink';
 
@@ -18,6 +20,11 @@ interface LearningItemActionsMenuProps {
   isArabic?: boolean;
   size?: number;
   /**
+   * The item's offline package, where the page listing it can build one: the
+   * menu then offers Download, as a song's does (not on the web).
+   */
+  download?: OfflineDownloadRequest | null;
+  /**
    * Called just before an action leaves for another page (Sign in), so a
    * full-screen player it was opened from can put itself away first.
    */
@@ -28,11 +35,12 @@ interface LearningItemActionsMenuProps {
 
 /**
  * A recording's or lesson's More menu: Add to playlist — where it stands in
- * My Learning, and the reader's own playlists, in the same sheet — then, for
- * an item other than the one playing, queue it next or last (into the one
- * queue Music shares, so it can follow a song), and share it.
+ * My Learning, and the reader's own playlists, in the same sheet — Download
+ * where the page gives its package, then, for an item other than the one
+ * playing, queue it next or last (into the one queue Music shares, so it can
+ * follow a song), and share it.
  */
-export default function LearningItemActionsMenu({ item, size = 36, onNavigate, renderTrigger }: LearningItemActionsMenuProps) {
+export default function LearningItemActionsMenu({ item, size = 36, download, onNavigate, renderTrigger }: LearningItemActionsMenuProps) {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [choosingPlaylist, setChoosingPlaylist] = useState(false);
@@ -94,6 +102,14 @@ export default function LearningItemActionsMenu({ item, size = 36, onNavigate, r
               label={addToPlaylistLabel}
               onPress={() => setChoosingPlaylist(true)}
             />
+            {download ? (
+              <LearningDownloadButton
+                packageKey={download.packageKey}
+                request={download}
+                menuRow
+                onAction={close}
+              />
+            ) : null}
             {!playingNow ? (
               <>
                 <ActionRow
