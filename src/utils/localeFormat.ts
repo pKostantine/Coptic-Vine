@@ -128,6 +128,25 @@ export function formatDayMonthRange(start: Date, end: Date, isArabic: boolean) {
   return `${dayMonth(start)} – ${dayMonth(end)} ${year}`;
 }
 
+/**
+ * The Gregorian days a liturgical day spans, its eve and the day itself:
+ * "October 18–19", "October 31 – November 1" / "18–19 octobre" / "١٨–١٩ أكتوبر".
+ */
+export function formatMonthDaySpan(start: Date, end: Date, isArabic: boolean) {
+  const digits = (value: number) => (isArabic ? toEasternArabicDigits(value) : String(value));
+  const sameMonth = start.getUTCMonth() === end.getUTCMonth();
+  if (!isArabic && !isFrench(isArabic)) {
+    const month = (date: Date) => GREGORIAN_MONTHS_EN[date.getUTCMonth()];
+    return sameMonth
+      ? `${month(start)} ${start.getUTCDate()}–${end.getUTCDate()}`
+      : `${month(start)} ${start.getUTCDate()} – ${month(end)} ${end.getUTCDate()}`;
+  }
+  const months = isArabic ? GREGORIAN_MONTHS_AR : GREGORIAN_MONTHS_FR;
+  return sameMonth
+    ? `${digits(start.getUTCDate())}–${digits(end.getUTCDate())} ${months[end.getUTCMonth()]}`
+    : `${digits(start.getUTCDate())} ${months[start.getUTCMonth()]} – ${digits(end.getUTCDate())} ${months[end.getUTCMonth()]}`;
+}
+
 /** A Coptic day and month: "Thoout 20" / "20 Thoout" / "٢٠ توت". */
 export function formatCopticDayMonth(monthName: string, day: number, isArabic: boolean) {
   if (isArabic) return `${toEasternArabicDigits(day)} ${formatCopticMonthName(monthName, true)}`;

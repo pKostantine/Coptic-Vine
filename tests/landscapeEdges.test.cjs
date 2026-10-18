@@ -19,8 +19,11 @@ test('each tab page builds its layout afresh when the device turns, rather than 
   const pages = ['src/app/books/index.tsx', 'src/app/music/index.tsx', 'src/app/learn/index.tsx', 'src/app/account.tsx', 'src/app/learn/library.tsx', 'src/app/music/library.tsx'];
   for (const page of pages) assert.match(read(page), /<NowPlayingAwareScrollView\n(\s+\/\/.*\n)*\s+key=\{layout\}/, page);
   for (const page of ['src/app/music/artist/[id].tsx', 'src/app/learn/cantor/[id].tsx']) assert.match(read(page), /<NowPlayingAwareScrollView key=\{layout\}/, page);
-  // Home's two columns (a phone on its side) and three (an iPad) are keyed apart too.
-  assert.match(read('src/components/vine/screens/HomeScreen.tsx'), /\s+key=\{`\$\{layout\}-\$\{twoColumns\}`\}/);
+  // Home's one column, two over two (an upright iPad) and three (an iPad on its side) are keyed apart too;
+  // a phone on its side has a page of its own, its seal and Pray now beside the scrolling cards.
+  const home = read('src/components/vine/screens/HomeScreen.tsx');
+  assert.match(home, /<NowPlayingAwareScrollView\n(\s+\/\/.*\n)*\s+key=\{layout\}/);
+  assert.match(home, /if \(layout === 'landscape'\) \{/);
   assert.match(read('src/components/vine/ui/BottomTabBar.tsx'), /key=\{tablet \? 'tablet' : isCompactLandscape \? 'sideways' : 'phone'\}/);
   // The seasons' frame and year bar, centred and narrowed on an iPad, are keyed apart too.
   const seasons = read('src/components/vine/screens/SeasonSelectorScreen.tsx');

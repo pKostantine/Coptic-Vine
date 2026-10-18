@@ -8,7 +8,7 @@ import { tr } from '@/utils/appText';
 import { formatDayMonthDate, toEasternArabicDigits } from '@/utils/localeFormat';
 import { canonDayDate, canonWeekday, type CanonTask } from '@/utils/spiritualCanon';
 
-import { canonTaskDetail, canonTaskTitle, weekdayInitial } from './canonText';
+import { canonTaskDetail, canonTaskTitle, canonTimeParts, weekdayInitial } from './canonText';
 
 const MAX_FONT_SCALE = 1.3;
 
@@ -44,15 +44,13 @@ export function CanonCheck({ done, disabled = false, label, onPress, size = 28 }
 
 /**
  * One task of a day: its tick, its name and what it asks, and — for the
- * Agpeya and the Bible — the way into the prayer or the reading. On Home the
- * rows sit on the framed card, a hairline apart; on the canon's own page each
- * is a card of its own.
+ * Agpeya and the Bible — the way into the prayer or the reading. Each is a
+ * card of its own on the canon's page; Home sets the day as a timeline
+ * (CanonTimelineRow).
  */
-export function CanonTaskRow({ task, arabic, variant, first = false, disabled = false, onToggle, onOpen, onSkip }: {
+export function CanonTaskRow({ task, arabic, disabled = false, onToggle, onOpen, onSkip }: {
   task: CanonTask;
   arabic: boolean;
-  variant: 'home' | 'card';
-  first?: boolean;
   /** A day still to come: shown, not yet to be ticked. */
   disabled?: boolean;
   onToggle: (done: boolean) => void;
@@ -88,8 +86,8 @@ export function CanonTaskRow({ task, arabic, variant, first = false, disabled = 
     : `${title}: ${tr('mark as done', 'marquer comme accompli', 'علّم كمكتمل')}`;
 
   return (
-    <View style={[styles.row, variant === 'card' ? styles.rowCard : [styles.rowHome, !first && styles.rowHomeRule]]}>
-      {variant === 'card' ? <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" /> : null}
+    <View style={[styles.row, styles.rowCard]}>
+      <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <CanonCheck done={task.done} disabled={disabled} label={checkLabel} onPress={() => onToggle(!task.done)} />
       {opens ? (
         <Pressable
@@ -137,7 +135,7 @@ export function CanonSkippedRow({ task, arabic, first = false, onRestore }: {
 }) {
   const title = canonTaskTitle(task);
   return (
-    <View style={[styles.row, styles.rowSkipped, !first && styles.rowHomeRule]}>
+    <View style={[styles.row, styles.rowSkipped, !first && styles.rowRule]}>
       <Icon name="play-skip-forward" size={14} color={COLORS.muted} />
       <Text style={[styles.skippedTitle, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
       <Pressable
@@ -148,6 +146,85 @@ export function CanonSkippedRow({ task, arabic, first = false, onRestore }: {
       >
         <Text style={[styles.restoreText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Restore', 'Rétablir', 'أعِده')}</Text>
       </Pressable>
+    </View>
+  );
+}
+
+/**
+ * One task on Home's timeline (Coptic Vine design, "Home v2"): its time, a
+ * dot on the line that ticks it off, its name and measure, and — until it is
+ * done — the way into the Agpeya's hour or the Bible. A done task fades back.
+ */
+export function CanonTimelineRow({ task, arabic, first, last, onToggle, onOpen }: {
+  task: CanonTask;
+  arabic: boolean;
+  first: boolean;
+  last: boolean;
+  onToggle: (done: boolean) => void;
+  onOpen?: () => void;
+}) {
+  const title = canonTaskTitle(task);
+  const detail = canonTaskDetail(task, { withTime: false });
+  const time = task.time ? canonTimeParts(task.time) : null;
+  const opens = (task.kind === 'agpeya' || task.kind === 'bible') && onOpen;
+  const action = task.kind === 'agpeya' ? tr('Pray', 'Prier', 'صلِّ') : tr('Read', 'Lire', 'اقرأ');
+  const checkLabel = task.done
+    ? `${title}: ${tr('done. Tap to undo', 'accompli. Touchez pour annuler', 'مكتمل. اضغط للتراجع')}`
+    : `${title}: ${tr('mark as done', 'marquer comme accompli', 'علّم كمكتمل')}`;
+  return (
+    <View style={styles.line}>
+      <View style={styles.lineTime}>
+        {time ? (
+          <>
+            <Text style={[styles.lineClock, task.done && styles.faded]} maxFontSizeMultiplier={1.2}>{time.clock}</Text>
+            {time.period ? <Text style={[styles.linePeriod, task.done && styles.faded, arabic && styles.arabicTight]} maxFontSizeMultiplier={1.2}>{time.period}</Text> : null}
+          </>
+        ) : null}
+      </View>
+      <View style={styles.lineDot}>
+        {/* The timeline runs through the dots, from the first row's to the last's. */}
+        <View style={[styles.lineRail, first && styles.lineRailFirst, last && styles.lineRailLast]} />
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityLabel={checkLabel}
+          accessibilityState={{ checked: task.done }}
+          aria-checked={task.done}
+          hitSlop={12}
+          onPress={() => onToggle(!task.done)}
+          style={({ pressed }) => [styles.dot, task.done && styles.dotDone, pressed && styles.pressed]}
+        >
+          {task.done ? <Icon name="checkmark" size={13} color={COLORS.greenDeep} /> : null}
+        </Pressable>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={opens ? `${action}: ${title}` : checkLabel}
+        onPress={opens ? onOpen : () => onToggle(!task.done)}
+        style={({ pressed }) => [styles.lineBody, pressed && styles.pressed]}
+      >
+        <View style={styles.text}>
+          <Text style={[styles.lineTitle, task.done && styles.lineTitleDone, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {title}
+          </Text>
+          {detail ? (
+            <Text style={[styles.lineDetail, task.done && styles.faded, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text>
+          ) : null}
+        </View>
+        {opens && !task.done ? (
+          <View style={styles.lineAction}>
+            <Text style={[styles.lineActionText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{action}</Text>
+          </View>
+        ) : null}
+      </Pressable>
+    </View>
+  );
+}
+
+/** How much of a day is done, a segment for each task in the day's order, gold once it is done. */
+export function CanonSegments({ tasks }: { tasks: Pick<CanonTask, 'key' | 'done'>[] }) {
+  return (
+    <View style={styles.segments} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {tasks.map((task) => <View key={task.key} style={[styles.segment, task.done && styles.segmentDone]} />)}
     </View>
   );
 }
@@ -219,8 +296,7 @@ const styles = StyleSheet.create({
   checkDisabled: { opacity: 0.4 },
 
   row: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  rowHome: { paddingVertical: 11 },
-  rowHomeRule: { borderTopColor: 'rgba(255, 255, 255, 0.07)', borderTopWidth: 1 },
+  rowRule: { borderTopColor: 'rgba(255, 255, 255, 0.07)', borderTopWidth: 1 },
   rowCard: { borderRadius: 16, minHeight: 64, overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 11 },
   body: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 10, minWidth: 0 },
   text: { flex: 1, minWidth: 0 },
@@ -237,6 +313,28 @@ const styles = StyleSheet.create({
   skippedTitle: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, minWidth: 0 },
   restore: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, height: 28, justifyContent: 'center', paddingHorizontal: 12 },
   restoreText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, fontWeight: '700' },
+
+  // Home's timeline: the time, the dot on its rail, the task (44 · 22 · the rest, 12 apart).
+  line: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 52 },
+  lineTime: { alignItems: 'flex-end', width: 44 },
+  lineClock: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700', lineHeight: 14.5 },
+  linePeriod: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '600', letterSpacing: 0.6, marginTop: 1, opacity: 0.8 },
+  lineDot: { alignItems: 'center', alignSelf: 'stretch', justifyContent: 'center', width: 22 },
+  lineRail: { backgroundColor: 'rgba(255, 255, 255, 0.1)', bottom: 0, left: 10, position: 'absolute', top: 0, width: 2 },
+  lineRailFirst: { top: '50%' },
+  lineRailLast: { bottom: '50%' },
+  dot: { alignItems: 'center', backgroundColor: '#0D2215', borderColor: 'rgba(255, 255, 255, 0.3)', borderRadius: 10, borderWidth: 1.5, height: 20, justifyContent: 'center', width: 20 },
+  dotDone: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
+  lineBody: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minWidth: 0, paddingVertical: 6 },
+  lineTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600', lineHeight: 19.5 },
+  lineTitleDone: { color: 'rgba(255, 255, 255, 0.5)' },
+  lineDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 2 },
+  lineAction: { alignItems: 'center', borderColor: COLORS.gold, borderRadius: 99, borderWidth: 1.5, height: 30, justifyContent: 'center', paddingHorizontal: 12 },
+  lineActionText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '700' },
+  faded: { opacity: 0.6 },
+  segments: { flexDirection: 'row', gap: 4 },
+  segment: { backgroundColor: 'rgba(255, 255, 255, 0.16)', borderRadius: 3, flex: 1, height: 5 },
+  segmentDone: { backgroundColor: COLORS.gold },
 
   track: { backgroundColor: 'rgba(255, 255, 255, 0.09)', borderRadius: 2, height: 4, overflow: 'hidden' },
   fill: { backgroundColor: COLORS.gold, borderRadius: 2, height: 4 },

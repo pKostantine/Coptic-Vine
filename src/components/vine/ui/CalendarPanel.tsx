@@ -68,7 +68,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const pickerListsHeight = Math.min(320, windowHeight - insets.top - insets.bottom - 2 * SPACING.lg - 50);
-  const { rawDate, selectDate } = useCalendar();
+  const { rawDate, effectiveDate, selectDate } = useCalendar();
   const { preferences } = useReadingPreferences();
   const isArabic = preferences.appLanguage === 'ar';
   const day = useLiturgicalDay();
@@ -97,10 +97,10 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   const monthListRef = useRef<ScrollView>(null);
   const yearListRef = useRef<ScrollView>(null);
 
-  // The grid highlight always tracks the literal calendar day, even after
-  // the liturgical day has rolled forward past 5pm — only the day/night
-  // toggle communicates that content is now for the evening.
-  const selectedIso = rawDate.toISOString().slice(0, 10);
+  // The grid marks the day being shown: on the Gregorian calendar the civil
+  // day, on the Coptic one the liturgical day, whose Coptic date has already
+  // rolled over on the eve (utils/liturgicalDay.ts).
+  const selectedIso = (mode === 'coptic' ? effectiveDate : rawDate).toISOString().slice(0, 10);
 
   // Keeps the visible month following `rawDate` when it changes from outside
   // (the Season selector, or the Books week strip behind the sheet).
@@ -108,18 +108,18 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
     setGregorianYear(rawDate.getUTCFullYear());
     setGregorianMonth(rawDate.getUTCMonth() + 1);
     setCopticYear(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the timestamp, not the Date instance
-  }, [rawDate.getTime()]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the timestamps, not the Date instances
+  }, [rawDate.getTime(), effectiveDate.getTime()]);
 
   useEffect(() => {
     if (mode !== 'coptic' || copticYear !== null) return;
-    getCopticMonthForDate(rawDate).then((result) => {
+    getCopticMonthForDate(effectiveDate).then((result) => {
       if (!result) return;
       setCopticYear(result.coptic_year);
       setCopticMonth(result.coptic_month);
       setCopticMonthName(result.coptic_month_name);
     });
-  }, [mode, copticYear, rawDate]);
+  }, [mode, copticYear, effectiveDate]);
 
   // The month on screen stays until the next one has arrived, days and feast
   // dots together, so switching month or calendar swaps the grid in place

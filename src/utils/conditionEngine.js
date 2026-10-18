@@ -328,8 +328,8 @@ async function computeGospelAuthorFlags(isoDate, extraContext) {
 
 /**
  * @param {Date|string} date - the liturgical date to resolve flags for
- *   (already rolled forward past the 5pm boundary where applicable — see
- *   CalendarContext's effectiveDate).
+ *   (already rolled forward on the eve, when the liturgical day has begun
+ *   — see CalendarContext's effectiveDate).
  * @param {Object} extraContext - non-date flags merged in (and always
  *   winning over anything date-derived): UI toggles like BishopPresent, and
  *   the schema/table-derived structural flags hymnLibrary.js's

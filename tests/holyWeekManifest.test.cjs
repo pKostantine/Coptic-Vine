@@ -224,7 +224,7 @@ function loadCurrentDay() {
   return new Function(`${outputText}\nreturn { currentHolyWeekDayId, HOLY_WEEK_DAY_IDS };`)();
 }
 
-test('the menu marks the day or eve being prayed, rolling to the eve after 5pm', () => {
+test('the menu marks the day or eve being prayed, rolling to the eve in the evening', () => {
   const { currentHolyWeekDayId, HOLY_WEEK_DAY_IDS } = loadCurrentDay();
   const { HOLY_WEEK_ROWS } = manifest;
   // The helper's day ids are the menu rows' first (day) entries, in order.

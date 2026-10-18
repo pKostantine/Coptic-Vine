@@ -36,8 +36,8 @@ export default function DayControls({ theme, arabic, seasonLabel, onOpenSeasons,
 
   const togglePeriod = () => {
     if (isLive) {
-      // Changing the period by hand leaves live mode, so the 5pm clock stops
-      // flipping it back. selectDate always starts the day in the morning.
+      // Changing the period by hand leaves live mode, so the liturgical
+      // clock stops flipping it back. selectDate always starts the day in the morning.
       selectDate(rawDate);
       if (!evening) setLiturgicalDayPeriod('evening');
     } else {
