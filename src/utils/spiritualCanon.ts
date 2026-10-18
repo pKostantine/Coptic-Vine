@@ -50,11 +50,13 @@ export type CanonFrequencyKind = CanonFrequency['kind'];
 /**
  * The days metanias are made: not on a weekend, nor on a feast — the Feasts
  * and Weekends flags calendar.get_context_flags gives the day, the real day,
- * never the date the Books screen has been moved to.
+ * never the date the Books screen has been moved to. Holy Week is not a feast
+ * here, though the calendar marks Pascha week (PaschaWeek, Lazarus Saturday
+ * to Bright Saturday) Feasts: its Monday to Friday keep their metanias.
  */
-export const METANIA_CONDITION = '!(Feasts || Weekends)';
+export const METANIA_CONDITION = '!((Feasts && !PaschaWeek) || Weekends)';
 /** The same days, the fasting days among them only. */
-export const METANIA_FASTING_CONDITION = '!(Feasts || Weekends) && Fasts';
+export const METANIA_FASTING_CONDITION = '!((Feasts && !PaschaWeek) || Weekends) && Fasts';
 
 /** One hour of the Agpeya in an Agpeya item: how much of it, and when. */
 export interface CanonHourPlan {
@@ -639,11 +641,9 @@ export function canonTaskKey(itemId: string, hourId?: string | null): string {
 }
 
 /**
- * The Agpeya in the canon through Pascha: none from Monday Eve to Bright
- * Saturday. Monday Eve begins on Palm Sunday evening, so that day keeps the
- * morning's hours and leaves out those from the Eleventh Hour on; Holy Monday
- * to Bright Saturday leave out every one. By the day's flags: HolyWeek (Holy
- * Monday to Bright Saturday) and PalmSunday.
+ * The Agpeya in the canon through Pascha: Palm Sunday keeps only the First,
+ * Third and Sixth Hours, and Holy Monday to Bright Saturday none at all. By
+ * the day's flags: HolyWeek (Holy Monday to Bright Saturday) and PalmSunday.
  */
 export const AGPEYA_NONE_CONDITION = 'HolyWeek';
 export const AGPEYA_MORNING_ONLY_CONDITION = 'PalmSunday';
@@ -671,14 +671,14 @@ export function canonNeedsCalendar(items: readonly CanonItem[]): boolean {
   return items.some((item) => item.kind === 'agpeya' || keptByCalendar(item.frequency));
 }
 
-/** The prayers said from the Eleventh Hour on: those Monday Eve, begun on Palm Sunday evening, takes the place of. */
-const EVENING_PRAYERS = new Set(['eleventh_hour', 'twelfth_hour', 'prayer_of_the_veil', ...MIDNIGHT_WATCHES]);
+/** The only hours of the Agpeya kept on Palm Sunday. */
+const PALM_SUNDAY_PRAYERS = new Set(['first_hour', 'third_hour', 'sixth_hour']);
 
 /** Whether a prayer of the Agpeya is asked on a day, by the calendar; a day not yet read keeps them all. */
 export function agpeyaPrayerKeptOn(hourId: string, day: string, calendar?: CanonCalendar): boolean {
   const agpeya = calendar?.calendarDay(day)?.agpeya ?? 'all';
   if (agpeya === 'none') return false;
-  if (agpeya === 'beforeEve') return !EVENING_PRAYERS.has(hourId);
+  if (agpeya === 'beforeEve') return PALM_SUNDAY_PRAYERS.has(hourId);
   return true;
 }
 

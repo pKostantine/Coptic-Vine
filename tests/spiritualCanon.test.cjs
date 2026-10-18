@@ -290,6 +290,10 @@ test('Home shows today’s canon in every layout, under the prayer of the hour',
   assert.equal((home.match(/\{prayCard\}\n\s+\{canonCard\}/g) || []).length, 3);
   assert.match(home, /onToggle=\{\(done\) => canon\.setTaskDone\(canon\.today, task\.key, done\)\}/);
   assert.match(home, /router\.push\('\/canon\/edit' as never\)/);
+  // Skipping is done on the canon's own page, not on Home's card.
+  assert.doesNotMatch(home, /onSkip=|CanonSkippedRow|setTaskSkipped/);
+  const page = read('src/app/canon/index.tsx');
+  assert.match(page, /onSkip=\{\(\) => canon\.setTaskSkipped\(day, task\.key, true\)\}/);
   // The tick and the way into the prayer are side by side, never one inside the other (a button may not hold a button on the web).
   const parts = read('src/components/canon/CanonParts.tsx');
   assert.match(parts, /<CanonCheck done=\{task\.done\} disabled=\{disabled\} label=\{checkLabel\} onPress=\{\(\) => onToggle\(!task\.done\)\} \/>\n\s+\{opens \? \(/);
@@ -394,7 +398,8 @@ test('metanias are kept on the days they are made: not on Saturdays, Sundays or 
 });
 
 test('the metania rule reads the day’s own flags, by the same engine the books are read with', async () => {
-  assert.equal(canon.METANIA_CONDITION, '!(Feasts || Weekends)');
+  // Holy Week isn't a feast here, though the calendar marks Pascha week Feasts.
+  assert.equal(canon.METANIA_CONDITION, '!((Feasts && !PaschaWeek) || Weekends)');
   const engine = load('src/utils/conditionEngine.js', {
     './dateUtils': { toIsoDate: (value) => String(value).slice(0, 10) },
     '../services/contentDataClient': { contentDataClient: {} },
@@ -404,7 +409,13 @@ test('the metania rule reads the day’s own flags, by the same engine the books
   assert.equal(made({ Weekends: true, Sunday: true }), false);
   assert.equal(made({ Feasts: true, GreatFeasts: true }), false); // a feast
   assert.equal(made({ Feasts: true, Weekdays: true }), false); // a feast on a weekday
-  assert.equal(canon.METANIA_FASTING_CONDITION, '!(Feasts || Weekends) && Fasts');
+  // Holy Week's Monday to Friday, as the calendar has them (Feasts and PaschaWeek): metanias are made.
+  assert.equal(made({ Feasts: true, Pascha: true, PaschaWeek: true, Weekdays: true, Tuesday: true }), true);
+  assert.equal(made({ Feasts: true, Pascha: true, PaschaWeek: true, GoodFriday: true, Weekdays: true }), true);
+  // Its weekends still not: Palm Sunday, Bright Saturday.
+  assert.equal(made({ Feasts: true, PalmSunday: true, PaschaWeek: true, Weekends: true }), false);
+  assert.equal(made({ Feasts: true, BrightSaturday: true, PaschaWeek: true, Weekends: true }), false);
+  assert.equal(canon.METANIA_FASTING_CONDITION, '!((Feasts && !PaschaWeek) || Weekends) && Fasts');
   const fasting = (flags) => engine.evaluateCondition(canon.METANIA_FASTING_CONDITION, flags);
   assert.equal(fasting({ Weekdays: true }), false); // not a fasting day
   assert.equal(fasting({ Weekdays: true, Fasts: true, NormalFastingDays: true }), true); // a Wednesday
@@ -482,7 +493,7 @@ test('a document opens at a section named by hymn key, as it does at a reading',
   assert.match(reader, /: newSections\.find\(\(section\) => section\.hymnKey === hymnKeyTarget\)\?\.id \?\? null;/);
 });
 
-test('no Agpeya from Monday Eve to Bright Saturday: Palm Sunday keeps its morning, Holy Week none, by the day’s own flags', () => {
+test('no Agpeya from Monday Eve to Bright Saturday: Palm Sunday keeps the First, Third and Sixth Hours, Holy Week none', () => {
   assert.equal(canon.AGPEYA_NONE_CONDITION, 'HolyWeek');
   assert.equal(canon.AGPEYA_MORNING_ONLY_CONDITION, 'PalmSunday');
   const every = canon.CANON_AGPEYA_PRAYERS.map((prayer) => plan(prayer.id));
@@ -491,7 +502,8 @@ test('no Agpeya from Monday Eve to Bright Saturday: Palm Sunday keeps its mornin
   const days = { '2027-04-25': 'beforeEve', '2027-04-26': 'none', '2027-05-01': 'none', '2027-05-02': 'all' };
   const calendar = { calendarDay: (day) => (days[day] ? { applicable: false, fasting: false, agpeya: days[day] } : null) };
   const agpeyaOn = (day) => canon.canonTasksForDay(doc(items), day, calendar).filter((task) => task.kind === 'agpeya').map((task) => task.hourId);
-  assert.deepEqual(agpeyaOn('2027-04-25'), ['first_hour', 'third_hour', 'sixth_hour', 'ninth_hour']);
+  // Palm Sunday: the First, Third and Sixth Hours only.
+  assert.deepEqual(agpeyaOn('2027-04-25'), ['first_hour', 'third_hour', 'sixth_hour']);
   assert.deepEqual(agpeyaOn('2027-04-26'), []);
   assert.deepEqual(agpeyaOn('2027-05-01'), []);
   assert.equal(agpeyaOn('2027-05-02').length, 10); // the Resurrection: all of it again

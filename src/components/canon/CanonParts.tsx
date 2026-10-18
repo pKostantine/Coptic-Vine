@@ -116,11 +116,12 @@ export function CanonTaskRow({ task, arabic, variant, first = false, disabled = 
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${tr('Skip for this day', 'Passer ce jour-ci', 'تخطَّ في هذا اليوم')}: ${title}`}
-          hitSlop={6}
+          hitSlop={4}
           onPress={onSkip}
           style={({ pressed }) => [styles.skip, pressed && styles.pressed]}
         >
-          <Icon name="play-skip-forward" size={13} color={COLORS.muted} />
+          <Icon name="play-skip-forward" size={12} color={COLORS.muted} />
+          <Text style={[styles.skipText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Skip', 'Passer', 'تخطَّ')}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -230,7 +231,8 @@ const styles = StyleSheet.create({
   openDone: { borderColor: 'rgba(255, 255, 255, 0.14)' },
   openText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
   openTextDone: { color: COLORS.muted },
-  skip: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 15, height: 30, justifyContent: 'center', width: 30 },
+  skip: { alignItems: 'center', borderColor: 'rgba(255, 255, 255, 0.22)', borderRadius: 99, borderWidth: 1, flexDirection: 'row', gap: 5, height: 30, paddingHorizontal: 11 },
+  skipText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
   rowSkipped: { gap: 10, paddingVertical: 8 },
   skippedTitle: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, minWidth: 0 },
   restore: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, height: 28, justifyContent: 'center', paddingHorizontal: 12 },

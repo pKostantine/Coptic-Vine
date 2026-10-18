@@ -8,7 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import FillSvg from '../ui/FillSvg';
 
-import { CanonProgressBar, CanonSkippedRow, CanonTaskRow } from '@/components/canon/CanonParts';
+import { CanonProgressBar, CanonTaskRow } from '@/components/canon/CanonParts';
 import { dayProgressLabel, paschaAgpeyaNote } from '@/components/canon/canonText';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
@@ -346,7 +346,6 @@ export default function HomeScreen() {
   // opens the week; each task ticks off here, and the Agpeya's hours and the
   // Bible open from their rows.
   const canonTasks = canon.tasksFor(canon.today);
-  const canonSkipped = canon.skippedFor(canon.today);
   const canonPascha = canon.items.some((item) => item.kind === 'agpeya') && canon.agpeyaOn(canon.today) !== 'all';
   const canonProgress = canonDayProgress(canonTasks);
   const canonComplete = canonProgress.total > 0 && canonProgress.done === canonProgress.total;
@@ -411,19 +410,11 @@ export default function HomeScreen() {
               first={index === 0}
               onToggle={(done) => canon.setTaskDone(canon.today, task.key, done)}
               onOpen={() => router.push(canonTaskRoute(task) as never)}
-              onSkip={() => canon.setTaskSkipped(canon.today, task.key, true)}
             />
           ))
         ) : (
           <Text style={[styles.empty, arabic && styles.arabic]}>{tr('Nothing in your canon today.', 'Rien dans votre canon aujourd’hui.', 'لا شيء في قانونك اليوم.')}</Text>
         )}
-        {canon.loaded && canonSkipped.length ? (
-          <View style={styles.canonSkipped}>
-            {canonSkipped.map((task, index) => (
-              <CanonSkippedRow key={task.key} task={task} arabic={arabic} first={index === 0} onRestore={() => canon.setTaskSkipped(canon.today, task.key, false)} />
-            ))}
-          </View>
-        ) : null}
         {canon.loaded && canonPascha ? <Text style={[styles.canonNote, arabic && styles.arabicCentered]}>{paschaAgpeyaNote()}</Text> : null}
         {canonComplete ? (
           <Text style={[styles.canonGlory, arabic && styles.arabicCentered]}>
@@ -624,7 +615,6 @@ const styles = StyleSheet.create({
   canonRows: { paddingBottom: 10, paddingHorizontal: 18, paddingTop: 6 },
   canonInvite: { alignItems: 'center', gap: 14, paddingBottom: 10, paddingTop: 12 },
   canonInviteText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, lineHeight: 21, textAlign: 'center' },
-  canonSkipped: { borderTopColor: 'rgba(255, 255, 255, 0.07)', borderTopWidth: 1, marginTop: 2, paddingTop: 2 },
   canonNote: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, paddingBottom: 4, paddingTop: 8, textAlign: 'center' },
   canonGlory: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontStyle: 'italic', paddingBottom: 6, paddingTop: 8, textAlign: 'center' },
 
