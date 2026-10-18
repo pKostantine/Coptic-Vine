@@ -68,7 +68,8 @@ export type IconName =
   | 'cloud-done-outline'
   | 'mail-outline'
   | 'key-outline'
-  | 'log-out-outline';
+  | 'log-out-outline'
+  | 'notifications-outline';
 
 interface IconProps {
   name: IconName;
@@ -117,6 +118,20 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="M221 400a179 179 0 1 0 0-358 179 179 0 0 0 0 358Z" fill="none" stroke={color} strokeWidth={32} strokeMiterlimit={10} />
           <Path d="M338 338 471 471" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeMiterlimit={10} />
+        </Svg>
+      );
+    case 'notifications-outline':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path
+            d="M427.68 351.43C402 320 383.87 304 383.87 217.35 383.87 138 343.35 109.73 310 96c-4.43-1.82-8.6-6-9.95-10.55C294.2 65.54 277.8 48 256 48s-38.21 17.55-44 37.47c-1.35 4.6-5.52 8.71-9.95 10.53-33.39 13.75-73.87 41.92-73.87 121.35C128.13 304 110 320 84.32 351.43 73.68 364.45 83 384 101.61 384h308.88c18.51 0 27.77-19.61 17.19-32.57Z"
+            fill="none"
+            stroke={color}
+            strokeWidth={32}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path d="M320 384v16a64 64 0 0 1-128 0v-16" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case 'checkmark':

@@ -17,6 +17,7 @@ import { BottomChromeProvider, useBottomChrome } from '@/context/BottomChromeCon
 import { CalendarProvider } from '@/context/CalendarContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { SpiritualCanonProvider } from '@/context/SpiritualCanonContext';
 import { VideoStageProvider } from '@/context/VideoStageContext';
 import { keepsWholeWindow } from '@/utils/desktopChrome';
 import type { OrientationMode } from '@/utils/preferencesStorage';
@@ -162,16 +163,18 @@ export default function RootLayout() {
         <NotificationBootstrap />
         <BookSyncBootstrap />
         <ReadingPreferencesProvider>
-          <CalendarProvider>
-            <MusicPlayerProvider>
-              <VideoStageProvider>
-                <StatusBar style="light" />
-                <BottomChromeProvider>
-                  <AppFrame />
-                </BottomChromeProvider>
-              </VideoStageProvider>
-            </MusicPlayerProvider>
-          </CalendarProvider>
+          <SpiritualCanonProvider>
+            <CalendarProvider>
+              <MusicPlayerProvider>
+                <VideoStageProvider>
+                  <StatusBar style="light" />
+                  <BottomChromeProvider>
+                    <AppFrame />
+                  </BottomChromeProvider>
+                </VideoStageProvider>
+              </MusicPlayerProvider>
+            </CalendarProvider>
+          </SpiritualCanonProvider>
         </ReadingPreferencesProvider>
       </AuthProvider>
     </SafeAreaProvider>

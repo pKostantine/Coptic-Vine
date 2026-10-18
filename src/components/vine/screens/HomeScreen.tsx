@@ -8,6 +8,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import FillSvg from '../ui/FillSvg';
 
+import { CanonProgressBar, CanonTaskRow } from '@/components/canon/CanonParts';
+import { dayProgressLabel } from '@/components/canon/canonText';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
 import { CrownOrnament, VineDivider } from '@/components/vine/ui/Ornaments';
@@ -15,6 +17,7 @@ import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAware
 import { SERVICES_BY_CATEGORY } from '@/constants/manifest';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
 import { homeService, type HomeSynaxariumEvent } from '@/services/homeService';
 import { getCopticDate, type CopticDate } from '@/utils/calendarService';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
@@ -24,6 +27,7 @@ import { formatCopticDayMonth, formatDayMonthDate } from '@/utils/localeFormat';
 import { agpeyaHourAt } from '@/utils/agpeyaHours';
 import { LECTIONARY_ROUTE_IDS, LECTIONARY_SERVICES, lectionaryHref, readingLinesFor, withPropheciesAsOneLine } from '@/utils/lectionaryOutline';
 import { getServiceReadingCitations, type LectionaryService, type ReadingCitation } from '@/utils/readingsService';
+import { canonDayProgress, canonTaskRoute } from '@/utils/spiritualCanon';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
 import { appText, entryLabel, tr } from '../../../utils/appText';
@@ -62,16 +66,17 @@ function splitSaintTitle(title: string): { main: string; detail: string | null }
 
 /**
  * Home (Coptic Vine design system, "HomeHero"): the seal on a green glow with
- * the day beneath it, the Agpeya hour to pray now,
- * then two framed cards under a gold crown — the day's readings, one service
- * at a time, and the saints of today and tomorrow. Home always shows the
- * live day, whatever date the Books screen has been moved to.
+ * the day beneath it, the Agpeya hour to pray now, the day's spiritual canon
+ * to tick off, then two framed cards under a gold crown — the day's readings,
+ * one service at a time, and the saints of today and tomorrow. Home always
+ * shows the live day, whatever date the Books screen has been moved to.
  */
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const layout = useLayoutMode();
   const { preferences } = useReadingPreferences();
+  const canon = useSpiritualCanon();
   const [now, setNow] = useState(() => new Date());
   const arabic = preferences.appLanguage === 'ar';
 
@@ -337,6 +342,87 @@ export default function HomeScreen() {
     </View>
   );
 
+  // The day's spiritual canon (context/SpiritualCanonContext.tsx): its head
+  // opens the week; each task ticks off here, and the Agpeya's hours and the
+  // Bible open from their rows.
+  const canonTasks = canon.tasksFor(canon.today);
+  const canonProgress = canonDayProgress(canonTasks);
+  const canonComplete = canonProgress.total > 0 && canonProgress.done === canonProgress.total;
+  const canonCard = (
+    <View style={card}>
+      {frame}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${tr('Today’s Canon', 'Canon du jour', 'قانون اليوم')}. ${tr('Open your canon', 'Ouvrir votre canon', 'افتح قانونك')}`}
+        onPress={() => router.push('/canon' as never)}
+        style={({ pressed }) => [styles.framedHead, pressed && styles.pressed]}
+      >
+        <Text style={[styles.framedKicker, arabic && styles.arabicTight]}>{tr('Spiritual Canon', 'Canon spirituel', 'القانون الروحي')}</Text>
+        <Text style={[styles.framedTitle, arabic && styles.arabicCentered]}>{tr('Today’s Canon', 'Canon du jour', 'قانون اليوم')}</Text>
+        <Text style={[styles.framedDate, arabic && styles.arabicCentered]}>
+          {canonProgress.total ? dayProgressLabel(canonProgress.done, canonProgress.total) : dayLine(liveDate)}
+        </Text>
+      </Pressable>
+      {canon.loaded && canon.items.length ? (
+        <View style={styles.segmentRow}>
+          <View style={styles.flex}>
+            {canonProgress.total ? <CanonProgressBar done={canonProgress.done} total={canonProgress.total} /> : null}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tr('Edit your canon', 'Modifier votre canon', 'عدّل قانونك')}
+            onPress={() => router.push('/canon/edit' as never)}
+            style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
+          >
+            <Icon name="create-outline" size={19} color={COLORS.gold} />
+          </Pressable>
+        </View>
+      ) : null}
+      <View style={styles.canonRows}>
+        {!canon.loaded ? (
+          <Text style={[styles.empty, arabic && styles.arabic]}>{tr('Loading…', 'Chargement…', 'جارٍ التحميل…')}</Text>
+        ) : !canon.items.length ? (
+          <View style={styles.canonInvite}>
+            <Text style={[styles.canonInviteText, arabic && styles.arabicCentered]}>
+              {tr(
+                'Set down your rule of prayer — hours of the Agpeya, Bible reading and your own — and tick it off each day.',
+                'Notez votre règle de prière — heures de l’Agpia, lecture de la Bible et le reste — et cochez-la chaque jour.',
+                'دوّن قانون صلاتك — ساعات الأجبية وقراءة الكتاب المقدس وما تختاره — وعلّمه كل يوم.',
+              )}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/canon/edit' as never)}
+              style={({ pressed }) => [styles.prayButton, pressed && styles.pressed]}
+            >
+              <Icon name="add" size={16} color={COLORS.greenDeep} />
+              <Text style={[styles.prayButtonText, arabic && styles.arabicTight]}>{tr('Set up your canon', 'Établir votre canon', 'ضع قانونك')}</Text>
+            </Pressable>
+          </View>
+        ) : canonTasks.length ? (
+          canonTasks.map((task, index) => (
+            <CanonTaskRow
+              key={task.key}
+              task={task}
+              arabic={arabic}
+              variant="home"
+              first={index === 0}
+              onToggle={(done) => canon.setTaskDone(canon.today, task.key, done)}
+              onOpen={() => router.push(canonTaskRoute(task) as never)}
+            />
+          ))
+        ) : (
+          <Text style={[styles.empty, arabic && styles.arabic]}>{tr('Nothing in your canon today.', 'Rien dans votre canon aujourd’hui.', 'لا شيء في قانونك اليوم.')}</Text>
+        )}
+        {canonComplete ? (
+          <Text style={[styles.canonGlory, arabic && styles.arabicCentered]}>
+            {tr('Glory to God! Today’s canon is complete.', 'Gloire à Dieu ! Le canon du jour est accompli.', 'المجد لله! اكتمل قانون اليوم.')}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+
   // The page runs to both edges; its content keeps clear of the notch.
   const sidePadding = useSidePadding(wideLayout ? 36 : 0);
   // Three columns want 1000pt: a phone on its side and an upright iPad set
@@ -365,6 +451,7 @@ export default function HomeScreen() {
             <View style={styles.columnNarrow}>
               {heroBlock}
               {prayCard}
+              {canonCard}
             </View>
             <View style={[styles.columnWide, styles.stack]}>
               {readingsCard}
@@ -377,6 +464,7 @@ export default function HomeScreen() {
             <View style={styles.columnNarrow}>
               {heroBlock}
               {prayCard}
+              {canonCard}
             </View>
             <View style={styles.columnWide}>{readingsCard}</View>
             <View style={styles.columnWide}>{synaxCard}</View>
@@ -385,6 +473,7 @@ export default function HomeScreen() {
           <View style={styles.column}>
             {heroBlock}
             {prayCard}
+            {canonCard}
             {readingsCard}
             {synaxCard}
           </View>
@@ -520,6 +609,11 @@ const styles = StyleSheet.create({
   readingKindArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', writingDirection: 'rtl' },
   readingValue: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
   readingMissing: { color: 'rgba(255, 255, 255, 0.35)' },
+
+  canonRows: { paddingBottom: 10, paddingHorizontal: 18, paddingTop: 6 },
+  canonInvite: { alignItems: 'center', gap: 14, paddingBottom: 10, paddingTop: 12 },
+  canonInviteText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, lineHeight: 21, textAlign: 'center' },
+  canonGlory: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontStyle: 'italic', paddingBottom: 6, paddingTop: 8, textAlign: 'center' },
 
   saints: { paddingBottom: 12, paddingHorizontal: 18, paddingTop: 2 },
   saint: { borderBottomColor: 'rgba(255, 255, 255, 0.07)', borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 13 },
