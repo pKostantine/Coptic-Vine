@@ -15,7 +15,7 @@ import {
   TimeAndReminder,
   WeekdayChips,
 } from '@/components/canon/CanonEditorParts';
-import { agpeyaHourName, applicableDaysExplanation, canonFrequencyLabel, canonGoalLabel, canonItemTitle, psalmsLabel, weekdayName } from '@/components/canon/canonText';
+import { agpeyaHourName, calendarDaysExplanation, canonFrequencyLabel, canonGoalLabel, canonItemTitle, psalmsLabel, weekdayName } from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow, SectionHeading } from '@/components/vine/screens/BookPage';
 import BleedPage from '@/components/vine/ui/BleedPage';
@@ -311,6 +311,7 @@ function GoalEditor({ kind, goal, hourId, arabic, onChange }: {
 function frequencyKindLabel(kind: CanonFrequency['kind'], long = false): string {
   switch (kind) {
     case 'applicable': return tr('All applicable days', 'Tous les jours prévus', 'كل الأيام المسموح بها');
+    case 'fastingDays': return tr('Fasting days', 'Jours de jeûne', 'أيام الصوم');
     case 'weekdays': return long ? tr('On certain days of the week', 'Certains jours de la semaine', 'في أيام معيّنة من الأسبوع') : tr('Some days', 'Certains jours', 'أيام معيّنة');
     case 'perWeek': return long ? tr('A number of times a week', 'Un nombre de fois par semaine', 'عددًا من المرات في الأسبوع') : tr('Per week', 'Par semaine', 'في الأسبوع');
     default: return tr('Every day', 'Chaque jour', 'كل يوم');
@@ -328,7 +329,7 @@ function FrequencyEditor({ kind, frequency, today, arabic, onChange }: {
   const select = (next: CanonFrequency['kind']) => {
     if (next === frequency.kind) return;
     if (next === 'daily') onChange({ kind: 'daily' });
-    else if (next === 'applicable') onChange({ kind: 'applicable' });
+    else if (next === 'applicable' || next === 'fastingDays') onChange({ kind: next });
     // Chosen days start from today's.
     else if (next === 'weekdays') onChange({ kind: 'weekdays', days: [canonWeekday(today)] });
     else onChange({ kind: 'perWeek', times: 3 });
@@ -342,7 +343,7 @@ function FrequencyEditor({ kind, frequency, today, arabic, onChange }: {
           options={FREQUENCY_KINDS[kind].map((option) => ({
             key: option,
             label: frequencyKindLabel(option, true),
-            detail: option === 'applicable' ? applicableDaysExplanation() : null,
+            detail: option === 'applicable' || option === 'fastingDays' ? calendarDaysExplanation() : null,
           }))}
           selected={frequency.kind}
           onSelect={select}

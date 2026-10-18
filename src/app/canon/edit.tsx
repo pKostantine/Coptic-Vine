@@ -80,9 +80,9 @@ export default function CanonEditScreen() {
       kind: 'metania',
       title: tr('Metanias', 'Métanies', 'المطانيات'),
       detail: tr(
-        'A number of metanias, on every day they are made — never on Saturdays, Sundays or feasts',
-        'Un nombre de métanies, chaque jour où on les fait — jamais le samedi, le dimanche ni aux fêtes',
-        'عدد من المطانيات، في كل يوم تُصنع فيه — ليس في السبت والأحد والأعياد',
+        'A number of metanias, or a time',
+        'Un nombre de métanies, ou un temps',
+        'عدد من المطانيات، أو وقت',
       ),
     },
     {

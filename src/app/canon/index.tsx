@@ -19,7 +19,7 @@ import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
 import { tr } from '@/utils/appText';
 import { formatDayMonthDate, formatDayMonthRange } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
-import { addCanonDays, canonDayDate, canonDayProgress, canonTaskRoute, canonWeekStart } from '@/utils/spiritualCanon';
+import { addCanonDays, canonDayDate, canonDayProgress, canonTaskRoute, canonWeekStart, keptByCalendar } from '@/utils/spiritualCanon';
 
 const MAX_FONT_SCALE = 1.3;
 
@@ -39,7 +39,7 @@ export default function CanonScreen() {
   const weekStart = canonWeekStart(day);
   const weekDays = Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset));
   // Metanias kept on the days they are made: the week shown is read from the calendar.
-  const keepsApplicableDays = canon.items.some((item) => item.frequency.kind === 'applicable');
+  const keepsApplicableDays = canon.items.some((item) => keptByCalendar(item.frequency));
   const { ensureCalendarDays } = canon;
   useEffect(() => {
     if (keepsApplicableDays) ensureCalendarDays(Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset)));
