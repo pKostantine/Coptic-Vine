@@ -61,6 +61,24 @@ async function prepareNativeNotifications(requestPermission: boolean) {
   return { Notifications, granted: permission.granted };
 }
 
+export type LocalNotificationPermission = 'granted' | 'denied' | 'undetermined' | 'unsupported';
+
+/** The Android channel local notifications (the canon's reminders) are sent on. */
+export const LOCAL_NOTIFICATION_CHANNEL_ID = CHANNEL_ID;
+
+/**
+ * Whether this device may show the app's own scheduled notifications (the
+ * spiritual canon's reminders), asking first when `requestPermission` is set
+ * and the system still allows asking. The web schedules none.
+ */
+export async function localNotificationPermission(requestPermission = false): Promise<LocalNotificationPermission> {
+  const { Notifications, granted } = await prepareNativeNotifications(requestPermission);
+  if (!Notifications) return 'unsupported';
+  if (granted) return 'granted';
+  const permission = await Notifications.getPermissionsAsync();
+  return permission.canAskAgain ? 'undetermined' : 'denied';
+}
+
 async function registerExpoToken(expoPushToken: string) {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
