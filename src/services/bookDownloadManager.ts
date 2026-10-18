@@ -18,6 +18,7 @@ import {
   importContentChunk,
   isContentChunkImported,
   listBooks as listStoredBooks,
+  listPendingResourceIds,
   listResources as listStoredResources,
   removeBookReferences,
   seedBookRows,
@@ -145,6 +146,8 @@ async function waitForMediaPackage(key: string): Promise<void> {
       void downloadManager.getProgress(key).then((progress) => {
         if (settled) return;
         if (progress?.status === 'complete') { settled = true; unsubscribe(); resolve(); }
+        // Removed from under the wait: nothing would ever report on it again.
+        else if (!progress) { settled = true; unsubscribe(); reject(new Error('The download was removed before it finished.')); }
         else if (progress?.status === 'paused') { settled = true; unsubscribe(); reject(new PausedDownloadError('Download paused.')); }
         else if (progress?.status === 'failed' || progress?.status === 'cancelled') {
           settled = true; unsubscribe(); reject(new Error(progress.error || 'Package download failed.'));
@@ -186,12 +189,31 @@ class NativeBookDownloadManager implements BookDownloadManager {
   // Every downloading book's progress is announced together, a few times a second.
   private announceProgress = throttled(async () => this.emit(), PROGRESS_INTERVAL_MS);
   private async cleanupActivatedVersions() {
+    // A resource a book is still installing keeps its other versions: the
+    // one being fetched isn't active yet. Cleared at launch, an update the
+    // app was closed in the middle of started again from nothing every time.
+    const pending = await listPendingResourceIds();
     for (const resource of await listStoredResources()) {
-      if (!resource.activeVersion) continue;
-      const obsoletePackages = await getResourcePackageKeys(resource.resourceId, resource.activeVersion);
-      await cleanupObsoleteResourceVersions(resource.resourceId);
-      for (const oldPackage of obsoletePackages) await downloadManager.remove(oldPackage);
+      if (!resource.activeVersion || pending.has(resource.resourceId)) continue;
+      await this.removeObsoleteVersions(resource.resourceId, resource.activeVersion);
     }
+  }
+  /** The versions of a resource being staged right now, for whichever book. */
+  private stagingVersions(resourceId: string): string[] {
+    const prefix = `${resourceId}@`;
+    return [...this.resourceWorkers.keys()].filter((key) => key.startsWith(prefix)).map((key) => key.slice(prefix.length));
+  }
+  /**
+   * Removes a resource's other versions, rows and packages, once `activeVersion`
+   * is in -- all but one another book is fetching meanwhile, which a book
+   * that read an older or newer manifest may be.
+   */
+  private async removeObsoleteVersions(resourceId: string, activeVersion: string) {
+    const staging = this.stagingVersions(resourceId);
+    const stagingPackages = new Set(staging.map((version) => `book-resource:${resourceId}:${version}`));
+    const obsoletePackages = (await getResourcePackageKeys(resourceId, activeVersion)).filter((key) => !stagingPackages.has(key));
+    await cleanupObsoleteResourceVersions(resourceId, staging);
+    for (const oldPackage of obsoletePackages) await downloadManager.remove(oldPackage);
   }
   private async initialize() {
     if (!this.initialized) {
@@ -255,7 +277,16 @@ class NativeBookDownloadManager implements BookDownloadManager {
         // reuse while SQLite activation remains version-atomic.
         const versionedPayload = { ...payload, version: resource.version };
         try { await importContentChunk(versionedPayload, request.packageKey, chunk.rowCount); }
-        catch { await invalidateDownloadedChunk(row, request.packageKey, `Package row count check failed for ${resource.id}/${chunk.id}.`); }
+        catch (cause) {
+          // Only a chunk that doesn't hold what the manifest says is fetched
+          // again. Anything else (the database, the disk) keeps the file for
+          // the next try and is reported as it is, not as a bad chunk.
+          const message = cause instanceof Error ? cause.message : String(cause);
+          if (/^Package row count is \d+; expected \d+\.$/.test(message)) {
+            await invalidateDownloadedChunk(row, request.packageKey, `Package row count check failed for ${resource.id}/${chunk.id}.`);
+          }
+          throw new Error(`Couldn't save ${resource.id}: ${message}`);
+        }
       }
       await setResourceState(resource.id, active ? 'update_available' : 'queued', { bytes: resource.size, error: null, systemOwned: resource.id === 'calendar' });
       this.emit();
@@ -312,11 +343,7 @@ class NativeBookDownloadManager implements BookDownloadManager {
       ]);
       await stopReporting();
       const graphOrphans = await activateBookResources(bookKey, resources.map((resource) => ({ id: resource.id, version: resource.version, bytes: resource.size })));
-      for (const resource of resources) {
-        const obsoletePackages = await getResourcePackageKeys(resource.id, resource.version);
-        await cleanupObsoleteResourceVersions(resource.id);
-        for (const oldPackage of obsoletePackages) await downloadManager.remove(oldPackage);
-      }
+      for (const resource of resources) await this.removeObsoleteVersions(resource.id, resource.version);
       if (graphOrphans.length) {
         const downloads = await downloadManager.listDownloads();
         for (const item of downloads.filter((download) => download.domain === 'books' && graphOrphans.includes(download.entityId))) {
@@ -413,9 +440,7 @@ class NativeBookDownloadManager implements BookDownloadManager {
     if (await getActiveResourceVersion('calendar') === resource.version) return;
     await this.stageResource(resource);
     await activateSystemResource('calendar', resource.version, resource.size);
-    const obsoletePackages = await getResourcePackageKeys('calendar', resource.version);
-    await cleanupObsoleteResourceVersions('calendar');
-    for (const oldPackage of obsoletePackages) await downloadManager.remove(oldPackage);
+    await this.removeObsoleteVersions('calendar', resource.version);
     this.emit();
   }
 

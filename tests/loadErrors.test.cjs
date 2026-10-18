@@ -63,14 +63,26 @@ test('the description follows the App Language', () => {
   assert.equal(loadErrors('en').describeLoadError('Failed to fetch', 'ar').title, 'أنت غير متصل بالإنترنت');
 });
 
-test('a failed download says so plainly, never with the database’s own words', () => {
+test('a failed download says what to do, and the cause in a few words, never the exception it came wrapped in', () => {
   const { describeDownloadError } = loadErrors();
-  const locked = "FunctionCallException: Calling the 'finalizeAsync' function has failed (at ExpoModulesCore/AsyncFunctionDefinition.swift:123) → Caused by: SQLiteErrorException: Error code 5: database is locked";
-  assert.deepEqual(describeDownloadError(locked), { title: 'The download didn’t finish', hint: 'Please try again.' });
+  const locked = "FunctionCallException: Calling the 'finalizeAsync' function has failed (at ExpoModulesCore/AsyncFunctionDefinition.swift:123) → Caused by: SQLiteErrorException: Error code 5: database is locked (at ExpoSQLite/SQLiteModule.swift:471)";
+  assert.deepEqual(describeDownloadError(locked), { title: 'The download didn’t finish', hint: 'Please try again.', detail: 'database is locked' });
+  assert.equal(describeDownloadError("Couldn't save liturgy: Package row count is 3; expected 4.").detail, "Couldn't save liturgy: Package row count is 3; expected 4.");
   assert.equal(describeDownloadError('Network request failed').title, 'You’re offline');
+  assert.equal(describeDownloadError('Connect to the internet to start or update this download.').title, 'You’re offline');
   assert.equal(loadErrors('fr').describeDownloadError(locked).title, 'Le téléchargement n’a pas abouti');
-  // The Downloads page shows that, not the message, and keeps the message for the log.
+  // The app's own reasons say what to do about them.
+  const wifi = describeDownloadError('Downloads are set to Wi-Fi only.');
+  assert.equal(wifi.title, 'Waiting for Wi‑Fi');
+  assert.match(wifi.hint, /turn on Download over cellular on this page/);
+  assert.equal(wifi.detail, null);
+  assert.equal(describeDownloadError('Video downloads over cellular are turned off in Settings.').title, 'Waiting for Wi‑Fi');
+  assert.equal(describeDownloadError('Error code 13: database or disk is full').title, 'Not enough space');
+  // The Downloads page shows that, the cause after it, and keeps the message for the log.
   const page = fs.readFileSync('src/app/downloads.tsx', 'utf8');
-  assert.match(page, /const \{ title, hint \} = describeDownloadError\(error\.message\);\n\s+Alert\.alert\(title, hint\);/);
+  assert.match(page, /console\.warn\('Download failed:', error\.message\);\n\s+const \{ title, hint, detail \} = describeDownloadError\(error\.message\);\n\s+Alert\.alert\(title, detail \? `\$\{hint\}/);
   assert.doesNotMatch(page, /Alert\.alert\(tr\('Download', 'Téléchargement', 'التنزيل'\), error\.message\)/);
+  // A book whose last try stopped says why on its row.
+  assert.match(page, /detail = book\.error \? describeDownloadError\(book\.error\)\.title : tr\('Couldn’t finish downloading'/);
+  assert.match(page, /const after = book\.error \? describeDownloadError\(book\.error\)\.title : size;/);
 });

@@ -396,6 +396,7 @@ function loadDownloadManager() {
         this.finish = (size) => { this.status = 'completed'; existing.set(this.destination.uri, size); resolve({ uri: this.destination.uri, size }); };
         this.pauseNow = () => { this.status = 'paused'; resolve(null); };
         this.cancelNow = () => { this.status = 'cancelled'; reject(new Error('cancelled')); };
+        this.failNow = (message) => { this.status = 'failed'; reject(new Error(message)); };
       });
     }
     downloadAsync() { return this.transfer(); }
@@ -518,6 +519,61 @@ test('pausing pauses every transfer in flight and keeps each one\'s own resume p
   }
   assert.equal(packages.get(key).status, 'complete');
   assert.ok([...files.values()].every((row) => row.status === 'complete'));
+});
+
+test('a transfer that fails is tried twice more, a moment apart, before its package fails', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { downloadManager, tasks, packages } = loadDownloadManager();
+  const key = 'book-resource:liturgy:v2';
+  await downloadManager.enqueue(contentRequest(key, 1));
+  await settle();
+  tasks[0].failNow('The network connection was lost.');
+  await settle();
+  assert.equal(tasks.length, 1, 'it waits a moment before trying again');
+  assert.equal(packages.get(key).status, 'downloading', 'and the package has not failed');
+  t.mock.timers.tick(1000);
+  await settle();
+  assert.equal(tasks.length, 2, 'then the chunk is fetched again');
+  tasks[1].finish(100);
+  await settle();
+  assert.equal(packages.get(key).status, 'complete');
+
+  // Three failures in a row, and the package fails.
+  const other = 'book-resource:bible:v2';
+  await downloadManager.enqueue(contentRequest(other, 1));
+  await settle();
+  tasks.at(-1).failNow('The network connection was lost.');
+  await settle();
+  t.mock.timers.tick(1000);
+  await settle();
+  tasks.at(-1).failNow('The network connection was lost.');
+  await settle();
+  t.mock.timers.tick(4000);
+  await settle();
+  assert.equal(tasks.length, 5, 'three tries in all');
+  tasks.at(-1).failNow('The network connection was lost.');
+  await settle();
+  assert.equal(packages.get(other).status, 'failed');
+});
+
+test('an update in progress survives the app closing, and another book never clears away the version one is fetching', () => {
+  const manager = fs.readFileSync('src/services/bookDownloadManager.ts', 'utf8');
+  const database = fs.readFileSync('src/services/bookContentDatabase.ts', 'utf8');
+  // At launch, a resource a book is still installing keeps its other versions:
+  // the one being fetched for an update isn't active yet.
+  assert.match(manager, /const pending = await listPendingResourceIds\(\);\n[\s\S]*?if \(!resource\.activeVersion \|\| pending\.has\(resource\.resourceId\)\) continue;/);
+  assert.match(database, /SELECT DISTINCT resource_id FROM content_book_pending_resources/);
+  // Every cleanup spares the versions being staged, packages and rows alike.
+  assert.match(manager, /const obsoletePackages = \(await getResourcePackageKeys\(resourceId, activeVersion\)\)\.filter\(\(key\) => !stagingPackages\.has\(key\)\);\n\s+await cleanupObsoleteResourceVersions\(resourceId, staging\);/);
+  assert.match(database, /DELETE FROM content_rows WHERE resource_id = \? AND version NOT IN \(\$\{versions\}\)/);
+  assert.equal((manager.match(/this\.removeObsoleteVersions\(/g) || []).length, 3, 'launch, a book activated and the calendar all clean up the same way');
+  assert.doesNotMatch(manager, /await cleanupObsoleteResourceVersions\(resource\.id\);|await cleanupObsoleteResourceVersions\('calendar'\);/);
+  // A package taken away from under the wait ends it rather than hanging the book.
+  assert.match(manager, /else if \(!progress\) \{ settled = true; unsubscribe\(\); reject\(new Error\('The download was removed before it finished\.'\)\); \}/);
+  // Only a chunk whose rows don't match its manifest is thrown away; any other
+  // failure saving it is reported with its own cause.
+  assert.match(manager, /if \(\/\^Package row count is \\d\+; expected \\d\+\\\.\$\/\.test\(message\)\) \{\n\s+await invalidateDownloadedChunk/);
+  assert.match(manager, /throw new Error\(`Couldn't save \$\{resource\.id\}: \$\{message\}`\);/);
 });
 
 test('cancelling cancels every transfer in flight', async () => {
