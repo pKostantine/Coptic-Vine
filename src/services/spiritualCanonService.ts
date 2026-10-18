@@ -27,8 +27,8 @@ function storageKey(identity: string) {
 /** The device's preference for canon reminders here (not the account's: each device decides). */
 const REMINDERS_KEY = 'cv-spiritual-canon-reminders-v1';
 /** The days metanias are made, as last read from the calendar: the canon shows them at once, offline too. */
-// v4: Holy Week's weekdays are no longer taken as feasts for metanias; days read before are read again.
-const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v4';
+// v5: Holy Week's weekdays are fasting days for metanias; days read before are read again.
+const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v5';
 
 /** A day as the calendar had it, and when it was read. */
 export type CachedCanonCalendarDay = CanonCalendarDay & { readAt: string };

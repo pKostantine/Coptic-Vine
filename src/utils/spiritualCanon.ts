@@ -51,12 +51,12 @@ export type CanonFrequencyKind = CanonFrequency['kind'];
  * The days metanias are made: not on a weekend, nor on a feast — the Feasts
  * and Weekends flags calendar.get_context_flags gives the day, the real day,
  * never the date the Books screen has been moved to. Holy Week is not a feast
- * here, though the calendar marks Pascha week (PaschaWeek, Lazarus Saturday
- * to Bright Saturday) Feasts: its Monday to Friday keep their metanias.
+ * here, though the calendar marks it (HolyWeek, Holy Monday to Bright
+ * Saturday) Feasts: its Monday to Friday keep their metanias.
  */
-export const METANIA_CONDITION = '!((Feasts && !PaschaWeek) || Weekends)';
-/** The same days, the fasting days among them only. */
-export const METANIA_FASTING_CONDITION = '!((Feasts && !PaschaWeek) || Weekends) && Fasts';
+export const METANIA_CONDITION = '!((Feasts && !HolyWeek) || Weekends)';
+/** The same days, the fasting days among them only: Holy Week's are, though the calendar doesn't mark them Fasts. */
+export const METANIA_FASTING_CONDITION = '!((Feasts && !HolyWeek) || Weekends) && (Fasts || HolyWeek)';
 
 /** One hour of the Agpeya in an Agpeya item: how much of it, and when. */
 export interface CanonHourPlan {

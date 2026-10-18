@@ -185,3 +185,16 @@ test('the raw Coptic day-29 marker alone is not treated as Joyful 29', async () 
   const flags = await getContextFlags('2026-01-07');
   assert.equal(Boolean(flags.Feasts), false);
 });
+
+test('the calendar raises HolyWeek, not PaschaWeek, from the day after Palm Sunday', () => {
+  // The last migration to define calendar.get_active_flags_for_date is the one the database runs.
+  const dir = 'supabase/migrations';
+  const latest = fs.readdirSync(dir).filter((name) => name.endsWith('.sql')).sort()
+    .map((name) => fs.readFileSync(`${dir}/${name}`, 'utf8'))
+    .filter((sql) => /CREATE OR REPLACE FUNCTION calendar\.get_active_flags_for_date/.test(sql))
+    .pop();
+  const holyWeek = latest.slice(latest.indexOf('B. HOLY WEEK'), latest.indexOf('C. HOLY 50 DAYS'));
+  assert.match(holyWeek, /RETURN QUERY VALUES \('Pascha','season_feast','Holy Pascha'\);/);
+  assert.match(holyWeek, /IF p_gregorian_date>palm_sun THEN RETURN QUERY VALUES \('HolyWeek','season_feast','Holy Week'\); END IF;/);
+  assert.doesNotMatch(latest, /\('PaschaWeek',/);
+});
