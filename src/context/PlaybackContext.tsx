@@ -749,6 +749,20 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     void player.seekTo(requestedPosition / 1000);
   }, [player, status.isLoaded]);
 
+  // The lock screen's next button greys out at the end of the queue, as the
+  // player's own does; previous always works while something plays, going
+  // back to the start of the track if nothing comes before it. Set again
+  // whenever expo-video may have put its 10-second skips back (a lesson
+  // loading, starting or stopping, and its readyToPlay below), as the module
+  // turns them off again while anything plays.
+  const hasCurrentItem = currentItem != null;
+  const canGoNext = hasCurrentItem && getManualNextIndex(queue.length, currentIndex, repeatMode) !== currentIndex;
+  const trackControlsRef = useRef({ canGoNext, canGoPrevious: hasCurrentItem });
+  useEffect(() => {
+    trackControlsRef.current = { canGoNext, canGoPrevious: hasCurrentItem };
+    setTrackControls(canGoNext, hasCurrentItem);
+  }, [activeEngine, canGoNext, currentKey, hasCurrentItem, playing]);
+
   useEventListener(videoPlayer, 'statusChange', (payload) => {
     if (payload.status === 'error') {
       setPlaybackError(payload.error?.message ?? 'Unable to play this lesson.');
@@ -757,7 +771,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       setVideoSwitch(null);
       return;
     }
-    if (payload.status === 'readyToPlay') videoReady();
+    if (payload.status === 'readyToPlay') {
+      videoReady();
+      setTrackControls(trackControlsRef.current.canGoNext, trackControlsRef.current.canGoPrevious);
+    }
   });
 
   useEventListener(videoPlayer, 'sourceLoad', (payload) => {
@@ -858,15 +875,6 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     previousRef.current = previous;
     togglePlaybackRef.current = togglePlayback;
   }, [next, previous, togglePlayback]);
-
-  // The lock screen's next button greys out at the end of the queue, as the
-  // player's own does; previous always works while something plays, going
-  // back to the start of the track if nothing comes before it.
-  const hasCurrentItem = currentItem != null;
-  const canGoNext = hasCurrentItem && getManualNextIndex(queue.length, currentIndex, repeatMode) !== currentIndex;
-  useEffect(() => {
-    setTrackControls(canGoNext, hasCurrentItem);
-  }, [canGoNext, hasCurrentItem]);
 
   useEffect(() => {
     const subscriptions = [
