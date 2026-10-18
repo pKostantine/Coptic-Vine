@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 
 import {
   emptyCanonDocument,
-  type MetaniaDay,
+  type CanonCalendarDay,
   normalizeCanonDayMarks,
   normalizeCanonDocument,
   normalizeCanonItem,
@@ -27,7 +27,10 @@ function storageKey(identity: string) {
 /** The device's preference for canon reminders here (not the account's: each device decides). */
 const REMINDERS_KEY = 'cv-spiritual-canon-reminders-v1';
 /** The days metanias are made, as last read from the calendar: the canon shows them at once, offline too. */
-const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v2';
+const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v3';
+
+/** A day as the calendar had it, and when it was read. */
+export type CachedCanonCalendarDay = CanonCalendarDay & { readAt: string };
 
 async function readText(key: string): Promise<string | null> {
   if (Platform.OS === 'web') return globalThis.localStorage?.getItem(key) ?? null;
@@ -97,20 +100,24 @@ export async function saveCanonRemindersEnabled(enabled: boolean): Promise<void>
   }
 }
 
-export async function loadCanonCalendarCache(): Promise<Record<string, MetaniaDay>> {
+export async function loadCanonCalendarCache(): Promise<Record<string, CachedCanonCalendarDay>> {
   try {
     const raw = await readText(CALENDAR_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed as Record<string, Partial<MetaniaDay>>)
-      .filter(([day, entry]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && typeof entry?.applicable === 'boolean' && typeof entry?.fasting === 'boolean')
-      .map(([day, entry]) => [day, { applicable: Boolean(entry.applicable), fasting: Boolean(entry.fasting) }]));
+    return Object.fromEntries(Object.entries(parsed as Record<string, Partial<CachedCanonCalendarDay>>)
+      .filter(([day, entry]) => /^\d{4}-\d{2}-\d{2}$/.test(day)
+        && typeof entry?.applicable === 'boolean'
+        && typeof entry?.fasting === 'boolean'
+        && (entry?.agpeya === 'all' || entry?.agpeya === 'beforeEve' || entry?.agpeya === 'none')
+        && typeof entry?.readAt === 'string' && !Number.isNaN(Date.parse(entry.readAt)))
+      .map(([day, entry]) => [day, { applicable: Boolean(entry.applicable), fasting: Boolean(entry.fasting), agpeya: entry.agpeya as CanonCalendarDay['agpeya'], readAt: String(entry.readAt) }]));
   } catch {
     return {};
   }
 }
 
-export async function saveCanonCalendarCache(days: Record<string, MetaniaDay>): Promise<void> {
+export async function saveCanonCalendarCache(days: Record<string, CachedCanonCalendarDay>): Promise<void> {
   try {
     await writeText(CALENDAR_KEY, JSON.stringify(days));
   } catch {

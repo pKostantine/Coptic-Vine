@@ -48,7 +48,7 @@ export function CanonCheck({ done, disabled = false, label, onPress, size = 28 }
  * rows sit on the framed card, a hairline apart; on the canon's own page each
  * is a card of its own.
  */
-export function CanonTaskRow({ task, arabic, variant, first = false, disabled = false, onToggle, onOpen }: {
+export function CanonTaskRow({ task, arabic, variant, first = false, disabled = false, onToggle, onOpen, onSkip }: {
   task: CanonTask;
   arabic: boolean;
   variant: 'home' | 'card';
@@ -57,6 +57,8 @@ export function CanonTaskRow({ task, arabic, variant, first = false, disabled = 
   disabled?: boolean;
   onToggle: (done: boolean) => void;
   onOpen?: () => void;
+  /** Takes the task off this day's list. Offered until it is ticked. */
+  onSkip?: () => void;
 }) {
   const title = canonTaskTitle(task);
   const detail = canonTaskDetail(task);
@@ -110,6 +112,41 @@ export function CanonTaskRow({ task, arabic, variant, first = false, disabled = 
           {body}
         </Pressable>
       )}
+      {onSkip && !task.done ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${tr('Skip for this day', 'Passer ce jour-ci', 'تخطَّ في هذا اليوم')}: ${title}`}
+          hitSlop={6}
+          onPress={onSkip}
+          style={({ pressed }) => [styles.skip, pressed && styles.pressed]}
+        >
+          <Icon name="play-skip-forward" size={13} color={COLORS.muted} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** A task skipped on a day: quiet, with the way to put it back on the day's list. */
+export function CanonSkippedRow({ task, arabic, first = false, onRestore }: {
+  task: CanonTask;
+  arabic: boolean;
+  first?: boolean;
+  onRestore: () => void;
+}) {
+  const title = canonTaskTitle(task);
+  return (
+    <View style={[styles.row, styles.rowSkipped, !first && styles.rowHomeRule]}>
+      <Icon name="play-skip-forward" size={14} color={COLORS.muted} />
+      <Text style={[styles.skippedTitle, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${tr('Restore', 'Rétablir', 'أعِده')}: ${title}`}
+        onPress={onRestore}
+        style={({ pressed }) => [styles.restore, pressed && styles.pressed]}
+      >
+        <Text style={[styles.restoreText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Restore', 'Rétablir', 'أعِده')}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -193,6 +230,11 @@ const styles = StyleSheet.create({
   openDone: { borderColor: 'rgba(255, 255, 255, 0.14)' },
   openText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
   openTextDone: { color: COLORS.muted },
+  skip: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 15, height: 30, justifyContent: 'center', width: 30 },
+  rowSkipped: { gap: 10, paddingVertical: 8 },
+  skippedTitle: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, minWidth: 0 },
+  restore: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, height: 28, justifyContent: 'center', paddingHorizontal: 12 },
+  restoreText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, fontWeight: '700' },
 
   track: { backgroundColor: 'rgba(255, 255, 255, 0.09)', borderRadius: 2, height: 4, overflow: 'hidden' },
   fill: { backgroundColor: COLORS.gold, borderRadius: 2, height: 4 },

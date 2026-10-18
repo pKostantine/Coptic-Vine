@@ -181,6 +181,11 @@ export function calendarDaysExplanation(): string {
   return tr('Not weekends or feasts', 'Sauf le week-end et les fêtes', 'ما عدا عطلة نهاية الأسبوع والأعياد');
 }
 
+/** Said on a day the Agpeya is left out (Palm Sunday evening to Bright Saturday). */
+export function paschaAgpeyaNote(): string {
+  return tr('No Agpeya from Monday Eve to Bright Saturday.', 'Pas d’Agpia de la veille du lundi au Samedi lumineux.', 'لا أجبية من ليلة الاثنين إلى سبت النور.');
+}
+
 /** "7:30 AM", "7 h 30", "٧:٣٠ ص": the time of day as the App Language tells it. */
 export function canonTimeLabel(time: string): string {
   const { hour, minute } = parseCanonTime(time);
