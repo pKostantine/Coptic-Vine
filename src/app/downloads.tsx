@@ -128,8 +128,8 @@ function NativeDownloadsScreen() {
     try { await action(); } catch (error) {
       if (!(error instanceof Error) || error.message === 'Download paused.') return;
       console.warn('Download failed:', error.message);
-      const { title, hint } = describeDownloadError(error.message);
-      Alert.alert(title, hint);
+      const { title, hint, detail } = describeDownloadError(error.message);
+      Alert.alert(title, detail ? `${hint}\n\n${tr('What went wrong: ', 'Ce qui s’est passé : ', 'ما حدث: ')}${detail}` : hint);
     }
   };
   // A check says what it found: the books it is updating, or that every
@@ -460,7 +460,8 @@ function BookRow({ book, arabic, run, onRemove, onCancel }: {
       );
       break;
     case 'failed':
-      detail = tr('Couldn’t finish downloading', 'Téléchargement interrompu', 'تعذّر إكمال التنزيل');
+      // Why the last try stopped, where it left word (Waiting for Wi‑Fi, Not enough space…).
+      detail = book.error ? describeDownloadError(book.error).title : tr('Couldn’t finish downloading', 'Téléchargement interrompu', 'تعذّر إكمال التنزيل');
       trailing = (
         <View style={styles.trailingPair}>
           <ActionButton icon="refresh" label={tr('Retry', 'Réessayer', 'أعد المحاولة')} arabic={arabic} onPress={install} />
@@ -468,10 +469,13 @@ function BookRow({ book, arabic, run, onRemove, onCancel }: {
         </View>
       );
       break;
-    case 'update_available':
-      detail = <><Text style={styles.detailGold}>{tr('Update available', 'Mise à jour disponible', 'يتوفر تحديث')}</Text>{size ? ` · ${size}` : ''}</>;
+    case 'update_available': {
+      // An update that was tried and stopped says why, in place of its size.
+      const after = book.error ? describeDownloadError(book.error).title : size;
+      detail = <><Text style={styles.detailGold}>{tr('Update available', 'Mise à jour disponible', 'يتوفر تحديث')}</Text>{after ? ` · ${after}` : ''}</>;
       trailing = <ActionButton label={tr('Update', 'Mettre à jour', 'تحديث')} arabic={arabic} filled onPress={install} />;
       break;
+    }
     default:
       detail = withSize(tr('Not downloaded', 'Non téléchargé', 'غير منزّل'));
       trailing = <ActionButton icon="arrow-down" label={tr('Download', 'Télécharger', 'تنزيل')} arabic={arabic} onPress={install} />;

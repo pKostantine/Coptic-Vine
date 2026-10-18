@@ -64,17 +64,67 @@ export function describeLoadError(message: string | null | undefined, language: 
 }
 
 /**
- * A download that failed, as the reader should see it. What the database or
- * the file system said ("FunctionCallException: Calling the 'finalizeAsync'
- * function has failed…") means nothing to a reader; it goes to the log.
+ * The part of a native failure that says what went wrong: expo's wrapper
+ * ("FunctionCallException: Calling the 'finalizeAsync' function has failed
+ * (at …) → Caused by: SQLiteErrorException: Error code 5: database is
+ * locked (at …)") comes down to "database is locked".
  */
-export function describeDownloadError(message: string | null | undefined, language: AppLanguage = getCurrentAppLanguage()): { title: string; hint: string } {
-  if (isLostConnectionMessage(message)) {
-    const offline = describeLoadError(message, language);
-    return { title: offline.title, hint: offline.hint };
+function rootCause(message: string): string {
+  const cause = message.split(/Caused by:/).pop() ?? message;
+  return cause
+    .replace(/\s*\(at [^)]*\)/g, '')
+    .replace(/^\s*(?:[\w.]*(?:Exception|Error):\s*)+/, '')
+    .replace(/^Error code \d+:\s*/i, '')
+    .trim();
+}
+
+/**
+ * A download that failed, as the reader should see it: what to do about it,
+ * and, where the app has nothing kinder to say, the cause in a few words
+ * (`detail`), the native exception it came wrapped in left out.
+ */
+export function describeDownloadError(message: string | null | undefined, language: AppLanguage = getCurrentAppLanguage()): { title: string; hint: string; detail: string | null } {
+  const text = message?.trim() ?? '';
+  // The app's own "Connect to the internet…" (assertDownloadNetworkAllowed) says the same as the platforms' phrases.
+  if (isLostConnectionMessage(text) || /^Connect to the internet/.test(text)) {
+    const offline = describeLoadError('Network request failed', language);
+    return { title: offline.title, hint: offline.hint, detail: null };
+  }
+  // The Download over cellular and Videos over cellular switches are on the Downloads page itself.
+  if (/^Downloads are set to Wi-Fi only/.test(text)) {
+    return {
+      title: tr('Waiting for Wi‑Fi', 'En attente du Wi‑Fi', 'في انتظار الواي فاي', language),
+      hint: tr(
+        'Downloads are set to Wi‑Fi only. Connect to Wi‑Fi, or turn on Download over cellular on this page.',
+        'Les téléchargements sont réglés sur Wi‑Fi uniquement. Connectez-vous au Wi‑Fi, ou activez Télécharger en données cellulaires sur cette page.',
+        'التنزيلات مضبوطة على الواي فاي فقط. اتصل بالواي فاي، أو فعّل التنزيل عبر بيانات الجوال في هذه الصفحة.',
+        language,
+      ),
+      detail: null,
+    };
+  }
+  if (/^Video downloads over cellular are turned off/.test(text)) {
+    return {
+      title: tr('Waiting for Wi‑Fi', 'En attente du Wi‑Fi', 'في انتظار الواي فاي', language),
+      hint: tr(
+        'Videos download over Wi‑Fi only. Connect to Wi‑Fi, or turn on Videos over cellular on this page.',
+        'Les vidéos se téléchargent en Wi‑Fi uniquement. Connectez-vous au Wi‑Fi, ou activez Vidéos en données cellulaires sur cette page.',
+        'يُنزَّل الفيديو عبر الواي فاي فقط. اتصل بالواي فاي، أو فعّل الفيديو عبر بيانات الجوال في هذه الصفحة.',
+        language,
+      ),
+      detail: null,
+    };
+  }
+  if (/database or disk is full|SQLITE_FULL|no space left|ENOSPC|not enough (?:free )?space/i.test(text)) {
+    return {
+      title: tr('Not enough space', 'Espace insuffisant', 'لا توجد مساحة كافية', language),
+      hint: tr('Free up some space on this device, then try again.', 'Libérez de l’espace sur cet appareil, puis réessayez.', 'أفرغ بعض المساحة على هذا الجهاز ثم حاول مرة أخرى.', language),
+      detail: null,
+    };
   }
   return {
     title: tr('The download didn’t finish', 'Le téléchargement n’a pas abouti', 'لم يكتمل التنزيل', language),
     hint: tr('Please try again.', 'Veuillez réessayer.', 'يُرجى المحاولة مرة أخرى.', language),
+    detail: text ? rootCause(text) || null : null,
   };
 }

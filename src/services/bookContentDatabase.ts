@@ -479,21 +479,38 @@ export async function removeBookReferences(bookKey: DownloadableBookKey): Promis
   return removed;
 }
 
-export async function cleanupObsoleteResourceVersions(resourceId: string): Promise<void> {
+/**
+ * Deletes a resource's rows for every version but the active one and those in
+ * `keep`: the versions another book is still fetching, which become active
+ * when that book finishes.
+ */
+export async function cleanupObsoleteResourceVersions(resourceId: string, keep: readonly string[] = []): Promise<void> {
   const db = await getOfflineDatabase();
   const active = await getActiveResourceVersion(resourceId);
   if (!active) return;
+  const kept = [active, ...keep.filter((version) => version !== active)];
+  const versions = kept.map(() => '?').join(', ');
   let deletedRows = 0;
   await db.withExclusiveTransactionAsync(async (txn) => {
-    deletedRows = (await txn.runAsync('DELETE FROM content_rows WHERE resource_id = ? AND version <> ?', resourceId, active)).changes;
-    await txn.runAsync('DELETE FROM content_rpc_results WHERE resource_id = ? AND version <> ?', resourceId, active);
-    await txn.runAsync('DELETE FROM content_resource_chunks WHERE resource_id = ? AND version <> ?', resourceId, active);
+    deletedRows = (await txn.runAsync(`DELETE FROM content_rows WHERE resource_id = ? AND version NOT IN (${versions})`, resourceId, ...kept)).changes;
+    await txn.runAsync(`DELETE FROM content_rpc_results WHERE resource_id = ? AND version NOT IN (${versions})`, resourceId, ...kept);
+    await txn.runAsync(`DELETE FROM content_resource_chunks WHERE resource_id = ? AND version NOT IN (${versions})`, resourceId, ...kept);
   });
   // Only other versions' rows go, which no read sees, but if a newer version
   // was switched in meanwhile they were the active ones. This runs at every
   // launch, and almost always finds nothing to delete, so the tables already
   // read are let go only when something was.
   if (deletedRows) contentChanged();
+}
+
+/**
+ * The resources some book is still installing, or was until a pause, a
+ * failure or the app closing: activation, or removing the book, clears them.
+ */
+export async function listPendingResourceIds(): Promise<Set<string>> {
+  const db = await getOfflineDatabase();
+  const rows = await db.getAllAsync<{ resource_id: string }>('SELECT DISTINCT resource_id FROM content_book_pending_resources');
+  return new Set(rows.map((row) => row.resource_id));
 }
 
 export async function listBooks(): Promise<BookDownloadProgress[]> {
