@@ -1,9 +1,9 @@
 import { tr } from '@/utils/appText';
-import { AGPEYA_HOURS } from '@/utils/agpeyaHours';
 import { getCurrentAppLanguage } from '@/utils/preferencesStorage';
 import { toEasternArabicDigits, WEEKDAYS_AR, WEEKDAYS_EN, WEEKDAYS_FR } from '@/utils/localeFormat';
 import {
   AGPEYA_PSALM_COUNTS,
+  canonAgpeyaPrayer,
   parseCanonTime,
   type CanonFrequency,
   type CanonGoal,
@@ -52,10 +52,11 @@ export function canonKindLabel(kind: CanonKind): string {
   return tr('Custom', 'Personnalisé', 'خاص');
 }
 
+/** A prayer of the Agpeya's name: on a task ("The First Hour", "Midnight · Second Watch"), or short, in a list ("Prime", "Second Watch"). */
 export function agpeyaHourName(hourId: string, form: 'prayer' | 'traditional' | 'short' = 'prayer'): string {
-  const hour = AGPEYA_HOURS.find((candidate) => candidate.id === hourId);
-  if (!hour) return hourId;
-  const name = hour[form];
+  const prayer = canonAgpeyaPrayer(hourId);
+  if (!prayer) return hourId;
+  const name = form === 'prayer' ? prayer.name : prayer.short;
   return tr(name.english, name.french, name.arabic);
 }
 

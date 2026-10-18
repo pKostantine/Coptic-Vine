@@ -135,19 +135,106 @@ export const MAX_TITLE_LENGTH = 80;
 export const MAX_NOTE_LENGTH = 280;
 export const MAX_UNIT_LENGTH = 30;
 
-/** The psalms each hour of the Agpeya prays: Prime nineteen, the Midnight hour's three watches thirty-one. */
-export const AGPEYA_PSALM_COUNTS: Record<string, number> = {
+interface PrayerName {
+  english: string;
+  french: string;
+  arabic: string;
+}
+
+/** A prayer of the Agpeya a canon can keep: an hour of the day, the Prayer of the Veil, or a watch of the Midnight hour. */
+export interface CanonAgpeyaPrayer {
+  /** What the canon stores ("first_hour", "midnight_second_watch"). */
+  id: string;
+  /** The Agpeya service it opens (SERVICES_BY_CATEGORY.agpeya). */
+  serviceId: string;
+  /** The section it opens at, by hymn key: a watch's own beginning; null for the top. */
+  openAt: string | null;
+  /** When it is prayed, for a reminder's first suggestion and for its place in the day. */
+  defaultTime: string;
+  /** How many psalms it prays (the Agpeya's own; Psalm 118 counted once). */
+  psalms: number;
+  /** Its name on a task: "The First Hour", "Midnight · Second Watch". */
+  name: PrayerName;
+  /** Its short name in a list: "Prime", "Second Watch". */
+  short: PrayerName;
+}
+
+const MIDNIGHT_NAME: PrayerName = { english: 'Midnight', french: 'Minuit', arabic: 'نصف الليل' };
+
+/** A watch of the Midnight hour, by the Agpeya's own title for it. */
+function midnightWatch(id: string, openAt: string | null, psalms: number, title: PrayerName): CanonAgpeyaPrayer {
+  return {
+    id,
+    serviceId: 'midnight_hour',
+    openAt,
+    defaultTime: '00:00',
+    psalms,
+    name: {
+      english: `${MIDNIGHT_NAME.english} · ${title.english}`,
+      french: `${MIDNIGHT_NAME.french} · ${title.french}`,
+      arabic: `${MIDNIGHT_NAME.arabic} · ${title.arabic}`,
+    },
+    short: title,
+  };
+}
+
+const DAY_HOUR_PSALMS: Record<string, number> = {
   first_hour: 19,
   third_hour: 12,
   sixth_hour: 12,
   ninth_hour: 12,
   eleventh_hour: 12,
   twelfth_hour: 12,
-  midnight_hour: 31,
 };
 
+/**
+ * The prayers of the Agpeya in the order of the praying day: the six hours
+ * of the day, the Prayer of the Veil, and the Midnight hour in its three
+ * watches, each kept on its own. The watches open at their own beginning;
+ * the first opens at the top, with the introduction the hour starts with.
+ */
+export const CANON_AGPEYA_PRAYERS: readonly CanonAgpeyaPrayer[] = [
+  ...AGPEYA_HOURS.filter((hour) => hour.id in DAY_HOUR_PSALMS).map((hour): CanonAgpeyaPrayer => ({
+    id: hour.id,
+    serviceId: hour.id,
+    openAt: null,
+    defaultTime: `${String(hour.from).padStart(2, '0')}:00`,
+    psalms: DAY_HOUR_PSALMS[hour.id],
+    name: hour.prayer,
+    short: hour.traditional,
+  })),
+  {
+    id: 'prayer_of_the_veil',
+    serviceId: 'prayer_of_the_veil',
+    openAt: null,
+    // Prayed after the Twelfth Hour; its wheel starts at the Twelfth's time.
+    defaultTime: '18:00',
+    psalms: 29,
+    name: { english: 'Prayer of the Veil', french: 'Prière du voile', arabic: 'صلاة الستار' },
+    short: { english: 'Prayer of the Veil', french: 'Prière du voile', arabic: 'صلاة الستار' },
+  },
+  midnightWatch('midnight_first_watch', null, 9, { english: 'First Watch', french: 'Premier service', arabic: 'الخِدمةُ الأولى' }),
+  midnightWatch('midnight_second_watch', 'introductionSecondWatch', 10, { english: 'Second Watch', french: 'Second service', arabic: 'الخِدمةُ الثانِيةُ' }),
+  midnightWatch('midnight_third_watch', 'introductionThirdWatch', 12, { english: 'Third Watch', french: 'Troisième service', arabic: 'الخِدمةُ الثالِثةُ' }),
+];
+
+const PRAYERS_BY_ID = new Map(CANON_AGPEYA_PRAYERS.map((prayer) => [prayer.id, prayer]));
+const PRAYER_ORDER = new Map(CANON_AGPEYA_PRAYERS.map((prayer, index) => [prayer.id, index]));
+
+export function canonAgpeyaPrayer(id: string): CanonAgpeyaPrayer | null {
+  return PRAYERS_BY_ID.get(id) ?? null;
+}
+
+/** The Midnight hour as a canon kept it before it was split: its three watches now. */
+const LEGACY_MIDNIGHT_HOUR = 'midnight_hour';
+const MIDNIGHT_WATCHES = ['midnight_first_watch', 'midnight_second_watch', 'midnight_third_watch'];
+
+/** The psalms each prayer of the Agpeya prays: Prime nineteen, the Prayer of the Veil twenty-nine, the watches nine, ten and twelve. */
+export const AGPEYA_PSALM_COUNTS: Record<string, number> = Object.fromEntries(CANON_AGPEYA_PRAYERS.map((prayer) => [prayer.id, prayer.psalms]));
+
 export const GOAL_LIMITS: Record<Exclude<CanonGoalKind, 'none'>, { min: number; max: number; step: number; initial: number }> = {
-  psalms: { min: 1, max: 31, step: 1, initial: 3 },
+  // Held to each prayer's own count (AGPEYA_PSALM_COUNTS); this is the most any has.
+  psalms: { min: 1, max: 29, step: 1, initial: 3 },
   chapters: { min: 1, max: 150, step: 1, initial: 1 },
   // One at a time up to ten, then by fives (canonGoalStep).
   verses: { min: 1, max: 500, step: 5, initial: 10 },
@@ -173,8 +260,6 @@ export const FREQUENCY_KINDS: Record<CanonKind, readonly CanonFrequencyKind[]> =
   custom: ['daily', 'weekdays', 'perWeek'],
 };
 
-const HOUR_IDS = new Set(AGPEYA_HOURS.map((hour) => hour.id));
-const HOUR_ORDER = new Map(AGPEYA_HOURS.map((hour, index) => [hour.id, index]));
 
 // —— Days ————————————————————————————————————————————————————————————————
 
@@ -229,10 +314,9 @@ export function parseCanonTime(time: string): { hour: number; minute: number } {
   return { hour, minute };
 }
 
-/** When each hour of the Agpeya is prayed: its reminder's first suggestion. */
+/** When each prayer of the Agpeya is prayed: its reminder's first suggestion. */
 export function agpeyaHourDefaultTime(hourId: string): string {
-  const hour = AGPEYA_HOURS.find((candidate) => candidate.id === hourId);
-  return canonTime(hour?.from ?? 6, 0);
+  return canonAgpeyaPrayer(hourId)?.defaultTime ?? '06:00';
 }
 
 /**
@@ -336,12 +420,20 @@ export function normalizeCanonFrequency(value: unknown, kind: CanonKind = 'custo
 
 function normalizeHourPlans(value: unknown): CanonHourPlan[] {
   if (!Array.isArray(value)) return [];
+  // The whole Midnight hour, from before it was split, is kept as its three
+  // watches, each with the hour's time and reminder (and its measure, held
+  // to what each watch has).
+  const entries = value.flatMap((entry) => {
+    const plan = entry as Partial<CanonHourPlan> | null;
+    if (!plan || typeof plan !== 'object' || plan.hourId !== LEGACY_MIDNIGHT_HOUR) return [entry];
+    return MIDNIGHT_WATCHES.map((hourId) => ({ ...plan, hourId }));
+  });
   const seen = new Set<string>();
   const plans: CanonHourPlan[] = [];
-  for (const entry of value) {
+  for (const entry of entries) {
     if (!entry || typeof entry !== 'object') continue;
     const plan = entry as Partial<CanonHourPlan>;
-    if (typeof plan.hourId !== 'string' || !HOUR_IDS.has(plan.hourId) || seen.has(plan.hourId)) continue;
+    if (typeof plan.hourId !== 'string' || !PRAYERS_BY_ID.has(plan.hourId) || seen.has(plan.hourId)) continue;
     seen.add(plan.hourId);
     const time = isCanonTime(plan.time) ? plan.time : null;
     plans.push({ hourId: plan.hourId, goal: normalizeCanonGoal(plan.goal, 'agpeya', plan.hourId), time, remind: Boolean(plan.remind) && time != null });
@@ -349,9 +441,9 @@ function normalizeHourPlans(value: unknown): CanonHourPlan[] {
   return sortHourPlans(plans);
 }
 
-/** The hours in the order they are prayed through the day. */
+/** The prayers in the order they are prayed through the day. */
 export function sortHourPlans(plans: CanonHourPlan[]): CanonHourPlan[] {
-  return [...plans].sort((a, b) => (HOUR_ORDER.get(a.hourId) ?? 0) - (HOUR_ORDER.get(b.hourId) ?? 0));
+  return [...plans].sort((a, b) => (PRAYER_ORDER.get(a.hourId) ?? 0) - (PRAYER_ORDER.get(b.hourId) ?? 0));
 }
 
 export function normalizeCanonItem(value: unknown): CanonItem | null {
@@ -618,10 +710,14 @@ export function weeklyCompletions(document: Pick<CanonDocument, 'days'>, day: st
   return count;
 }
 
-/** Where a task sits in the day: by its time; an Agpeya hour with none, at its own hour; the rest after. */
+/**
+ * Where a task sits in the day: by its time; a prayer of the Agpeya with
+ * none, at its own time and in the Agpeya's order (the Prayer of the Veil
+ * after the Twelfth Hour, the watches one after another); the rest after.
+ */
 function taskOrder(template: Pick<TaskTemplate, 'time' | 'hourId'>): number {
   if (template.time) return prayingDayMinutes(template.time);
-  if (template.hourId) return prayingDayMinutes(agpeyaHourDefaultTime(template.hourId)) + 0.5;
+  if (template.hourId) return prayingDayMinutes(agpeyaHourDefaultTime(template.hourId)) + 0.5 + (PRAYER_ORDER.get(template.hourId) ?? 0) / 100;
   return 48 * 60;
 }
 
@@ -747,9 +843,10 @@ export function canonHasReminders(items: readonly CanonItem[]): boolean {
   });
 }
 
-/** Where a task's prayer or reading opens: its hour of the Agpeya, the Bible, or the canon itself. */
+/** Where a task's prayer or reading opens: its prayer of the Agpeya (a watch at its own beginning), the Bible, or the canon itself. */
 export function canonTaskRoute(task: Pick<CanonTask, 'kind' | 'hourId'>): string {
-  if (task.kind === 'agpeya' && task.hourId) return `/agpeya/${task.hourId}`;
+  const prayer = task.kind === 'agpeya' && task.hourId ? canonAgpeyaPrayer(task.hourId) : null;
+  if (prayer) return prayer.openAt ? `/agpeya/${prayer.serviceId}?at=${prayer.openAt}` : `/agpeya/${prayer.serviceId}`;
   if (task.kind === 'bible') return '/bible';
   return '/canon';
 }
