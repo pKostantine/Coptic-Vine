@@ -1,0 +1,6 @@
+node_modules
+tests
+cloudflare
+wrangler.jsonc
+README.md
+.wrangler

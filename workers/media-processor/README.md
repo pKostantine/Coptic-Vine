@@ -2,6 +2,10 @@
 
 FFmpeg worker that turns uploaded submission files into delivery assets.
 
+It runs as a Cloudflare Container that starts when there is work and stops
+when the queue is empty: see [CLOUDFLARE.md](CLOUDFLARE.md) for how, its cost,
+settings, deploying and checking on it.
+
 ## Runtime
 
 The worker claims a queued Supabase processing job, downloads the source object
@@ -49,6 +53,8 @@ Optional:
 - `MEDIA_WORK_DIR` — scratch directory, default the OS temp dir
 - `MEDIA_KEEP_WORK_DIR=1` — keep the per-job scratch directory for debugging
 - `STORAGE_GC_INTERVAL_MS` — physical R2 inventory interval, default 15 minutes
+- `MEDIA_EXIT_WHEN_IDLE_MS` — exit once this long passes with no job, cleanup or admin request (Cloudflare sets `20000`); unset, the worker polls forever
+- `MEDIA_FFMPEG_THREADS` — FFmpeg threads, instead of reading them from the container's limits (Cloudflare sets `4`)
 
 ## Commands
 
