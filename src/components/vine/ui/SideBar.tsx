@@ -1,5 +1,4 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useRouter } from 'expo-router';
 import { Image, Pressable, type PressableStateCallbackType, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,13 +6,14 @@ import { COLORS, TYPOGRAPHY } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { useLiturgicalNow } from '../../../hooks/useLiturgicalNow';
 import { tr } from '../../../utils/appText';
+import { useOpenSection, type SectionHref } from '../../../utils/navigation';
 import { formatCopticDayMonth, formatCopticYear, formatDayMonthDate } from '../../../utils/localeFormat';
 import { SIDEBAR_WIDTH } from '../../../utils/useLayoutMode';
 import Icon, { type IconName } from './Icon';
 
 export type AppSection = 'home' | 'books' | 'music' | 'learn' | 'account';
 
-const SECTIONS: { key: AppSection; href: string; icon: IconName; label: { english: string; french: string; arabic: string } }[] = [
+const SECTIONS: { key: AppSection; href: SectionHref; icon: IconName; label: { english: string; french: string; arabic: string } }[] = [
   { key: 'home', href: '/', icon: 'home-outline', label: { english: 'Home', french: 'Accueil', arabic: 'الرئيسية' } },
   { key: 'books', href: '/books', icon: 'library-outline', label: { english: 'Books', french: 'Livres', arabic: 'الكتب' } },
   { key: 'music', href: '/music', icon: 'musical-notes', label: { english: 'Music', french: 'Musique', arabic: 'الترانيم' } },
@@ -44,11 +44,11 @@ export function sectionForPath(pathname: string): AppSection {
  * spacing"): the seal and wordmark, the five sections — the current one in
  * gold on a gold wash — and today's date in both calendars at its foot, the
  * Coptic one the liturgical day's, which begins the evening before. It
- * takes the place of the bottom tab bar, and like it, switching sections
- * replaces the page rather than stacking it.
+ * takes the place of the bottom tab bar, and like it, opens a section afresh
+ * (utils/navigation.ts, useOpenSection) rather than stacking it.
  */
 export default function SideBar({ pathname }: { pathname: string }) {
-  const router = useRouter();
+  const openSection = useOpenSection();
   const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
@@ -73,7 +73,7 @@ export default function SideBar({ pathname }: { pathname: string }) {
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
             accessibilityLabel={label}
-            onPress={() => router.replace(section.href as never)}
+            onPress={() => openSection(section.href)}
             style={(state) => [
               styles.item,
               on && { backgroundColor: COLORS.goldSoft },

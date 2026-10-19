@@ -239,7 +239,8 @@ export default function HomeScreen() {
 
   // ── The framed cards: no outlines, depth from their fills (Coptic Vine design, "no line"). ──
   const cardFill = <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />;
-  const cardHead = (eyebrow: string, title: string, sub: ReactNode, action?: ReactNode, onPress?: () => void) => {
+  /** A card's head; with `open`, a button into the card's own page, named for where it goes. */
+  const cardHead = (eyebrow: string, title: string, sub: ReactNode, action?: ReactNode, open?: { label: string; onPress: () => void }) => {
     const text = (
       <>
         <View style={styles.eyebrowRow}>
@@ -252,8 +253,8 @@ export default function HomeScreen() {
     );
     return (
       <View style={styles.cardHead}>
-        {onPress ? (
-          <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.flex, pressed && styles.pressed]}>{text}</Pressable>
+        {open ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`${title}. ${open.label}`} onPress={open.onPress} style={({ pressed }) => [styles.flex, pressed && styles.pressed]}>{text}</Pressable>
         ) : (
           <View style={styles.flex}>{text}</View>
         )}
@@ -309,7 +310,7 @@ export default function HomeScreen() {
         tr('Today’s Canon', 'Canon du jour', 'قانون اليوم'),
         canonProgress.total ? dayProgressLabel(canonProgress.done, canonProgress.total) : formatDayMonthDate(live.today, arabic),
         canon.loaded && canon.items.length ? roundButton(tr('Edit your canon', 'Modifier votre canon', 'عدّل قانونك'), 'create-outline', () => router.push('/canon/edit' as never)) : undefined,
-        () => router.push('/canon' as never),
+        { label: tr('Open your canon', 'Ouvrir votre canon', 'افتح قانونك'), onPress: () => router.push('/canon' as never) },
       )}
       {canon.loaded && canonTasks.length ? <View style={styles.segmentsGap}><CanonSegments tasks={canonTasks} /></View> : null}
       <View style={styles.timeline}>
@@ -364,7 +365,7 @@ export default function HomeScreen() {
   const readingsCard = (
     <View style={styles.card}>
       {cardFill}
-      {cardHead(tr('Lectionary', 'Lectionnaire', 'القطمارس'), readingsTitle, spanLine(day, coptic), undefined, () => router.push('/lectionary' as never))}
+      {cardHead(tr('Lectionary', 'Lectionnaire', 'القطمارس'), readingsTitle, spanLine(day, coptic), undefined, { label: tr('Open the Lectionary', 'Ouvrir le lectionnaire', 'افتح القطمارس'), onPress: () => router.push('/lectionary' as never) })}
       <View style={styles.segmentRow}>
         {segment(serviceReadings.map(({ service, title }) => ({ key: service, label: title })), shownReadings.service, (service) => setReadingsChoice({ key: dayIso, service }))}
       </View>
