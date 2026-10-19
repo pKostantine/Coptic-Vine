@@ -7,6 +7,7 @@
 -- replacing an item's audio or video. Two RPCs carry it:
 --   get_submission_editor(submission)        the editor's state
 --   save_submission_edit(submission, edit)   one save, all of it
+--   delete_submission(submission)            deletes it and all it became
 -- The same rules decide who may call them as for the rest of the creator
 -- tools (private.can_edit_creator_account: the workspace's editors, and
 -- admins).
@@ -2013,6 +2014,69 @@ end;
 $function$;
 
 -- ---------------------------------------------------------------------------
+-- Deleting what was sent.
+
+-- An artist (or an admin) deletes a submission and everything it became,
+-- live or not: a music release and its tracks, or a Learn album or lesson set
+-- and its recordings or lessons. The submission goes too, so it leaves both
+-- apps, and its files, no longer referenced, are cleaned up by storage GC.
+-- Single tracks, recordings and lessons are deleted in the editor instead.
+create or replace function public.delete_submission(p_submission_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  actor uuid := auth.uid();
+  sub media.submissions%rowtype;
+  release_id uuid;
+  deleted_tracks integer := 0;
+  deleted_items integer := 0;
+begin
+  if actor is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  select * into sub from media.submissions where id = p_submission_id for update;
+  if not found then
+    raise exception 'Submission not found' using errcode = 'P0002';
+  end if;
+  if not private.can_edit_creator_account(sub.creator_account_id) then
+    raise exception 'Not authorized for this submission' using errcode = '42501';
+  end if;
+
+  if sub.submission_type = 'music_release'::media.submission_type then
+    select release.id into release_id from music.releases release
+    where nullif(release.metadata ->> 'submissionId', '')::uuid = sub.id
+    for update;
+    if release_id is not null then
+      deleted_tracks := coalesce((private.delete_music_release_core(release_id) ->> 'deletedTrackCount')::integer, 0);
+    end if;
+  elsif sub.submission_type = 'learning_album'::media.submission_type then
+    select count(*)::integer into deleted_items
+    from learning.album_recordings recording
+    join learning.albums album on album.id = recording.album_id
+    where album.submission_id = sub.id;
+    delete from learning.albums where submission_id = sub.id;
+  elsif sub.submission_type = 'learning_lesson_set'::media.submission_type then
+    select count(*)::integer into deleted_items
+    from learning.lessons lesson
+    join learning.lesson_sets lesson_set on lesson_set.id = lesson.lesson_set_id
+    where lesson_set.submission_id = sub.id;
+    delete from learning.lesson_sets where submission_id = sub.id;
+  end if;
+
+  delete from media.submissions where id = sub.id;
+
+  return jsonb_build_object(
+    'submissionId', sub.id, 'kind', sub.submission_type, 'deleted', true,
+    'deletedTrackCount', deleted_tracks, 'deletedItemCount', deleted_items
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Who may call what.
 
 revoke all on function private.edit_localized_titles(jsonb) from public;
@@ -2033,3 +2097,5 @@ revoke all on function public.get_submission_editor(uuid) from public, anon;
 revoke all on function public.save_submission_edit(uuid, jsonb) from public, anon;
 grant execute on function public.get_submission_editor(uuid) to authenticated;
 grant execute on function public.save_submission_edit(uuid, jsonb) to authenticated;
+revoke all on function public.delete_submission(uuid) from public, anon;
+grant execute on function public.delete_submission(uuid) to authenticated;
