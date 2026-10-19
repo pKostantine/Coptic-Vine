@@ -1,4 +1,4 @@
-import { abortActiveJobs, claimAndProcessOne, getConfig } from './processor.mjs';
+import { abortActiveJobs, activeJobCount, claimAndProcessOne, getConfig } from './processor.mjs';
 import { containerResources } from './runtime.mjs';
 import { startAdminServer } from './admin-server.mjs';
 import { purgeUnusedStorage } from './storage-gc.mjs';
@@ -12,12 +12,30 @@ const IDLE_POLL_MS = Number(process.env.MEDIA_POLL_INTERVAL_MS || 1000);
 const MIN_ERROR_BACKOFF_MS = Number(process.env.MEDIA_ERROR_BACKOFF_MS || 5000);
 const MAX_ERROR_BACKOFF_MS = Number(process.env.MEDIA_MAX_ERROR_BACKOFF_MS || 300000);
 const STORAGE_GC_INTERVAL_MS = Number(process.env.STORAGE_GC_INTERVAL_MS || 15 * 60 * 1000);
+// On Cloudflare the container is started when there is work and billed while
+// it runs, so it exits once nothing has happened for this long: no job, no
+// storage cleanup, no admin request. Unset (0), the worker polls forever.
+const EXIT_WHEN_IDLE_MS = Number(process.env.MEDIA_EXIT_WHEN_IDLE_MS || 0);
 
 let shuttingDown = false;
 let wakeUp = null;
 let adminServer = null;
 let storageGcTimer = null;
 let storageGcRunning = false;
+let lastActivityAt = Date.now();
+
+/** Whether anything is under way: the host asks before it lets its idle timer stop the container. */
+function isBusy() {
+  return activeJobCount() > 0 || storageGcRunning || (adminServer?.requestsInFlight() ?? 0) > 0;
+}
+
+function noteActivity() {
+  lastActivityAt = Date.now();
+}
+
+function idleLongEnough() {
+  return EXIT_WHEN_IDLE_MS > 0 && !isBusy() && Date.now() - lastActivityAt >= EXIT_WHEN_IDLE_MS;
+}
 
 function log(payload) {
   console.log(JSON.stringify({ at: new Date().toISOString(), ...payload }));
@@ -89,7 +107,7 @@ async function main() {
   const config = getConfig();
   let consecutiveQueueErrors = 0;
 
-  adminServer = startAdminServer(config, { onLog: log });
+  adminServer = startAdminServer(config, { onLog: log, isBusy, onActivity: noteActivity });
   // The first inventory establishes each currently-unused object's own grace
   // period. Hourly scans then remove objects individually once they have
   // remained unused for three full days.
@@ -105,6 +123,7 @@ async function main() {
     resources,
     idlePollMs: IDLE_POLL_MS,
     storageGcIntervalMs: STORAGE_GC_INTERVAL_MS,
+    exitWhenIdleMs: EXIT_WHEN_IDLE_MS || null,
   });
 
   while (!shuttingDown) {
@@ -130,20 +149,33 @@ async function main() {
         retryInMs: backoffMs,
       });
 
+      // An unreachable queue is no reason to keep a billed container up: the
+      // host starts it again the next time it finds work.
+      if (idleLongEnough()) break;
       await sleep(backoffMs);
       continue;
     }
 
     if (result.status === 'no_job') {
+      if (idleLongEnough()) break;
       await sleep(IDLE_POLL_MS);
       continue;
     }
 
+    noteActivity();
     log(result);
     // Keep claiming while there is work: only an empty queue pauses the loop.
   }
 
+  if (!shuttingDown) {
+    // Idle: stop like a shutdown would, minus the job hand-back (there is none).
+    log({ status: 'idle_exit', idleMs: Date.now() - lastActivityAt });
+    adminServer?.close();
+    if (storageGcTimer) clearInterval(storageGcTimer);
+  }
   log({ status: 'worker_stopped' });
+  // Idle keep-alive sockets (Supabase, R2) must not hold a finished container open.
+  if (EXIT_WHEN_IDLE_MS > 0) setTimeout(() => process.exit(0), 1000).unref();
 }
 
 main().catch((error) => {

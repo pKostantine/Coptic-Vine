@@ -1,0 +1,41 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // The media processor as a Cloudflare Container. cloudflare/host.js wakes it
+  // when a job is queued; the container (Dockerfile, src/) drains the queue and
+  // exits once idle, so it is billed only while it works.
+  "name": "cv-media-processor",
+  "main": "cloudflare/host.js",
+  "compatibility_date": "2026-09-21",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "SUPABASE_URL": "https://wtuujmeinzqfikvuofmh.supabase.co",
+    // Public by design: the same key ships in the web app.
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_H0lG0vRL6io4Uy0htd77Cw_dlNbwx0n",
+    "R2_ACCOUNT_ID": "cf3267bfcb8e3b6d980e9a690c7e7a00"
+  },
+  // Secrets, set with `wrangler secret put`: MEDIA_WORKER_TOKEN,
+  // R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY.
+  "triggers": {
+    // Every minute: start the container if a job is due (retries, missed
+    // wake-ups). Daily: start it anyway, for storage cleanup.
+    "crons": ["* * * * *", "17 9 * * *"]
+  },
+  "containers": [
+    {
+      "class_name": "MediaProcessor",
+      "image": "./Dockerfile",
+      // The largest standard size. Lesson videos run past 10 GB; an encode
+      // costs about the same on 4 vCPUs as on 2 and finishes twice as fast.
+      "instance_type": "standard-4",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "MEDIA_PROCESSOR", "class_name": "MediaProcessor" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MediaProcessor"] }],
+  "observability": {
+    "enabled": true
+  }
+}

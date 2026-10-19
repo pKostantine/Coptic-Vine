@@ -658,6 +658,11 @@ async function rpcIfAvailable(config, name, payload) {
 
 const activeControls = new Set();
 
+/** How many jobs this worker is processing right now. */
+export function activeJobCount() {
+  return activeControls.size;
+}
+
 /** Stops the job in flight: `shutdown` hands it back to the queue, `cancelled` just stops. */
 export function abortActiveJobs(kind = 'shutdown') {
   for (const control of activeControls) {

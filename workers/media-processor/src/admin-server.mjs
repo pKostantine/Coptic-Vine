@@ -198,7 +198,7 @@ async function deleteAllUnusedStorage(request, response, config) {
   });
 }
 
-async function handleRequest(request, response, config) {
+async function handleRequest(request, response, config, isBusy) {
   if (request.method === 'OPTIONS') {
     response.writeHead(204, corsHeaders());
     response.end();
@@ -209,7 +209,9 @@ async function handleRequest(request, response, config) {
   const url = new URL(request.url || '/', `http://${host}`);
 
   if (request.method === 'GET' && url.pathname === '/health') {
-    sendJson(response, 200, { ok: true, service: 'cv-media-processor' });
+    // `busy` tells the Cloudflare host whether a job, a storage cleanup or an
+    // admin request is under way, so it never stops the container mid-encode.
+    sendJson(response, 200, { ok: true, service: 'cv-media-processor', busy: isBusy() });
     return;
   }
 
@@ -241,17 +243,29 @@ async function handleRequest(request, response, config) {
   throw new HttpError(404, 'not_found', 'Route not found.');
 }
 
-export function startAdminServer(config, { onLog } = {}) {
-  // The Railway service domain is explicitly routed to container port 3000.
-  // Do not use Railway's injected PORT here; that value can differ from the
-  // service-domain target and would make the public admin endpoint unreachable.
+export function startAdminServer(config, { onLog, isBusy = () => false, onActivity } = {}) {
+  // The Cloudflare host (and, before it, Railway's service domain) reaches
+  // the container on port 3000. Do not use a platform-injected PORT here; it
+  // can differ from the port the host targets.
   const port = Number(process.env.ADMIN_API_PORT || 3000);
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error(`Invalid ADMIN_API_PORT ${process.env.ADMIN_API_PORT}`);
   }
 
+  // Admin deletions in progress count as work, so an idle container waits for them.
+  let inFlight = 0;
+
   const server = http.createServer((request, response) => {
-    handleRequest(request, response, config).catch((error) => {
+    const counted = request.method !== 'OPTIONS' && !request.url?.startsWith('/health');
+    if (counted) {
+      inFlight += 1;
+      onActivity?.();
+      response.once('close', () => {
+        inFlight -= 1;
+        onActivity?.();
+      });
+    }
+    handleRequest(request, response, config, () => isBusy() || inFlight > 0).catch((error) => {
       const status = error instanceof HttpError ? error.status : 500;
       const code = error instanceof HttpError ? error.code : 'internal_error';
       const message = error instanceof HttpError
@@ -275,5 +289,6 @@ export function startAdminServer(config, { onLog } = {}) {
     onLog?.({ status: 'admin_api_started', port });
   });
 
+  server.requestsInFlight = () => inFlight;
   return server;
 }
