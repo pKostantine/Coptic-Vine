@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useId, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useBottomChrome } from '../../../context/BottomChromeContext';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { tr } from '../../../utils/appText';
+import { useOpenSection } from '../../../utils/navigation';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import Icon from './Icon';
@@ -19,7 +20,8 @@ interface BottomTabBarProps {
 }
 
 export default function BottomTabBar({ active }: BottomTabBarProps) {
-  const router = useRouter();
+  // A tab opens its section afresh, with nothing beneath it to go back to.
+  const openSection = useOpenSection();
   const insets = useSafeAreaInsets();
   const { preferences } = useReadingPreferences();
   const isCompactLandscape = useIsCompactLandscape();
@@ -98,27 +100,27 @@ export default function BottomTabBar({ active }: BottomTabBarProps) {
         // An iPad with a Home button has no band below: its row gets the 6pt it has above.
         style={[styles.bar, tablet && styles.barTablet, { paddingBottom: tablet && !aboveHomeIndicator ? 6 : insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}
       >
-      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'home' }} accessibilityLabel={labels.home} style={tabStyle} onPress={() => router.replace('/')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'home' }} accessibilityLabel={labels.home} style={tabStyle} onPress={() => openSection('/')}>
         <Icon name="home-outline" size={iconSize} color={active === 'home' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'home' && styles.tabLabelActive]}>{labels.home}</Text>
       </Pressable>
 
-      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'books' }} accessibilityLabel={labels.books} style={tabStyle} onPress={() => router.replace('/books')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'books' }} accessibilityLabel={labels.books} style={tabStyle} onPress={() => openSection('/books')}>
         <Icon name="library-outline" size={iconSize} color={active === 'books' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'books' && styles.tabLabelActive]}>{labels.books}</Text>
       </Pressable>
 
-      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'music' }} accessibilityLabel={labels.music} style={tabStyle} onPress={() => router.replace('/music')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'music' }} accessibilityLabel={labels.music} style={tabStyle} onPress={() => openSection('/music')}>
         <Icon name="musical-notes" size={iconSize} color={active === 'music' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'music' && styles.tabLabelActive]}>{labels.music}</Text>
       </Pressable>
 
-      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'learn' }} accessibilityLabel={labels.learn} style={tabStyle} onPress={() => router.replace('/learn')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'learn' }} accessibilityLabel={labels.learn} style={tabStyle} onPress={() => openSection('/learn')}>
         <Icon name="school-outline" size={iconSize} color={active === 'learn' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'learn' && styles.tabLabelActive]}>{labels.learn}</Text>
       </Pressable>
 
-      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'account' }} accessibilityLabel={labels.account} style={tabStyle} onPress={() => router.replace('/account')}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: active === 'account' }} accessibilityLabel={labels.account} style={tabStyle} onPress={() => openSection('/account')}>
         <Icon name="person-circle-outline" size={iconSize} color={active === 'account' ? COLORS.gold : COLORS.muted} />
         <Text numberOfLines={1} style={[labelStyle, active === 'account' && styles.tabLabelActive]}>{labels.account}</Text>
       </Pressable>

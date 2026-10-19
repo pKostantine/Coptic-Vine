@@ -70,7 +70,10 @@ function AppStack() {
           shows it) was pushed over Books, so Books stayed underneath the tab
           it was replaced by, and iOS's edge swipe brought it back. A swipe
           back from a page within a section -- a book, an album -- is that
-          page's own, and still goes back. */}
+          page's own, and still goes back. The tab bar and the sidebar now
+          open a section afresh, alone in the stack (utils/navigation.ts,
+          useOpenSection), so nothing lies beneath a tab for any back --
+          a swipe, Android's back, a document's own swipe -- to uncover. */}
       <Stack.Screen name="index" options={TAB_PAGE} />
       <Stack.Screen name="books" options={TAB_PAGE} />
       <Stack.Screen name="music" options={TAB_PAGE} />
