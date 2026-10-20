@@ -67,18 +67,19 @@ function loadContentSource(env) {
   }
 }
 
-test('content is read from Supabase unless the source is set to cloudflare', () => {
-  const { module, created, supabase } = loadContentSource({});
+test('content is read from Supabase only when the source is set to supabase', () => {
+  const { module, created, supabase } = loadContentSource({ EXPO_PUBLIC_CONTENT_SOURCE: 'supabase' });
   assert.equal(module.CONTENT_SOURCE, 'supabase');
   assert.equal(module.contentApi, supabase);
   assert.equal(created.length, 0);
 
   const other = loadContentSource({ EXPO_PUBLIC_CONTENT_SOURCE: 'something-else' });
-  assert.equal(other.module.contentApi, other.supabase);
+  assert.equal(other.module.CONTENT_SOURCE, 'cloudflare');
+  assert.notEqual(other.module.contentApi, other.supabase);
 });
 
-test('with EXPO_PUBLIC_CONTENT_SOURCE=cloudflare, content goes to the Worker on a client with no session', () => {
-  const { module, created } = loadContentSource({ EXPO_PUBLIC_CONTENT_SOURCE: 'cloudflare' });
+test('by default content goes to the Worker, on a client with no session', () => {
+  const { module, created } = loadContentSource({});
   assert.equal(module.CONTENT_SOURCE, 'cloudflare');
   assert.equal(created.length, 1);
   assert.equal(created[0].url, 'https://content.copticvine.ca');
@@ -100,6 +101,13 @@ test('contentDataClient sends table reads and RPCs it cannot answer offline to t
   assert.deepEqual(rows.data, [{ hymn_key: 'x' }]);
   await contentDataClient.schema('calendar').rpc('get_context_flags', { p_date: '2026-10-20', p_extra_context: {} });
   assert.deepEqual(contentApi.calls.map((call) => [call.kind, call.schema, call.table || call.fn]), [['from', 'liturgy', 'hymn_titles'], ['rpc', 'calendar', 'get_context_flags']]);
+});
+
+test('on web, contentDataClient is the content source itself', () => {
+  const contentApi = fakeClient('content');
+  const web = loadModule(source('services/contentDataClient.web.ts'), { '@/services/contentSource': { contentApi } });
+  assert.equal(web.contentDataClient, contentApi);
+  assert.doesNotMatch(fs.readFileSync(source('services/contentDataClient.web.ts'), 'utf8'), /@\/utils\/supabase/);
 });
 
 test('the home screen reads its calendar and Synaxarium from the content source', async () => {

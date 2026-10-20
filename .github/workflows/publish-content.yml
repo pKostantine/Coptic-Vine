@@ -7,8 +7,9 @@ name: Publish book packages
 # tab to publish at once, or to rebuild everything.
 #
 # Needs the repository secret PUBLISH_TOKEN: the content Worker's publish
-# token (workers/content-packages). The database's public URL and key, and the
-# Worker's address, come from .env.
+# token (workers/content-packages). Where the content is read from, and the
+# packages Worker's address, come from .env: since the cutover on 20 Oct 2026
+# that is the D1 content Worker (https://content.copticvine.ca).
 
 on:
   schedule:

@@ -19,13 +19,15 @@
  * --dry-run builds every package and reports its chunks without uploading
  * anything or touching the manifest, so it needs no publish token.
  *
- * Where the content comes from: Supabase by default, or the D1 content
- * Worker with CONTENT_SOURCE_URL (or --source <url>), e.g.
- *   CONTENT_SOURCE_URL=https://content.copticvine.ca node scripts/publish-content-packages.mjs --dry-run
+ * Where the content comes from follows the app's switch in .env
+ * (EXPO_PUBLIC_CONTENT_SOURCE): the D1 content Worker (EXPO_PUBLIC_CONTENT_API_URL),
+ * the content master since 20 Oct 2026, unless it says supabase. CONTENT_SOURCE_URL
+ * or --source <url> points it anywhere else, e.g.
+ *   CONTENT_SOURCE_URL=https://wtuujmeinzqfikvuofmh.supabase.co node scripts/publish-content-packages.mjs --dry-run
  * The Worker answers the same four functions from D1 (workers/content-api,
- * src/rpc/offline.ts), so nothing else changes. Packages built from D1 leave
- * out what D1 doesn't copy: Supabase's legacy and staging tables and the
- * generated tsvector columns of bible.verses.
+ * src/rpc/offline.ts). Packages built from D1 leave out what D1 doesn't copy:
+ * Supabase's legacy and staging tables and the generated tsvector columns of
+ * bible.verses.
  *
  * What to package comes from the database (get_offline_package_plan): each
  * book's resources, their dependencies and tables. The rows are read a page
@@ -60,7 +62,10 @@ function loadDotEnv() {
 const dotenv = loadDotEnv();
 const env = (name) => process.env[name] || dotenv[name] || '';
 const SOURCE_ARG = process.argv.includes('--source') ? process.argv[process.argv.indexOf('--source') + 1] : '';
-const SUPABASE_URL = (SOURCE_ARG || process.env.CONTENT_SOURCE_URL || env('EXPO_PUBLIC_SUPABASE_URL')).replace(/\/+$/, '');
+const SWITCHED_SOURCE = env('EXPO_PUBLIC_CONTENT_SOURCE') === 'supabase'
+  ? env('EXPO_PUBLIC_SUPABASE_URL')
+  : env('EXPO_PUBLIC_CONTENT_API_URL') || 'https://content.copticvine.ca';
+const SOURCE_URL = (SOURCE_ARG || process.env.CONTENT_SOURCE_URL || SWITCHED_SOURCE).replace(/\/+$/, '');
 const ANON_KEY = env('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 const CONTENT_URL = (env('CONTENT_PACKAGES_URL') || env('EXPO_PUBLIC_CONTENT_PACKAGES_URL')).replace(/\/+$/, '');
 const PUBLISH_TOKEN = (process.env.PUBLISH_TOKEN || (process.env.PUBLISH_TOKEN_FILE ? readFileSync(process.env.PUBLISH_TOKEN_FILE, 'utf8') : '')).trim();
@@ -69,7 +74,7 @@ const CHANGED_ONLY = process.argv.includes('--changed');
 /** How long a --changed run goes before it rebuilds everything anyway. */
 const FULL_REBUILD_MS = 7 * 24 * 60 * 60 * 1000;
 
-if (!SUPABASE_URL || !ANON_KEY) throw new Error('EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are needed (from .env).');
+if (!SOURCE_URL || !ANON_KEY) throw new Error('A content source and EXPO_PUBLIC_SUPABASE_ANON_KEY are needed (from .env).');
 if (!CONTENT_URL && !DRY_RUN) throw new Error('EXPO_PUBLIC_CONTENT_PACKAGES_URL is needed (from .env).');
 if (!PUBLISH_TOKEN && !DRY_RUN) throw new Error('Set PUBLISH_TOKEN or PUBLISH_TOKEN_FILE to the content Worker\'s publish token.');
 
@@ -96,7 +101,7 @@ async function rpc(schema, name, args = {}) {
   for (let attempt = 0; ; attempt += 1) {
     let response;
     try {
-      response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+      response = await fetch(`${SOURCE_URL}/rest/v1/rpc/${name}`, {
         method: 'POST',
         headers: { apikey: ANON_KEY, authorization: `Bearer ${ANON_KEY}`, 'content-type': 'application/json', 'content-profile': schema },
         body: JSON.stringify(args),
