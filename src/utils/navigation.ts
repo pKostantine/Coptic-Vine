@@ -1,5 +1,6 @@
 import { type Href, type ImperativeRouter, useNavigationContainerRef, useRouter } from 'expo-router';
 import { useCallback } from 'react';
+import { Platform } from 'react-native';
 
 /**
  * router.back() silently no-ops (with a dev-only "GO_BACK was not handled by
@@ -52,6 +53,11 @@ function findAppStack(state: StackState | undefined): StackState | null {
  * page: Account → Downloads → Books left Account beneath Books, and the next
  * back — a swipe, Android's back, a document's own swipe — went to Account.
  * A section opened afresh has nothing beneath it to go back to.
+ *
+ * On the web the reset alone would replace the browser's history entry, so
+ * Chrome's Back skipped every section visited and left the page, reloading
+ * the site and stopping playback. The page being left gets its own entry
+ * first, so Back and Forward move between sections within the page.
  */
 export function useOpenSection(): (href: SectionHref) => void {
   const navigationRef = useNavigationContainerRef();
@@ -61,6 +67,10 @@ export function useOpenSection(): (href: SectionHref) => void {
     if (!stack) {
       router.replace(href);
       return;
+    }
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname !== href) {
+      // The router then writes the section over this copy (same history id).
+      window.history.pushState(window.history.state, '', window.location.href);
     }
     navigationRef.dispatch({ type: 'RESET', payload: { index: 0, routes: [{ name: SECTION_ROUTES[href] }] }, target: stack.key });
   }, [navigationRef, router]);

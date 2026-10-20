@@ -1,7 +1,7 @@
 import { useEvent, useEventListener } from 'expo';
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayerStatus } from 'expo-audio';
 import * as Network from 'expo-network';
-import { useVideoPlayer, type VideoPlayer, type VideoSource } from 'expo-video';
+import type { VideoPlayer, VideoSource } from 'expo-video';
 import { AppState, Platform } from 'react-native';
 import {
   createContext,
@@ -17,6 +17,7 @@ import {
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { downloadManager } from '@/services/downloadManager';
 import type { PlaybackQueueEntry, PlaybackRepeatMode, PlaybackSnapshot } from '@/types/playback';
+import { readLiveSession, usePlaybackPlayers, writeLiveSession } from '@/utils/livePlayback';
 import {
   loadLearningResume,
   peekLearningResume,
@@ -48,7 +49,9 @@ import {
 import {
   loadPlaybackSnapshot,
   localPlaybackUriExists,
+  reloadPointFor,
   savePlaybackSnapshot,
+  saveReloadPoint,
 } from '@/utils/playbackStateStorage';
 import { addTrackControlListener, hasTrackControls, setTrackControls } from '@/utils/trackControls';
 
@@ -203,6 +206,33 @@ function whenWebVideoReady(callback: () => void): void {
   element.addEventListener('canplay', callback, { once: true });
 }
 
+/** The video player's settings, made once (utils/livePlayback). */
+function setupVideoPlayer(instance: VideoPlayer): void {
+  instance.loop = false;
+  instance.staysActiveInBackground = true;
+  instance.audioMixingMode = 'doNotMix';
+  instance.timeUpdateEventInterval = 0.25;
+}
+
+/**
+ * Chrome's previous/next track buttons, and a keyboard's media keys, change
+ * tracks. expo-audio maps them to 10-second seeks, and sets them again each
+ * time it takes the media session (on activation, and on every new source),
+ * so they are taken back after each of those.
+ */
+function claimWebTrackButtons(next: () => void, previous: () => void): void {
+  if (Platform.OS !== 'web') return;
+  const session = (globalThis as unknown as {
+    navigator?: { mediaSession?: { setActionHandler?: (action: string, handler: (() => void) | null) => void } };
+  }).navigator?.mediaSession;
+  try {
+    session?.setActionHandler?.('nexttrack', next);
+    session?.setActionHandler?.('previoustrack', previous);
+  } catch {
+    // Older browsers reject unknown actions; the basic controls still work.
+  }
+}
+
 const HIDDEN_PRESENTATION: VideoPresentation = { placement: 'hidden', pictureInPicture: false, claimedItemIds: [], covered: false };
 
 function samePresentation(a: VideoPresentation, b: VideoPresentation): boolean {
@@ -218,40 +248,33 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const lessonVideoMode = preferences.lessonVideoMode;
   const lessonVideoOnCellular = preferences.lessonVideoOnCellular;
 
-  const player = useAudioPlayer(null, {
-    updateInterval: 125,
-    preferredForwardBufferDuration: 20,
-  });
+  // The second player, `videoPlayer`: a lesson with a picture plays on it
+  // whether the picture shows or not, so showing and hiding the video never
+  // changes players (and never loses the place). On the web both outlive a
+  // rebuild of the app's root, and the session with them (utils/livePlayback).
+  const { player, videoPlayer } = usePlaybackPlayers(setupVideoPlayer);
   const status = useAudioPlayerStatus(player);
-
-  // The second player: a lesson with a picture plays on it whether the
-  // picture shows or not, so showing and hiding the video never changes
-  // players (and never loses the place).
-  const videoPlayer = useVideoPlayer(null, (instance) => {
-    instance.loop = false;
-    instance.staysActiveInBackground = true;
-    instance.audioMixingMode = 'doNotMix';
-    instance.timeUpdateEventInterval = 0.25;
-  });
+  const [live] = useState(readLiveSession);
   const videoPlayingEvent = useEvent(videoPlayer, 'playingChange', { isPlaying: false, oldIsPlaying: false });
   const videoStatusEvent = useEvent(videoPlayer, 'statusChange', { status: 'idle' as const });
   const videoTimeEvent = useEvent(videoPlayer, 'timeUpdate', { currentTime: 0, currentLiveTimestamp: null, currentOffsetFromLive: null, bufferedPosition: 0 });
 
-  const [queue, setQueue] = useState<PlaybackQueueEntry[]>([]);
-  const [originalQueue, setOriginalQueue] = useState<PlaybackQueueEntry[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(-1);
-  const [repeatMode, setRepeatMode] = useState<PlaybackRepeatMode>('off');
-  const [shuffleEnabled, setShuffleEnabled] = useState(false);
+  const [queue, setQueue] = useState<PlaybackQueueEntry[]>(live?.queue ?? []);
+  const [originalQueue, setOriginalQueue] = useState<PlaybackQueueEntry[]>(live?.originalQueue ?? []);
+  const [currentIndex, setCurrentIndex] = useState(live?.currentIndex ?? -1);
+  const [repeatMode, setRepeatMode] = useState<PlaybackRepeatMode>(live?.repeatMode ?? 'off');
+  const [shuffleEnabled, setShuffleEnabled] = useState(live?.shuffleEnabled ?? false);
   const [loadingSource, setLoadingSource] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-  const [learningRate, setLearningRate] = useState(1);
+  // A session carried over from before a rebuild is already in place.
+  const [hydrated, setHydrated] = useState(live != null);
+  const [learningRate, setLearningRate] = useState(live?.learningRate ?? 1);
   const sourceRequestId = useRef(0);
   const restorePositionMs = useRef<number | null>(null);
 
   // The video player's own state.
-  const [videoRendition, setVideoRendition] = useState<LessonRendition | null>(null);
-  const [videoDurationMs, setVideoDurationMs] = useState(0);
+  const [videoRendition, setVideoRendition] = useState<LessonRendition | null>(live?.videoRendition ?? null);
+  const [videoDurationMs, setVideoDurationMs] = useState(live?.videoDurationMs ?? 0);
   const [measuredAspectRatio, setMeasuredAspectRatio] = useState<number | null>(null);
   const [videoPresentation, setVideoPresentationState] = useState<VideoPresentation>(HIDDEN_PRESENTATION);
   const [cellularOverride, setCellularOverride] = useState(false);
@@ -272,6 +295,18 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   // The video player's properties are set through this ref: it is the same
   // instance for the provider's life, and a ref may be written to after render.
   const videoPlayerRef = useRef(videoPlayer);
+  // Media Session action handlers outlive renders, so they read the latest
+  // queue navigation through refs instead of capturing stale callbacks.
+  const nextRef = useRef<() => void>(() => undefined);
+  const previousRef = useRef<() => void>(() => undefined);
+  const togglePlaybackRef = useRef<() => void>(() => undefined);
+  const claimTrackButtons = useCallback(() => {
+    claimWebTrackButtons(() => nextRef.current(), () => previousRef.current());
+  }, []);
+  // After a reload Chrome may refuse to start sound until the listener touches
+  // the page; then playback carries on at their first click or key instead.
+  const resumeOnGesture = useRef(false);
+  const playingRef = useRef(false);
 
   const currentItem = currentIndex >= 0 && currentIndex < queue.length ? queue[currentIndex] : null;
   const currentHasVideo = entryHasVideo(currentItem);
@@ -290,6 +325,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const videoSwitching = videoSwitch != null;
   const videoPlaying = videoPlayingEvent.isPlaying || Boolean(videoSwitch?.wasPlaying);
   const playing = activeEngine === 'video' ? videoPlaying : audioPlaying;
+  useEffect(() => {
+    playingRef.current = playing;
+    if (playing) resumeOnGesture.current = false;
+  }, [playing]);
   const audioTimeMs = Math.max(0, Math.round((status.currentTime ?? 0) * 1000));
   const videoTimeMs = videoSwitch
     ? videoSwitch.positionMs
@@ -458,8 +497,17 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         headers: entry.playable.source.headers ?? undefined,
         name: entry.playable.title,
       });
+      claimTrackButtons();
 
-      restorePositionMs.current = startMs > 0 ? startMs : null;
+      if (Platform.OS === 'web') {
+        // The web player still says it is loaded from the source before, so
+        // waiting for that would never seek; a position set on the new source
+        // now is where the browser starts it once it has loaded.
+        restorePositionMs.current = null;
+        if (startMs > 0) void player.seekTo(startMs / 1000);
+      } else {
+        restorePositionMs.current = startMs > 0 ? startMs : null;
+      }
       if (autoplay) player.play();
     } catch (cause) {
       if (requestId !== sourceRequestId.current) return;
@@ -469,7 +517,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     } finally {
       if (requestId === sourceRequestId.current) setLoadingSource(false);
     }
-  }, [player, startingRenditionFor, stopAudioEngine, stopVideoEngine, videoReady]);
+  }, [claimTrackButtons, player, startingRenditionFor, stopAudioEngine, stopVideoEngine, videoReady]);
 
   const playQueue = useCallback((items: PlaybackQueueEntry[], startIndex = 0) => {
     if (!items.length) return;
@@ -516,6 +564,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
   const togglePlayback = useCallback(() => {
     if (!currentItem) return;
+    resumeOnGesture.current = false;
     if (activeEngine === 'video') {
       const video = videoPlayerRef.current;
       if (playing) video.pause();
@@ -643,12 +692,6 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Media Session action handlers outlive renders, so they read the latest
-  // queue navigation through refs instead of capturing stale callbacks.
-  const nextRef = useRef<() => void>(() => undefined);
-  const previousRef = useRef<() => void>(() => undefined);
-  const togglePlaybackRef = useRef<() => void>(() => undefined);
-
   useEffect(() => {
     const webGlobal = globalThis as unknown as {
       navigator?: {
@@ -691,6 +734,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
           showSeekForward: !hasTrackControls,
         });
         player.updateLockScreenMetadata(metadata);
+        claimTrackButtons();
       };
       activate();
       // The video player clears the lock screen a moment after it lets go of
@@ -712,12 +756,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         artwork: playable.artworkUri ? [{ src: playable.artworkUri, type: 'image/jpeg' }] : undefined,
       });
 
-      // expo-audio maps Chrome's previous/next buttons to 10-second seeks.
-      // Coptic Vine is a queue player, so those buttons should change tracks.
+      // Coptic Vine is a queue player: previous/next change tracks (claimWebTrackButtons).
+      claimTrackButtons();
       const session = webGlobal.navigator.mediaSession;
       try {
-        session.setActionHandler?.('nexttrack', () => nextRef.current());
-        session.setActionHandler?.('previoustrack', () => previousRef.current());
         // The video element has no handlers of its own; the audio player sets its own.
         session.setActionHandler?.('play', activeEngine === 'video' ? () => togglePlaybackRef.current() : null);
         session.setActionHandler?.('pause', activeEngine === 'video' ? () => togglePlaybackRef.current() : null);
@@ -726,7 +768,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       }
     }
     return () => { if (timer) clearTimeout(timer); };
-  }, [activeEngine, currentItem, player]);
+  }, [activeEngine, claimTrackButtons, currentItem, player]);
 
   // Set again on every new source as well as on a change of speed: a
   // replaced source starts at the player's default rate.
@@ -788,6 +830,29 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   // flag is still set, so without an edge check one finished track would skip
   // straight through the rest of the queue and stop on the last entry.
   const finishHandled = useRef(false);
+  const armResumeOnGesture = useCallback(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    resumeOnGesture.current = true;
+    // Chrome refusing the first play() is expected here, not an error.
+    const quiet = (event: PromiseRejectionEvent) => {
+      if ((event.reason as { name?: string } | null)?.name === 'NotAllowedError') event.preventDefault();
+    };
+    window.addEventListener('unhandledrejection', quiet);
+    setTimeout(() => window.removeEventListener('unhandledrejection', quiet), 10_000);
+    const resume = () => {
+      // After the press itself is handled: a press of play or pause has
+      // already decided (togglePlayback), and nothing is restarted under it.
+      setTimeout(() => {
+        window.removeEventListener('pointerup', resume, true);
+        window.removeEventListener('keyup', resume, true);
+        if (!resumeOnGesture.current) return;
+        resumeOnGesture.current = false;
+        if (!playingRef.current) togglePlaybackRef.current();
+      }, 0);
+    };
+    window.addEventListener('pointerup', resume, true);
+    window.addEventListener('keyup', resume, true);
+  }, []);
   const finishCurrent = useCallback(() => {
     if (currentIndex < 0) return;
     const entry = queue[currentIndex];
@@ -830,23 +895,57 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     if (currentItemRef.current && entryHasVideo(currentItemRef.current)) finishCurrentRef.current();
   });
 
+  // The saved queue comes back where it was left, paused; after a reload of a
+  // page that was playing (the web, utils/playbackStateStorage), playing, from
+  // that very moment. A session carried over from a rebuild needs neither.
+  const carriedOver = useRef(live != null);
   useEffect(() => {
     let active = true;
     Promise.all([loadPlaybackSnapshot(), loadLearningResume()])
       .then(([snapshot]) => {
-        if (!active || !snapshot || !snapshot.queue.length) return;
+        if (!active || carriedOver.current || !snapshot || !snapshot.queue.length) return;
+        const reload = reloadPointFor(snapshot.queue[snapshot.currentIndex]?.key);
         setQueue(snapshot.queue);
         setOriginalQueue(snapshot.originalQueue.length ? snapshot.originalQueue : snapshot.queue);
         setCurrentIndex(snapshot.currentIndex);
         setRepeatMode(snapshot.repeatMode);
         setShuffleEnabled(snapshot.shuffleEnabled);
-        void loadEntry(snapshot.queue, snapshot.currentIndex, false, snapshot.positionMs);
+        const carryOn = reload?.playing === true;
+        if (carryOn) armResumeOnGesture();
+        void loadEntry(snapshot.queue, snapshot.currentIndex, carryOn, reload ? reload.positionMs : snapshot.positionMs);
       })
       .finally(() => {
         if (active) setHydrated(true);
       });
     return () => { active = false; };
-  }, [loadEntry]);
+  }, [armResumeOnGesture, loadEntry]);
+
+  // Kept outside React on the web, for a provider rebuilt with the app's root.
+  useEffect(() => {
+    writeLiveSession({ queue, originalQueue, currentIndex, repeatMode, shuffleEnabled, learningRate, videoRendition, videoDurationMs });
+  }, [currentIndex, learningRate, originalQueue, queue, repeatMode, shuffleEnabled, videoDurationMs, videoRendition]);
+
+  // Where playback is as the page goes (a reload): for the tab only, so that
+  // closing the site still stops it.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const save = () => {
+      const entry = currentItemRef.current;
+      if (!entry) {
+        saveReloadPoint(null);
+        return;
+      }
+      const seconds = entryHasVideo(entry) ? videoPlayerRef.current.currentTime : player.currentTime;
+      saveReloadPoint({
+        key: entry.key,
+        positionMs: Math.max(0, Math.round((Number.isFinite(seconds) ? seconds : 0) * 1000)),
+        playing: playingRef.current,
+        savedAt: Date.now(),
+      });
+    };
+    window.addEventListener('pagehide', save);
+    return () => window.removeEventListener('pagehide', save);
+  }, [player]);
 
   const persistenceBucket = Math.floor(currentTimeMs / 5000);
   useEffect(() => {
