@@ -54,6 +54,9 @@ jobs:
           --rule "react-hooks/exhaustive-deps: off"
       - name: Every test suite
         run: npm test
+      - name: Content API (D1 schema, quoted table names)
+        working-directory: workers/content-api
+        run: npm test && ../../node_modules/.bin/tsc -p . && npm run gen:schema -- --check
       - name: Validate media processor (including multi-GB video)
         working-directory: workers/media-processor
         run: npm ci --no-audit --no-fund && npm test

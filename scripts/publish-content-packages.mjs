@@ -19,6 +19,14 @@
  * --dry-run builds every package and reports its chunks without uploading
  * anything or touching the manifest, so it needs no publish token.
  *
+ * Where the content comes from: Supabase by default, or the D1 content
+ * Worker with CONTENT_SOURCE_URL (or --source <url>), e.g.
+ *   CONTENT_SOURCE_URL=https://content.copticvine.ca node scripts/publish-content-packages.mjs --dry-run
+ * The Worker answers the same four functions from D1 (workers/content-api,
+ * src/rpc/offline.ts), so nothing else changes. Packages built from D1 leave
+ * out what D1 doesn't copy: Supabase's legacy and staging tables and the
+ * generated tsvector columns of bible.verses.
+ *
  * What to package comes from the database (get_offline_package_plan): each
  * book's resources, their dependencies and tables. The rows are read a page
  * at a time (get_offline_table_rows) with the public anon key -- everything in
@@ -51,7 +59,8 @@ function loadDotEnv() {
 
 const dotenv = loadDotEnv();
 const env = (name) => process.env[name] || dotenv[name] || '';
-const SUPABASE_URL = env('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
+const SOURCE_ARG = process.argv.includes('--source') ? process.argv[process.argv.indexOf('--source') + 1] : '';
+const SUPABASE_URL = (SOURCE_ARG || process.env.CONTENT_SOURCE_URL || env('EXPO_PUBLIC_SUPABASE_URL')).replace(/\/+$/, '');
 const ANON_KEY = env('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 const CONTENT_URL = (env('CONTENT_PACKAGES_URL') || env('EXPO_PUBLIC_CONTENT_PACKAGES_URL')).replace(/\/+$/, '');
 const PUBLISH_TOKEN = (process.env.PUBLISH_TOKEN || (process.env.PUBLISH_TOKEN_FILE ? readFileSync(process.env.PUBLISH_TOKEN_FILE, 'utf8') : '')).trim();

@@ -1,0 +1,7146 @@
+{
+ "tables": [
+  {
+   "schema": "agpeya",
+   "table": "eleventh_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "first_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "agpeya.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "introduction_to_every_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "agpeya.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "midnight_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "ninth_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "other_prayers",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "prayer_of_the_veil",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "sixth_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "third_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "agpeya",
+   "table": "twelfth_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "aspasmos",
+   "table": "adam_aspasmos",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "aspasmos",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "aspasmos",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "aspasmos.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "aspasmos",
+   "table": "vatos_aspasmos",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "bible",
+   "table": "books",
+   "public": true,
+   "columns": [
+    {
+     "name": "book_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "book_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "source_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "calendar_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "testament",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "aliases_json",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true
+    },
+    {
+     "name": "title_greek",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "book_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "bible",
+   "table": "book_number_aliases",
+   "public": true,
+   "columns": [
+    {
+     "name": "number_system",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "book_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "book_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "number_system",
+    "book_number",
+    "book_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "bible.books"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "bible",
+   "table": "verse_parts",
+   "public": true,
+   "columns": [
+    {
+     "name": "part_id",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": true
+    },
+    {
+     "name": "book_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "chapter_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "verse_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "part_label",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "greek",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "english_from_coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic_from_coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "part_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "bible.books"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "bible",
+   "table": "verses",
+   "public": true,
+   "columns": [
+    {
+     "name": "verse_id",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "book_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "chapter_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "verse_number",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "greek",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "english_from_coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic_from_coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "english_nkjv",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "french_from_coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [
+    "fts_english",
+    "fts_english_nkjv",
+    "fts_english_from_coptic",
+    "fts_arabic",
+    "fts_arabic_from_coptic",
+    "fts_coptic",
+    "fts_greek"
+   ],
+   "rowKey": [
+    "verse_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "bible.books"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "calendar",
+   "table": "coptic_date_conversions",
+   "public": true,
+   "columns": [
+    {
+     "name": "gregorian_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": true
+    },
+    {
+     "name": "gregorian_year",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "gregorian_month",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "gregorian_day",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "weekday",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "weekday_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_year",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_month",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_month_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "coptic_day",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_date_label",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "coptic_date_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "is_coptic_leap_year",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true
+    },
+    {
+     "name": "is_coptic_leap_day",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true
+    },
+    {
+     "name": "sunday_ordinal_in_coptic_month",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "gregorian_date"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "calendar",
+   "table": "calendar_event_instances",
+   "public": true,
+   "columns": [
+    {
+     "name": "event_instance_id",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "event_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "gregorian_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": true
+    },
+    {
+     "name": "coptic_year",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "coptic_month",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "coptic_month_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic_day",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "coptic_date_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "event_kind",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "source_id",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "event_instance_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "calendar.coptic_date_conversions"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "calendar",
+   "table": "condition_flags",
+   "public": true,
+   "columns": [
+    {
+     "name": "flag_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "flag_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "flag_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "calendar",
+   "table": "fixed_coptic_day_flags",
+   "public": true,
+   "columns": [
+    {
+     "name": "condition_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "coptic_month",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_month_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "coptic_day",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "source",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "condition_key",
+    "coptic_month",
+    "coptic_day"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "calendar.condition_flags"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "calendar",
+   "table": "reading_rules",
+   "public": true,
+   "columns": [
+    {
+     "name": "reading_rule_id",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "cycle_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "priority",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_month",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "coptic_day",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "sunday_ordinal",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "lent_week",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "pentecost_week",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "day_of_week",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "service",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "reading_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "reading_code",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "reading_reference",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "source_day_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "sunday_message",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "reading_rule_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "calendar",
+   "table": "season_ranges",
+   "public": true,
+   "columns": [
+    {
+     "name": "range_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "start_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": true
+    },
+    {
+     "name": "end_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": false
+    },
+    {
+     "name": "active_season",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "content_ids_json",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "start_event",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "end_event",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "includes_end_event",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "range_key",
+    "start_date"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "calendar.coptic_date_conversions"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "canons",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "canons",
+   "table": "canons",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "canons.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "canons",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "canons.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "doxologies",
+   "table": "doxologies",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "doxologies",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "doxologies",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "text_id",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "text_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "doxologies.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "fractions",
+   "table": "fractions",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "fractions",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "fractions",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "fractions.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "gospel_responses",
+   "table": "alternate_gospel_responses",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "gospel_responses",
+   "table": "gospel_responses",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "gospel_responses",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "gospel_responses",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "gospel_responses.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "gospel_rite",
+   "table": "gospel_rite",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "gospel_rite",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "gospel_rite",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "gospel_rite.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "gospel_rite",
+   "table": "mournful_4_gospels_rite",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "gospel_rite",
+   "table": "mournful_gospel_rite",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "gospel_rite",
+   "table": "palm_sunday_liturgy_gospel_rite",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "implying_conditions",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "bright_saturday",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "general_funeral_prayer",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "good_friday",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "good_friday_ninth_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "good_friday_sixth_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "good_friday_twelfth_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "holy_thursday",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "holy_thursday_liturgy",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "holy_week.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "liturgy_of_the_waters",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "pascha_common_hymns",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "pascha_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "reading_rules",
+   "public": true,
+   "columns": [
+    {
+     "name": "reading_rule_id",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "hour_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "day_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "part",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "hour",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "reading_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "reading_code",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "book_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "reading_reference",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "psalm_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "reading_rule_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "holy_week.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "holy_week",
+   "table": "thursday_first_hour",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "hymn_of_the_intercessions",
+   "table": "hymn_of_the_intercessions",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "hymn_of_the_intercessions",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "hymn_of_the_intercessions",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "litanies",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "litanies",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "litanies.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "litanies",
+   "table": "the_five_short_litanies",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "litanies",
+   "table": "the_three_great_litanies",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "distribution",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": [
+    "liturgy.validate_order_hymn_key"
+   ]
+  },
+  {
+   "schema": "liturgy",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "liturgy.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "lectionary_liturgy",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order",
+    "hymn_key",
+    "condition",
+    "minimization",
+    "item_type"
+   ],
+   "hasPrimaryKey": false,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "lectionary_matins",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order",
+    "hymn_key",
+    "condition",
+    "minimization",
+    "item_type"
+   ],
+   "hasPrimaryKey": false,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "lectionary_vespers",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order",
+    "hymn_key",
+    "condition",
+    "minimization",
+    "item_type"
+   ],
+   "hasPrimaryKey": false,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "liturgy_agpeya",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "liturgy_of_st_basil",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": [
+    "liturgy.validate_order_hymn_key"
+   ]
+  },
+  {
+   "schema": "liturgy",
+   "table": "liturgy_of_st_cyril",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": [
+    "liturgy.validate_order_hymn_key"
+   ]
+  },
+  {
+   "schema": "liturgy",
+   "table": "liturgy_of_st_gregory",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": [
+    "liturgy.validate_order_hymn_key"
+   ]
+  },
+  {
+   "schema": "liturgy",
+   "table": "liturgy_of_the_word",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "offering_of_the_lamb",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "raising_of_incense",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "sermon_planner",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "praxis_response",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float4",
+     "pgType": "real",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "praxis_response",
+   "table": "praxis_response",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "procession_of_the_cross",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "procession_of_the_cross",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "procession_of_the_cross.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "procession_of_the_cross",
+   "table": "procession_of_the_cross",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "procession_of_the_cross",
+   "table": "reading_rules",
+   "public": true,
+   "columns": [
+    {
+     "name": "reading_rule_id",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "station",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "station_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "reading_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "reading_code",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "book_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "reading_reference",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "psalm_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "reading_rule_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "procession_of_the_cross.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "antiphonary",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "psalmody.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "midnight_praises",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "morning_doxology",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "psalies_daily",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "psalies_saints",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "psalies_seasonal",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "psalmody",
+   "table": "vespers_praises",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "public",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "public",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "public.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "public",
+   "table": "saint_order",
+   "public": true,
+   "columns": [
+    {
+     "name": "flag_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "sort_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "flag_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "catholic_epistle",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "coptic_catholic_epistle",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "coptic_pauline_epistle",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "coptic_praxis",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "coptic_prophecy",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "readings.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "pauline_epistle",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "praxis",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "readings",
+   "table": "prophecy",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "seasonal_liturgy_hymns",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "seasonal_liturgy_hymns",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "seasonal_liturgy_hymns.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "seasonal_liturgy_hymns",
+   "table": "seasonal_distribution_hymns",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "seasonal_liturgy_hymns.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "seasonal_liturgy_hymns",
+   "table": "seasonal_liturgy_of_the_word_hymns",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "seasonal_liturgy_hymns.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "synaxarium",
+   "table": "coptic_days",
+   "public": true,
+   "columns": [
+    {
+     "name": "coptic_month",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_day",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_month_name_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "coptic_month_name_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "coptic_month",
+    "coptic_day"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "synaxarium",
+   "table": "entries",
+   "public": true,
+   "columns": [
+    {
+     "name": "entry_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "coptic_month",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "coptic_day",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "entry_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "source",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "entry_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "synaxarium",
+   "table": "entry_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "text_id",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "entry_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "text_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "synaxarium.entries"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "veneration",
+   "table": "hymn_titles",
+   "public": true,
+   "columns": [
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "title_english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "title_arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "toggled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "title_french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "hymn_key"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "veneration",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float8",
+     "pgType": "double precision",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [
+    "veneration.hymn_titles"
+   ],
+   "validators": []
+  },
+  {
+   "schema": "veneration",
+   "table": "veneration",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": [
+    "veneration.validate_veneration_hymn_key",
+    "public.veneration_validate_hymn_key"
+   ]
+  },
+  {
+   "schema": "verses_of_the_cymbals",
+   "table": "hymn_texts",
+   "public": true,
+   "columns": [
+    {
+     "name": "line_id",
+     "kind": "float4",
+     "pgType": "real",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "line_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": false
+    },
+    {
+     "name": "english",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "coptic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "arabic",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "person_type",
+     "kind": "text",
+     "pgType": "\"Person Type\"",
+     "notNull": false
+    },
+    {
+     "name": "prayer_type",
+     "kind": "text",
+     "pgType": "\"Prayer Type\"",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "inline_hymn_title_shown",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false
+    },
+    {
+     "name": "french",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "line_id"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  },
+  {
+   "schema": "verses_of_the_cymbals",
+   "table": "verses_of_the_cymbals",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": []
+  }
+ ],
+ "views": [
+  {
+   "schema": "bible",
+   "table": "calendar_book_lookup",
+   "public": true,
+   "columns": [
+    "calendar_number",
+    "book_key",
+    "title_english",
+    "title_arabic",
+    "testament",
+    "book_order"
+   ]
+  },
+  {
+   "schema": "synaxarium",
+   "table": "day_entries",
+   "public": true,
+   "columns": [
+    "coptic_month",
+    "coptic_day",
+    "coptic_month_name_english",
+    "coptic_month_name_arabic",
+    "entry_order",
+    "entry_key",
+    "title_english",
+    "title_arabic",
+    "line_order",
+    "english",
+    "arabic",
+    "source"
+   ]
+  }
+ ],
+ "enums": {
+  "Minimization": [
+   "Minimizable",
+   "Minimized"
+  ],
+  "Person Type": [
+   "Bishop/Priest",
+   "Priest",
+   "Deacon",
+   "Reader",
+   "People",
+   "Comment"
+  ],
+  "Prayer Type": [
+   "Single Alternating",
+   "Double Alternating",
+   "Recited Prayer",
+   "Silent Prayer",
+   "Chanted Prayer",
+   "Refrain",
+   "Pre-Refrain",
+   "Reverse Alternating",
+   "Quadruple Alternating",
+   "Invincible Coptic",
+   "White",
+   "Blue"
+  ],
+  "Item Type": [
+   "Subdocument",
+   "Hyperlink",
+   "Inline"
+  ]
+ }
+}
