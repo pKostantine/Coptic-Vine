@@ -54,3 +54,32 @@ export interface PlaybackSnapshot {
   repeatMode: PlaybackRepeatMode;
   shuffleEnabled: boolean;
 }
+
+/**
+ * What the playback provider holds about the session in progress, kept on the
+ * web outside React for as long as the page lives (utils/livePlayback.web.ts):
+ * Chrome's Back and Forward can make Expo Router rebuild the app's root, and a
+ * rebuilt provider picks the session up from here instead of starting over.
+ */
+export interface LivePlaybackSession {
+  queue: PlaybackQueueEntry[];
+  originalQueue: PlaybackQueueEntry[];
+  currentIndex: number;
+  repeatMode: PlaybackRepeatMode;
+  shuffleEnabled: boolean;
+  learningRate: number;
+  /** A lesson's picture or its sound alone: 'video' or 'audio' (utils/lessonPlayback.ts). */
+  videoRendition: 'video' | 'audio' | null;
+  videoDurationMs: number;
+}
+
+/**
+ * Where playback was when the page was left, to carry on after a reload: kept
+ * for the tab only (sessionStorage), so closing the site still stops it.
+ */
+export interface PlaybackReloadPoint {
+  key: string;
+  positionMs: number;
+  playing: boolean;
+  savedAt: number;
+}
