@@ -24,6 +24,14 @@
     "default": { "type": "worker", "cache": { "enabled": false } },
     "Content": { "type": "worker", "cache": { "enabled": true } }
   },
+  // Every minute: start the offline-book build when the content has changed
+  // and settled (src/publish.ts). Needs the GITHUB_TOKEN secret.
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "GITHUB_REPOSITORY": "pKostantine/Coptic-Vine",
+    "PUBLISH_WORKFLOW": "publish-content.yml",
+    "PUBLISH_REF": "master"
+  },
   "observability": {
     "enabled": true
   }
