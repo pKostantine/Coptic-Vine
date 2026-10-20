@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // The liturgical content API: the copy of Supabase's content in D1 (Phase 1
+  // of docs/coptic-vine-d1-plan.md), read-only for clients.
+  "name": "cv-content-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-21",
+  "workers_dev": true,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "CONTENT_DB",
+      "database_name": "copticvine",
+      "database_id": "73a769f9-62fe-486d-a3c2-171b9aec274a",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

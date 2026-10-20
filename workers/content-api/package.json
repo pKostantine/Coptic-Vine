@@ -1,0 +1,12 @@
+{
+  "name": "@coptic-vine/content-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen:schema": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-schema.ts",
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test tests/*.test.ts",
+    "typecheck": "tsc -p .",
+    "deploy": "wrangler deploy"
+  }
+}
