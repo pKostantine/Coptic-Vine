@@ -1,9 +1,10 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   StyleProp,
@@ -19,6 +20,8 @@ import PlayerIcon, { type PlayerIconName } from '@/components/playback/PlayerIco
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import type { MusicConsumerTrack } from '@/types/musicConsumer';
+import type { ArtworkPalette } from '@/utils/artworkPalette';
+import { useArtworkPalette } from '@/utils/useArtworkPalette';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
@@ -115,17 +118,50 @@ export function edgeFade(top: number | null, bottom: number | null): StyleProp<V
 }
 
 /**
+ * The cover's colours as a deep gradient (utils/artworkPalette), fading in
+ * as each cover's are read. Remounted per palette, so each fades in anew.
+ */
+function PaletteWash({ palette }: { palette: ArtworkPalette }) {
+  const [opacity] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [opacity]);
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity }]}>
+      <LinearGradient
+        colors={[palette.primary, palette.secondary, palette.deep]}
+        locations={[0, 0.55, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* The second colour rises from the far corner, as a glow. */}
+      <LinearGradient
+        colors={['rgba(0, 0, 0, 0)', palette.secondary]}
+        start={{ x: 0.3, y: 0.2 }}
+        end={{ x: 1, y: 0.9 }}
+        style={[StyleSheet.absoluteFill, styles.paletteGlow]}
+      />
+    </Animated.View>
+  );
+}
+
+/**
  * The artwork, blurred and saturated behind the whole player, under a shade
  * that deepens to black where the controls sit — or, behind full-screen
- * lyrics, an even dim so every line reads alike.
+ * lyrics, an even dim so every line reads alike. On the web the cover's own
+ * colours run underneath it as a gradient, so a pale cover (paper and ink)
+ * still colours the player instead of greying it.
  */
 export function PlayerBackdrop({ uri, flat = false }: { uri: string | null; flat?: boolean }) {
+  const palette = useArtworkPalette(uri);
   return (
     <View pointerEvents="none" style={styles.backdrop}>
+      {palette ? <PaletteWash key={palette.key} palette={palette} /> : null}
       {uri ? (
         Platform.OS === 'web' ? (
           // The browser blurs and saturates in one CSS filter, as drawn.
-          <View style={[styles.backdropArt, styles.backdropWebFilter]}>
+          <View style={[styles.backdropArt, styles.backdropWebFilter, palette && styles.backdropArtOverPalette]}>
             <Image source={{ uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
           </View>
         ) : (
@@ -134,10 +170,12 @@ export function PlayerBackdrop({ uri, flat = false }: { uri: string | null; flat
       ) : null}
       {uri && Platform.OS !== 'web' ? <View style={styles.backdropNativeDim} /> : null}
       {flat ? (
-        <View style={styles.backdropFlat} />
+        <View style={[styles.backdropFlat, palette && styles.backdropFlatOverPalette]} />
       ) : (
         <LinearGradient
-          colors={['rgba(0, 0, 0, 0.1)', 'rgba(0, 0, 0, 0.42)', 'rgba(0, 0, 0, 0.86)', '#000000']}
+          colors={palette
+            ? ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.16)', 'rgba(0, 0, 0, 0.55)', 'rgba(0, 0, 0, 0.82)']
+            : ['rgba(0, 0, 0, 0.1)', 'rgba(0, 0, 0, 0.42)', 'rgba(0, 0, 0, 0.86)', '#000000']}
           locations={[0, 0.36, 0.7, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -399,9 +437,20 @@ export function PlayerBarButton({ icon, accessibilityLabel, onPress, on = false,
   );
 }
 
-/** The panel the lyrics and the queue sit in beside the desktop player. */
-export function PlayerPanel({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.panel, style]}>{children}</View>;
+/**
+ * The panel the lyrics and the queue sit in beside the desktop player: with
+ * the cover's colours (the web), frosted glass washed with them.
+ */
+export function PlayerPanel({ children, style, palette }: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  palette?: ArtworkPalette | null;
+}) {
+  return (
+    <View style={[styles.panel, palette && [styles.panelTinted, { backgroundColor: palette.panel }], style]}>
+      {children}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -411,6 +460,10 @@ const styles = StyleSheet.create({
   backdropWebFilter: { filter: 'blur(64px) saturate(1.6) brightness(0.85)' } as object,
   backdropNativeDim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0, 0, 0, 0.15)' },
   backdropFlat: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0, 0, 0, 0.58)' },
+  // Over the cover's colours the blurred cover is texture, not the colour.
+  backdropArtOverPalette: { opacity: 0.22 },
+  backdropFlatOverPalette: { backgroundColor: 'rgba(0, 0, 0, 0.42)' },
+  paletteGlow: { opacity: 0.55 },
 
   topBar: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 12 },
   topBarCompact: { height: 42 },
@@ -497,5 +550,10 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     overflow: 'hidden',
+  },
+  panelTinted: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)' } as object) : null),
   },
 });
