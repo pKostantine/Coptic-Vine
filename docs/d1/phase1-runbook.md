@@ -1,8 +1,12 @@
 # Phase 1 runbook: liturgical content on Cloudflare D1
 
-How the D1 copy of the content works, how to keep it in step with Supabase
-until cutover, and how to cut over. The plan is
-[coptic-vine-d1-plan.md](../coptic-vine-d1-plan.md), section 4.
+How the liturgical content works on Cloudflare D1, and how to edit it. The
+plan is [coptic-vine-d1-plan.md](../coptic-vine-d1-plan.md), section 4.
+
+**Status: cut over on 20 Oct 2026.** D1 is the content master. The app and
+the offline books read from it. Supabase's content schemas are a frozen copy,
+kept read-only as a fallback until about 19 Nov 2026 (see
+[Cutover](#cutover-plan-section-45)).
 
 ## What is where
 
@@ -11,7 +15,7 @@ until cutover, and how to cut over. The plan is
 | D1 database | `copticvine` (`73a769f9-62fe-486d-a3c2-171b9aec274a`): 121 content tables named `"schema.table"`, the Bible search index, the content revision and the offline package plan |
 | Content API | Worker `cv-content-api` (`workers/content-api`), at `https://content.copticvine.ca`. Also at `https://cv-content-api.hrmpdd8d6c.workers.dev` |
 | Offline books | Worker `cv-content-packages` serving R2 bucket `chc-content`, at `https://packages.copticvine.ca`. Also at `https://cv-content-packages.hrmpdd8d6c.workers.dev`, which installed apps still use |
-| App switch | `EXPO_PUBLIC_CONTENT_SOURCE` in `.env`: `supabase` (the current setting) or `cloudflare`. See `src/services/contentSource.ts` |
+| App switch | `EXPO_PUBLIC_CONTENT_SOURCE` in `.env`: `cloudflare` (the default since the cutover) or `supabase` (the frozen copy). See `src/services/contentSource.ts`. The offline-book publisher follows the same switch |
 
 **The content API.** It answers the same requests as Supabase's REST API:
 
@@ -70,13 +74,33 @@ way to write to it. It also accepts a church id (`x-church-id` or
     76.6 to 44.0 MB (no tsvector columns) and the Synaxarium from 17.7 to
     11.5 MB (no legacy staging tables). The app reads neither.
 
-## Keeping D1 in step with Supabase (until cutover)
+## Editing content (D1 is the master)
 
-Supabase stays the master. Whenever its content changes:
+- **Small fixes:** the D1 console in the Cloudflare dashboard (database
+  `copticvine`). Table names need their quotes: `"liturgy.hymn_texts"`.
+- **Bulk edits:** a numbered migration file in `workers/content-api/migrations`,
+  applied with `npx wrangler d1 migrations apply copticvine --remote`.
+- **Safety:** D1 Time Travel restores the whole database to any minute in the
+  last 30 days (`npx wrangler d1 time-travel restore copticvine --timestamp …`).
+  Before a risky bulk edit, copy the affected table first.
+- **After a change to `bible.verses`:** run `npm run build-search` to rebuild
+  the search index.
+- **What happens on its own:**
+  - The triggers move the content revision, so the edge cache starts afresh.
+  - The publish Action (every half hour) rebuilds the offline books whose
+    tables changed.
+- **Don't edit Supabase's content any more.** The app no longer reads it, and
+  `npm run import` refuses to copy it over D1 (it would undo D1's edits)
+  unless given `--overwrite-d1-edits`.
+
+## Before the cutover: reloading D1 from Supabase
+
+This is how D1 was kept in step while Supabase was the master. It is kept for
+the record and for local testing.
 
 ```sh
 cd workers/content-api
-npm run import                      # reads Supabase read-only, reloads every table in D1 (about 1 min + 30 s)
+npm run import -- --local           # into the local D1; a remote import now needs --overwrite-d1-edits
 npm run import -- --tables liturgy  # or one schema / schema.table (and the tables that reference it)
 ```
 
@@ -84,7 +108,8 @@ npm run import -- --tables liturgy  # or one schema / schema.table (and the tabl
 - **Search follows.** Reloading `bible.verses` rebuilds the search index.
 - **Egress.** A full import reads about 60 MB from Supabase.
 
-Then verify:
+The checks compare D1 with Supabase, so they only mean something until D1 is
+edited:
 
 ```sh
 npm run verify -- --print-pg-sql       # run in the Supabase SQL editor (read-only), save the JSON
@@ -93,34 +118,50 @@ npm run search-verify -- --print-pg-sql / --pg …   # every verse's search vect
 npm run parity -- --worker https://content.copticvine.ca   # the app's requests, both sides
 ```
 
-The latest reports are [phase1-verification.md](phase1-verification.md) and
+The reports are [phase1-verification.md](phase1-verification.md) and
 [phase1-parity.md](phase1-parity.md).
 
-## Building the offline books from D1
+## Building the offline books
+
+`scripts/publish-content-packages.mjs` reads from wherever
+`EXPO_PUBLIC_CONTENT_SOURCE` in `.env` points. Since the cutover that's D1,
+through `https://content.copticvine.ca`. The GitHub Action
+(`.github/workflows/publish-content.yml`) runs it every half hour.
+`CONTENT_SOURCE_URL` or `--source <url>` points it elsewhere for a one-off:
 
 ```sh
-CONTENT_SOURCE_URL=https://content.copticvine.ca node scripts/publish-content-packages.mjs --dry-run
+node scripts/publish-content-packages.mjs --dry-run
 ```
-
-The GitHub Action (`.github/workflows/publish-content.yml`) still builds from
-Supabase every half hour. Change it at cutover; see below.
 
 ## Cutover (plan section 4.5)
 
-1. Freeze content edits in Supabase.
-2. Run `npm run import`, then `verify`, `search-verify` and `parity` (with
-   `--only tables` too). All must be clean.
-3. Set `EXPO_PUBLIC_CONTENT_SOURCE=cloudflare` in `.env`. Release the app and
-   deploy the web app.
-4. Point the publish Action at D1: add
-   `CONTENT_SOURCE_URL: https://content.copticvine.ca` to its `env`.
-5. **D1 is now the master.**
-   - Small edits go in the D1 console.
-   - Bulk edits go in migration files.
-   - After any change to `bible.verses`, run `npm run build-search`.
-   - The revision moves on its own.
-6. Keep the Supabase content schemas read-only for 30 days, then drop them
-   (after Pierre confirms).
+Done on 20 Oct 2026, between about 17:45 and 18:30 UTC:
+
+1. **Content edits in Supabase frozen.** Nothing in Supabase writes content
+   by itself: no cron job, trigger or user-data function does. So the freeze
+   just means no more manual edits there.
+2. **Final reload, then full verification:**
+   - every table reloaded at 17:45;
+   - 121 of 121 tables match Postgres by SHA-256;
+   - 608 of 608 search-vector groups match;
+   - parity: 5,841 cases equal and none different, plus 47 cases where
+     Supabase timed out and the Worker answered.
+3. **The app's default flipped to the Worker** (`EXPO_PUBLIC_CONTENT_SOURCE=cloudflare`).
+   - The web app has been deployed with it.
+   - Native apps pick it up with their next build or update. Until then they
+     read Supabase's frozen copy, which is identical.
+   - A live check found that the web build's `contentDataClient.web.ts` still
+     used the Supabase client. It now reads through the switch. After the fix,
+     every content request from the home screen, an Agpeya hour, the Liturgy,
+     the Synaxarium and the Bible went to `content.copticvine.ca`.
+4. **The offline books are built from D1.** The publisher follows the switch,
+   so the Action reads D1. Its first run rebuilt every book.
+5. **D1 is the master** (see [Editing content](#editing-content-d1-is-the-master)).
+6. **Still to do:**
+   - Keep the Supabase content schemas read-only until about 19 Nov 2026.
+   - Then drop them, after Pierre confirms.
+   - Phase 2 also removes the content functions in `public` (`get_service`,
+     the French alignment helpers and the rest), once nothing calls Supabase.
 
 ## Known differences from Supabase, all deliberate
 

@@ -40,6 +40,21 @@ Supabase includes its seven generated tsvector columns in that query, and the
 Worker doesn't copy them. The step 4 checksums cover those rows anyway
 ([phase1-verification.md](phase1-verification.md)).
 
+### The final run, at the cutover
+
+This run came after the last reload, on 20 Oct 2026 at 17:54 UTC. It covered all
+seven groups and took 263 s. **No differences:**
+
+| Group | Equal | Supabase timed out |
+|---|---:|---:|
+| `rpc` | 3,563 | 0 |
+| `bible` | 308 | 0 |
+| `documents` | 1,289 | 0 |
+| `queries` | 30 | 0 |
+| `search` | 355 | 14 |
+| `tables` | 186 | 33 |
+| `packages` | 110 | 0 |
+
 ## How the comparison works
 
 `workers/content-api/scripts/parity.ts` sends the same supabase-js calls the

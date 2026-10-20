@@ -9,6 +9,11 @@
  *   npm run import -- --tables liturgy     one schema (or schema.table, comma-separated)
  *   npm run import -- --dry-run            read and check everything, write the SQL, run nothing
  *
+ * D1 has been the content master since the cutover on 20 Oct 2026, and
+ * Supabase's copy is frozen: reloading the remote D1 from it would undo every
+ * edit made in D1 since. So a remote import refuses unless it is given
+ * --overwrite-d1-edits; --local and --dry-run are unaffected.
+ *
  * A table's reload also reloads every table that references it, because
  * deleting its rows deletes theirs (ON DELETE CASCADE).
  *
@@ -31,6 +36,8 @@ import { executeFile, type Target } from './lib/d1.ts';
 import { qualified, selectTables, type TableInfo } from './lib/schema.ts';
 import { NotReadable, readTable, type SourceRow } from './lib/supabase.ts';
 
+/** The Phase 1 cutover (docs/d1/phase1-runbook.md). */
+const D1_MASTER_SINCE = '2026-10-20';
 const MAX_STATEMENT_BYTES = 90_000;
 const MAX_ROWS_PER_STATEMENT = 500;
 
@@ -130,6 +137,11 @@ async function main() {
   const dryRun = args.includes('--dry-run');
   const tablesArg = args.includes('--tables') ? args[args.indexOf('--tables') + 1].split(',') : null;
   const tables = selectTables(tablesArg);
+  if (target === 'remote' && !dryRun && !args.includes('--overwrite-d1-edits')) {
+    console.error(`D1 is the content master since ${D1_MASTER_SINCE}: reloading it from Supabase's frozen copy would undo every edit made in D1 since.
+Pass --overwrite-d1-edits to do it anyway (D1 Time Travel can restore the minute before), or use --local / --dry-run.`);
+    process.exit(1);
+  }
 
   console.log(`Reading ${tables.length} tables from Supabase (read-only)…`);
   const started = Date.now();
