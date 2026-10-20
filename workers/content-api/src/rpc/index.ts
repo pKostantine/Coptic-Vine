@@ -3,12 +3,12 @@
  * answered as PostgREST answers POST /rest/v1/rpc/<name> with
  * Content-Profile: <schema>: the same arguments, the same JSON.
  *
- * bible.search_verses is added with the FTS5 search (step 6).
  */
 import { dateArg, int4, PgError } from '../pg.ts';
 import type { ContentContext } from '../types.ts';
 import { getBibleBooks, getBibleChapterList, getBookKeyByCalendarNumber, getVersePartByCalendar } from './bible.ts';
 import { getActiveFlagsForDate, getContextFlags, getReadingsForDate, getSundayMessage, noConversionRow } from './calendar.ts';
+import { searchVerses } from './searchVerses.ts';
 import { getDayJson, getHomeSynaxariumEvents, getSynaxariumYear } from './synaxarium.ts';
 
 type Args = Record<string, unknown>;
@@ -48,6 +48,11 @@ export const RPCS: Record<string, Record<string, Rpc>> = {
     get_verse_part_by_calendar: {
       params: ['p_calendar_book_number', 'p_chapter', 'p_verse', 'p_part_label'],
       run: (c, a) => getVersePartByCalendar(c, int4(a.p_calendar_book_number), int4(a.p_chapter), int4(a.p_verse), text(a.p_part_label)),
+    },
+    search_verses: {
+      params: ['p_query', 'p_languages', 'p_mode', 'p_prefix', 'p_testament', 'p_book_keys', 'p_sort', 'p_limit', 'p_offset'],
+      defaults: { p_languages: null, p_mode: 'all', p_prefix: false, p_testament: null, p_book_keys: null, p_sort: 'relevance', p_limit: 25, p_offset: 0 },
+      run: (c, a) => searchVerses(c, a),
     },
   },
   synaxarium: {

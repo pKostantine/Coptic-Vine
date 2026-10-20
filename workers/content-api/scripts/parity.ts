@@ -17,6 +17,10 @@
  *              it: the order rows, then titles and texts by hymn key in every
  *              lookup schema
  *   queries    the app's other table reads (calendar, Bible, saints)
+ *   search     bible.search_verses over a corpus of queries: every mode, prefix,
+ *              both sorts, testament and book filters, paging, all eight
+ *              renderings, and awkward input (diacritics, websearch syntax,
+ *              stopwords alone, punctuation, numbers, hyphens)
  *   tables     every public table in full, page by page (as much egress as an import)
  *
  * Answers are compared as JSON values: numbers by value (Postgres prints
@@ -34,7 +38,7 @@ const env = loadEnv();
 const args = process.argv.slice(2);
 const option = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
 const WORKER_URL = (option('--worker') || 'http://localhost:8790').replace(/\/+$/, '');
-const GROUPS = new Set((option('--only') || 'rpc,bible,documents,queries').split(','));
+const GROUPS = new Set((option('--only') || 'rpc,bible,documents,queries,search').split(','));
 const CONCURRENCY = Number(option('--concurrency') || 6);
 
 const clientOptions = { auth: { persistSession: false, autoRefreshToken: false } };
@@ -249,6 +253,51 @@ async function queryCases(): Promise<Case[]> {
   return cases;
 }
 
+/** bible.search_verses, as bibleSearch.ts calls it, over a corpus of queries and options. */
+async function searchCases(): Promise<Case[]> {
+  const queries: [string, string[] | null][] = [
+    ['love', null], ['mercy love', null], ['God', null], ['the', null], ['the and of', ['english']], ['Lord have mercy', null],
+    ['in the beginning was the word', null], ['bapti', null], ['shepherd', ['english', 'english_nkjv']], ['Jerusalem', null],
+    ['God-fearing', null], ['a-whoring', ['english']], ['Adoni-Bezek', null], ['666', null], ['7', null], ['up.In', ['english_from_coptic']],
+    ['"my shepherd" -want', null], ['love or mercy', null], ['-sin', ['english_from_coptic']], ['peace "be with you"', null], ['""', null],
+    ['الله', null], ['اللَّهُ', null], ['المسيح يسوع', ['arabic', 'arabic_from_coptic']], ['محبة', null], ['إله', null], ['أحب', null], ['السلام عليكم', null],
+    ['Ⲡⲟ̅ⲥ̅', null], ['ⲛⲁⲓ', null], ['Ⲓⲏ̅ⲥ̅ Ⲡⲭ̅ⲥ̅', ['coptic']], ['ⲉⲃⲟⲗ', null], ['ⲟⲩ-ⲉⲃⲟⲗ', ['coptic']],
+    ['θεός', null], ['Θεος', ['greek']], ['ἀγάπη', null], ['εις', ['greek']], ['Χριστοῦ Ἰησοῦ', null], ['κύριος', null],
+    ['Dieu', null], ['amour', ['french']], ['l\'Éternel', null], ['être', null], ['Jésus-Christ', null], ['à', ['french']], ['bœuf', null],
+    ['  spaced   words  ', null], ['love!', null], ['(love)', null], ['love & mercy', null], ['love | mercy', null], ['<->', null], ['!', null],
+    ['', null], ['   ', null], ['xyzzyplugh', null], ['Love LOVE love', null], ['loving kindness', null], ['generations', null], ['cities', null],
+  ];
+  const variants = [
+    { mode: 'all', prefix: false, sort: 'relevance' },
+    { mode: 'any', prefix: false, sort: 'relevance' },
+    { mode: 'phrase', prefix: false, sort: 'relevance' },
+    { mode: 'websearch', prefix: false, sort: 'canonical' },
+    { mode: 'all', prefix: true, sort: 'relevance' },
+    { mode: 'any', prefix: true, sort: 'canonical' },
+  ];
+  const cases: Case[] = [];
+  for (const [query, languages] of queries) {
+    for (const variant of variants) {
+      cases.push({
+        group: 'search',
+        name: `search_verses ${JSON.stringify(query)} ${variant.mode}${variant.prefix ? ' prefix' : ''} ${variant.sort}${languages ? ' ' + languages.join('+') : ''}`,
+        call: (c) => c.schema('bible').rpc('search_verses', { p_query: query, p_languages: languages, p_mode: variant.mode, p_prefix: variant.prefix, p_testament: null, p_book_keys: null, p_sort: variant.sort, p_limit: 25, p_offset: 0 }),
+      });
+    }
+  }
+  // Filters and paging.
+  const filtered = [
+    { p_query: 'love', p_testament: 'NT', p_offset: 0 }, { p_query: 'love', p_testament: 'OT', p_offset: 25 },
+    { p_query: 'God', p_book_keys: ['psalms', 'john'], p_offset: 0 }, { p_query: 'God', p_book_keys: [], p_offset: 100 },
+    { p_query: 'mercy', p_limit: 100, p_offset: 0 }, { p_query: 'mercy', p_limit: 0, p_offset: -5 }, { p_query: 'mercy', p_limit: 500, p_offset: 1000000 },
+    { p_query: 'الرب', p_limit: 100, p_offset: 200, p_sort: 'canonical' }, { p_query: 'ⲡⲟⲥ', p_limit: 50, p_prefix: true },
+  ];
+  for (const options of filtered) {
+    cases.push({ group: 'search', name: `search_verses ${JSON.stringify(options)}`, call: (c) => c.schema('bible').rpc('search_verses', { p_languages: null, p_mode: 'all', p_prefix: false, p_testament: null, p_book_keys: null, p_sort: 'relevance', p_limit: 25, p_offset: 0, ...options }) });
+  }
+  return cases;
+}
+
 /** Every public table, all of it, in PostgREST's pages of 1000. */
 async function tableCases(): Promise<Case[]> {
   const cases: Case[] = [];
@@ -276,7 +325,7 @@ function withoutDropped(data: unknown): unknown {
 }
 
 async function main() {
-  const builders: Record<string, () => Promise<Case[]>> = { rpc: rpcCases, bible: bibleCases, documents: documentCases, queries: queryCases, tables: tableCases };
+  const builders: Record<string, () => Promise<Case[]>> = { rpc: rpcCases, bible: bibleCases, documents: documentCases, queries: queryCases, search: searchCases, tables: tableCases };
   const cases: Case[] = [];
   for (const group of Object.keys(builders)) if (GROUPS.has(group)) cases.push(...(await builders[group]()));
   console.log(`${cases.length} cases against ${WORKER_URL}…`);
@@ -291,6 +340,14 @@ async function main() {
     const normalize = testCase.normalize ?? (ties ? (data: unknown) => sortTies(data, ties) : (data: unknown) => data);
     const left = { data: normalize(withoutDropped(a.data)), error: errorOf(a.error) };
     const right = { data: normalize(b.data), error: errorOf(b.error) };
+    // Postgres giving up (statement timeout) while the Worker answers isn't a difference in content.
+    if ((a.error as { code?: string } | null)?.code === '57014' && !b.error) {
+      const total = totals.get(`${testCase.group} (Supabase timed out)`) ?? { run: 0, failed: 0 };
+      total.run += 1;
+      totals.set(`${testCase.group} (Supabase timed out)`, total);
+      done += 1;
+      return;
+    }
     const ok = sameJson(left.error, right.error) && sameJson(left.data, right.data, testCase.unordered);
     const total = totals.get(testCase.group) ?? { run: 0, failed: 0 };
     total.run += 1;

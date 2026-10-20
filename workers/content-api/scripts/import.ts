@@ -20,11 +20,13 @@
  * and stop the run only with --strict.
  *
  * The SQL goes to D1 as one file through D1's import API, in statements
- * under its 100 KB limit. Verify the result with `npm run verify`.
+ * under its 100 KB limit. Reloading bible.verses also rebuilds the Bible
+ * search index (build-search.ts). Verify the result with `npm run verify`.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { col, t } from '../src/db/names.ts';
+import { buildSearch } from './build-search.ts';
 import { executeFile, type Target } from './lib/d1.ts';
 import { qualified, selectTables, type TableInfo } from './lib/schema.ts';
 import { NotReadable, readTable, type SourceRow } from './lib/supabase.ts';
@@ -183,6 +185,8 @@ async function main() {
 
   console.log(`Loading into the ${target} D1…`);
   executeFile(target, file);
+  // The Bible search index is built from the verses, so it follows them.
+  if (loaded.some((table) => table.schema === 'bible' && table.table === 'verses')) buildSearch(target);
   console.log(`Done in ${((Date.now() - started) / 1000).toFixed(0)} s. Now run npm run verify.`);
 }
 

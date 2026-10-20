@@ -6,14 +6,17 @@
 
 /** A Postgres or PostgREST error, answered with the same status and body PostgREST gives. */
 export class PgError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly status = 400,
-    readonly details: string | null = null,
-    readonly hint: string | null = null,
-  ) {
+  readonly code: string;
+  readonly status: number;
+  readonly details: string | null;
+  readonly hint: string | null;
+
+  constructor(code: string, message: string, status = 400, details: string | null = null, hint: string | null = null) {
     super(message);
+    this.code = code;
+    this.status = status;
+    this.details = details;
+    this.hint = hint;
   }
 
   body() {
