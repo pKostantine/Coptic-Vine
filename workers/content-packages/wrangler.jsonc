@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-20",
   "workers_dev": true,
+  // The app downloads books from here (EXPO_PUBLIC_CONTENT_PACKAGES_URL); the
+  // workers.dev address keeps working for installs that still have it.
+  "routes": [{ "pattern": "packages.copticvine.ca", "custom_domain": true }],
   "r2_buckets": [
     {
       "binding": "CONTENT_BUCKET",

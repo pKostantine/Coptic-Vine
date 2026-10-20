@@ -7,6 +7,7 @@
   "compatibility_date": "2026-09-21",
   "workers_dev": true,
   "preview_urls": false,
+  "routes": [{ "pattern": "content.copticvine.ca", "custom_domain": true }],
   "d1_databases": [
     {
       "binding": "CONTENT_DB",
@@ -15,6 +16,14 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Workers Caching in front of the Content entrypoint only: the default
+  // entrypoint runs on every request to read the content revision, which it
+  // puts in the URL it asks Content for (src/index.ts).
+  "cache": { "enabled": true },
+  "exports": {
+    "default": { "type": "worker", "cache": { "enabled": false } },
+    "Content": { "type": "worker", "cache": { "enabled": true } }
+  },
   "observability": {
     "enabled": true
   }

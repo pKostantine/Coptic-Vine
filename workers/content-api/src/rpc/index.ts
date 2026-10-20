@@ -8,6 +8,7 @@ import { dateArg, int4, PgError } from '../pg.ts';
 import type { ContentContext } from '../types.ts';
 import { getBibleBooks, getBibleChapterList, getBookKeyByCalendarNumber, getVersePartByCalendar } from './bible.ts';
 import { getActiveFlagsForDate, getContextFlags, getReadingsForDate, getSundayMessage, noConversionRow } from './calendar.ts';
+import { offlineRpcs } from './offline.ts';
 import { searchVerses } from './searchVerses.ts';
 import { getDayJson, getHomeSynaxariumEvents, getSynaxariumYear } from './synaxarium.ts';
 
@@ -30,6 +31,8 @@ export const RPCS: Record<string, Record<string, Rpc>> = {
     get_synaxarium_year: { params: ['p_reference_date'], run: (c, a) => (a.p_reference_date === null ? Promise.resolve([]) : getSynaxariumYear(c, requiredDate(a.p_reference_date))) },
     get_bible_books: { params: [], run: (c) => getBibleBooks(c) },
     get_bible_chapter_list: { params: ['p_book_key'], run: (c, a) => getBibleChapterList(c, text(a.p_book_key)) },
+    // For scripts/publish-content-packages.mjs, not the app.
+    ...offlineRpcs,
   },
   calendar: {
     get_active_flags_for_date: { params: ['p_gregorian_date'], run: (c, a) => (a.p_gregorian_date === null ? Promise.resolve([]) : getActiveFlagsForDate(c, requiredDate(a.p_gregorian_date))) },

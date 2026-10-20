@@ -1,5 +1,6 @@
 import { hasLocalSchema, readLocalRpc, readLocalTable } from '@/services/bookContentDatabase';
-import { supabase } from '@/utils/supabase';
+import { contentApi } from '@/services/contentSource';
+import type { supabase } from '@/utils/supabase';
 
 type Filter = { kind: 'eq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'ilike'; column: string; value: unknown };
 type Ordering = { column: string; ascending: boolean };
@@ -117,7 +118,8 @@ class HybridQuery implements PromiseLike<QueryResult> {
   abortSignal(signal: AbortSignal) { this.signal = signal; return this; }
 
   private online(): Promise<QueryResult> {
-    let query: any = supabase.schema(this.schemaName).from(this.tableName).select(this.selection);
+    // Supabase or the Cloudflare content Worker, as EXPO_PUBLIC_CONTENT_SOURCE says (contentSource.ts).
+    let query: any = contentApi.schema(this.schemaName).from(this.tableName).select(this.selection);
     for (const filter of this.filters) query = query[filter.kind](filter.column, filter.value);
     for (const ordering of this.orderings) query = query.order(ordering.column, { ascending: ordering.ascending });
     if (this.rowLimit != null) query = query.limit(this.rowLimit);
@@ -252,7 +254,7 @@ class HybridRpc implements PromiseLike<QueryResult> {
   abortSignal(signal: AbortSignal) { this.signal = signal; return this; }
 
   private online(): PromiseLike<QueryResult> {
-    let query: any = supabase.schema(this.schemaName).rpc(this.functionName, this.args);
+    let query: any = contentApi.schema(this.schemaName).rpc(this.functionName, this.args);
     if (this.signal) query = query.abortSignal(this.signal);
     return query;
   }

@@ -21,6 +21,20 @@ Worker answered. They are counted separately below:
 | `search`: `bible.search_verses` | 351 | 351 | 18 |
 | `tables`: every public table in full, by REST page | 211 | 211 | 8 |
 
+Step 8 added a seventh group, run on 20 Oct 2026 at 04:13 UTC against the
+same Worker. All 110 cases were equal:
+
+| Group | Cases | Equal | Supabase timed out |
+|---|---:|---:|---:|
+| `packages`: the offline book plan and every packaged table, read page by page as the publish script reads them | 110 | 110 | 0 |
+
+`bible.verses` is left out of that group, because the `tables` group covers it.
+Two things are allowed for:
+
+- The plan's table lists leave out the legacy tables D1 doesn't copy.
+- A request that never got an answer is sent again, up to three times. Supabase
+  dropped one or two connections per run.
+
 The 8 table pages that timed out are `bible.verses` read with `select=*`.
 Supabase includes its seven generated tsvector columns in that query, and the
 Worker doesn't copy them. The step 4 checksums cover those rows anyway

@@ -22,6 +22,11 @@ export interface Env {
   CONTENT_DB: D1Database;
 }
 
+/** The request context, with the entrypoints of this Worker callable as ctx.exports.<Name>. */
+export interface Context {
+  exports: { Content: { fetch(request: Request): Promise<Response> } };
+}
+
 /**
  * Who a request is answered for. churchId is accepted from the start so that
  * Phase 3's church layers (docs/coptic-vine-d1-plan.md, section 6) slot in

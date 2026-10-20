@@ -22,6 +22,11 @@
  *              renderings, and awkward input (diacritics, websearch syntax,
  *              stopwords alone, punctuation, numbers, hyphens)
  *   tables     every public table in full, page by page (as much egress as an import)
+ *   packages   what the offline books are built from: the package plan, and every
+ *              packaged table's rows through get_offline_table_rows, compared as a
+ *              set (pages follow ctid there and rowid here). bible.verses is left
+ *              out: Supabase's rows carry its tsvector columns (a lot of egress),
+ *              and its content is proven by verify.ts's checksums.
  *
  * Answers are compared as JSON values: numbers by value (Postgres prints
  * numeric 21.50 where D1 has 21.5), object keys in any order. Arrays keep
@@ -314,6 +319,43 @@ async function tableCases(): Promise<Case[]> {
   return cases;
 }
 
+/** Tables Supabase packages that D1 doesn't copy (plan section 4.1). */
+const NOT_COPIED = /^(entries_old|entry_texts_old|entry_texts_split|entry_texts_align_map|entry_texts_deferred_review|entry_texts_rubric_strip|entries_rematch_proposal|arabic_orphans|gospel_responses_old|hymn_texts_old)$/;
+
+async function packageCases(): Promise<Case[]> {
+  type Plan = { books: unknown[]; dependencies: unknown[]; resources: { id: string; schema: string; tables: string[] }[] };
+  const withoutLegacy = (data: unknown) => {
+    const plan = data as Plan;
+    return plan && { ...plan, resources: plan.resources.map((r) => ({ ...r, tables: r.tables.filter((name) => !NOT_COPIED.test(name)) })) };
+  };
+  const cases: Case[] = [{ group: 'packages', name: 'get_offline_package_plan', call: (c) => c.rpc('get_offline_package_plan'), normalize: withoutLegacy }];
+  const { data } = await worker.rpc('get_offline_package_plan');
+  for (const resource of (data as Plan).resources) {
+    for (const table of resource.tables) {
+      if (resource.id === 'bible' && table === 'verses') continue;
+      cases.push({
+        group: 'packages',
+        name: `get_offline_table_rows ${resource.id}.${table}`,
+        unordered: true,
+        call: async (c) => {
+          const rows: Record<string, unknown>[] = [];
+          let after: string | null = null;
+          for (;;) {
+            const { data: pageData, error } = await c.rpc('get_offline_table_rows', { p_resource: resource.id, p_table: table, p_after: after, p_limit: 500 });
+            if (error) return { data: null, error };
+            const { rows: pageRows, after: next } = pageData as { rows: Record<string, unknown>[]; after: string | null };
+            rows.push(...pageRows);
+            if (!next || pageRows.length < 500) break;
+            after = next;
+          }
+          return { data: rows, error: null };
+        },
+      });
+    }
+  }
+  return cases;
+}
+
 // ─── Running them ────────────────────────────────────────────────────────
 
 /** Columns D1 doesn't copy (the tsvector ones) are left out of Supabase's answers. */
@@ -325,7 +367,7 @@ function withoutDropped(data: unknown): unknown {
 }
 
 async function main() {
-  const builders: Record<string, () => Promise<Case[]>> = { rpc: rpcCases, bible: bibleCases, documents: documentCases, queries: queryCases, search: searchCases, tables: tableCases };
+  const builders: Record<string, () => Promise<Case[]>> = { rpc: rpcCases, bible: bibleCases, documents: documentCases, queries: queryCases, search: searchCases, tables: tableCases, packages: packageCases };
   const cases: Case[] = [];
   for (const group of Object.keys(builders)) if (GROUPS.has(group)) cases.push(...(await builders[group]()));
   console.log(`${cases.length} cases against ${WORKER_URL}…`);
@@ -334,8 +376,15 @@ async function main() {
   const totals = new Map<string, { run: number; failed: number }>();
   const started = Date.now();
   let done = 0;
+  // A request that never got an answer (supabase-js reports it as "fetch failed") says nothing about content: ask again.
+  const answer = async (testCase: Case, client: SupabaseClient) => {
+    for (let attempt = 1; ; attempt += 1) {
+      const result = await testCase.call(client);
+      if (attempt === 3 || !/fetch failed/.test((result.error as { message?: string } | null)?.message ?? '')) return result;
+    }
+  };
   await pool(cases, CONCURRENCY, async (testCase) => {
-    const [a, b] = await Promise.all([testCase.call(supabase), testCase.call(worker)]);
+    const [a, b] = await Promise.all([answer(testCase, supabase), answer(testCase, worker)]);
     const ties = testCase.ties;
     const normalize = testCase.normalize ?? (ties ? (data: unknown) => sortTies(data, ties) : (data: unknown) => data);
     const left = { data: normalize(withoutDropped(a.data)), error: errorOf(a.error) };
