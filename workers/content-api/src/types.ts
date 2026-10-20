@@ -20,6 +20,11 @@ export interface D1Database {
 
 export interface Env {
   CONTENT_DB: D1Database;
+  /** Secret: a GitHub token that may start the publish Action (src/publish.ts). */
+  GITHUB_TOKEN?: string;
+  GITHUB_REPOSITORY?: string;
+  PUBLISH_WORKFLOW?: string;
+  PUBLISH_REF?: string;
 }
 
 /** The request context, with the entrypoints of this Worker callable as ctx.exports.<Name>. */

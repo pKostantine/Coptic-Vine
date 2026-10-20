@@ -5,7 +5,7 @@
  *
  *   GET  /rest/v1/<table>        Accept-Profile: <schema>   rows (src/rest/rows.ts)
  *   POST /rest/v1/rpc/<function> Content-Profile: <schema>  the content RPCs (src/rpc)
- *   GET  /health
+ *   GET  /health                 the content revision, and where the offline books stand
  *
  * Everything is public and read-only: there is no write path to D1. An
  * optional church (x-church-id header or church_id parameter) is accepted
@@ -19,10 +19,14 @@
  * that; any change to the content moves the revision (the triggers in
  * migrations/0003) and with it every key. A new deployment starts a new
  * cache too, since the Worker version is part of the key.
+ *
+ * A cron every minute starts the offline-book build when the content has
+ * changed (src/publish.ts).
  */
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { col, t } from './db/names.ts';
 import { PgError } from './pg.ts';
+import { checkPublish } from './publish.ts';
 import { readRows } from './rest/rows.ts';
 import { callRpc } from './rpc/index.ts';
 import type { Context, ContentContext, Env } from './types.ts';
@@ -146,7 +150,13 @@ export async function handle(request: Request, env: Env, ctx: Context): Promise<
   const url = new URL(request.url);
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   try {
-    if (url.pathname === '/health') return json({ ok: true, revision: await currentRevision(env) }, 200, { ...CORS, 'cache-control': 'no-store' });
+    if (url.pathname === '/health') {
+      const books = await env.CONTENT_DB
+        .prepare(`SELECT "revision", "requested_at", "failed_at", "last_error" FROM ${t('offline_content', 'publish_requests')} WHERE "id" = 1`)
+        .first<{ revision: number; requested_at: string | null; failed_at: string | null; last_error: string | null }>();
+      const offlineBooks = books && { requestedForRevision: books.revision, requestedAt: books.requested_at, failedAt: books.failed_at, lastError: books.last_error };
+      return json({ ok: true, revision: await currentRevision(env), offlineBooks }, 200, { ...CORS, 'cache-control': 'no-store' });
+    }
     const churchId = churchOf(request, url);
     const path = await internalPath(request, url, churchId);
     const revision = await currentRevision(env);
@@ -166,4 +176,9 @@ export async function handle(request: Request, env: Env, ctx: Context): Promise<
   }
 }
 
-export default { fetch: handle };
+export default {
+  fetch: handle,
+  async scheduled(_controller: unknown, env: Env): Promise<void> {
+    console.log(`offline books: ${await checkPublish(env)}`);
+  },
+};

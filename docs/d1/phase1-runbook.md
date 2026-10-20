@@ -34,6 +34,7 @@ way to write to it. It also accepts a church id (`x-church-id` or
 | `0002_bible_search.sql` | The Bible search index (`"bible.verse_search"` and its FTS5 table). |
 | `0003_content_revision.sql` | The content revision, the record of changed tables, and the triggers that keep both. Generated. |
 | `0004_offline_plan.sql` | The offline books' plan (books, resources, dependencies). |
+| `0005_publish_requests.sql` | The revision the offline books were last asked to be rebuilt for (see [Building the offline books](#building-the-offline-books)). |
 
 ## Decisions made in Phase 1
 
@@ -126,8 +127,25 @@ The reports are [phase1-verification.md](phase1-verification.md) and
 `scripts/publish-content-packages.mjs` reads from wherever
 `EXPO_PUBLIC_CONTENT_SOURCE` in `.env` points. Since the cutover that's D1,
 through `https://content.copticvine.ca`. The GitHub Action
-(`.github/workflows/publish-content.yml`) runs it every half hour.
-`CONTENT_SOURCE_URL` or `--source <url>` points it elsewhere for a one-off:
+(`.github/workflows/publish-content.yml`) runs it.
+
+**When it runs.** The Action is scheduled every half hour, but GitHub only
+runs it every four or five hours. So `cv-content-api` also starts it itself
+(`src/publish.ts`):
+
+- A cron checks every minute. When D1's content revision has moved past the
+  one the books were last built for, and nothing has changed for two
+  minutes, it starts the Action through GitHub's API.
+- The Action then rebuilds only the books whose tables changed.
+- `/health` shows the last request (`offlineBooks`) and any error.
+- After GitHub refuses a request, it waits 15 minutes before asking again.
+- It needs the Worker secret `GITHUB_TOKEN`: a fine-grained token for
+  `pKostantine/Coptic-Vine` with **Actions: read and write**. Set it with
+  `npx wrangler secret put GITHUB_TOKEN` in `workers/content-api`. Without
+  the secret, the check only logs that the token is missing.
+
+`CONTENT_SOURCE_URL` or `--source <url>` points the script elsewhere for a
+one-off:
 
 ```sh
 node scripts/publish-content-packages.mjs --dry-run
