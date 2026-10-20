@@ -135,7 +135,7 @@ node scripts/publish-content-packages.mjs --dry-run
 
 ## Cutover (plan section 4.5)
 
-Done on 20 Oct 2026, between about 17:45 and 18:30 UTC:
+Done on 20 Oct 2026, between about 17:45 and 18:05 UTC:
 
 1. **Content edits in Supabase frozen.** Nothing in Supabase writes content
    by itself: no cron job, trigger or user-data function does. So the freeze
