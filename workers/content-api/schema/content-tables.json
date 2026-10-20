@@ -3738,7 +3738,7 @@
   {
    "schema": "hymn_of_the_intercessions",
    "table": "hymn_titles",
-   "public": false,
+   "public": true,
    "columns": [
     {
      "name": "hymn_key",
@@ -7109,5 +7109,38 @@
     "source"
    ]
   }
- ]
+ ],
+ "enums": {
+  "Minimization": [
+   "Minimizable",
+   "Minimized"
+  ],
+  "Person Type": [
+   "Bishop/Priest",
+   "Priest",
+   "Deacon",
+   "Reader",
+   "People",
+   "Comment"
+  ],
+  "Prayer Type": [
+   "Single Alternating",
+   "Double Alternating",
+   "Recited Prayer",
+   "Silent Prayer",
+   "Chanted Prayer",
+   "Refrain",
+   "Pre-Refrain",
+   "Reverse Alternating",
+   "Quadruple Alternating",
+   "Invincible Coptic",
+   "White",
+   "Blue"
+  ],
+  "Item Type": [
+   "Subdocument",
+   "Hyperlink",
+   "Inline"
+  ]
+ }
 }

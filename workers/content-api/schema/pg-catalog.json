@@ -7160,7 +7160,7 @@
    "schema": "hymn_of_the_intercessions",
    "table": "hymn_titles",
    "kind": "r",
-   "anonReadable": false,
+   "anonReadable": true,
    "view": null,
    "columns": [
     {

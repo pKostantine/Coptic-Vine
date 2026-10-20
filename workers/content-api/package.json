@@ -9,6 +9,7 @@
     "verify": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify.ts",
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test tests/*.test.ts",
     "typecheck": "tsc -p .",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "parity": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/parity.ts"
   }
 }

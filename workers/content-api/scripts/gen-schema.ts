@@ -48,7 +48,12 @@ export type TableInfo = {
   validators: string[];
 };
 
-export type ContentSchema = { tables: TableInfo[]; views: { schema: string; table: string; public: boolean; columns: string[] }[] };
+export type ContentSchema = {
+  tables: TableInfo[];
+  views: { schema: string; table: string; public: boolean; columns: string[] }[];
+  /** Enum values in Postgres's order, which is how it sorts them. */
+  enums: Record<string, string[]>;
+};
 
 const root = new URL('..', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), 'utf8');
@@ -203,7 +208,7 @@ export function generate(catalog: PgCatalog): { migration: string; schema: Conte
     viewInfo.push({ schema: view.schema, table: view.table, public: view.anonReadable, columns: view.columns.map((column) => column.name) });
   }
 
-  return { migration: out.join('\n'), schema: { tables: info, views: viewInfo } };
+  return { migration: out.join('\n'), schema: { tables: info, views: viewInfo, enums: catalog.enums } };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

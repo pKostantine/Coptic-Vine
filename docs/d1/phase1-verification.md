@@ -1,21 +1,18 @@
 # Phase 1 verification: Supabase vs D1
 
-Step 4 of [the D1 plan](../coptic-vine-d1-plan.md). Run on 20 Oct 2026 at
-02:25 UTC against the remote D1 database `copticvine`, straight after the
-import of 02:20 UTC.
+Step 4 of [the D1 plan](../coptic-vine-d1-plan.md). Last run on 20 Oct 2026
+at 02:46 UTC against the remote D1 database `copticvine`.
 
 ## Result
 
-- **109 of 121 tables match exactly**: the same rows, with every value
-  byte-identical (114,326 rows).
-- **The 12 that differ were not imported** and are empty in D1:
-  - `aspasmos` (4 tables), `fractions` (3) and `procession_of_the_cross` (4).
-    The Supabase REST API doesn't expose these schemas, so a read-only import
-    with the public key can't read them.
-  - `hymn_of_the_intercessions.hymn_titles` (3 rows): `anon` has no SELECT
-    grant on it.
-  - The app reads none of the 12. Fixing this needs a decision; see the
-    summary in chat.
+- **All 121 tables match exactly**: the same rows, with every value
+  byte-identical (115,363 rows).
+- The first run (02:25 UTC) matched 109. The other 12 hadn't been imported,
+  because Supabase's REST API couldn't serve them to the anon key: `aspasmos`,
+  `fractions` and `procession_of_the_cross` weren't exposed schemas, and
+  `hymn_of_the_intercessions.hymn_titles` had no anon grant. Pierre exposed
+  the schemas and granted the table. The import of those 12 tables (1,037
+  rows) then made all 121 match.
 - **Byte-for-byte sample:** 100 rows, all identical. The rows come from 10
   tables (`hymn_texts` of liturgy, psalmody, holy_week, doxologies,
   veneration, agpeya and public; `bible.verses`; `bible.verse_parts`;
@@ -89,10 +86,10 @@ npm run verify -- --pg pg.json --spot spot.json --report report.md
 | `agpeya.sixth_hour` | 23 | 23 | match | `24fe20af7a34` |
 | `agpeya.third_hour` | 23 | 23 | match | `29122aa1f150` |
 | `agpeya.twelfth_hour` | 30 | 30 | match | `293233b89875` |
-| `aspasmos.adam_aspasmos` | 31 | 0 | **differs** | `e3b0c44298fc` |
-| `aspasmos.hymn_titles` | 23 | 0 | **differs** | `e3b0c44298fc` |
-| `aspasmos.hymn_texts` | 316 | 0 | **differs** | `e3b0c44298fc` |
-| `aspasmos.vatos_aspasmos` | 21 | 0 | **differs** | `e3b0c44298fc` |
+| `aspasmos.adam_aspasmos` | 31 | 31 | match | `93216ba8d118` |
+| `aspasmos.hymn_titles` | 23 | 23 | match | `0c7a4a3a5aa4` |
+| `aspasmos.hymn_texts` | 316 | 316 | match | `129b2470ecaa` |
+| `aspasmos.vatos_aspasmos` | 21 | 21 | match | `d33c21b1fe4a` |
 | `bible.books` | 76 | 76 | match | `2842993e6267` |
 | `bible.book_number_aliases` | 221 | 221 | match | `a7ebdb3284c5` |
 | `bible.verse_parts` | 139 | 139 | match | `9d5c09f0c527` |
@@ -109,9 +106,9 @@ npm run verify -- --pg pg.json --spot spot.json --report report.md
 | `doxologies.doxologies` | 143 | 143 | match | `f5bf98f67dc0` |
 | `doxologies.hymn_titles` | 142 | 142 | match | `a060d910f73b` |
 | `doxologies.hymn_texts` | 1252 | 1252 | match | `9271f79926e9` |
-| `fractions.fractions` | 25 | 0 | **differs** | `e3b0c44298fc` |
-| `fractions.hymn_titles` | 25 | 0 | **differs** | `e3b0c44298fc` |
-| `fractions.hymn_texts` | 355 | 0 | **differs** | `e3b0c44298fc` |
+| `fractions.fractions` | 25 | 25 | match | `c73d5ff934af` |
+| `fractions.hymn_titles` | 25 | 25 | match | `e42cc4d05bc3` |
+| `fractions.hymn_texts` | 355 | 355 | match | `8d8c8570f212` |
 | `gospel_responses.alternate_gospel_responses` | 1 | 1 | match | `f57ab7bbecc8` |
 | `gospel_responses.gospel_responses` | 93 | 93 | match | `c1c77ba8ccb7` |
 | `gospel_responses.hymn_titles` | 96 | 96 | match | `6c68558e3724` |
@@ -139,7 +136,7 @@ npm run verify -- --pg pg.json --spot spot.json --report report.md
 | `holy_week.thursday_first_hour` | 48 | 48 | match | `3df59c62f46e` |
 | `hymn_of_the_intercessions.hymn_of_the_intercessions` | 75 | 75 | match | `f631b0c54a41` |
 | `hymn_of_the_intercessions.hymn_texts` | 76 | 76 | match | `e5f52b94318e` |
-| `hymn_of_the_intercessions.hymn_titles` | 3 | 0 | **differs** | `e3b0c44298fc` |
+| `hymn_of_the_intercessions.hymn_titles` | 3 | 3 | match | `507a17eb2bc0` |
 | `litanies.hymn_titles` | 17 | 17 | match | `a0f08031fccb` |
 | `litanies.hymn_texts` | 245 | 245 | match | `4b9a480522b5` |
 | `litanies.the_five_short_litanies` | 10 | 10 | match | `9ff9e4486484` |
@@ -160,10 +157,10 @@ npm run verify -- --pg pg.json --spot spot.json --report report.md
 | `liturgy.sermon_planner` | 10 | 10 | match | `096e4d43d36b` |
 | `praxis_response.hymn_texts` | 88 | 88 | match | `c0856ee7abc9` |
 | `praxis_response.praxis_response` | 87 | 87 | match | `bbfdf16e7668` |
-| `procession_of_the_cross.hymn_titles` | 58 | 0 | **differs** | `e3b0c44298fc` |
-| `procession_of_the_cross.hymn_texts` | 87 | 0 | **differs** | `e3b0c44298fc` |
-| `procession_of_the_cross.procession_of_the_cross` | 69 | 0 | **differs** | `e3b0c44298fc` |
-| `procession_of_the_cross.reading_rules` | 24 | 0 | **differs** | `e3b0c44298fc` |
+| `procession_of_the_cross.hymn_titles` | 58 | 58 | match | `34995df0c68c` |
+| `procession_of_the_cross.hymn_texts` | 87 | 87 | match | `72789e85711b` |
+| `procession_of_the_cross.procession_of_the_cross` | 69 | 69 | match | `9438b4640229` |
+| `procession_of_the_cross.reading_rules` | 24 | 24 | match | `3111f7e09575` |
 | `psalmody.antiphonary` | 811 | 811 | match | `e78c9ff7b4cd` |
 | `psalmody.hymn_titles` | 1364 | 1364 | match | `1ce053d493d9` |
 | `psalmody.hymn_texts` | 18708 | 18708 | match | `718a51132cac` |
