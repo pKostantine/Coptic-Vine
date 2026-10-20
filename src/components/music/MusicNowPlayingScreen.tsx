@@ -50,6 +50,7 @@ import { musicService } from '@/services/musicService';
 import type { PublishedLyricSet } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
 import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
+import { useArtworkPalette } from '@/utils/useArtworkPalette';
 
 import { tr } from '../../utils/appText';
 // Swipe distance (or flick speed) that dismisses the player.
@@ -253,6 +254,10 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   );
   const rootStyle = embedded ? styles.embedded : styles.root;
 
+  // The cover's colours, for the panels; the backdrop reads them itself.
+  // Read before the empty state, so the hook runs on every render.
+  const palette = useArtworkPalette(currentItem ? musicService.resolveAsset(currentItem.coverAsset ?? null) : null);
+
   if (!currentItem) {
     return (
       <View style={rootStyle}>
@@ -389,7 +394,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   const body = wide ? (
     <View style={[styles.columns, { gap: columns.gap }]}>
       {lyricsPanelShown ? (
-        <PlayerPanel style={sharedPanels ? styles.flexPanel : { width: columns.panelWidth ?? undefined }}>
+        <PlayerPanel palette={palette} style={sharedPanels ? styles.flexPanel : { width: columns.panelWidth ?? undefined }}>
           <View style={styles.panelHeader}>
             <Text style={[styles.panelTitle, isArabic && styles.arabicTitle]}>{tr('Lyrics', 'Paroles', 'الكلمات')}</Text>
             <LyricsLanguageSwitch
@@ -419,7 +424,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         </View>
       </View>
       {queuePanelShown ? (
-        <PlayerPanel style={sharedPanels ? styles.flexPanel : { width: columns.panelWidth ?? undefined }}>
+        <PlayerPanel palette={palette} style={sharedPanels ? styles.flexPanel : { width: columns.panelWidth ?? undefined }}>
           <PlaybackQueueList {...queueProps} scrollable surface="panel" />
         </PlayerPanel>
       ) : null}
