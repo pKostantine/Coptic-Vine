@@ -27,8 +27,8 @@
   "vars": {
     "BETTER_AUTH_URL": "https://api.copticvine.ca",
     "EMAIL_FROM": "no-reply@copticvine.ca",
-    // The web apps and the native apps' schemes (app.json of each app).
-    "TRUSTED_ORIGINS": "https://copticvine.ca,https://admin.copticvine.ca,https://artists.copticvine.ca,https://preview.copticvine.ca,copticvine://,coptichymnscentre://,copticvineadmin://,copticvineartists://",
+    // The web apps (CV-Artists also at its workers.dev address, in its README) and the native apps' schemes (app.json of each app).
+    "TRUSTED_ORIGINS": "https://copticvine.ca,https://admin.copticvine.ca,https://artists.copticvine.ca,https://cv-artists.hrmpdd8d6c.workers.dev,https://preview.copticvine.ca,copticvine://,coptichymnscentre://,copticvineadmin://,copticvineartists://",
     // Google's web OAuth client (EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in the app's .env).
     // GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET and SERVICE_TOKEN (the notification
     // dispatcher's key, src/index.ts) are secrets.
