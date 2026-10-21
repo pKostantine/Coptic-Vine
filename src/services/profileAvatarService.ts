@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 const BUCKET = 'profile-avatars';
 const AVATAR_OBJECT_NAME = 'avatar';
@@ -39,7 +39,7 @@ export async function pickAndUploadProfileAvatar(userId: string): Promise<string
   }
 
   const objectPath = `${userId}/${AVATAR_OBJECT_NAME}`;
-  const { error } = await supabase.storage
+  const { error } = await api.storage
     .from(BUCKET)
     .upload(objectPath, bytes, {
       contentType: mimeType,
@@ -49,7 +49,7 @@ export async function pickAndUploadProfileAvatar(userId: string): Promise<string
 
   if (error) throw new Error(error.message || 'Unable to upload your profile photo.');
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(objectPath);
+  const { data } = api.storage.from(BUCKET).getPublicUrl(objectPath);
   if (!data.publicUrl) throw new Error('Unable to create a profile photo URL.');
 
   // A version query prevents a cached previous avatar from lingering after an
@@ -59,7 +59,7 @@ export async function pickAndUploadProfileAvatar(userId: string): Promise<string
 
 export async function removeProfileAvatar(userId: string): Promise<void> {
   const objectPath = `${userId}/${AVATAR_OBJECT_NAME}`;
-  const { error } = await supabase.storage.from(BUCKET).remove([objectPath]);
+  const { error } = await api.storage.from(BUCKET).remove([objectPath]);
   if (error && !/not found/i.test(error.message)) {
     throw new Error(error.message || 'Unable to remove your profile photo.');
   }

@@ -23,7 +23,7 @@ import type {
   LearningSeasonDetail,
 } from '@/types/learningPlatform';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 type RpcError = { message: string } | null;
 
@@ -71,12 +71,12 @@ export function resolveLearningAsset(asset: LearningMediaAsset | null | undefine
 }
 
 export async function getLearningHome(locale = 'en'): Promise<LearningHomePayload> {
-  const { data, error } = await supabase.rpc('get_learning_home', { p_locale: locale });
+  const { data, error } = await api.rpc('get_learning_home', { p_locale: locale });
   return assertRpcData(data as LearningHomePayload | null, error, 'Load Learn & Study');
 }
 
 export async function getLearningCantor(cantorId: string, locale = 'en'): Promise<LearningCantorDetail> {
-  const { data, error } = await supabase.rpc('get_published_learning_cantor', {
+  const { data, error } = await api.rpc('get_published_learning_cantor', {
     p_cantor_id: cantorId,
     p_locale: locale,
   });
@@ -84,7 +84,7 @@ export async function getLearningCantor(cantorId: string, locale = 'en'): Promis
 }
 
 export async function getLearningSeason(seasonId: string, locale = 'en'): Promise<LearningSeasonDetail> {
-  const { data, error } = await supabase.rpc('get_published_learning_season', {
+  const { data, error } = await api.rpc('get_published_learning_season', {
     p_season_id: seasonId,
     p_locale: locale,
   });
@@ -92,7 +92,7 @@ export async function getLearningSeason(seasonId: string, locale = 'en'): Promis
 }
 
 export async function getLearningHymn(hymnId: string, locale = 'en'): Promise<LearningHymnDetail> {
-  const { data, error } = await supabase.rpc('get_published_learning_hymn', {
+  const { data, error } = await api.rpc('get_published_learning_hymn', {
     p_hymn_id: hymnId,
     p_locale: locale,
   });
@@ -101,7 +101,7 @@ export async function getLearningHymn(hymnId: string, locale = 'en'): Promise<Le
 
 export async function getLearningAlbum(albumId: string, locale = 'en'): Promise<LearningAlbumDetail> {
   return offlineFallback(async () => {
-    const { data, error } = await supabase.rpc('get_published_learning_album', {
+    const { data, error } = await api.rpc('get_published_learning_album', {
       p_album_id: albumId,
       p_locale: locale,
     });
@@ -111,7 +111,7 @@ export async function getLearningAlbum(albumId: string, locale = 'en'): Promise<
 
 export async function getLearningLessonSet(lessonSetId: string, locale = 'en'): Promise<LearningLessonSetDetail> {
   return offlineFallback(async () => {
-    const { data, error } = await supabase.rpc('get_published_learning_lesson_set', {
+    const { data, error } = await api.rpc('get_published_learning_lesson_set', {
       p_lesson_set_id: lessonSetId,
       p_locale: locale,
     });
@@ -132,7 +132,7 @@ export async function getLearningLesson(
 
 export async function getMyLearningProgress(locale = 'en'): Promise<LearningProgressPayload> {
   if (!await hasAuthenticatedSession()) return { authenticated: false, items: [] };
-  const { data, error } = await supabase.rpc('get_my_learning_progress', { p_locale: locale });
+  const { data, error } = await api.rpc('get_my_learning_progress', { p_locale: locale });
   return assertRpcData(data as LearningProgressPayload | null, error, 'Load learning progress');
 }
 
@@ -140,7 +140,7 @@ export async function setLearningProgress(
   hymnId: string,
   state: LearningProgressState,
 ): Promise<LearningProgressMutationResult> {
-  const { data, error } = await supabase.rpc('set_learning_progress', {
+  const { data, error } = await api.rpc('set_learning_progress', {
     p_hymn_id: hymnId,
     p_state: state,
   });
@@ -149,13 +149,13 @@ export async function setLearningProgress(
 
 export async function getMyLearningPlaylists(locale = 'en'): Promise<LearningPlaylistLibraryPayload> {
   if (!await hasAuthenticatedSession()) return { authenticated: false, playlists: [] };
-  const { data, error } = await supabase.rpc('get_my_learning_playlists', { p_locale: locale });
+  const { data, error } = await api.rpc('get_my_learning_playlists', { p_locale: locale });
   return assertRpcData(data as LearningPlaylistLibraryPayload | null, error, 'Load learning playlists');
 }
 
 export async function getMyLearningItems(locale = 'en'): Promise<LearningItemLibraryPayload> {
   if (!await hasAuthenticatedSession()) return { authenticated: false, likedItemIds: [], items: [] };
-  const { data, error } = await supabase.rpc('get_my_learning_items', { p_locale: locale });
+  const { data, error } = await api.rpc('get_my_learning_items', { p_locale: locale });
   return assertRpcData(data as LearningItemLibraryPayload | null, error, 'Load My Learning');
 }
 
@@ -164,7 +164,7 @@ export async function setLearningItemProgress(
   itemId: string,
   state: LearningProgressState,
 ): Promise<void> {
-  const { error } = await supabase.rpc('set_learning_item_progress', {
+  const { error } = await api.rpc('set_learning_item_progress', {
     p_item_kind: itemKind,
     p_item_id: itemId,
     p_state: state,
@@ -177,7 +177,7 @@ export async function setLearningItemLiked(
   itemId: string,
   liked: boolean,
 ): Promise<boolean> {
-  const { data, error } = await supabase.rpc('set_learning_item_liked', {
+  const { data, error } = await api.rpc('set_learning_item_liked', {
     p_item_kind: itemKind,
     p_item_id: itemId,
     p_liked: liked,
@@ -189,7 +189,7 @@ export async function getLearningLyrics(
   itemKind: LearningPlaylistItemKind,
   itemId: string,
 ): Promise<LearningLyricsPayload> {
-  const { data, error } = await supabase.rpc('get_published_learning_item_lyrics', {
+  const { data, error } = await api.rpc('get_published_learning_item_lyrics', {
     p_item_kind: itemKind,
     p_item_id: itemId,
     p_locale: null,
@@ -202,7 +202,7 @@ export async function getLearningPlaylist(
   locale = 'en',
 ): Promise<LearningPlaylistDetail> {
   return offlineFallback(async () => {
-    const { data, error } = await supabase.rpc('get_learning_playlist', {
+    const { data, error } = await api.rpc('get_learning_playlist', {
       p_playlist_id: playlistId,
       p_locale: locale,
     });
@@ -215,7 +215,7 @@ export async function createLearningPlaylist(
   description?: string | null,
   visibility: LearningPlaylistVisibility = 'private',
 ): Promise<LearningPlaylistSummary> {
-  const { data, error } = await supabase.rpc('create_learning_playlist', {
+  const { data, error } = await api.rpc('create_learning_playlist', {
     p_name: name,
     p_description: description ?? null,
     p_visibility: visibility,
@@ -234,7 +234,7 @@ export async function updateLearningPlaylist(
   description: string | null,
   visibility: LearningPlaylistVisibility,
 ): Promise<LearningPlaylistDetail> {
-  const { data, error } = await supabase.rpc('update_learning_playlist', {
+  const { data, error } = await api.rpc('update_learning_playlist', {
     p_playlist_id: playlistId,
     p_name: name,
     p_description: description,
@@ -244,7 +244,7 @@ export async function updateLearningPlaylist(
 }
 
 export async function deleteLearningPlaylist(playlistId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_learning_playlist', { p_playlist_id: playlistId });
+  const { data, error } = await api.rpc('delete_learning_playlist', { p_playlist_id: playlistId });
   return assertRpcData(data as boolean | null, error, 'Delete learning playlist');
 }
 
@@ -253,7 +253,7 @@ export async function addLearningPlaylistItem(
   itemKind: LearningPlaylistItemKind,
   itemId: string,
 ): Promise<LearningPlaylistDetail> {
-  const { data, error } = await supabase.rpc('add_learning_playlist_item', {
+  const { data, error } = await api.rpc('add_learning_playlist_item', {
     p_playlist_id: playlistId,
     p_item_kind: itemKind,
     p_album_recording_id: itemKind === 'album_recording' ? itemId : null,
@@ -266,7 +266,7 @@ export async function removeLearningPlaylistItem(
   playlistId: string,
   itemId: string,
 ): Promise<LearningPlaylistDetail> {
-  const { data, error } = await supabase.rpc('remove_learning_playlist_item', {
+  const { data, error } = await api.rpc('remove_learning_playlist_item', {
     p_playlist_id: playlistId,
     p_item_id: itemId,
   });

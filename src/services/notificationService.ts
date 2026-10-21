@@ -3,7 +3,7 @@ import type { DevicePushToken, NotificationResponse } from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { accountAuth } from '@/services/accountAuth';
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 export type NotificationPreferenceMap = Record<string, boolean>;
 export type NotificationSyncResult = 'registered' | 'permission_required' | 'signed_out' | 'unsupported' | 'unconfigured';
@@ -88,7 +88,7 @@ export async function localNotificationPermission(requestPermission = false): Pr
  * CV Admin sends to everyone (feast greetings, announcements).
  */
 async function registerExpoToken(expoPushToken: string) {
-  const { error } = await supabase.rpc('register_notification_device', {
+  const { error } = await api.rpc('register_notification_device', {
     p_app_key: APP_KEY,
     p_platform: Platform.OS,
     p_provider: PROVIDER,
@@ -144,7 +144,7 @@ export async function disableNativeNotificationDevice(): Promise<void> {
   const token = storage()?.getItem(LAST_TOKEN_KEY);
   if (!token) return;
 
-  const { error } = await supabase.rpc('disable_notification_device', {
+  const { error } = await api.rpc('disable_notification_device', {
     p_app_key: APP_KEY,
     p_provider: PROVIDER,
     p_push_token: token,
@@ -204,7 +204,7 @@ export async function loadNotificationPreferences(categories: string[]): Promise
   const user = await accountAuth.getUser();
   if (!user) return result;
 
-  const { data, error } = await supabase
+  const { data, error } = await api
     .from('notification_preferences')
     .select('category, enabled')
     .eq('user_id', user.id)
@@ -220,7 +220,7 @@ export async function setNotificationPreference(category: string, enabled: boole
   const user = await accountAuth.getUser();
   if (!user) throw new Error('Sign in to change notification preferences.');
 
-  const { error } = await supabase.from('notification_preferences').upsert({
+  const { error } = await api.from('notification_preferences').upsert({
     user_id: user.id,
     app_key: APP_KEY,
     category,
@@ -231,7 +231,7 @@ export async function setNotificationPreference(category: string, enabled: boole
 }
 
 export async function listNotifications(limit = 50) {
-  const { data, error } = await supabase
+  const { data, error } = await api
     .from('notifications')
     .select('id, category, event_type, title, body, image_url, deep_link, payload, created_at, read_at')
     .eq('app_key', APP_KEY)
@@ -242,7 +242,7 @@ export async function listNotifications(limit = 50) {
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await api
     .from('notifications')
     .update({ read_at: new Date().toISOString() })
     .eq('id', notificationId)

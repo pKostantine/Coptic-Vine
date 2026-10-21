@@ -5,12 +5,12 @@ const test = require('node:test');
 const ts = require('typescript');
 
 /**
- * The switch for signing in and the user's data (src/services/userApi.ts):
- * Supabase unless EXPO_PUBLIC_USER_DATA_SOURCE is 'cloudflare', and then
- * cv-api, for signing in (src/services/accountAuth.ts) and for the supabase-js
- * client (src/utils/supabase.ts). Each module is loaded for real, with its
- * imports replaced by stubs. The cv-api client itself is tested against the
- * Worker, in workers/api/tests/appAuth.test.ts.
+ * Signing in and the user's data go to cv-api, and only there
+ * (src/services/userApi.ts): signing in (src/services/accountAuth.ts) and the
+ * supabase-js client (src/utils/api.ts). Each module is loaded for real, with
+ * its imports replaced by stubs. The cv-api client itself is tested against
+ * the Worker, in workers/api/tests/appAuth.test.ts. And nothing in the app
+ * points at Supabase any more.
  */
 function loadModule(file, stubs) {
   const javascript = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
@@ -31,7 +31,7 @@ function withEnv(env, load) {
   const saved = { ...process.env };
   delete process.env.EXPO_PUBLIC_USER_DATA_SOURCE;
   delete process.env.EXPO_PUBLIC_USER_API_URL;
-  Object.assign(process.env, { EXPO_PUBLIC_SUPABASE_URL: 'https://project.supabase.co', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'anon-key' }, env);
+  Object.assign(process.env, env);
   try {
     return load();
   } finally {
@@ -53,37 +53,29 @@ function loadUserApi(env, os = 'ios') {
   return { module, created, appState };
 }
 
-test('signing in and the user\'s data stay on Supabase unless the source is cloudflare', () => {
-  for (const source of [undefined, 'supabase', 'something-else']) {
-    const { module, created, appState } = loadUserApi(source ? { EXPO_PUBLIC_USER_DATA_SOURCE: source } : {});
-    assert.equal(module.USER_DATA_SOURCE, 'supabase', String(source));
-    assert.equal(module.cvApiAuth, null);
-    assert.equal(created.length, 0);
-    assert.equal(appState.length, 0);
+test('a phone signs in to cv-api with a bearer token and its own scheme, and checks the session on return, whatever the old switch says', () => {
+  for (const old of [undefined, 'supabase']) {
+    const { module, created, appState } = loadUserApi(old ? { EXPO_PUBLIC_USER_DATA_SOURCE: old } : {});
+    assert.equal(module.USER_DATA_SOURCE, undefined, 'there is no switch');
+    assert.equal(module.USER_API_URL, 'https://api.copticvine.ca');
+    assert.equal(module.cvApiAuth, created[0]);
+    const { options } = created[0];
+    assert.equal(options.baseUrl, 'https://api.copticvine.ca');
+    assert.equal(options.native, true);
+    assert.equal(options.appOrigin, 'copticvine://');
+    assert.equal(options.callbackPath, 'account');
+    assert.equal(options.replaceUrl, undefined);
+    assert.equal(options.message('signIn'), 'message:signIn');
+
+    assert.deepEqual(appState.map((entry) => entry.event), ['change']);
+    appState[0].listener('background');
+    appState[0].listener('active');
+    assert.equal(created[0].refreshed, 1);
   }
 });
 
-test('with cloudflare, a phone signs in to cv-api with a bearer token and its own scheme, and checks the session on return', () => {
-  const { module, created, appState } = loadUserApi({ EXPO_PUBLIC_USER_DATA_SOURCE: 'cloudflare' });
-  assert.equal(module.USER_DATA_SOURCE, 'cloudflare');
-  assert.equal(module.USER_API_URL, 'https://api.copticvine.ca');
-  assert.equal(module.cvApiAuth, created[0]);
-  const { options } = created[0];
-  assert.equal(options.baseUrl, 'https://api.copticvine.ca');
-  assert.equal(options.native, true);
-  assert.equal(options.appOrigin, 'copticvine://');
-  assert.equal(options.callbackPath, 'account');
-  assert.equal(options.replaceUrl, undefined);
-  assert.equal(options.message('signIn'), 'message:signIn');
-
-  assert.deepEqual(appState.map((entry) => entry.event), ['change']);
-  appState[0].listener('background');
-  appState[0].listener('active');
-  assert.equal(created[0].refreshed, 1);
-});
-
-test('with cloudflare on the web, the cookie is the session, and another address can be given', () => {
-  const { module, created, appState } = loadUserApi({ EXPO_PUBLIC_USER_DATA_SOURCE: 'cloudflare', EXPO_PUBLIC_USER_API_URL: 'http://localhost:8790/' }, 'web');
+test('on the web the cookie is the session, and another address can be given', () => {
+  const { module, created, appState } = loadUserApi({ EXPO_PUBLIC_USER_API_URL: 'http://localhost:8790/' }, 'web');
   assert.equal(module.USER_API_URL, 'http://localhost:8790');
   assert.equal(created[0].options.baseUrl, 'http://localhost:8790');
   assert.equal(created[0].options.native, false);
@@ -91,55 +83,41 @@ test('with cloudflare on the web, the cookie is the session, and another address
   assert.equal(appState.length, 0);
 });
 
-/** utils/supabase with a recording createClient. */
-function loadClient(cvApiAuth, os = 'ios') {
+/** utils/api with a recording createClient. */
+function loadClient(cvApiAuth) {
   const created = [];
-  const appState = [];
-  const module = withEnv({}, () => loadModule(source('utils/supabase.ts'), {
+  const module = withEnv({}, () => loadModule(source('utils/api.ts'), {
     'expo-sqlite/localStorage/install': {},
     'react-native-url-polyfill/auto': {},
-    'react-native': { Platform: { OS: os }, AppState: { addEventListener: (event, listener) => appState.push({ event, listener }) } },
     '@supabase/supabase-js': { createClient: (url, key, options) => { const client = { url, key, options }; created.push(client); return client; } },
     '@/services/userApi': { cvApiAuth, USER_API_URL: 'https://api.copticvine.ca' },
   }));
-  return { module, created, appState };
+  return { module, created };
 }
 
 test('the data client goes to cv-api with cv-api\'s session, and never signs in itself', () => {
   const cvApiAuth = { accessToken: async () => 'token', fetch: async () => new Response('null') };
-  const { module, created, appState } = loadClient(cvApiAuth);
+  const { module, created } = loadClient(cvApiAuth);
   assert.equal(created.length, 1);
-  assert.equal(module.supabase, created[0]);
+  assert.equal(module.api, created[0]);
   assert.equal(created[0].url, 'https://api.copticvine.ca');
+  assert.equal(created[0].key, 'cv-api', 'a placeholder: cv-api has no key');
   assert.equal(created[0].options.accessToken, cvApiAuth.accessToken);
   assert.equal(created[0].options.global.fetch, cvApiAuth.fetch);
   assert.equal(created[0].options.auth, undefined);
-  assert.equal(appState.length, 0, 'no Supabase token to refresh');
 });
 
-test('with Supabase, the data client is Supabase\'s, as before', () => {
-  const { created, appState } = loadClient(null);
-  assert.equal(created[0].url, 'https://project.supabase.co');
-  assert.equal(created[0].options.auth.persistSession, true);
-  assert.equal(created[0].options.accessToken, undefined);
-  assert.deepEqual(appState.map((entry) => entry.event), ['change']);
-});
-
-test('signing in goes to cv-api\'s client when there is one, and to Supabase Auth otherwise', () => {
-  const stubs = (cvApiAuth, supabase = { auth: {} }) => ({
-    'expo-web-browser': {},
-    'react-native': { Platform: { OS: 'ios' } },
-    '@/services/userApi': { cvApiAuth },
-    '@/utils/authMessages': { authMessage: (key) => key },
-    '@/utils/supabase': { supabase },
-  });
+test('signing in is cv-api\'s client', () => {
   const cvApiAuth = { name: 'cv-api' };
-  assert.equal(loadModule(source('services/accountAuth.ts'), stubs(cvApiAuth)).accountAuth, cvApiAuth);
+  assert.equal(loadModule(source('services/accountAuth.ts'), { '@/services/userApi': { cvApiAuth } }).accountAuth, cvApiAuth);
+});
 
-  const { accountAuth } = loadModule(source('services/accountAuth.ts'), stubs(null, {
-    auth: { getUser: async () => ({ data: { user: { id: 'user-1' } }, error: null }) },
-  }));
-  assert.equal(accountAuth.needsCurrentPassword, false);
-  assert.equal(accountAuth.readsWebCallbacks, false);
-  return accountAuth.getUser().then((user) => assert.equal(user.id, 'user-1'));
+test('nothing in the app points at Supabase: no address, key or variable of its own', () => {
+  const root = path.join(__dirname, '..');
+  const files = ['.env', 'app.json', 'eas.json', 'wrangler.jsonc', 'workers/web-app/src/index.js', 'scripts/publish-content-packages.mjs'];
+  const walk = (dir) => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
+  for (const file of [...files, ...walk('src')]) {
+    const text = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.doesNotMatch(text, /supabase\.co|sb_publishable_|EXPO_PUBLIC_SUPABASE_|EXPO_PUBLIC_USER_DATA_SOURCE|EXPO_PUBLIC_CONTENT_SOURCE/, file);
+  }
 });

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 
 import type { BibleHighlightBook } from '@/types/bibleHighlights';
 import { emptyBibleHighlightBook, normalizeBibleHighlightBook } from '@/utils/bibleHighlights';
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 const STORAGE_PREFIX = 'chc-bible-highlights';
 
@@ -43,7 +43,7 @@ export async function saveLocalBibleHighlights(book: BibleHighlightBook): Promis
 }
 
 export async function loadCloudBibleHighlights(bookKey: string): Promise<BibleHighlightBook | null> {
-  const { data, error } = await supabase
+  const { data, error } = await api
     .from('bible_highlights')
     .select('book_key, highlights, highlight_deletions, updated_at')
     .eq('book_key', bookKey)
@@ -60,7 +60,7 @@ export async function loadCloudBibleHighlights(bookKey: string): Promise<BibleHi
 }
 
 export async function saveCloudBibleHighlights(userId: string, book: BibleHighlightBook): Promise<void> {
-  const { error } = await supabase.from('bible_highlights').upsert({
+  const { error } = await api.from('bible_highlights').upsert({
     user_id: userId,
     book_key: book.bookKey,
     highlights: book.highlights,

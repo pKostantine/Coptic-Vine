@@ -23,7 +23,7 @@
     "enabled": true
   },
   "vars": {
-    // The link previews' data (workers/web-app): cv-api since the Phase 2 cutover; unset, Supabase.
+    // The link previews' data (workers/web-app): cv-api, also the default when unset.
     "DATA_API_URL": "https://api.copticvine.ca"
   },
   "previews": {}

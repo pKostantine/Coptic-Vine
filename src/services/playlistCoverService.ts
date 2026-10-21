@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 
 import type { MusicConsumerAsset } from '@/types/musicConsumer';
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 const BUCKET = 'playlist-covers';
 const COVER_OBJECT_NAME = 'cover';
@@ -48,7 +48,7 @@ export async function pickAndUploadPlaylistCover(
   }
 
   const path = objectPath(userId, playlistId);
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await api.storage
     .from(BUCKET)
     .upload(path, bytes, {
       contentType: mimeType,
@@ -58,7 +58,7 @@ export async function pickAndUploadPlaylistCover(
 
   if (uploadError) throw new Error(uploadError.message || 'Unable to upload the playlist cover.');
 
-  const { data, error } = await supabase.rpc('set_music_playlist_cover', {
+  const { data, error } = await api.rpc('set_music_playlist_cover', {
     p_playlist_id: playlistId,
   });
   if (error) throw new Error(error.message || 'Unable to attach the playlist cover.');
@@ -67,7 +67,7 @@ export async function pickAndUploadPlaylistCover(
 }
 
 export async function removePlaylistCover(userId: string, playlistId: string): Promise<void> {
-  const { error } = await supabase.rpc('clear_music_playlist_cover', {
+  const { error } = await api.rpc('clear_music_playlist_cover', {
     p_playlist_id: playlistId,
   });
   if (error) throw new Error(error.message || 'Unable to remove the playlist cover.');
@@ -75,7 +75,7 @@ export async function removePlaylistCover(userId: string, playlistId: string): P
   // The database is already back on the dynamic first-track fallback. Object
   // deletion is best-effort; a stale object is detached and will be replaced
   // on the next upload to this deterministic path.
-  await supabase.storage.from(BUCKET).remove([objectPath(userId, playlistId)]);
+  await api.storage.from(BUCKET).remove([objectPath(userId, playlistId)]);
 }
 
 export const playlistCoverService = {

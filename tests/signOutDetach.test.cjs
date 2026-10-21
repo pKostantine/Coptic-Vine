@@ -57,7 +57,7 @@ function fakeBrowser() {
 function loadWebPush() {
   return load('src/services/webPushService.ts', {
     'react-native': { Platform: { OS: 'web' } },
-    '@/utils/supabase': { supabase: { rpc: async () => ({ error: null }) } },
+    '@/utils/api': { api: { rpc: async () => ({ error: null }) } },
   });
 }
 

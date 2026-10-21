@@ -1,11 +1,8 @@
-const SUPABASE_URL = 'https://wtuujmeinzqfikvuofmh.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_H0lG0vRL6io4Uy0htd77Cw_dlNbwx0n';
+const DATA_API_URL = 'https://api.copticvine.ca';
 
-// Where the previews' data comes from: Supabase until the Phase 2 cutover sets
-// DATA_API_URL to cv-api (https://api.copticvine.ca), which answers the same calls.
+// Where the previews' data comes from: cv-api, unless DATA_API_URL (wrangler.jsonc) says another address.
 function dataApi(env) {
-  const url = env && typeof env.DATA_API_URL === 'string' && env.DATA_API_URL ? env.DATA_API_URL.replace(/\/+$/, '') : SUPABASE_URL;
-  return { url, key: url === SUPABASE_URL ? SUPABASE_PUBLISHABLE_KEY : null };
+  return { url: env && typeof env.DATA_API_URL === 'string' && env.DATA_API_URL ? env.DATA_API_URL.replace(/\/+$/, '') : DATA_API_URL };
 }
 const MEDIA_BASE_URL = 'https://cv-media-resolver.hrmpdd8d6c.workers.dev';
 const APP_NAME = 'Coptic Vine';
@@ -90,7 +87,6 @@ async function loadPreview(target, locale, env) {
     method: 'POST',
     headers: {
       'Accept-Profile': 'public',
-      ...(api.key ? { apikey: api.key } : {}),
       'Content-Type': 'application/json',
       'Content-Profile': 'public',
     },

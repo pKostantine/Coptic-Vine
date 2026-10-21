@@ -1,6 +1,6 @@
 import { hasLocalSchema, readLocalRpc, readLocalTable } from '@/services/bookContentDatabase';
 import { contentApi } from '@/services/contentSource';
-import type { supabase } from '@/utils/supabase';
+import type { api } from '@/utils/api';
 
 type Filter = { kind: 'eq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'ilike'; column: string; value: unknown };
 type Ordering = { column: string; ascending: boolean };
@@ -118,7 +118,7 @@ class HybridQuery implements PromiseLike<QueryResult> {
   abortSignal(signal: AbortSignal) { this.signal = signal; return this; }
 
   private online(): Promise<QueryResult> {
-    // Supabase or the Cloudflare content Worker, as EXPO_PUBLIC_CONTENT_SOURCE says (contentSource.ts).
+    // The Cloudflare content Worker (contentSource.ts).
     let query: any = contentApi.schema(this.schemaName).from(this.tableName).select(this.selection);
     for (const filter of this.filters) query = query[filter.kind](filter.column, filter.value);
     for (const ordering of this.orderings) query = query.order(ordering.column, { ascending: ordering.ascending });
@@ -304,8 +304,8 @@ export function isContentSchemaInstalled(schemaName: string): Promise<boolean> {
   return hasLocalSchema(schemaName);
 }
 
-export const contentDataClient: typeof supabase = {
+export const contentDataClient: typeof api = {
   schema: (schemaName: string) => schemaClient(schemaName),
   from: (tableName: string) => new HybridQuery('public', tableName),
   rpc: (functionName: string, args: Record<string, unknown> = {}) => new HybridRpc('public', functionName, args),
-} as unknown as typeof supabase;
+} as unknown as typeof api;
