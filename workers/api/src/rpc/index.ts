@@ -9,6 +9,7 @@ import functions from '../../schema/functions.json' with { type: 'json' };
 import type { FunctionInfo } from '../../scripts/gen-functions.ts';
 import { PgError } from '../pg.ts';
 import type { ApiContext } from '../rest/context.ts';
+import { adminRpcs } from './admin/index.ts';
 import { convert } from './args.ts';
 import { creatorRpcs } from './creator/index.ts';
 import { learningRpcs } from './learning/index.ts';
@@ -29,6 +30,7 @@ export const RPCS: Record<string, Rpc> = {
   ...learningRpcs,
   ...searchRpcs,
   ...creatorRpcs,
+  ...adminRpcs,
 };
 
 export const FUNCTIONS = functions as Record<string, FunctionInfo>;

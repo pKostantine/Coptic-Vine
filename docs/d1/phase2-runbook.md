@@ -178,7 +178,12 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 - **The Worker:** it implements the working behaviour. The parity tests compare it with Supabase as it was before the revoke (`createOracle({ privateUsage: true })`), and one test records the failure as deployed.
 - **On Supabase:** left as it is (Pierre, 21 Oct 2026); only the new database has to work.
 
-**Another Supabase bug, ported working:** `ensure_creator_workspace` reclaims an artist a user credited before having a workspace by setting `is_credit_only = false`, a generated column Postgres refuses to set, so that branch always fails there. The Worker sets the owner and lets `is_credit_only` follow; the parity test runs the oracle's copy without that assignment.
+**Another Supabase bug, ported working:** two functions set `is_credit_only = false`, a generated column Postgres refuses to set, so they always fail there at that point:
+
+- `ensure_creator_workspace`, when it reclaims an artist a user credited before having a workspace;
+- `confirm_admin_creator_artist_claim` (CV-Admin), every time it links a workspace to an existing credit.
+
+The Worker sets the owner and lets `is_credit_only` follow. The parity tests run the oracle's copies without that assignment.
 
 **Triggers and writes.**
 
@@ -207,7 +212,7 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 | Learning | 19: the catalog, progress, likes and playlists | Ported, at parity |
 | Search | `search_media_catalog`, `search_section_catalog` | Ported, at parity, and checked on the real catalog (below) |
 | Creator editor and lyrics | 34: workspaces, artists, cantors and hymns, submissions (create, add, submit, edit, delete), releases, processing jobs, the lyrics studio | Ported, at parity (reads, writes and lyrics have their own parity tests; every table is compared after each write) |
-| Admin | 26 | |
+| Admin | 26: CV-Admin's review queue, submission detail, publication overview, processing jobs, artists, artist claims and broadcast overview; reviews (approval publishes what is due), publishing, release dates, deletions, artist profiles and claims, forcing and retrying jobs, test and broadcast notifications | Ported, at parity (reads and writes have their own parity tests; every table is compared after each write, refused ones included) |
 | Workers (media, uploads, notifications, share previews) | 27 | |
 | Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | |
 
@@ -239,6 +244,6 @@ Phase 1's, which now also handle weights.
 | 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
 | 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
-| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices, music, learning, search, the triggers, and the creator editor with its lyrics studio. |
+| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices, music, learning, search, the triggers, the creator editor with its lyrics studio, and CV-Admin. Left: the Workers' 27 functions. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |
 | 7. Cutover | Not started. Apply `0009`, `0010` (and any later migration) to the remote D1 before the final import. |

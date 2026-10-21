@@ -1,6 +1,7 @@
 /**
  * Publishing what a submission brings, used by edits, reviews and the
  * scheduled release job: ports of private.publish_music_submission_internal,
+ * private.publish_learning_submission_internal,
  * private.apply_music_submission_replacements and
  * private.apply_learning_submission_edits (schema/pg-user-schema.sql), each
  * run inside the caller's transaction.
@@ -8,7 +9,7 @@
 import { col, t } from '../../../../content-api/src/db/names.ts';
 import type { Tx } from '../../db/transaction.ts';
 import { jsonbText, raise } from '../../pg.ts';
-import { addEvent, attachCompletedJobs, cleanText, dropSupersededArtwork, eachText, itemReady, requiredReady } from './core.ts';
+import { addEvent, attachCompletedJobs, cleanText, dropSupersededArtwork, eachText, itemReady, requiredReady, trimSpaces } from './core.ts';
 import { itemMediaReady, type Row } from './shared.ts';
 
 const ITEMS = t('media', 'submission_items');
@@ -60,6 +61,27 @@ export async function applyMusicReplacements(tx: Tx, submissionId: unknown, acto
   return applied;
 }
 
+/**
+ * What publishing a release publishes before the release itself (both
+ * private.publish_music_submission_internal and public.publish_music_release):
+ * every track's file must be processed and published; then its artists,
+ * tracks and their localizations go live.
+ */
+export async function publishReleaseParts(tx: Tx, release: Row, actor: unknown): Promise<void> {
+  const invalid = (await tx.first(`SELECT count(*) AS n FROM ${RELEASE_TRACKS} rt JOIN ${t('music', 'tracks')} tr ON tr.${col('id')} = rt.${col('track_id')}
+    LEFT JOIN ${ASSETS} a ON a.${col('id')} = tr.${col('media_asset_id')}
+    WHERE rt.${col('release_id')} = ? AND (tr.${col('media_asset_id')} IS NULL OR a.${col('id')} IS NULL OR a.${col('processing_status')} <> 'completed' OR a.${col('publication_status')} <> 'published')`, release.id))!.n as number;
+  if (invalid > 0) raise('Release has tracks without completed published media assets', '22023');
+  const credited = `SELECT ta.${col('artist_id')} FROM ${RELEASE_TRACKS} rt JOIN ${t('music', 'track_artists')} ta ON ta.${col('track_id')} = rt.${col('track_id')} WHERE rt.${col('release_id')} = ?`;
+  const tracks = `SELECT ${col('track_id')} FROM ${RELEASE_TRACKS} WHERE ${col('release_id')} = ?`;
+  const set = `${col('publication_status')} = 'published', ${col('updated_by')} = ?, ${col('updated_at')} = ?`;
+  await tx.run(`UPDATE ${t('music', 'artists')} SET ${set} WHERE ${col('id')} = ? OR ${col('id')} IN (${credited})`, actor, tx.at, release.primary_artist_id, release.id);
+  await tx.run(`UPDATE ${t('music', 'artist_localizations')} SET ${set} WHERE ${col('artist_id')} = ? OR ${col('artist_id')} IN (${credited})`, actor, tx.at, release.primary_artist_id, release.id);
+  await tx.run(`UPDATE ${t('music', 'tracks')} SET ${set} WHERE ${col('id')} IN (${tracks})`, actor, tx.at, release.id);
+  await tx.run(`UPDATE ${t('music', 'track_localizations')} SET ${set} WHERE ${col('track_id')} IN (${tracks})`, actor, tx.at, release.id);
+  await tx.run(`UPDATE ${t('music', 'release_localizations')} SET ${set} WHERE ${col('release_id')} = ?`, actor, tx.at, release.id);
+}
+
 /** private.publish_music_submission_internal: an approved music submission's release, tracks, credits and files published. */
 export async function publishMusicSubmission(tx: Tx, submissionId: unknown, actorId: unknown, reason: string): Promise<Row> {
   let sub = await tx.first(`SELECT * FROM ${t('media', 'submissions')} WHERE ${col('id')} = ?`, submissionId);
@@ -73,18 +95,7 @@ export async function publishMusicSubmission(tx: Tx, submissionId: unknown, acto
   const actor = actorId ?? sub!.reviewer_id ?? sub!.created_by;
   const published = await tx.run(`UPDATE ${ASSETS} SET ${col('publication_status')} = 'published', ${col('updated_by')} = ?, ${col('updated_at')} = ?
     WHERE ${col('id')} IN (SELECT DISTINCT ${col('media_asset_id')} FROM ${ITEMS} WHERE ${col('submission_id')} = ? AND ${col('media_asset_id')} IS NOT NULL)`, actor, tx.at, sub!.id);
-  const invalid = (await tx.first(`SELECT count(*) AS n FROM ${RELEASE_TRACKS} rt JOIN ${t('music', 'tracks')} tr ON tr.${col('id')} = rt.${col('track_id')}
-    LEFT JOIN ${ASSETS} a ON a.${col('id')} = tr.${col('media_asset_id')}
-    WHERE rt.${col('release_id')} = ? AND (tr.${col('media_asset_id')} IS NULL OR a.${col('id')} IS NULL OR a.${col('processing_status')} <> 'completed' OR a.${col('publication_status')} <> 'published')`, release!.id))!.n as number;
-  if (invalid > 0) raise('Release has tracks without completed published media assets', '22023');
-  const credited = `SELECT ta.${col('artist_id')} FROM ${RELEASE_TRACKS} rt JOIN ${t('music', 'track_artists')} ta ON ta.${col('track_id')} = rt.${col('track_id')} WHERE rt.${col('release_id')} = ?`;
-  const tracks = `SELECT ${col('track_id')} FROM ${RELEASE_TRACKS} WHERE ${col('release_id')} = ?`;
-  const set = `${col('publication_status')} = 'published', ${col('updated_by')} = ?, ${col('updated_at')} = ?`;
-  await tx.run(`UPDATE ${t('music', 'artists')} SET ${set} WHERE ${col('id')} = ? OR ${col('id')} IN (${credited})`, actor, tx.at, release!.primary_artist_id, release!.id);
-  await tx.run(`UPDATE ${t('music', 'artist_localizations')} SET ${set} WHERE ${col('artist_id')} = ? OR ${col('artist_id')} IN (${credited})`, actor, tx.at, release!.primary_artist_id, release!.id);
-  await tx.run(`UPDATE ${t('music', 'tracks')} SET ${set} WHERE ${col('id')} IN (${tracks})`, actor, tx.at, release!.id);
-  await tx.run(`UPDATE ${t('music', 'track_localizations')} SET ${set} WHERE ${col('track_id')} IN (${tracks})`, actor, tx.at, release!.id);
-  await tx.run(`UPDATE ${t('music', 'release_localizations')} SET ${set} WHERE ${col('release_id')} = ?`, actor, tx.at, release!.id);
+  await publishReleaseParts(tx, release!, actor);
   release = await tx.writeFirst(`UPDATE ${RELEASES} SET ${col('publication_status')} = 'published', ${col('release_date')} = coalesce(${col('release_date')}, substr(${col('scheduled_release_at')}, 1, 10), ?),
     ${col('updated_by')} = ?, ${col('updated_at')} = ? WHERE ${col('id')} = ? RETURNING *`, tx.at.slice(0, 10), actor, tx.at, release!.id);
   const previous = sub!.status;
@@ -182,4 +193,106 @@ export async function applyLearningEdits(tx: Tx, submissionId: unknown, actor: u
   }
   await dropSupersededArtwork(tx, sub.id, cover);
   return applied;
+}
+
+/**
+ * private.publish_learning_submission_internal: an approved album or lesson
+ * set, once due and its files are ready, goes live with a recording or lesson
+ * per file (and their titles), its cover, cantor and the submitter's own hymn.
+ * One already live takes what an edit brought instead.
+ */
+export async function publishLearningSubmission(tx: Tx, submissionId: unknown, actorId: unknown, reason: string): Promise<Row> {
+  const sub = await tx.first(`SELECT * FROM ${t('media', 'submissions')} WHERE ${col('id')} = ?`, submissionId);
+  if (!sub) raise('Learning submission not found', 'P0002');
+  const album = sub!.submission_type === 'learning_album';
+  if (!album && sub!.submission_type !== 'learning_lesson_set') raise('Not a learning submission', '22023');
+  if (sub!.status === 'published') {
+    await applyLearningEdits(tx, sub!.id, actorId);
+    return { submissionId: sub!.id, status: 'published' };
+  }
+  if (sub!.status !== 'approved' || sub!.approved_at == null) raise('Coptic Vine approval is required before publishing', '42501');
+  const table = album ? t('learning', 'albums') : t('learning', 'lesson_sets');
+  const collection = await tx.first(`SELECT * FROM ${table} WHERE ${col('submission_id')} = ? ORDER BY rowid LIMIT 1`, sub!.id);
+  if (!collection) raise(album ? 'Learning album not found' : 'Learning lesson set not found', 'P0002');
+  if (collection!.release_timing_mode === 'scheduled' && (collection!.scheduled_release_at == null || (collection!.scheduled_release_at as string) > tx.at)) {
+    return { submissionId: sub!.id, status: 'scheduled' };
+  }
+  await attachCompletedJobs(tx, sub!.id);
+  if (!(await requiredReady(tx, sub!.id))) raise('Learning submission media is not ready', '22023');
+  const actor = actorId ?? sub!.reviewer_id ?? sub!.created_by;
+  const mediaCount = (await tx.first(`SELECT count(*) AS n FROM ${ITEMS} WHERE ${col('submission_id')} = ? AND ${col('role')} <> 'artwork' AND ${col('replaces_item_id')} IS NULL`, sub!.id))!.n as number;
+  if (mediaCount === 0) raise('Learning submission has no media', '22023');
+
+  const cantorOk = await tx.first(`SELECT 1 AS yes FROM ${t('learning', 'cantors')} WHERE ${col('id')} = ? AND (${col('publication_status')} = 'published' OR ${col('owner_creator_account_id')} = ?)`,
+    collection!.cantor_id, sub!.creator_account_id);
+  const seasonOk = async () => collection!.season_id == null
+    || !!(await tx.first(`SELECT 1 AS yes FROM ${t('learning', 'seasons')} WHERE ${col('id')} = ? AND ${col('publication_status')} = 'published'`, collection!.season_id));
+  const publishCantor = () => tx.run(`UPDATE ${t('learning', 'cantors')} SET ${col('publication_status')} = 'published', ${col('updated_by')} = ? WHERE ${col('id')} = ? AND ${col('owner_creator_account_id')} = ?`,
+    actor, collection!.cantor_id, sub!.creator_account_id);
+  if (album) {
+    if (!cantorOk) raise('Cantor must be published before learning album', '22023');
+    if (!(await seasonOk())) raise('Learning season must be published', '22023');
+    await publishCantor();
+  } else {
+    if (!cantorOk) raise('Cantor must be published before lesson set', '22023');
+    const own = `${col('created_by')} = ? AND json_extract(${col('metadata')}, '$.creatorAccountId') = ?`;
+    const hymnOk = await tx.first(`SELECT 1 AS yes FROM ${t('learning', 'hymns')} WHERE ${col('id')} = ? AND (${col('publication_status')} = 'published' OR (${own}))`,
+      collection!.hymn_id, sub!.created_by, sub!.creator_account_id);
+    if (!hymnOk) raise('Hymn must be published or created by this submitter', '22023');
+    await tx.run(`UPDATE ${t('learning', 'hymns')} SET ${col('publication_status')} = 'published', ${col('updated_by')} = ? WHERE ${col('id')} = ? AND ${own}`,
+      actor, collection!.hymn_id, sub!.created_by, sub!.creator_account_id);
+    if (!(await seasonOk())) raise('Learning season must be published', '22023');
+    await publishCantor();
+  }
+
+  // Every processed file is visible before published content links to it.
+  await tx.run(`UPDATE ${ASSETS} SET ${col('publication_status')} = 'published', ${col('updated_by')} = ?, ${col('updated_at')} = ?
+    WHERE ${col('id')} IN (SELECT DISTINCT ${col('media_asset_id')} FROM ${ITEMS} WHERE ${col('submission_id')} = ? AND ${col('media_asset_id')} IS NOT NULL)
+      AND ${col('processing_status')} = 'completed'`, actor, tx.at, sub!.id);
+
+  // A replacement waiting for its item is applied by applyLearningEdits, not added as an item of its own.
+  const items = await tx.all(`SELECT i.${col('id')} AS id, i.${col('title')} AS title, i.${col('sort_order')} AS sort_order, i.${col('role')} AS role, i.${col('media_asset_id')} AS asset,
+      i.${col('localized_titles')} AS titles, a.${col('media_type')} AS media_type, a.${col('duration_ms')} AS duration, a.${col('processing_status')} AS processing
+    FROM ${ITEMS} i LEFT JOIN ${ASSETS} a ON a.${col('id')} = i.${col('media_asset_id')}
+    WHERE i.${col('submission_id')} = ? AND i.${col('replaces_item_id')} IS NULL ORDER BY i.${col('sort_order')}, i.${col('id')}`, sub!.id);
+  const children = album ? t('learning', 'album_recordings') : t('learning', 'lessons');
+  const parent = album ? col('album_id') : col('lesson_set_id');
+  for (const item of items) {
+    if (item.asset == null || item.processing !== 'completed') raise('Incomplete learning submission item', '22023');
+    if (item.role === 'artwork') {
+      if (item.media_type !== 'image') raise('Learning artwork must be an image', '22023');
+      await tx.run(`UPDATE ${table} SET ${col('cover_asset_id')} = ? WHERE ${col('id')} = ?`, item.asset, collection!.id);
+      continue;
+    }
+    if (album && item.media_type !== 'audio') raise('Learning album recordings must be audio', '22023');
+    if (!album && item.media_type !== 'audio' && item.media_type !== 'video') raise('Lesson media must be audio or video', '22023');
+    const exists = await tx.first(`SELECT 1 AS yes FROM ${children} WHERE ${parent} = ? AND json_extract(${col('metadata')}, '$.submissionItemId') = ?`, collection!.id, item.id);
+    if (!exists) {
+      const columns = album
+        ? ['id', 'album_id', 'media_asset_id', 'title', 'duration_ms', 'sort_order', 'publication_status', 'metadata', 'created_by', 'updated_by']
+        : ['id', 'lesson_set_id', 'media_asset_id', 'media_type', 'title', 'duration_ms', 'sort_order', 'publication_status', 'metadata', 'created_by', 'updated_by'];
+      const values = [crypto.randomUUID(), collection!.id, item.asset, ...(album ? [] : [item.media_type]), item.title ?? collection!.title, item.duration, item.sort_order,
+        'published', jsonbText({ submissionItemId: item.id }), actor, actor];
+      await tx.run(`INSERT INTO ${children} (${columns.map(col).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`, ...values);
+    }
+    // Each recording's or lesson's titles, whatever the album's or set's.
+    const localizations = album ? t('learning', 'recording_localizations') : t('learning', 'lesson_localizations');
+    const child = album ? col('recording_id') : col('lesson_id');
+    for (const [locale, text] of eachText(item.titles == null ? {} : JSON.parse(item.titles as string))) {
+      const title = text == null ? null : trimSpaces(text);
+      if (!['en', 'ar', 'fr'].includes(locale) || !title) continue;
+      await tx.run(`INSERT INTO ${localizations} (${child}, ${col('locale')}, ${col('title')}) SELECT c.${col('id')}, ?, ? FROM ${children} c
+        WHERE c.${parent} = ? AND json_extract(c.${col('metadata')}, '$.submissionItemId') = ?
+        ON CONFLICT (${child}, ${col('locale')}) DO UPDATE SET ${col('title')} = excluded.${col('title')}, ${col('updated_at')} = ?`, locale, title, collection!.id, item.id, tx.at);
+    }
+  }
+
+  await tx.run(`UPDATE ${table} SET ${col('publication_status')} = 'published', ${col('updated_by')} = ? WHERE ${col('id')} = ?`, actor, collection!.id);
+  await tx.run(`UPDATE ${t('media', 'submissions')} SET ${col('status')} = 'published', ${col('published_at')} = coalesce(${col('published_at')}, ?), ${col('updated_by')} = ? WHERE ${col('id')} = ?`,
+    tx.at, actor, sub!.id);
+  // Replacements an edit brought, and the newest artwork as the cover.
+  await applyLearningEdits(tx, sub!.id, actor);
+  await addEvent(tx, sub!.id, actor, reason === 'scheduled' ? 'published_automatically_on_schedule' : 'published_automatically', sub!.status, 'published', null,
+    { learningType: sub!.submission_type, mediaItemCount: mediaCount });
+  return { submissionId: sub!.id, status: 'published', mediaItemCount: mediaCount };
 }
