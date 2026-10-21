@@ -10,7 +10,8 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { afterWrites } from '../src/db/afterWrites.ts';
-import { publishDueLearningReleases, publishDueMusicReleases } from '../src/jobs/releases.ts';
+import { Tx } from '../src/db/transaction.ts';
+import { publishDueLearningReleases, publishDueMusicReleases, publishDueReleases } from '../src/jobs/releases.ts';
 import { A1, ALICE, C1, CAROL, id, K1, K2, seedCatalog } from './lib/creatorCatalog.ts';
 import { createOracle, type Oracle } from './lib/oracle.ts';
 import { seed } from './lib/seed.ts';
@@ -115,4 +116,40 @@ test('learning: a due album published with its recordings; one whose cantor isn\
   await sameTables('after publishing due learning');
   assert.deepEqual([await status(SL1), await status(SL2), await status(SL3)], ['published', 'approved', 'approved']);
   assert.deepEqual(await failures(SL2), ['Cantor must be published before learning album']);
+});
+
+test('one run at a time: a run that can\'t take the lease leaves the releases; a dead run\'s release log is rolled back first; one that won\'t roll back stops them', async () => {
+  // Each run that publishes notes the broken release again.
+  const noted = () => worker.rows<{ n: number }>(`SELECT count(*) AS n FROM "media.submission_events" WHERE "submission_id" = ? AND "action" = 'scheduled_publish_failed'`, SM2)[0].n;
+  const lease = () => worker.rows(`SELECT "holder", "until" FROM "private.job_lease" WHERE "name" = 'releases'`)[0];
+  const free = { holder: null, until: null };
+  const at = Date.now();
+  worker.db.prepare(`UPDATE "private.job_lease" SET "holder" = 'other run', "until" = ? WHERE "name" = 'releases'`).run(new Date(at + 60_000).toISOString());
+  let before = noted();
+  assert.equal(await publishDueReleases(worker.env, at), false);
+  assert.equal(noted(), before);
+  // That run died: after the lease's 15 minutes it is taken, the releases run, and it is let go.
+  assert.equal(await publishDueReleases(worker.env, at + 16 * 60_000), true);
+  assert.equal(noted(), before + 1);
+  assert.deepEqual(lease(), free);
+
+  const dead = new Tx(worker.env.DB, 'release:dead');
+  await dead.run(`UPDATE "music.releases" SET "title" = 'Half published' WHERE "id" = ?`, RM3);
+  before = noted();
+  assert.equal(await publishDueReleases(worker.env), true);
+  assert.equal(worker.rows<{ title: string }>(`SELECT "title" FROM "music.releases" WHERE "id" = ?`, RM3)[0].title, 'Not Yet');
+  assert.equal(noted(), before + 1);
+
+  // A dead run's delete whose key has been taken since: it can't be rolled back, so nothing is published.
+  const stuck = new Tx(worker.env.DB, 'release:stuck');
+  await stuck.run(`DELETE FROM "music.track_artists" WHERE "track_id" = ? AND "artist_id" = ?`, TM1, A1);
+  worker.db.prepare(`INSERT INTO "music.track_artists" ("track_id", "artist_id", "role", "sort_order", "created_at") VALUES (?, ?, 'primary', 0, ?)`).run(TM1, A1, AT);
+  before = noted();
+  await assert.rejects(publishDueReleases(worker.env));
+  assert.equal(noted(), before);
+  assert.deepEqual(lease(), free);
+  worker.db.prepare(`DELETE FROM "music.track_artists" WHERE "track_id" = ? AND "artist_id" = ?`).run(TM1, A1);
+  assert.equal(await publishDueReleases(worker.env), true);
+  assert.equal(noted(), before + 1);
+  assert.equal(worker.rows<{ n: number }>(`SELECT count(*) AS n FROM "music.track_artists" WHERE "track_id" = ?`, TM1)[0].n, 1);
 });

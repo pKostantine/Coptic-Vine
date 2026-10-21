@@ -21,7 +21,7 @@
 import { createAuth, list, type Auth } from './auth/index.ts';
 import { afterWrites, trackWrites } from './db/afterWrites.ts';
 import { recoverTransactions } from './db/transaction.ts';
-import { publishDueLearningReleases, publishDueMusicReleases } from './jobs/releases.ts';
+import { publishDueReleases } from './jobs/releases.ts';
 import { httpStatus, PgError, triggerError, uniqueViolation } from './pg.ts';
 import type { ApiContext } from './rest/context.ts';
 import { tableRequest } from './rest/tables.ts';
@@ -156,9 +156,8 @@ export default {
    * step missed.
    */
   async scheduled(_controller: unknown, env: Env): Promise<void> {
-    await recoverTransactions(env.DB);
-    await publishDueMusicReleases(env).catch((error) => console.error('Publishing due music releases:', error));
-    await publishDueLearningReleases(env).catch((error) => console.error('Publishing due learning releases:', error));
+    await recoverTransactions(env.DB).catch((error) => console.error('Recovering abandoned transactions:', error));
+    await publishDueReleases(env).catch((error) => console.error('Publishing due releases:', error));
     await afterWrites(env);
   },
 };
