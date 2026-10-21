@@ -299,6 +299,13 @@ test('links for elsewhere in the app are left alone', async () => {
   assert.deepEqual(events, []);
 });
 
+test('without a callback path, a link to any page is read (CV-Artists\' web, where Google returns to the page it left)', async () => {
+  const { auth } = phone({ callbackPath: undefined });
+  await assert.rejects(auth.applyCallback('https://artists.copticvine.ca/lyrics?error=access_denied&error_description=Not+now'), /Not now/);
+  await auth.applyCallback('https://artists.copticvine.ca/releases');
+  assert.equal(await auth.getSession(), null);
+});
+
 test('the session token is read from Set-Cookie, with or without the __Secure- prefix', () => {
   assert.equal(sessionTokenFromCookie('__Secure-better-auth.session_token=abc.d%2Bef; Max-Age=2592000; Path=/; HttpOnly; Secure; SameSite=Lax'), 'abc.d%2Bef');
   assert.equal(sessionTokenFromCookie('better-auth.state=xyz; Path=/, better-auth.session_token=tok.sig; Path=/'), 'tok.sig');
@@ -364,6 +371,31 @@ test('the web keeps cv-api\'s cookie, never a token, and the data requests carry
   // Google: the page itself goes there, and comes back with the cookie.
   await auth.signInWithGoogle(WEB_LINK);
   assert.equal(new URL(navigated[0]).host, 'accounts.google.com');
+});
+
+test('the web with a bearer token too (CV-Admin, CV-Artists): from the sign-in, or from the cookie after Google\'s redirect', async () => {
+  const { jar, fetcher } = browser();
+  const options = { baseUrl: BASE, native: false, bearer: true, appOrigin: '', callbackPath: 'account', fetch: fetcher, message: (key: string) => key };
+  const signIn = memoryStorage();
+  const auth = createCvApiAuth({ ...options, storage: () => signIn });
+  await auth.signInWithEmail('reader@example.com', 'old password 1');
+  const token = await auth.accessToken();
+  assert.ok(token);
+  assert.equal(await serverUser(token), USER, 'a token other Workers can hand on');
+  await auth.signOut();
+  assert.equal(await serverUser(token), null);
+  assert.equal(jar.has('better-auth.session_token'), false, 'and the cookie went with the session');
+
+  // Back from Google: the page has only the cookie, which the first check turns into a bearer.
+  const google = await handle(new Request(`${BASE}/auth/sign-in/email`, { method: 'POST', headers: { 'content-type': 'application/json', origin: WEB }, body: JSON.stringify({ email: 'reader@example.com', password: 'old password 1' }) }), env);
+  const cookie = /better-auth\.session_token=([^;]+)/.exec(google.headers.get('set-cookie')!)![1];
+  jar.set('better-auth.session_token', cookie);
+  const returned = memoryStorage();
+  const back = createCvApiAuth({ ...options, storage: () => returned });
+  assert.equal((await back.getSession())?.user.id, USER);
+  const adopted = await back.accessToken();
+  assert.ok(adopted);
+  assert.equal(await serverUser(adopted), USER);
 });
 
 test('a phone sends the app\'s scheme as its origin, so its links are checked against the trusted ones', async () => {

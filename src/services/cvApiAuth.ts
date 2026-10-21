@@ -3,6 +3,7 @@
  * EXPO_PUBLIC_USER_DATA_SOURCE=cloudflare (src/services/userApi.ts). It calls
  * Better Auth's /auth endpoints with fetch, as Better Auth's own Expo client
  * would, and hands the user out in Supabase's shape (src/types/account.ts).
+ * CV-Admin and CV-Artists keep a copy of this file, which stays the same.
  *
  *   phone and tablet  the session token is kept in storage and sent as a
  *                     bearer token. The links that sign in outside the app
@@ -13,6 +14,10 @@
  *   web               the session is api.copticvine.ca's cookie, same-site
  *                     with copticvine.ca: every request is sent with
  *                     credentials, and the app never sees the token.
+ *   web, with bearer  as a phone, a bearer token too, for apps that hand the
+ *                     session to other Workers (CV-Admin's media routes,
+ *                     CV-Artists' uploads): the sign-in's token, or, back
+ *                     from Google with the cookie, the cookie's session's.
  *
  * The session is kept with its user, so the app opens signed in without the
  * network. It is checked with the server when the app starts and when it
@@ -36,10 +41,12 @@ export type CvApiAuthOptions = {
   baseUrl: string;
   /** A phone or tablet, which keeps a bearer token; otherwise the web, which keeps the cookie. */
   native: boolean;
-  /** The app's own address (copticvine://), sent as expo-origin so the server checks the app's links against it. */
+  /** The web keeps a bearer token too (a phone always does). */
+  bearer?: boolean;
+  /** A phone: the app's own address (copticvine://), sent as expo-origin so the server checks the app's links against it. */
   appOrigin: string;
-  /** The path the links come back to: account. */
-  callbackPath: string;
+  /** The path the links come back to (account); without one, links to any page are read. */
+  callbackPath?: string;
   storage: () => KeyValueStorage | null | undefined;
   fetch?: typeof fetch;
   /** A phone: opens Google's sign-in in the browser, and tells where the browser came back to. */
@@ -52,7 +59,7 @@ export type CvApiAuthOptions = {
 };
 
 export type CvApiAuth = AccountAuth & {
-  /** The bearer token for the data requests (supabase-js's accessToken): null on the web, where the cookie goes instead. */
+  /** The bearer token for the data requests (supabase-js's accessToken): null on the web without `bearer`, where the cookie goes instead. */
   accessToken(): Promise<string | null>;
   /** fetch for the data requests: with the cookie on the web. */
   fetch: typeof fetch;
@@ -76,9 +83,10 @@ export function sessionTokenFromCookie(setCookie: string): string | null {
 
 export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
   const base = options.baseUrl.replace(/\/+$/, '');
+  const keepsToken = options.native || Boolean(options.bearer);
   const send: typeof fetch = options.fetch ?? ((input, init) => fetch(input, init));
   const ownPhotos = `${base}/storage/v1/object/public/profile-avatars/`;
-  const callback = new RegExp(`(^|/)${options.callbackPath}/?$`);
+  const callback = options.callbackPath ? new RegExp(`(^|/)${options.callbackPath}/?$`) : null;
   const listeners = new Set<(event: AccountEvent, session: AccountSession | null) => void>();
   /** The session as known here; undefined until first read. */
   let current: AccountSession | null | undefined;
@@ -112,11 +120,9 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
   async function request(path: string, body?: unknown): Promise<Response> {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (body !== undefined) headers['content-type'] = 'application/json';
-    if (options.native) {
-      headers['expo-origin'] = options.appOrigin;
-      const token = read(TOKEN_KEY);
-      if (token) headers.authorization = `Bearer ${token}`;
-    }
+    if (options.native) headers['expo-origin'] = options.appOrigin;
+    const token = keepsToken ? read(TOKEN_KEY) : null;
+    if (token) headers.authorization = `Bearer ${token}`;
     const response = await send(`${base}/auth${path}`, {
       method: body === undefined ? 'GET' : 'POST',
       headers,
@@ -124,8 +130,8 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
       credentials: options.native ? 'omit' : 'include',
     });
     // A new session's token (a sign-in), for the bearer.
-    const token = options.native ? response.headers.get('set-auth-token') : null;
-    if (token) write(TOKEN_KEY, token);
+    const issued = keepsToken ? response.headers.get('set-auth-token') : null;
+    if (issued) write(TOKEN_KEY, issued);
     return response;
   }
 
@@ -159,8 +165,10 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
 
   /** The session from the server, with the ways its user signs in (first the oldest). */
   async function fetchSession(): Promise<AccountSession | null> {
-    const body = await answer<{ user?: ServerUser } | null>(await request('/get-session'), 'finishSignIn');
+    const body = await answer<{ user?: ServerUser; session?: { token?: string } } | null>(await request('/get-session'), 'finishSignIn');
     if (!body?.user) return null;
+    // The web, back from Google with the cookie: its session's token is the bearer from now on.
+    if (keepsToken && !read(TOKEN_KEY) && body.session?.token) write(TOKEN_KEY, body.session.token);
     const accounts = await request('/list-accounts')
       .then((response) => answer<{ providerId: string; createdAt: string }[]>(response, 'finishSignIn'))
       .catch(() => null);
@@ -244,7 +252,7 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
     } catch {
       return;
     }
-    if (!callback.test(link.host + link.pathname)) return;
+    if (callback && !callback.test(link.host + link.pathname)) return;
     const params = link.searchParams;
     if (!LINK_PARAMETERS.some((name) => params.has(name))) return;
     const cookie = params.get('cookie');
@@ -267,7 +275,7 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
     }
     const sessionToken = cookie ? sessionTokenFromCookie(cookie) : null;
     if (!sessionToken) return;
-    if (options.native) write(TOKEN_KEY, sessionToken);
+    if (keepsToken) write(TOKEN_KEY, sessionToken);
     await signedIn();
   }
 
@@ -287,7 +295,7 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
     refresh,
 
     async accessToken() {
-      return options.native ? read(TOKEN_KEY) : null;
+      return keepsToken ? read(TOKEN_KEY) : null;
     },
     fetch: options.native ? send : (input, init) => send(input, { ...init, credentials: 'include' }),
 
