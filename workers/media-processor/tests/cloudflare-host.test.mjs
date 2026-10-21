@@ -30,15 +30,14 @@ const routes = await import('../cloudflare/routes.js');
 const { MediaProcessor, default: worker } = await import('../cloudflare/host.js');
 
 const ENV = {
-  SUPABASE_URL: 'https://example.supabase.co/',
-  SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',
+  API_URL: 'https://api.example/',
   MEDIA_WORKER_TOKEN: 'worker-token',
   R2_ACCOUNT_ID: 'account',
   R2_ACCESS_KEY_ID: 'key-id',
   R2_SECRET_ACCESS_KEY: 'secret',
 };
 
-/** Supabase's answer to the queue check, recording each request. */
+/** cv-api's answer to the queue check, recording each request. */
 function fakeQueue(answer) {
   const requests = [];
   const fetchImpl = async (url, init) => {
@@ -80,13 +79,13 @@ function processorObject({ running = false, busy = false, failStart = false } = 
 }
 
 describe('when the container runs', () => {
-  it('asks Supabase, with the worker token, whether a job is ready', async () => {
+  it('asks cv-api, with the worker token, whether a job is ready', async () => {
     const queue = fakeQueue(true);
     assert.equal(await routes.queueHasWork(ENV, queue.fetchImpl), true);
     const [request] = queue.requests;
-    assert.equal(request.url, 'https://example.supabase.co/rest/v1/rpc/media_processing_queue_has_work');
+    assert.equal(request.url, 'https://api.example/rest/v1/rpc/media_processing_queue_has_work');
     assert.deepEqual(request.body, { p_worker_token: 'worker-token' });
-    assert.equal(request.init.headers.apikey, 'sb_publishable_test');
+    assert.equal(request.init.headers.apikey, undefined);
     assert.equal(request.init.headers['content-profile'], 'public');
     assert.equal(await routes.queueHasWork(ENV, fakeQueue(false).fetchImpl), false);
     await assert.rejects(routes.queueHasWork(ENV, fakeQueue(new Error('down')).fetchImpl), /failed with 500/);
@@ -104,7 +103,7 @@ describe('when the container runs', () => {
     assert.deepEqual(idle.calls, []);
   });
 
-  it('when Supabase cannot answer, the container is not started', async () => {
+  it('when cv-api cannot answer, the container is not started', async () => {
     const processor = fakeProcessor();
     const response = await routes.handleFetch(new Request('https://w.dev/wake', { method: 'POST' }), ENV, processor, { fetchImpl: fakeQueue(new Error('down')).fetchImpl, log: () => {} });
     assert.equal(response.status, 502);

@@ -346,15 +346,16 @@ on any page, because Google returns to the page it left.
 
 ## The other Workers
 
-They call only `/rest/v1/rpc/…`, which `cv-api` answers at the same paths. At
-the cutover each points at `https://api.copticvine.ca`:
+They call only `/rest/v1/rpc/…`, which `cv-api` answers at the same paths,
+at `API_URL` (`https://api.copticvine.ca`, in each `wrangler.jsonc`). Since
+21 Oct 2026 nothing in them names Supabase:
 
-| Worker | Change |
+| Worker | Setting |
 |---|---|
-| `cv-media-processor` (and its admin routes) | `SUPABASE_URL`. It keeps its worker token; admins' tokens are cv-api sessions. |
-| `cv-upload-authorizer` | `SUPABASE_URL`. It forwards the user's token, now a cv-api session. |
-| `cv-notification-dispatcher` | `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` set to `cv-api`'s `SERVICE_TOKEN`. |
-| `coptic-vine` (the web app's link previews) | `DATA_API_URL` (no key needed); unset, it reads Supabase. |
+| `cv-media-processor` (and its admin routes) | `API_URL`. It keeps its worker token; admins' tokens are cv-api sessions. |
+| `cv-upload-authorizer` | `API_URL`. It forwards the user's cv-api session. |
+| `cv-notification-dispatcher` | `API_URL`, and the `SERVICE_TOKEN` secret: cv-api's service token. |
+| `coptic-vine` (the web app's link previews) | `DATA_API_URL`, cv-api also when unset. |
 
 `cv-api` itself wakes the media processor after a job is queued
 (`MEDIA_PROCESSOR_URL`), where `pg_net` did.

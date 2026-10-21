@@ -63,8 +63,7 @@ export function getConfig() {
   }
 
   return {
-    supabaseUrl: requireEnv('SUPABASE_URL').replace(/\/+$/, ''),
-    supabasePublishableKey: requireEnv('SUPABASE_PUBLISHABLE_KEY'),
+    apiUrl: requireEnv('API_URL').replace(/\/+$/, ''),
     mediaWorkerToken: requireEnv('MEDIA_WORKER_TOKEN'),
     mediaWorkerId: process.env.MEDIA_WORKER_ID || `media-processor-${process.pid}`,
     r2Driver,
@@ -74,17 +73,12 @@ export function getConfig() {
 
 export async function callRpc(config, name, payload) {
   const headers = {
-    apikey: config.supabasePublishableKey,
     'accept-profile': 'public',
     'content-profile': 'public',
     'content-type': 'application/json',
   };
 
-  if (process.env.SUPABASE_ACCESS_TOKEN) {
-    headers.authorization = `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`;
-  }
-
-  const response = await fetch(`${config.supabaseUrl}/rest/v1/rpc/${name}`, {
+  const response = await fetch(`${config.apiUrl}/rest/v1/rpc/${name}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
@@ -94,7 +88,7 @@ export async function callRpc(config, name, payload) {
 
   if (!response.ok) {
     const message = body?.message || bodyText || `${name} failed`;
-    throw new Error(`Supabase RPC ${name} failed with ${response.status}: ${message}`);
+    throw new Error(`cv-api RPC ${name} failed with ${response.status}: ${message}`);
   }
 
   return Array.isArray(body) ? body : [];
@@ -675,7 +669,7 @@ export function abortActiveJobs(kind = 'shutdown') {
 const HEARTBEAT_MS = Number(process.env.MEDIA_HEARTBEAT_MS || 20_000);
 
 /**
- * Proves to Supabase, every 20 seconds, that this worker is still working on
+ * Proves to cv-api, every 20 seconds, that this worker is still working on
  * its jobs (so a dead worker's job is retried within minutes), reports
  * progress, and stops the work if an admin cancelled or deleted it.
  */
@@ -1059,7 +1053,7 @@ async function releaseJobs(config, jobIds, reason) {
  * Claims one queued job and processes it.
  *
  * Returns `{ status: 'no_job' }` when the queue is empty, and never throws for a
- * job-level failure: the failure is reported back to Supabase (which decides
+ * job-level failure: the failure is reported back to cv-api (which decides
  * whether to retry with backoff or mark the job failed) and returned to the
  * caller so a long-running worker keeps going.
  */

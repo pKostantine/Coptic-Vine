@@ -6,14 +6,14 @@ Cloudflare Worker for Coptic Vine native push and standards-based Web Push.
 
 Set these with Wrangler before deployment:
 
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SERVICE_TOKEN`: cv-api's service token (the same value as its own `SERVICE_TOKEN`)
 - `NOTIFICATION_WORKER_SECRET`
 - `WEB_PUSH_VAPID_PRIVATE_KEY`
 - `WEB_PUSH_VAPID_PUBLIC_KEY`
 - `WEB_PUSH_VAPID_SUBJECT` (for example `mailto:admin@coptichymnscentre.com`)
 - `EXPO_ACCESS_TOKEN` only if Expo Push enhanced security is enabled
 
-`SUPABASE_URL` is a non-secret Worker variable in `wrangler.jsonc`.
+`API_URL` (cv-api, `https://api.copticvine.ca`) is a non-secret Worker variable in `wrangler.jsonc`.
 
 The same VAPID public key must be supplied to the Coptic Vine web build as
 `EXPO_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY`. Never expose the VAPID private key to
@@ -31,7 +31,7 @@ database's 15-minute receipt delay. Web Push claims a conservative batch of 40
 and sends encrypted VAPID-authenticated notifications directly to each browser
 push service.
 
-Do not put Apple, Firebase, Expo, Supabase service-role, VAPID private, or WNS
+Do not put Apple, Firebase, Expo, cv-api service, VAPID private, or WNS
 secrets in the repository.
 
 ## Before a notification reaches a phone

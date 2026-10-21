@@ -58,16 +58,15 @@ function requireBearerToken(request) {
   const authorization = request.headers.authorization || '';
   const match = authorization.match(/^Bearer\s+(.+)$/i);
   if (!match?.[1]) {
-    throw new HttpError(401, 'auth_required', 'A Supabase bearer token is required.');
+    throw new HttpError(401, 'auth_required', 'A sign-in token is required.');
   }
   return match[1].trim();
 }
 
 async function callUserRpc(config, bearerToken, rpcName, payload) {
-  const response = await fetch(`${config.supabaseUrl}/rest/v1/rpc/${rpcName}`, {
+  const response = await fetch(`${config.apiUrl}/rest/v1/rpc/${rpcName}`, {
     method: 'POST',
     headers: {
-      apikey: config.supabasePublishableKey,
       authorization: `Bearer ${bearerToken}`,
       'accept-profile': 'public',
       'content-profile': 'public',
@@ -89,13 +88,13 @@ async function callUserRpc(config, bearerToken, rpcName, payload) {
   if (!response.ok) {
     throw new HttpError(
       response.status >= 400 && response.status < 500 ? response.status : 502,
-      body?.code || 'supabase_rpc_failed',
-      body?.message || text || `Supabase RPC ${rpcName} failed.`,
+      body?.code || 'api_rpc_failed',
+      body?.message || text || `cv-api RPC ${rpcName} failed.`,
     );
   }
 
   if (!Array.isArray(body)) {
-    throw new HttpError(502, 'invalid_supabase_response', `Supabase RPC ${rpcName} returned an unexpected response.`);
+    throw new HttpError(502, 'invalid_api_response', `cv-api RPC ${rpcName} returned an unexpected response.`);
   }
 
   return body;

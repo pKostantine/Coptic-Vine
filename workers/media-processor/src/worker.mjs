@@ -7,7 +7,7 @@ import { purgeUnusedStorage } from './storage-gc.mjs';
 // enough that a completed upload is normally claimed before the artist has
 // finished entering the rest of the submission metadata.
 const IDLE_POLL_MS = Number(process.env.MEDIA_POLL_INTERVAL_MS || 1000);
-// Backoff applied when the queue itself is unreachable (Supabase down, network
+// Backoff applied when the queue itself is unreachable (cv-api down, network
 // blip), so a broken dependency does not turn into a request flood.
 const MIN_ERROR_BACKOFF_MS = Number(process.env.MEDIA_ERROR_BACKOFF_MS || 5000);
 const MAX_ERROR_BACKOFF_MS = Number(process.env.MEDIA_MAX_ERROR_BACKOFF_MS || 300000);
@@ -174,7 +174,7 @@ async function main() {
     if (storageGcTimer) clearInterval(storageGcTimer);
   }
   log({ status: 'worker_stopped' });
-  // Idle keep-alive sockets (Supabase, R2) must not hold a finished container open.
+  // Idle keep-alive sockets (cv-api, R2) must not hold a finished container open.
   if (EXIT_WHEN_IDLE_MS > 0) setTimeout(() => process.exit(0), 1000).unref();
 }
 

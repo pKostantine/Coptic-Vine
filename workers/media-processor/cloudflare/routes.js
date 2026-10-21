@@ -6,7 +6,7 @@
 // - every minute, a backstop for retries and any missed wake-up;
 // - once a day, so storage cleanup runs even when nothing is uploaded.
 //
-// It starts the container only when Supabase says a job is ready. The
+// It starts the container only when cv-api says a job is ready. The
 // container drains the queue, then exits by itself once it has been idle.
 
 export const CONTAINER_NAME = 'media-processor';
@@ -43,11 +43,9 @@ function message(error) {
 
 /** Whether a job is ready to claim: queued and due, or left behind by a worker that died. */
 export async function queueHasWork(env, fetchImpl = fetch) {
-  const response = await fetchImpl(`${env.SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/rpc/media_processing_queue_has_work`, {
+  const response = await fetchImpl(`${env.API_URL.replace(/\/+$/, '')}/rest/v1/rpc/media_processing_queue_has_work`, {
     method: 'POST',
     headers: {
-      apikey: env.SUPABASE_PUBLISHABLE_KEY,
-      // graphql_public is the project's first exposed schema; name public.
       'accept-profile': 'public',
       'content-profile': 'public',
       'content-type': 'application/json',
@@ -56,7 +54,7 @@ export async function queueHasWork(env, fetchImpl = fetch) {
   });
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`Supabase RPC media_processing_queue_has_work failed with ${response.status}: ${text}`);
+    throw new Error(`cv-api RPC media_processing_queue_has_work failed with ${response.status}: ${text}`);
   }
   return JSON.parse(text) === true;
 }
@@ -64,8 +62,7 @@ export async function queueHasWork(env, fetchImpl = fetch) {
 /** The container's environment: the Worker's settings, and how to behave on Cloudflare. */
 export function containerEnv(env) {
   const vars = {
-    SUPABASE_URL: env.SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY: env.SUPABASE_PUBLISHABLE_KEY,
+    API_URL: env.API_URL,
     MEDIA_WORKER_TOKEN: env.MEDIA_WORKER_TOKEN,
     R2_DRIVER: 's3',
     R2_ACCOUNT_ID: env.R2_ACCOUNT_ID,
@@ -89,7 +86,7 @@ export function startBackoffMs(crashCount) {
   return Math.min(60 * 60_000, 60_000 * 2 ** (crashCount - 1));
 }
 
-/** Starts the container when Supabase has work for it. `processor` is its Durable Object. */
+/** Starts the container when cv-api has work for it. `processor` is its Durable Object. */
 export async function wakeIfWork(env, processor, fetchImpl = fetch) {
   if (!(await queueHasWork(env, fetchImpl))) return { woke: false, reason: 'no_work' };
   return { woke: true, ...(await processor.wake()) };
@@ -119,7 +116,7 @@ export async function handleFetch(request, env, processor, { fetchImpl = fetch, 
   }
 
   // Coptic Vine Admin's file deletions run in the container, which checks the
-  // admin's Supabase session itself. This starts the container if it is asleep.
+  // admin's cv-api session itself. This starts the container if it is asleep.
   if (url.pathname.startsWith('/admin/')) return processor.fetch(request);
 
   return json({ error: 'not_found', message: 'Route not found.' }, 404);
