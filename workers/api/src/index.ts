@@ -5,6 +5,7 @@
  *   /auth/*                       Better Auth (src/auth)
  *   POST /rest/v1/rpc/<function>  the database functions the apps call (src/rpc)
  *   /rest/v1/<table>              the tables they read and write directly (src/rest/tables.ts)
+ *   /storage/v1/…                 the two buckets the apps upload to, on R2 (src/storage.ts)
  *   /health                       whether the Worker and D1 answer
  *
  * The /rest/v1 paths answer as Supabase's REST API (PostgREST) does, so the
@@ -20,10 +21,12 @@
 import { createAuth, list, type Auth } from './auth/index.ts';
 import { afterWrites, trackWrites } from './db/afterWrites.ts';
 import { recoverTransactions } from './db/transaction.ts';
+import { publishDueLearningReleases, publishDueMusicReleases } from './jobs/releases.ts';
 import { httpStatus, PgError, triggerError, uniqueViolation } from './pg.ts';
 import type { ApiContext } from './rest/context.ts';
 import { tableRequest } from './rest/tables.ts';
 import { callRpc } from './rpc/index.ts';
+import { storageRequest } from './storage.ts';
 import type { Env } from './types.ts';
 
 const auths = new WeakMap<Env, Auth>();
@@ -40,7 +43,7 @@ function cors(request: Request, env: Env): Record<string, string> {
     'access-control-allow-origin': origin,
     'access-control-allow-credentials': 'true',
     'access-control-allow-methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
-    'access-control-allow-headers': 'accept, authorization, content-type, x-client-info, apikey, accept-profile, content-profile, prefer, range',
+    'access-control-allow-headers': 'accept, authorization, content-type, x-client-info, apikey, accept-profile, content-profile, prefer, range, x-upsert, cache-control',
     'access-control-expose-headers': 'set-auth-token, content-range',
     'access-control-max-age': '86400',
     vary: 'origin',
@@ -67,6 +70,11 @@ export async function handle(request: Request, env: Env, execution?: Execution):
   }
   if (url.pathname.startsWith('/rest/v1/')) {
     return withHeaders(await rest(request, url, env, execution), corsHeaders);
+  }
+  if (url.pathname.startsWith('/storage/v1/')) {
+    const isRead = request.method === 'GET' || request.method === 'HEAD';
+    const session = isRead ? null : await auth(env).api.getSession({ headers: request.headers });
+    return withHeaders(await storageRequest(request, url, env, session?.user.id ?? null), corsHeaders);
   }
   if (url.pathname === '/health') {
     const db = await env.DB.prepare('SELECT 1 AS ok').first<{ ok: number }>();
@@ -142,9 +150,15 @@ async function restResponse(request: Request, url: URL, env: Env, onWrite: () =>
 
 export default {
   fetch: handle,
-  /** Every minute: transactions a Worker never finished, then whatever a request's after-write step missed. */
+  /**
+   * Every minute: transactions a Worker never finished, the releases due by
+   * their schedule (pg_cron's two jobs), then whatever a request's after-write
+   * step missed.
+   */
   async scheduled(_controller: unknown, env: Env): Promise<void> {
     await recoverTransactions(env.DB);
+    await publishDueMusicReleases(env).catch((error) => console.error('Publishing due music releases:', error));
+    await publishDueLearningReleases(env).catch((error) => console.error('Publishing due learning releases:', error));
     await afterWrites(env);
   },
 };

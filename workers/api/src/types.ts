@@ -24,6 +24,29 @@ export interface D1Database {
   batch<T = Record<string, unknown>>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
 }
 
+/** An R2 object's description (head), and with its body (get). */
+export interface R2Object {
+  key: string;
+  size: number;
+  etag: string;
+  httpEtag: string;
+  uploaded: Date;
+  httpMetadata?: { contentType?: string; cacheControl?: string };
+  customMetadata?: Record<string, string>;
+}
+export interface R2ObjectBody extends R2Object {
+  body: ReadableStream;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+
+/** The R2 bucket binding, the part used here. */
+export interface R2Bucket {
+  head(key: string): Promise<R2Object | null>;
+  get(key: string): Promise<R2ObjectBody | null>;
+  put(key: string, value: ArrayBuffer | ReadableStream | string, options?: { httpMetadata?: { contentType?: string; cacheControl?: string }; customMetadata?: Record<string, string> }): Promise<R2Object>;
+  delete(keys: string | string[]): Promise<void>;
+}
+
 /** Cloudflare Email Service's send binding (wrangler.jsonc "send_email"). */
 export interface SendEmail {
   send(message: {
@@ -61,4 +84,9 @@ export interface Env {
    * send to call functions as Supabase's service role. Unset, nobody can.
    */
   SERVICE_TOKEN?: string;
+  /**
+   * The user's own uploads that Supabase Storage held (the profile-avatars
+   * and playlist-covers buckets), keyed "<bucket>/<path>" (src/storage.ts).
+   */
+  USER_MEDIA?: R2Bucket;
 }

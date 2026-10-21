@@ -230,3 +230,16 @@ test('unrelated routes remain ordinary static asset requests', async () => {
   assert.equal(await response.text(), 'static asset');
   assert.equal(requests.length, 1);
 });
+
+test('after the Phase 2 cutover, previews come from cv-api (DATA_API_URL), without Supabase\'s key', async () => {
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), 'https://api.copticvine.ca/rest/v1/rpc/get_share_preview');
+    assert.equal(new Headers(init?.headers).get('apikey'), null);
+    return new Response(JSON.stringify(PREVIEW), { headers: { 'Content-Type': 'application/json' } });
+  };
+  const { env } = makeEnv();
+  env.DATA_API_URL = 'https://api.copticvine.ca/';
+  const response = await worker.fetch(new Request(`https://copticvine.ca/share/music/release/${RELEASE_ID}`, { headers: { 'User-Agent': 'facebookexternalhit/1.1' } }), env);
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /Liturgy with Cantor Ibrahim Ayad/);
+});

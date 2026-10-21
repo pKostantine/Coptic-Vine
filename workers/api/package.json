@@ -14,6 +14,7 @@
     "deploy": "wrangler deploy",
     "save-schema-dump": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/save-schema-dump.ts",
     "closure": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/function-closure.ts",
+    "move-storage": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/move-storage.ts",
     "gen:functions": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-functions.ts",
     "search-parity": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/search-parity.ts",
     "gen:triggers": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-triggers.ts"
