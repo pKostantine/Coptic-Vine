@@ -404,10 +404,13 @@ on the day.
      (`@react-native-google-signin/google-signin`, `expo-task-manager`), so
      `eas fingerprint:compare` differs and an update with today's code would
      call native code that build doesn't have. That build also still reads
-     content from Supabase (it predates Phase 1's cutover). Run
-     `eas build --platform android --profile production`, then
-     `eas submit --platform android --latest` (Play's internal testing track,
-     the default). There is no iOS build on EAS.
+     content from Supabase (it predates Phase 1's cutover). And it is another
+     app: it was `com.pkostantine.CopticHymnsCentre`, and `app.json` is now
+     `com.copticvine.app`, so a build from `master` needs its own Play
+     listing, which is Pierre's to create. Then
+     `eas build --platform android --profile production` and
+     `eas submit --platform android --latest`. Until then the store app keeps
+     reading and writing Supabase. There is no iOS build on EAS.
 6. **The other Workers.** Point each one at `https://api.copticvine.ca` (see
    "The other Workers"), then deploy it:
    - `cv-media-processor` and `cv-upload-authorizer`: `SUPABASE_URL` in their
@@ -451,9 +454,9 @@ on the day.
 | Step | State |
 |---|---|
 | 1. Inventory | Done ([phase2-inventory.md](phase2-inventory.md)). |
-| 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
+| 2. D1 schema | Done. `0006` to `0011` are applied to the remote D1 (`0009` to `0011` on 21 Oct 2026, at the cutover). |
 | 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
-| 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
-| 5. API (~134 functions, 6 tables) | Done (see below): the six tables and every function. Nothing is deployed until the cutover. |
-| 6. Jobs, storage and Workers that call Supabase | Done in code (see "Storage" and "The other Workers" below); nothing switches until the cutover. |
-| 7. Cutover | Ready to run (see "Cutover (step 7)"). All three apps can switch to cv-api; Supabase stays their default until then. |
+| 4. Sign-in Worker | Live at `https://api.copticvine.ca` since the cutover. |
+| 5. API (~134 functions, 6 tables) | Done and live (see below): the six tables and every function. |
+| 6. Jobs, storage and Workers that call Supabase | Done and live: the minute cron runs the release jobs, storage is on R2, and the other Workers call cv-api. |
+| 7. Cutover | Done on 21 Oct 2026 from the 15:34 UTC export: 994 rows, **74 of 74 checksums match** in the remote D1, the export deleted after loading. cv-api deployed, the one stored avatar moved to R2, the three other Workers and the link previews on cv-api, and copticvine.ca, CV-Admin and CV-Artists switched (cv-api is now their default). Left: the Android app, which needs its own Play listing (step 5), and Google sign-in, tried by hand. |
