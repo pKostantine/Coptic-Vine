@@ -133,6 +133,51 @@ npm run verify -- --pg <saved checksums>           # every table's SHA-256 in D1
 made here would be wiped by the final import, and the apps still sign in with
 Supabase.
 
+## The user-data API (`/rest/v1` on `cv-api`)
+
+**How it answers.** It answers the apps' supabase-js calls as Supabase's REST
+API does, so the apps keep their code:
+
+- `POST /rest/v1/rpc/<function>`, in `src/rpc`;
+- the six tables the apps use directly, in `src/rest/tables.ts`.
+
+The user always comes from the session. Supabase's grants apply too:
+`schema/function-grants.json`, generated from the dump, refuses a signed-out
+call exactly as Postgres does.
+
+**How it is checked: the parity oracle.** `tests/lib/oracle.ts` runs
+Supabase's own functions, policies and grants in PGlite (Postgres compiled to
+WebAssembly). They come from `schema/pg-user-schema.sql`, the structure-only
+dump made by `schema/pg-schema-dump.sql` and saved with
+`npm run save-schema-dump`.
+
+- The `*.parity.test.ts` tests send the same calls, as the same users, to
+  the oracle and to the Worker. The Worker runs on SQLite with the real
+  migrations, and its users sign in through Better Auth.
+- The answers must match: the data, or the error code and message. Ids and
+  server timestamps that each side generates itself are compared as
+  placeholders.
+- Writes are compared table by table.
+- Nothing touches Supabase.
+
+**After a change to a Supabase function, until the cutover:**
+
+1. Re-run the dump and `npm run save-schema-dump -- <result>`.
+2. Run `npm run gen:grants`.
+3. Run the tests; they show what the Worker's port has to follow.
+
+| Group | Functions | State |
+|---|---|---|
+| The user's own tables | `notification_preferences`, `notifications` (read, mark read), `spiritual_canons`, `spiritual_canon_days`, `bible_highlights`, `sermon_plans` | Ported, at parity |
+| Settings and devices | `get_my_content_preferences`, `save_my_content_preferences`, `register_notification_device`, `disable_notification_device` | Ported, at parity |
+| Music | 22 | Next |
+| Learning | 19 | |
+| Search | 2 | |
+| Creator editor and lyrics | 34 | |
+| Admin | 26 | |
+| Workers (media, uploads, notifications, share previews) | 27 | |
+| Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | |
+
 ## Status
 
 | Step | State |
@@ -141,6 +186,6 @@ Supabase.
 | 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
 | 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
-| 5. API (~134 functions, 6 tables) | Not started. |
+| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences and push devices. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |
 | 7. Cutover | Not started. |

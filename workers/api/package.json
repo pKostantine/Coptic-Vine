@@ -11,11 +11,16 @@
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test tests/*.test.ts",
     "typecheck": "tsc -p .",
     "dev": "wrangler dev --port 8790 --persist-to ../content-api/.wrangler/state",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "gen:grants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-grants.ts",
+    "save-schema-dump": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/save-schema-dump.ts"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.12",
     "bcryptjs": "3.0.3",
     "better-auth": "1.7.12"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.10"
   }
 }
