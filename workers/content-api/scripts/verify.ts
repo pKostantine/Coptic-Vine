@@ -152,6 +152,10 @@ async function main() {
   if (!pgFile) throw new Error('Give Postgres\'s checksums with --pg <file> (see --print-pg-sql).');
   const target: Target = args.includes('--local') ? 'local' : 'remote';
   const pg: Record<string, Checksum> = JSON.parse(readFileSync(pgFile, 'utf8'));
+  // A file for another set of tables (the user data's, say) would report every table as different.
+  if (!tables.some((table) => pg[qualified(table)])) {
+    throw new Error(`${pgFile} has none of the content tables' checksums: save the single value --print-pg-sql's query returns. (The user data is checked from workers/api.)`);
+  }
 
   const started = Date.now();
   const d1Rows = readD1(target, tables);
