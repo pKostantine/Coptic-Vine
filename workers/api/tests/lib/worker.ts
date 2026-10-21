@@ -31,7 +31,7 @@ export class WorkerSide {
     this.db = new DatabaseSync(':memory:');
     this.db.exec('PRAGMA foreign_keys = ON');
     this.db.exec('CREATE TABLE "public.hymn_titles" ("hymn_key" TEXT PRIMARY KEY) STRICT');
-    for (const name of ['0006_auth.sql', '0007_user_schema.sql', '0008_auth_rate_limits.sql', '0009_user_triggers.sql', '0010_undo_log.sql']) this.db.exec(migration(name));
+    for (const name of ['0006_auth.sql', '0007_user_schema.sql', '0008_auth_rate_limits.sql', '0009_user_triggers.sql', '0010_undo_log.sql', '0011_job_lease.sql']) this.db.exec(migration(name));
     this.env = {
       DB: d1(this.db), BETTER_AUTH_URL: BASE, BETTER_AUTH_SECRET: 'a-parity-secret-that-is-long-enough-0123456789',
       EMAIL_FROM: 'no-reply@copticvine.ca', TRUSTED_ORIGINS: `${ORIGIN},copticvine://`, EMAIL_MODE: 'outbox', SERVICE_TOKEN, USER_MEDIA: r2(),
@@ -69,7 +69,8 @@ export class WorkerSide {
   fetch(user: string | null, method: string, path: string, init: { body?: BodyInit; headers?: Record<string, string> } = {}): Promise<Response> {
     const headers = this.headers(init.headers);
     if (user) headers.authorization = `Bearer ${user === SERVICE_ROLE ? SERVICE_TOKEN : this.tokens.get(user)}`;
-    return handle(new Request(`${BASE}${path}`, { method, headers, body: init.body }), this.env);
+    // duplex: a streamed body, which Node's Request needs said.
+    return handle(new Request(`${BASE}${path}`, { method, headers, body: init.body, duplex: 'half' } as RequestInit), this.env);
   }
 
   rpc(user: string | null, fn: string, args: Record<string, unknown> = {}): Promise<Answer> {

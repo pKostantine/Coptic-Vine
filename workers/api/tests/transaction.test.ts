@@ -5,8 +5,8 @@
  * triggers and the foreign keys' cascades wrote on its behalf.
  */
 import assert from 'node:assert/strict';
-import { before, test } from 'node:test';
-import { recoverTransactions, rollback, transaction, Tx } from '../src/db/transaction.ts';
+import { before, mock, test } from 'node:test';
+import { recoverTransactions, rollBackLabelled, rollback, transaction, Tx } from '../src/db/transaction.ts';
 import type { ApiContext } from '../src/rest/context.ts';
 import { ALICE, A2, BOB, C1, id, R1, R2, R5, S1, seedCatalog, T1, T4 } from './lib/creatorCatalog.ts';
 import { createOracle } from './lib/oracle.ts';
@@ -101,4 +101,50 @@ test('a transaction its Worker never finished is rolled back by the cron', async
   assert.equal(await recoverTransactions(worker.env.DB, Date.now() + 6 * 60_000), 1);
   assert.deepEqual(differences(snapshot(), before), []);
   await rollback(worker.env.DB, 'nothing'); // a transaction with no log is a no-op
+});
+
+/** Bob's follow deleted in a transaction, then taken again outside it: that transaction can't be rolled back. */
+async function unrollable(name: string): Promise<void> {
+  const tx = new Tx(worker.env.DB, name);
+  await tx.run(`DELETE FROM "music.artist_follows" WHERE "user_id" = ? AND "artist_id" = ?`, BOB, id(20));
+  worker.db.exec(`INSERT INTO "music.artist_follows" ("user_id", "artist_id", "created_at") VALUES ('${BOB}', '${id(20)}', '2026-03-02T08:00:00+00:00')`);
+}
+const retaken = () => worker.db.exec(`DELETE FROM "music.artist_follows" WHERE "user_id" = '${BOB}' AND "created_at" = '2026-03-02T08:00:00+00:00'`);
+
+test('one abandoned transaction that can\'t be rolled back is left for the next run, and the rest still are', async () => {
+  const before = snapshot();
+  await unrollable('stuck');
+  const fine = new Tx(worker.env.DB, 'fine');
+  await fine.run(`UPDATE "music.tracks" SET "title" = 'Half done' WHERE "id" = ?`, T1);
+  const errors = mock.method(console, 'error', () => {});
+  try {
+    assert.equal(await recoverTransactions(worker.env.DB, Date.now() + 6 * 60_000), 1);
+    assert.equal(errors.mock.callCount(), 1);
+  } finally {
+    errors.mock.restore();
+  }
+  assert.deepEqual(worker.db.prepare(`SELECT DISTINCT "txn" FROM "private.undo_log"`).all().map((row) => row.txn), ['stuck']);
+  retaken();
+  assert.equal(await recoverTransactions(worker.env.DB, Date.now() + 6 * 60_000), 1);
+  assert.deepEqual(differences(snapshot(), before), []);
+});
+
+test('a label names a transaction; rolling back a label takes its logs at any age, and only its own', async () => {
+  const before = snapshot();
+  let name = '';
+  await transaction(ctx, async (tx) => { name = tx.id; }, 'release');
+  assert.match(name, /^release:[0-9a-f-]{36}$/);
+  const mine = new Tx(worker.env.DB, 'release:1');
+  await mine.run(`UPDATE "music.tracks" SET "title" = 'Mine' WHERE "id" = ?`, T1);
+  const lookalike = new Tx(worker.env.DB, 'releases:1');
+  await lookalike.run(`UPDATE "music.artists" SET "display_name" = 'Not mine' WHERE "id" = ?`, A2);
+  assert.equal(await rollBackLabelled(worker.env.DB, 'release'), 1);
+  assert.deepEqual(worker.db.prepare(`SELECT DISTINCT "txn" FROM "private.undo_log"`).all().map((row) => row.txn), ['releases:1']);
+  await rollback(worker.env.DB, 'releases:1');
+  assert.deepEqual(differences(snapshot(), before), []);
+  await unrollable('release:2');
+  await assert.rejects(rollBackLabelled(worker.env.DB, 'release'));
+  retaken();
+  assert.equal(await rollBackLabelled(worker.env.DB, 'release'), 1);
+  assert.deepEqual(differences(snapshot(), before), []);
 });

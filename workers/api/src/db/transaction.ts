@@ -13,6 +13,8 @@
  * Unlike Postgres, a transaction's writes are visible to other requests
  * before it ends. A Worker that dies mid-transaction leaves its log behind:
  * recoverTransactions (run by the cron) rolls back any older than five minutes.
+ * A job that knows none of its own transactions is running (src/jobs/releases.ts)
+ * labels them, and rolls back what its earlier runs left before writing again.
  */
 import { col, t } from '../../../content-api/src/db/names.ts';
 import { now } from '../pg.ts';
@@ -65,9 +67,9 @@ export class Tx {
   }
 }
 
-/** Runs work in a transaction: all its writes stay, or none. */
-export async function transaction<T>(ctx: ApiContext, work: (tx: Tx) => Promise<T>): Promise<T> {
-  const tx = new Tx(ctx.db, crypto.randomUUID());
+/** Runs work in a transaction: all its writes stay, or none. A label starts its name ("<label>:<uuid>"). */
+export async function transaction<T>(ctx: ApiContext, work: (tx: Tx) => Promise<T>, label?: string): Promise<T> {
+  const tx = new Tx(ctx.db, label ? `${label}:${crypto.randomUUID()}` : crypto.randomUUID());
   let result: T;
   try {
     result = await work(tx);
@@ -106,10 +108,30 @@ export async function rollback(db: D1Database, txn: string): Promise<void> {
   ]);
 }
 
-/** Rolls back transactions whose Worker never finished them. */
+/**
+ * Rolls back transactions whose Worker never finished them. One that can't be
+ * rolled back (a row it deleted has had its key taken since) is logged and
+ * tried again on the next run, without holding up the rest.
+ */
 export async function recoverTransactions(db: D1Database, now = Date.now()): Promise<number> {
   const cutoff = new Date(now - ABANDONED_AFTER_MS).toISOString().replace('Z', '+00:00');
   const abandoned = await db.prepare(`SELECT ${col('txn')} AS txn FROM ${LOG} GROUP BY ${col('txn')} HAVING max(${col('at')}) < ?`).bind(cutoff).all<{ txn: string }>();
-  for (const { txn } of abandoned.results) await rollback(db, txn);
-  return abandoned.results.length;
+  let recovered = 0;
+  for (const { txn } of abandoned.results) {
+    try {
+      await rollback(db, txn);
+      recovered += 1;
+    } catch (error) {
+      console.error(`Rolling back abandoned transaction ${txn}:`, error);
+    }
+  }
+  return recovered;
+}
+
+/** Rolls back every transaction under a label, whatever its age; throws if one can't be. */
+export async function rollBackLabelled(db: D1Database, label: string): Promise<number> {
+  const prefix = `${label}:`;
+  const left = await db.prepare(`SELECT DISTINCT ${col('txn')} AS txn FROM ${LOG} WHERE substr(${col('txn')}, 1, ?) = ?`).bind(prefix.length, prefix).all<{ txn: string }>();
+  for (const { txn } of left.results) await rollback(db, txn);
+  return left.results.length;
 }

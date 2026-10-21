@@ -192,7 +192,7 @@ The Worker sets the owner and lets `is_credit_only` follow. The parity tests run
 - **After the write.** Two things Supabase did outside the transaction, the Worker does once the write has committed (`src/db/afterWrites.ts`): rebuild the catalog search index when the catalog changed (the triggers count changes in `"private.search_index_state"`), and wake the media processor when a job is queued (`"private.outbox"`). A cron runs the same step every minute, in case a request missed it.
 - **Atomic.** A Supabase function runs in one transaction. D1 has none across statements (only a `db.batch()` is atomic), so:
   - a ported function that can check everything first writes in one batch;
-  - one that must read what it wrote (the creator editor's, the admin's) runs in `transaction()` (`src/db/transaction.ts`): migration `0010`'s triggers record the inverse of each of its writes in `"private.undo_log"`, cascades and trigger writes included, and a failure plays them back. The minute cron rolls back any transaction a Worker never finished. Unlike Postgres, other requests can see a transaction's writes before it ends.
+  - one that must read what it wrote (the creator editor's, the admin's) runs in `transaction()` (`src/db/transaction.ts`): migration `0010`'s triggers record the inverse of each of its writes in `"private.undo_log"`, cascades and trigger writes included, and a failure plays them back. The minute cron rolls back any transaction a Worker never finished (older than five minutes); one that can't be rolled back is logged and tried again the next minute, without holding up the rest. Unlike Postgres, other requests can see a transaction's writes before it ends.
   - The tests' D1 stand-in makes batches atomic as D1 does; `tests/transaction.test.ts` checks that a rollback restores every row, and it was also checked on workerd's D1.
 - **Checked by** `tests/triggers.parity.test.ts`: the same writes on the oracle and on SQLite, every table compared after each. The search index rebuilt from the real D1 copy matched Supabase's, 103 documents of 103, field by field.
 - **Not ported:** `media.search_aliases`' normalization trigger. Nothing writes that table; whatever does must store `normalized_alias` with `normalizeSearchText`.
@@ -214,7 +214,7 @@ The Worker sets the owner and lets `is_credit_only` follow. The parity tests run
 | Creator editor and lyrics | 34: workspaces, artists, cantors and hymns, submissions (create, add, submit, edit, delete), releases, processing jobs, the lyrics studio | Ported, at parity (reads, writes and lyrics have their own parity tests; every table is compared after each write) |
 | Admin | 26: CV-Admin's review queue, submission detail, publication overview, processing jobs, artists, artist claims and broadcast overview; reviews (approval publishes what is due), publishing, release dates, deletions, artist profiles and claims, forcing and retrying jobs, test and broadcast notifications | Ported, at parity (reads and writes have their own parity tests; every table is compared after each write, refused ones included) |
 | Workers (media, uploads, notifications, share previews) | 27: the media processor's queue (9) and storage clean-up (4), the admin's file deletion (3, through the processor's admin routes), the upload authorizer's (4), the notification dispatcher's (5), the web app's link previews (2) | Ported, at parity. The processor proves itself with its worker token, checked against `"private.media_worker_tokens"`; the dispatcher's functions, which Supabase lets only its service role call, take `SERVICE_TOKEN` (below). |
-| Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | Ported, at parity. The two pg_cron jobs run in `cv-api`'s minute cron (`src/jobs/releases.ts`), each submission in its own transaction, a failure noted on it as Supabase did; the three notification triggers are 0009's SQLite triggers, and the dispatcher keeps its own schedule. |
+| Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | Ported, at parity. The two pg_cron jobs run in `cv-api`'s minute cron (`src/jobs/releases.ts`), each submission in its own transaction, a failure noted on it as Supabase did. pg_cron never ran a job beside its own last run, and Cloudflare does, so a run takes a lease first (`"private.job_lease"`, migration `0011`, 15 minutes) and one that can't leaves the releases alone; holding it, it first rolls back any release transaction a dead run left, so a later recovery can't undo a publish made over it; the three notification triggers are 0009's SQLite triggers, and the dispatcher keeps its own schedule. |
 
 **Calls from other Workers.** The notification dispatcher's functions are
 granted only to Supabase's service role. On `cv-api`, a request whose bearer
@@ -266,7 +266,9 @@ Supabase Storage held two public buckets the apps upload to: `profile-avatars`
   `/storage/v1/object/<bucket>/<path>`. The policies of `storage.objects` carry
   over: a photo only under the user's own folder, a cover only at
   `<uid>/<playlist>/cover` of the user's own playlist. Both buckets take JPEG,
-  PNG or WebP up to 5 MB, and the uploader is kept as the object's owner.
+  PNG or WebP up to 5 MB, and the uploader is kept as the object's owner. A
+  larger upload is refused by its declared length before it is read, or once
+  the stream passes the limit, as Supabase stopped it while streaming.
 - **Removing:** `DELETE /storage/v1/object/<bucket>` with `{ "prefixes": [...] }`.
 - **`set_music_playlist_cover`** reads the upload from R2 (type, size, owner)
   and gives the cover cv-api's address, where Supabase's took the project URL
@@ -278,7 +280,9 @@ the final import is verified, `npm run move-storage` in `workers/api`. It
 copies each object the D1 copy points to from Supabase's public buckets (read
 only) to R2, and rewrites the addresses: users' `image` and
 `raw_user_meta_data.chc_avatar_url`, and uploaded covers' `media_assets.path`.
-`--dry-run` lists what it would do.
+`--dry-run` lists what it would do. An object already gone from Supabase (a
+cleared cover keeps its archived row) is reported and skipped, its address
+still rewritten; any other failure stops it, and it can be run again.
 
 ## The Coptic Vine app's switch
 
@@ -406,7 +410,11 @@ on the day.
      `SUPABASE_SERVICE_ROLE_KEY` secret set to cv-api's `SERVICE_TOKEN`.
    - `coptic-vine` (the link previews): `DATA_API_URL` under `vars` in the
      root `wrangler.jsonc`.
-7. **CV-Admin and CV-Artists.**
+7. **CV-Admin and CV-Artists.** Only after step 6: both hand the signed-in
+   session to `cv-media-processor` and `cv-upload-authorizer`, and a cv-api
+   session must never reach Workers that still forward it to Supabase. So
+   don't switch either one before then, not even to try it. Between steps 6
+   and 7 their uploads and previews are refused; keep the gap short.
    - For each Worker (`cv-admin`, `cv-artists`), go to Settings > Build >
      Variables and secrets. Set `EXPO_PUBLIC_USER_DATA_SOURCE=cloudflare`,
      then retry the latest build.
