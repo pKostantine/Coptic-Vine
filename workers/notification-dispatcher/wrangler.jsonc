@@ -4,7 +4,9 @@
   "main": "src/index.js",
   "compatibility_date": "2026-09-21",
   "vars": {
-    "SUPABASE_URL": "https://wtuujmeinzqfikvuofmh.supabase.co"
+    // cv-api since the Phase 2 cutover (docs/d1/phase2-runbook.md), with its SERVICE_TOKEN as the
+    // SUPABASE_SERVICE_ROLE_KEY secret; Supabase was https://wtuujmeinzqfikvuofmh.supabase.co.
+    "SUPABASE_URL": "https://api.copticvine.ca"
   },
   "triggers": {
     "crons": ["* * * * *"]
