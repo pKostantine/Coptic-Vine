@@ -7,6 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
+import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import { createCvApiAuth, sessionTokenFromCookie, type CvApiAuthOptions } from '../../../src/services/cvApiAuth.ts';
 import type { AccountEvent } from '../../../src/types/account.ts';
@@ -14,6 +15,7 @@ import { outbox } from '../src/auth/email.ts';
 import { handle } from '../src/index.ts';
 import type { Env } from '../src/types.ts';
 import { authDatabase } from './lib/d1.ts';
+import { r2 } from './lib/r2.ts';
 
 const BASE = 'http://localhost:8790';
 const WEB = 'http://localhost:8081';
@@ -291,6 +293,73 @@ test('Google on a phone: through the Expo plugin\'s proxy, which leaves the sign
   assert.equal((await done.auth.getSession())?.user.id, USER);
 });
 
+const OTHER = '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+
+/** A second account, as someone else's: its Set-Cookie after signing in, as a link back would carry it. */
+async function otherAccountCookie(): Promise<string> {
+  db.prepare('INSERT INTO "auth.users" ("id", "name", "email", "email_verified", "created_at", "updated_at", "raw_user_meta_data") VALUES (?, ?, ?, 1, ?, ?, ?)')
+    .run(OTHER, 'Someone Else', 'other@example.com', STAMP, STAMP, '{}');
+  db.prepare('INSERT INTO "auth.accounts" ("id", "user_id", "account_id", "provider_id", "password", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('acc-2', OTHER, OTHER, 'credential', bcrypt.hashSync('other password 1', 4), STAMP, STAMP);
+  const signedIn = await handle(new Request(`${BASE}/auth/sign-in/email`, { method: 'POST', headers: { 'content-type': 'application/json', origin: WEB }, body: JSON.stringify({ email: 'other@example.com', password: 'other password 1' }) }), env);
+  return signedIn.headers.get('set-cookie')!;
+}
+
+test('a link with someone else\'s session never signs the app in to their account', async () => {
+  const cookie = encodeURIComponent(await otherAccountCookie());
+  // A phone that started no sign-in: a crafted link is ignored.
+  const idle = phone();
+  await idle.auth.applyCallback(`${APP_LINK}?cookie=${cookie}`);
+  assert.equal(await idle.auth.getSession(), null);
+  assert.equal(idle.storage.values.get('cv-api.session-token'), undefined);
+  // A phone signed in, in the middle of changing its email: a link for another account doesn't replace it.
+  const busy = phone();
+  await busy.auth.signInWithEmail('reader@example.com', 'old password 1');
+  const own = await busy.auth.accessToken();
+  await busy.auth.updateEmail('moved@example.com', APP_LINK);
+  await assert.rejects(busy.auth.applyCallback(`${APP_LINK}?cookie=${cookie}`), /finishSignIn/);
+  assert.equal((await busy.auth.getSession())?.user.id, USER);
+  assert.equal(await busy.auth.accessToken(), own);
+  assert.deepEqual(busy.events, ['SIGNED_IN']);
+  // The web never takes a session from a link (the cookie is set by the redirect itself), not even CV-Artists' with its bearer token.
+  const { fetcher } = browser();
+  const storage = memoryStorage();
+  const web = createCvApiAuth({ baseUrl: BASE, native: false, bearer: true, appOrigin: '', storage: () => storage, fetch: fetcher, message: (key) => key, replaceUrl: () => {} });
+  assert.deepEqual(await web.signUpWithEmail('web@example.com', 'a new password', 'Web Reader', WEB_LINK), { confirmationRequired: true });
+  await web.applyCallback(`https://artists.copticvine.ca/auth/callback?cookie=${cookie}`);
+  assert.equal(await web.accessToken(), null);
+  assert.equal(await web.getSession(), null);
+});
+
+test('a reset link for another account, opened while signed in, leaves this device signed in', async () => {
+  await otherAccountCookie();
+  const { auth, events } = phone();
+  await auth.signInWithEmail('reader@example.com', 'old password 1');
+  const own = await auth.accessToken();
+  await phone().auth.sendPasswordReset('other@example.com', APP_LINK);
+  await auth.applyCallback(await openLink(lastEmailTo('other@example.com').link));
+  await auth.updatePassword('their new password');
+  assert.equal((await auth.getSession())?.user.id, USER);
+  assert.equal(await serverUser(own), USER, 'its session untouched');
+  assert.deepEqual(events, ['SIGNED_IN', 'PASSWORD_RECOVERY']);
+});
+
+test('an answer that is not cv-api\'s (a page in its place) is the server failing, not a sign-out', async () => {
+  const first = phone();
+  await first.auth.signInWithEmail('reader@example.com', 'old password 1');
+  const send = worker();
+  const page = phone({
+    storage: () => first.storage,
+    fetch: async (input, init) => String(input).endsWith('/auth/get-session')
+      ? new Response('<!doctype html><title>Coptic Vine</title>', { status: 200, headers: { 'content-type': 'text/html' } })
+      : send(input, init),
+  });
+  assert.equal((await page.auth.getSession())?.user.id, USER);
+  assert.equal((await page.auth.refresh())?.user.id, USER);
+  assert.ok(first.storage.values.get('cv-api.session-token'), 'the token is kept');
+  assert.deepEqual(page.events, []);
+});
+
 test('links for elsewhere in the app are left alone', async () => {
   const { auth, events } = phone();
   await auth.applyCallback('copticvine://music/release/1?token=abc');
@@ -371,6 +440,32 @@ test('the web keeps cv-api\'s cookie, never a token, and the data requests carry
   // Google: the page itself goes there, and comes back with the cookie.
   await auth.signInWithGoogle(WEB_LINK);
   assert.equal(new URL(navigated[0]).host, 'accounts.google.com');
+});
+
+test('the web\'s data requests, as supabase-js sends them, are the signed-in user\'s', async () => {
+  env.USER_MEDIA = r2();
+  const { fetcher } = browser();
+  const sent: Headers[] = [];
+  const storage = memoryStorage();
+  const auth = createCvApiAuth({
+    baseUrl: BASE, native: false, appOrigin: '', callbackPath: 'account', storage: () => storage, message: (key) => key,
+    fetch: async (input, init) => {
+      sent.push(new Headers(init?.headers));
+      return fetcher(input, init);
+    },
+  });
+  await auth.signInWithEmail('reader@example.com', 'old password 1');
+  // As src/utils/supabase.ts makes it: with no token of its own, supabase-js sends its publishable key as the bearer.
+  const supabase = createClient(BASE, 'sb_publishable_AbCdEf0123456789_xyz', { accessToken: auth.accessToken, global: { fetch: auth.fetch } });
+  sent.length = 0;
+  const { error } = await supabase.storage.from('profile-avatars').upload(`${USER}/avatar`, new Uint8Array(64), { contentType: 'image/png' });
+  assert.equal(error, null);
+  assert.equal(sent[0].get('apikey'), 'sb_publishable_AbCdEf0123456789_xyz');
+  assert.equal(sent[0].get('authorization'), null, 'the cookie is the session: no bearer goes with it');
+  // And signed out, the same upload is refused.
+  await auth.signOut();
+  const refused = await supabase.storage.from('profile-avatars').upload(`${USER}/again`, new Uint8Array(64), { contentType: 'image/png' });
+  assert.ok(refused.error);
 });
 
 test('the web with a bearer token too (CV-Admin, CV-Artists): from the sign-in, or from the cookie after Google\'s redirect', async () => {
