@@ -2,15 +2,17 @@
  * Listeners' playlists: ports of public.get_music_playlist,
  * create_music_playlist, update_music_playlist, delete_music_playlist,
  * add_track_to_music_playlist, remove_track_from_music_playlist,
- * set_music_playlist_track_order and clear_music_playlist_cover
- * (schema/pg-user-schema.sql), checked by tests/music.parity.test.ts.
+ * set_music_playlist_track_order, clear_music_playlist_cover and
+ * set_music_playlist_cover (schema/pg-user-schema.sql), checked by
+ * tests/music.parity.test.ts and tests/storage.objects.test.ts.
  *
- * set_music_playlist_cover isn't here: it reads the uploaded file from
- * Supabase Storage and builds its URL from Supabase's sign-in issuer, so it
- * moves with the playlist covers to R2 (step 6 of docs/d1/phase2-runbook.md).
+ * set_music_playlist_cover reads the uploaded file from R2 (src/storage.ts)
+ * where Supabase's read storage.objects, and builds the cover's address from
+ * this Worker's own (BETTER_AUTH_URL) where Supabase's took its sign-in issuer.
  */
 import { col, t } from '../../../../content-api/src/db/names.ts';
-import { now, raise } from '../../pg.ts';
+import { transaction } from '../../db/transaction.ts';
+import { jsonbText, now, raise } from '../../pg.ts';
 import type { ApiContext } from '../../rest/context.ts';
 import {
   all, assetColumns, assetObject, first, firstReleases, IN_LIST, loadAssets, loadCredits, loadLocalizations, localized, ME, meParams, order, payload,
@@ -197,4 +199,39 @@ export async function clearMusicPlaylistCover(ctx: ApiContext, playlistId: strin
   }
   await ctx.db.batch(statements);
   return true;
+}
+
+const COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/** The cover just uploaded to "<uid>/<playlist>/cover" becomes the playlist's, at its public address; uploading again bumps its version. */
+export async function setMusicPlaylistCover(ctx: ApiContext, playlistId: string): Promise<unknown> {
+  const userId = requireUser(ctx);
+  const playlist = await first(ctx, `SELECT 1 AS yes FROM ${t('music', 'playlists')} WHERE ${col('id')} = ? AND ${col('owner_user_id')} = ?`, playlistId, userId);
+  if (!playlist) raise(NOT_EDITABLE, '42501');
+  const path = `${userId}/${playlistId}/cover`;
+  // The upload, if the caller made it (storage.objects' owner).
+  const object = await ctx.env.USER_MEDIA?.head(`playlist-covers/${path}`) ?? null;
+  const mine = object != null && object.customMetadata?.owner === userId;
+  const mimeType = mine ? object!.httpMetadata?.contentType?.toLowerCase() ?? null : null;
+  const size = mine ? object!.size : null;
+  if (mimeType == null || size == null) raise('Upload the playlist cover before attaching it', '22023');
+  if (!COVER_TYPES.includes(mimeType!)) raise('Playlist covers must be JPEG, PNG, or WebP', '22023');
+  if (size! <= 0 || size! > 5242880) raise('Playlist covers must be 5 MB or smaller', '22023');
+  const base = ctx.env.BETTER_AUTH_URL ?? '';
+  if (!/^https?:\/\//.test(base)) raise('Unable to resolve the playlist cover URL', '22023');
+  const address = `${base.replace(/\/+$/, '')}/storage/v1/object/public/playlist-covers/${path}`;
+  const cover = await transaction(ctx, async (tx) => {
+    const asset = (await tx.writeFirst(`INSERT INTO ${t('media', 'media_assets')} (${['id', 'owner_creator_account_id', 'provider', 'bucket', 'path', 'media_type', 'mime_type', 'file_size_bytes',
+      'version', 'processing_status', 'publication_status', 'metadata', 'created_by', 'updated_by'].map(col).join(', ')})
+      VALUES (?, NULL, 'external', 'playlist-covers', ?, 'image', ?, ?, 1, 'completed', 'published', ?, ?, ?)
+      ON CONFLICT (${col('provider')}, ${col('bucket')}, ${col('path')}) DO UPDATE SET ${col('mime_type')} = excluded.${col('mime_type')},
+        ${col('file_size_bytes')} = excluded.${col('file_size_bytes')}, ${col('version')} = ${t('media', 'media_assets')}.${col('version')} + 1, ${col('processing_status')} = 'completed',
+        ${col('publication_status')} = 'published', ${col('metadata')} = excluded.${col('metadata')}, ${col('updated_by')} = ?, ${col('updated_at')} = ?
+      RETURNING ${col('id')}, ${col('version')}`, crypto.randomUUID(), address, mimeType, size, jsonbText({ playlistId, storagePath: path }), userId, userId, userId, tx.at))!;
+    await tx.run(`UPDATE ${t('music', 'playlists')} SET ${col('cover_asset_id')} = ?, ${col('updated_at')} = ? WHERE ${col('id')} = ? AND ${col('owner_user_id')} = ?`, asset.id, tx.at, playlistId, userId);
+    return asset;
+  });
+  return payload({
+    id: cover.id, provider: 'external', bucket: 'playlist-covers', path: `${address}?v=${cover.version}`, mimeType, fileSizeBytes: size, version: cover.version,
+  });
 }

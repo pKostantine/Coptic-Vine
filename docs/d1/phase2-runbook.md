@@ -208,13 +208,13 @@ The Worker sets the owner and lets `is_credit_only` follow. The parity tests run
 |---|---|---|
 | The user's own tables | `notification_preferences`, `notifications` (read, mark read), `spiritual_canons`, `spiritual_canon_days`, `bible_highlights`, `sermon_plans` | Ported, at parity |
 | Settings and devices | `get_my_content_preferences`, `save_my_content_preferences`, `register_notification_device`, `disable_notification_device` | Ported, at parity |
-| Music | 21 of 22: the catalog, library, likes, follows, plays and playlists | Ported, at parity. `set_music_playlist_cover` moves with the covers to R2 (step 6). |
+| Music | 22: the catalog, library, likes, follows, plays and playlists (`set_music_playlist_cover` with the covers on R2, see "Storage") | Ported, at parity |
 | Learning | 19: the catalog, progress, likes and playlists | Ported, at parity |
 | Search | `search_media_catalog`, `search_section_catalog` | Ported, at parity, and checked on the real catalog (below) |
 | Creator editor and lyrics | 34: workspaces, artists, cantors and hymns, submissions (create, add, submit, edit, delete), releases, processing jobs, the lyrics studio | Ported, at parity (reads, writes and lyrics have their own parity tests; every table is compared after each write) |
 | Admin | 26: CV-Admin's review queue, submission detail, publication overview, processing jobs, artists, artist claims and broadcast overview; reviews (approval publishes what is due), publishing, release dates, deletions, artist profiles and claims, forcing and retrying jobs, test and broadcast notifications | Ported, at parity (reads and writes have their own parity tests; every table is compared after each write, refused ones included) |
 | Workers (media, uploads, notifications, share previews) | 27: the media processor's queue (9) and storage clean-up (4), the admin's file deletion (3, through the processor's admin routes), the upload authorizer's (4), the notification dispatcher's (5), the web app's link previews (2) | Ported, at parity. The processor proves itself with its worker token, checked against `"private.media_worker_tokens"`; the dispatcher's functions, which Supabase lets only its service role call, take `SERVICE_TOKEN` (below). |
-| Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | |
+| Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | Ported, at parity. The two pg_cron jobs run in `cv-api`'s minute cron (`src/jobs/releases.ts`), each submission in its own transaction, a failure noted on it as Supabase did; the three notification triggers are 0009's SQLite triggers, and the dispatcher keeps its own schedule. |
 
 **Calls from other Workers.** The notification dispatcher's functions are
 granted only to Supabase's service role. On `cv-api`, a request whose bearer
@@ -254,6 +254,47 @@ Phase 1's, which now also handle weights.
   (`private.refresh_unified_search_index`) and `search_aliases` must store
   `normalized_text` and `normalized_alias` with `normalizeSearchText`.
 
+## Storage (`/storage/v1` on `cv-api`)
+
+Supabase Storage held two public buckets the apps upload to: `profile-avatars`
+(one photo) and `playlist-covers` (empty). They move to the R2 bucket
+`cv-user-media`, keyed `<bucket>/<path>` (binding `USER_MEDIA`), served by
+`src/storage.ts` with the supabase-js storage calls the apps make:
+
+- **Reading:** `GET /storage/v1/object/public/<bucket>/<path>`, for anyone.
+- **Uploading:** `POST` (with `x-upsert: true` to replace) or `PUT` to
+  `/storage/v1/object/<bucket>/<path>`. The policies of `storage.objects` carry
+  over: a photo only under the user's own folder, a cover only at
+  `<uid>/<playlist>/cover` of the user's own playlist. Both buckets take JPEG,
+  PNG or WebP up to 5 MB, and the uploader is kept as the object's owner.
+- **Removing:** `DELETE /storage/v1/object/<bucket>` with `{ "prefixes": [...] }`.
+- **`set_music_playlist_cover`** reads the upload from R2 (type, size, owner)
+  and gives the cover cv-api's address, where Supabase's took the project URL
+  from the sign-in issuer. `tests/storage.objects.test.ts` checks it against
+  Supabase's own function, the oracle given a `storage.objects` row.
+
+**At the cutover:** `npx wrangler r2 bucket create cv-user-media`, then, after
+the final import is verified, `npm run move-storage` in `workers/api`. It
+copies each object the D1 copy points to from Supabase's public buckets (read
+only) to R2, and rewrites the addresses: users' `image` and
+`raw_user_meta_data.chc_avatar_url`, and uploaded covers' `media_assets.path`.
+`--dry-run` lists what it would do.
+
+## The other Workers
+
+They call only `/rest/v1/rpc/…`, which `cv-api` answers at the same paths. At
+the cutover each points at `https://api.copticvine.ca`:
+
+| Worker | Change |
+|---|---|
+| `cv-media-processor` (and its admin routes) | `SUPABASE_URL`. It keeps its worker token; admins' tokens are cv-api sessions. |
+| `cv-upload-authorizer` | `SUPABASE_URL`. It forwards the user's token, now a cv-api session. |
+| `cv-notification-dispatcher` | `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` set to `cv-api`'s `SERVICE_TOKEN`. |
+| `coptic-vine` (the web app's link previews) | `DATA_API_URL` (no key needed); unset, it reads Supabase. |
+
+`cv-api` itself wakes the media processor after a job is queued
+(`MEDIA_PROCESSOR_URL`), where `pg_net` did.
+
 ## Status
 
 | Step | State |
@@ -262,6 +303,6 @@ Phase 1's, which now also handle weights.
 | 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
 | 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
-| 5. API (~134 functions, 6 tables) | Done (see below): the six tables and every function, but `set_music_playlist_cover`, which moves with the playlist covers to R2 in step 6. Nothing is deployed until the cutover. |
-| 6. Jobs, storage and Workers that call Supabase | Not started. |
+| 5. API (~134 functions, 6 tables) | Done (see below): the six tables and every function. Nothing is deployed until the cutover. |
+| 6. Jobs, storage and Workers that call Supabase | Done in code (see "Storage" and "The other Workers" below); nothing switches until the cutover. |
 | 7. Cutover | Not started. Apply `0009`, `0010` (and any later migration) to the remote D1 before the final import. |

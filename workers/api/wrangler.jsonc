@@ -20,6 +20,8 @@
       "migrations_dir": "../content-api/migrations"
     }
   ],
+  // The user's own uploads that Supabase Storage held: profile photos and playlist covers (src/storage.ts).
+  "r2_buckets": [{ "binding": "USER_MEDIA", "bucket_name": "cv-user-media" }],
   // Cloudflare Email Service: copticvine.ca has to be onboarded for Email Sending.
   "send_email": [{ "name": "EMAIL" }],
   "vars": {
@@ -28,12 +30,14 @@
     // The web apps and the native apps' schemes (app.json of each app).
     "TRUSTED_ORIGINS": "https://copticvine.ca,https://admin.copticvine.ca,https://artists.copticvine.ca,https://preview.copticvine.ca,copticvine://,coptichymnscentre://,copticvineadmin://,copticvineartists://",
     // Google's web OAuth client (EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in the app's .env).
-    // GOOGLE_CLIENT_SECRET and BETTER_AUTH_SECRET are secrets.
+    // GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET and SERVICE_TOKEN (the notification
+    // dispatcher's key, src/index.ts) are secrets.
     "GOOGLE_CLIENT_ID": "42138677998-dnc84mpjmu5cej8k40vsp1b5l9bgs34k.apps.googleusercontent.com",
     // Woken when a media processing job is queued (src/db/afterWrites.ts).
     "MEDIA_PROCESSOR_URL": "https://cv-media-processor.hrmpdd8d6c.workers.dev"
   },
-  // The search index and the processor's wake-up, if a request's after-write step missed them.
+  // Every minute: releases due by their schedule (src/jobs/releases.ts), and the search
+  // index and the processor's wake-up, if a request's after-write step missed them.
   "triggers": { "crons": ["* * * * *"] },
   "observability": {
     "enabled": true

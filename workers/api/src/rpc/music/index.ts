@@ -5,7 +5,7 @@ import {
 } from './catalog.ts';
 import { getArtistFollowed, getMyMusicLibrary, getReleaseLiked, recordMusicPlay, setArtistFollowed, setReleaseLiked, setTrackLiked } from './library.ts';
 import {
-  addTrackToMusicPlaylist, clearMusicPlaylistCover, createMusicPlaylist, deleteMusicPlaylist, getMusicPlaylist, removeTrackFromMusicPlaylist,
+  addTrackToMusicPlaylist, clearMusicPlaylistCover, createMusicPlaylist, setMusicPlaylistCover, deleteMusicPlaylist, getMusicPlaylist, removeTrackFromMusicPlaylist,
   setMusicPlaylistTrackOrder, updateMusicPlaylist,
 } from './playlists.ts';
 
@@ -34,4 +34,5 @@ export const musicRpcs: Record<string, Rpc> = {
   'public.remove_track_from_music_playlist': (c, a) => removeTrackFromMusicPlaylist(c, s(a, 'p_playlist_id'), s(a, 'p_track_id')),
   'public.set_music_playlist_track_order': (c, a) => setMusicPlaylistTrackOrder(c, s(a, 'p_playlist_id'), a.p_track_ids as (string | null)[] | null),
   'public.clear_music_playlist_cover': (c, a) => clearMusicPlaylistCover(c, s(a, 'p_playlist_id')),
+  'public.set_music_playlist_cover': (c, a) => setMusicPlaylistCover(c, s(a, 'p_playlist_id')),
 };

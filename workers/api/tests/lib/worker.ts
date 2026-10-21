@@ -10,6 +10,7 @@ import { handle } from '../../src/index.ts';
 import type { Env } from '../../src/types.ts';
 import { d1, migration } from './d1.ts';
 import { SERVICE_ROLE } from './oracle.ts';
+import { r2 } from './r2.ts';
 
 export const BASE = 'http://localhost:8790';
 const ORIGIN = 'http://localhost:8081';
@@ -33,7 +34,7 @@ export class WorkerSide {
     for (const name of ['0006_auth.sql', '0007_user_schema.sql', '0008_auth_rate_limits.sql', '0009_user_triggers.sql', '0010_undo_log.sql']) this.db.exec(migration(name));
     this.env = {
       DB: d1(this.db), BETTER_AUTH_URL: BASE, BETTER_AUTH_SECRET: 'a-parity-secret-that-is-long-enough-0123456789',
-      EMAIL_FROM: 'no-reply@copticvine.ca', TRUSTED_ORIGINS: `${ORIGIN},copticvine://`, EMAIL_MODE: 'outbox', SERVICE_TOKEN,
+      EMAIL_FROM: 'no-reply@copticvine.ca', TRUSTED_ORIGINS: `${ORIGIN},copticvine://`, EMAIL_MODE: 'outbox', SERVICE_TOKEN, USER_MEDIA: r2(),
     };
   }
 
@@ -62,6 +63,13 @@ export class WorkerSide {
     const text = await response.text();
     const json = text ? JSON.parse(text) : null;
     return response.ok ? { status: response.status, data: json, error: null } : { status: response.status, data: null, error: json };
+  }
+
+  /** Any request as the user (signed out with null), its body as given, the raw response. */
+  fetch(user: string | null, method: string, path: string, init: { body?: BodyInit; headers?: Record<string, string> } = {}): Promise<Response> {
+    const headers = this.headers(init.headers);
+    if (user) headers.authorization = `Bearer ${user === SERVICE_ROLE ? SERVICE_TOKEN : this.tokens.get(user)}`;
+    return handle(new Request(`${BASE}${path}`, { method, headers, body: init.body }), this.env);
   }
 
   rpc(user: string | null, fn: string, args: Record<string, unknown> = {}): Promise<Answer> {

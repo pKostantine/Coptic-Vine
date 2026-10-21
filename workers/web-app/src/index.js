@@ -1,5 +1,12 @@
 const SUPABASE_URL = 'https://wtuujmeinzqfikvuofmh.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_H0lG0vRL6io4Uy0htd77Cw_dlNbwx0n';
+
+// Where the previews' data comes from: Supabase until the Phase 2 cutover sets
+// DATA_API_URL to cv-api (https://api.copticvine.ca), which answers the same calls.
+function dataApi(env) {
+  const url = env && typeof env.DATA_API_URL === 'string' && env.DATA_API_URL ? env.DATA_API_URL.replace(/\/+$/, '') : SUPABASE_URL;
+  return { url, key: url === SUPABASE_URL ? SUPABASE_PUBLISHABLE_KEY : null };
+}
 const MEDIA_BASE_URL = 'https://cv-media-resolver.hrmpdd8d6c.workers.dev';
 const APP_NAME = 'Coptic Vine';
 const DEFAULT_DESCRIPTION = 'Cross-platform Coptic Orthodox worship app for multilingual liturgical books, Scripture, and hymns.';
@@ -72,17 +79,18 @@ function previewLocale(url) {
   return url.searchParams.get('lang') === 'ar' ? 'ar' : 'en';
 }
 
-async function loadPreview(target, locale) {
+async function loadPreview(target, locale, env) {
   const playlist = target.section === 'music' && target.kind === 'playlist';
   const rpc = playlist ? 'get_music_playlist_share_preview' : 'get_share_preview';
   const body = playlist
     ? { p_playlist_id: target.id }
     : { p_path: target.path, p_locale: locale };
-  const response = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + rpc, {
+  const api = dataApi(env);
+  const response = await fetch(api.url + '/rest/v1/rpc/' + rpc, {
     method: 'POST',
     headers: {
       'Accept-Profile': 'public',
-      apikey: SUPABASE_PUBLISHABLE_KEY,
+      ...(api.key ? { apikey: api.key } : {}),
       'Content-Type': 'application/json',
       'Content-Profile': 'public',
     },
@@ -365,7 +373,7 @@ export default {
 
     let preview;
     try {
-      preview = await loadPreview(target, previewLocale(url));
+      preview = await loadPreview(target, previewLocale(url), env);
     } catch (error) {
       if (target.dedicated) return previewFailureResponse(error);
       return env.ASSETS.fetch(request);
