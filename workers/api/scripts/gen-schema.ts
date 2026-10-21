@@ -280,11 +280,34 @@ export function generate(catalog: PgCatalog): { migration: string; schema: UserS
   return { migration: out.join('\n'), schema: { tables: info, enums: catalog.enums } };
 }
 
+/**
+ * Each table's unique indexes and constraints, as Postgres names them, with
+ * their columns: a UNIQUE failure from SQLite names the columns, and the
+ * Worker answers with Postgres's name for them (src/pg.ts, uniqueViolation).
+ */
+export function uniqueKeys(catalog: PgCatalog): Record<string, [string, string[]][]> {
+  const out: Record<string, [string, string[]][]> = {};
+  for (const relation of catalog.relations) {
+    if (relation.kind !== 'r' || relation.schema === 'auth') continue;
+    const keys: [string, string[]][] = [];
+    for (const index of relation.indexes) {
+      if (!index.unique) continue;
+      const columns = index.definition.match(/USING btree \(([^)]*)\)/)?.[1];
+      if (!columns || /[()]/.test(columns)) continue;
+      keys.push([index.name, columns.split(', ').map((c) => c.replace(/"/g, ''))]);
+    }
+    if (keys.length) out[`${relation.schema}.${relation.table}`] = keys.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  }
+  return out;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { migration, schema } = generate(JSON.parse(read('schema/pg-catalog-users.json')));
+  const catalog = JSON.parse(read('schema/pg-catalog-users.json')) as PgCatalog;
+  const { migration, schema } = generate(catalog);
   const files: [string, string][] = [
     ['../content-api/migrations/0007_user_schema.sql', migration],
     ['schema/user-tables.json', `${JSON.stringify(schema, null, 1)}\n`],
+    ['schema/unique-keys.json', `${JSON.stringify(uniqueKeys(catalog), null, 1)}\n`],
   ];
   if (process.argv.includes('--check')) {
     const stale = files.filter(([path, text]) => read(path) !== text).map(([path]) => path);

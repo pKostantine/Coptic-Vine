@@ -20,7 +20,7 @@
 import { createAuth, list, type Auth } from './auth/index.ts';
 import { afterWrites, trackWrites } from './db/afterWrites.ts';
 import { recoverTransactions } from './db/transaction.ts';
-import { httpStatus, PgError, triggerError } from './pg.ts';
+import { httpStatus, PgError, triggerError, uniqueViolation } from './pg.ts';
 import type { ApiContext } from './rest/context.ts';
 import { tableRequest } from './rest/tables.ts';
 import { callRpc } from './rpc/index.ts';
@@ -114,7 +114,8 @@ async function restResponse(request: Request, url: URL, env: Env, onWrite: () =>
     if (raised) return Response.json(raised.body(), { status: raised.code === '42501' ? httpStatus(raised.code, Boolean(ctx?.userId)) : raised.status });
     const message = (error as Error).message ?? String(error);
     // D1's constraint failures, as Postgres would report them.
-    if (/UNIQUE constraint failed/.test(message)) return Response.json({ code: '23505', details: null, hint: null, message: 'duplicate key value violates unique constraint' }, { status: 409 });
+    const duplicate = uniqueViolation(error);
+    if (duplicate) return Response.json(duplicate.body(), { status: duplicate.status });
     if (/FOREIGN KEY constraint failed/.test(message)) return Response.json({ code: '23503', details: null, hint: null, message: 'insert or update on table violates foreign key constraint' }, { status: 409 });
     if (/CHECK constraint failed/.test(message)) return Response.json({ code: '23514', details: null, hint: null, message: 'new row violates check constraint' }, { status: 400 });
     if (/NOT NULL constraint failed/.test(message)) return Response.json({ code: '23502', details: null, hint: null, message: 'null value violates not-null constraint' }, { status: 400 });

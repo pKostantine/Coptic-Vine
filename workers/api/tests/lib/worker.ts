@@ -81,13 +81,23 @@ export function normalize(value: unknown, keep: Set<string> = new Set()): unknow
   const ids = new Map<string, string>();
   const walk = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(walk);
-    if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map((key) => [key, walk((v as Record<string, unknown>)[key])]));
+    // An image "version" is its updated_at in epoch seconds: a timestamp, compared as one.
+    if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map((key) => {
+      const value = (v as Record<string, unknown>)[key];
+      return [key, key === 'version' && typeof value === 'number' && value > 1e9 ? '<epoch>' : walk(value)];
+    }));
     if (typeof v === 'string' && !keep.has(v)) {
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)) {
         if (!ids.has(v)) ids.set(v, `<id ${ids.size + 1}>`);
         return ids.get(v);
       }
       if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(\+00:00|Z)$/.test(v)) return '<timestamp>';
+      // An id made of a generated uuid and a suffix ("<artist>:featured").
+      const prefixed = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(:.+)$/.exec(v);
+      if (prefixed && !keep.has(prefixed[1])) {
+        if (!ids.has(prefixed[1])) ids.set(prefixed[1], `<id ${ids.size + 1}>`);
+        return `${ids.get(prefixed[1])}${prefixed[2]}`;
+      }
     }
     return v;
   };

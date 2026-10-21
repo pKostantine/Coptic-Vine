@@ -116,8 +116,8 @@ export function catalog(): Seed {
       { id: id(95), release_id: R1, locale: 'en', title: 'Midnight Praises (en)', is_primary: true, ...stamps() },
     ]],
     ['music.release_tracks', [
-      { id: id(96), release_id: R1, track_id: T2, disc_number: 1, track_number: 2, created_at: AT(0) },
-      { id: id(97), release_id: R1, track_id: T1, disc_number: 1, track_number: 1, created_at: AT(0) },
+      { id: id(96), release_id: R1, track_id: T2, disc_number: 1, track_number: 2, created_at: AT(2) },
+      { id: id(97), release_id: R1, track_id: T1, disc_number: 1, track_number: 1, created_at: AT(1) },
       { id: id(98), release_id: R1, track_id: T3, disc_number: 2, track_number: 1, created_at: AT(0) },
       { id: id(99), release_id: R2, track_id: T4, disc_number: 1, track_number: 1, created_at: AT(0) },
     ]],
