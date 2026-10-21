@@ -14,7 +14,8 @@
     "deploy": "wrangler deploy",
     "save-schema-dump": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/save-schema-dump.ts",
     "closure": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/function-closure.ts",
-    "gen:functions": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-functions.ts"
+    "gen:functions": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-functions.ts",
+    "search-parity": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/search-parity.ts"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.12",

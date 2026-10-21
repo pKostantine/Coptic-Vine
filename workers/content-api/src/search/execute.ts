@@ -10,7 +10,7 @@
  */
 import { compareLexemes } from './chars.ts';
 import type { QNode, QVal } from './tsquery.ts';
-import type { TsVector } from './tsvector.ts';
+import { weightOf, type TsVector } from './tsvector.ts';
 
 export const NO = 0, YES = 1, MAYBE = 2;
 export type Ternary = 0 | 1 | 2;
@@ -202,7 +202,8 @@ export function vectorCheck(vector: TsVector): Check {
       if (difference > 0) low = middle + 1;
       else high = middle;
     }
-    const positionsOf = (index: number) => (val.weight && !(val.weight & 1) ? [] : vector[index].positions);
+    // Only the positions whose weight the operand allows (checkclass_str).
+    const positionsOf = (index: number) => (val.weight ? vector[index].positions.filter((_, i) => val.weight & (1 << weightOf(vector[index], i))) : vector[index].positions);
     if (!val.prefix) {
       if (found < 0) return NO;
       const positions = positionsOf(found);

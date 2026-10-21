@@ -104,7 +104,7 @@ export async function searchVerses(context: ContentContext, args: Record<string,
       const vector = parseTsvectorText(row.vector);
       if (!matches(vector, query)) continue;
       const entry = verses.get(row.verse_id) ?? { id: row.id, verse_id: row.verse_id, book_key: row.book_key, chapter_number: row.chapter_number, verse_number: row.verse_number, ranks: new Map() };
-      entry.ranks.set(language, canonical ? 0 : rankCd(vector, query));
+      entry.ranks.set(language, canonical ? 0 : rankCd(vector, query, 32));
       verses.set(row.verse_id, entry);
     }
   });

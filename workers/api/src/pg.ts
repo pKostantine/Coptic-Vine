@@ -86,3 +86,23 @@ export function now(): string {
   lastNow = Math.max(Date.now(), lastNow + 1);
   return pgTimestamp(new Date(lastNow));
 }
+
+/**
+ * round(x::numeric, places) for a double precision x: the cast keeps 15
+ * significant digits (float8_numeric prints with DBL_DIG), and numeric rounds
+ * half away from zero.
+ */
+export function roundNumeric(value: number, places: number): number {
+  const [mantissa, exponent] = value.toExponential(14).split('e');
+  const negative = mantissa.startsWith('-');
+  const digits = BigInt(mantissa.replace(/[-.]/g, ''));
+  const shift = Number(exponent) - 14 + places;
+  let scaled: bigint;
+  if (shift >= 0) {
+    scaled = digits * 10n ** BigInt(shift);
+  } else {
+    const unit = 10n ** BigInt(-shift);
+    scaled = digits / unit + (2n * (digits % unit) >= unit ? 1n : 0n);
+  }
+  return Number(`${negative ? '-' : ''}${scaled}e-${places}`);
+}

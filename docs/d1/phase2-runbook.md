@@ -148,7 +148,7 @@ checked (uuid syntax, enum values) and signed-out calls are refused, all
 exactly as PostgREST and Postgres do it.
 
 **Visibility.** Supabase's row-level security is written out as SQL
-fragments (`src/rpc/music/shared.ts`): published, or readable by the creator
+fragments (`src/rpc/common.ts`): published, or readable by the creator
 account or an admin. They are added to every read the original made as the
 caller.
 
@@ -188,12 +188,32 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 | The user's own tables | `notification_preferences`, `notifications` (read, mark read), `spiritual_canons`, `spiritual_canon_days`, `bible_highlights`, `sermon_plans` | Ported, at parity |
 | Settings and devices | `get_my_content_preferences`, `save_my_content_preferences`, `register_notification_device`, `disable_notification_device` | Ported, at parity |
 | Music | 21 of 22: the catalog, library, likes, follows, plays and playlists | Ported, at parity. `set_music_playlist_cover` moves with the covers to R2 (step 6). |
-| Learning | 19 | Next |
-| Search | 2 | |
+| Learning | 19: the catalog, progress, likes and playlists | Ported, at parity |
+| Search | `search_media_catalog`, `search_section_catalog` | Ported, at parity, and checked on the real catalog (below) |
 | Creator editor and lyrics | 34 | |
 | Admin | 26 | |
 | Workers (media, uploads, notifications, share previews) | 27 | |
 | Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | |
+
+**Search.** `src/rpc/search` computes what Postgres computed for the two
+functions: `media.normalize_search_text`, `pg_trgm`'s `similarity`, and each
+document's weighted `search_vector`, built per query from its title (A),
+subtitle (B) and body (C). The full-text parser, queries and `ts_rank_cd` are
+Phase 1's, which now also handle weights.
+
+- `tests/search.parity.test.ts` compares the Worker with the oracle on a
+  seeded ASCII catalog. The oracle's collation is C, so it can't judge Arabic
+  or Coptic.
+- `tests/search.text.test.ts` covers those: Supabase's own answers for
+  Arabic, Coptic, Greek and French text, recorded on 20 Oct 2026.
+- `npm run search-parity` sends 404 calls to Supabase's functions (anon key,
+  read only) and to the port over the local D1, and compares the answers. On
+  20 Oct 2026: **404 of 404 match**. In 15 of them, results with the same rank
+  and the same title (a release and its title track) come in another order;
+  Postgres leaves that order to its plan.
+- Still to come with the trigger work: whatever writes `search_documents`
+  (`private.refresh_unified_search_index`) and `search_aliases` must store
+  `normalized_text` and `normalized_alias` with `normalizeSearchText`.
 
 ## Status
 
@@ -203,6 +223,6 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 | 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
 | 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
-| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices and music. |
+| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices, music, learning and search. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |
 | 7. Cutover | Not started. |

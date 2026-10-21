@@ -12,6 +12,7 @@ import type { ApiContext } from '../rest/context.ts';
 import { convert } from './args.ts';
 import { learningRpcs } from './learning/index.ts';
 import { musicRpcs } from './music/index.ts';
+import { searchRpcs } from './search/index.ts';
 import { disableNotificationDevice, getMyContentPreferences, registerNotificationDevice, saveMyContentPreferences } from './user.ts';
 
 export type Args = Record<string, unknown>;
@@ -25,6 +26,7 @@ export const RPCS: Record<string, Rpc> = {
   'public.disable_notification_device': (c, a) => disableNotificationDevice(c, a as never),
   ...musicRpcs,
   ...learningRpcs,
+  ...searchRpcs,
 };
 
 export const FUNCTIONS = functions as Record<string, FunctionInfo>;

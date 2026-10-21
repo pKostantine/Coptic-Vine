@@ -70,8 +70,17 @@ export function parseText(config: Config, text: string): ParsedWord[] {
   return words;
 }
 
-/** A tsvector: lexemes in Postgres's order, each with its sorted positions. */
-export type TsVector = { lexeme: string; positions: number[] }[];
+/**
+ * A tsvector: lexemes in Postgres's order, each with its sorted positions and
+ * their weights (WEP_GETWEIGHT: A 3, B 2, C 1, D 0). No weights means all D,
+ * as to_tsvector gives.
+ */
+export type TsVector = { lexeme: string; positions: number[]; weights?: number[] }[];
+
+export const WEIGHT = { A: 3, B: 2, C: 1, D: 0 } as const;
+
+/** The weight of an entry's i-th position. */
+export const weightOf = (entry: TsVector[number], i: number): number => entry.weights?.[i] ?? WEIGHT.D;
 
 /** uniqueWORD: sort by lexeme then position, merge duplicates, at most 255 positions a lexeme. */
 export function makeTsvector(words: ParsedWord[]): TsVector {
@@ -92,9 +101,50 @@ export function toTsvector(config: Config, text: string | null): TsVector {
   return makeTsvector(parseText(config, text ?? ''));
 }
 
-/** A tsvector as Postgres prints it: 'lexeme':1,4 'other':2 */
+/** setweight(vector, weight): every position takes the weight. */
+export function setweight(vector: TsVector, weight: number): TsVector {
+  return vector.map(({ lexeme, positions }) => ({ lexeme, positions, weights: positions.map(() => weight) }));
+}
+
+/**
+ * The || operator (tsvector_concat): the right vector's positions move past
+ * the left's last one (capped at 16383), and a lexeme in both keeps the left's
+ * positions, then the right's, at most 256 (add_pos).
+ */
+export function tsvectorConcat(left: TsVector, right: TsVector): TsVector {
+  let maxpos = 0;
+  for (const { positions } of left) for (const pos of positions) maxpos = Math.max(maxpos, pos);
+  const addPositions = (into: { positions: number[]; weights: number[] }, entry: TsVector[number]) => {
+    for (let i = 0; i < entry.positions.length && into.positions.length < MAXNUMPOS && into.positions.at(-1) !== MAXENTRYPOS - 1; i += 1) {
+      into.positions.push(limitPos(entry.positions[i] + maxpos));
+      into.weights.push(weightOf(entry, i));
+    }
+  };
+  const copy = (entry: TsVector[number]) => ({ lexeme: entry.lexeme, positions: [...entry.positions], weights: entry.positions.map((_, i) => weightOf(entry, i)) });
+  const out: TsVector = [];
+  let l = 0;
+  let r = 0;
+  while (l < left.length || r < right.length) {
+    const difference = l === left.length ? 1 : r === right.length ? -1 : compareLexemes(left[l].lexeme, right[r].lexeme);
+    if (difference < 0) {
+      out.push(copy(left[l]));
+      l += 1;
+      continue;
+    }
+    const entry = difference === 0 ? copy(left[l]) : { lexeme: right[r].lexeme, positions: [], weights: [] };
+    addPositions(entry, right[r]);
+    out.push(entry);
+    if (difference === 0) l += 1;
+    r += 1;
+  }
+  return out;
+}
+
+const WEIGHT_LETTER = ['', 'C', 'B', 'A'];
+
+/** A tsvector as Postgres prints it: 'lexeme':1,4A 'other':2B (weight D has no letter). */
 export function tsvectorText(vector: TsVector): string {
-  return vector.map(({ lexeme, positions }) => `'${lexeme.replace(/['\\]/g, (c) => c + c)}':${positions.join(',')}`).join(' ');
+  return vector.map((entry) => `'${entry.lexeme.replace(/['\\]/g, (c) => c + c)}':${entry.positions.map((pos, i) => `${pos}${WEIGHT_LETTER[weightOf(entry, i)]}`).join(',')}`).join(' ');
 }
 
 /** The inverse of tsvectorText, for the vectors stored in D1. */
@@ -113,13 +163,18 @@ export function parseTsvectorText(text: string): TsVector {
     }
     i += 1; // closing quote
     const positions: number[] = [];
+    const weights: number[] = [];
     if (text[i] === ':') {
       i += 1;
       const start = i;
       while (i < text.length && text[i] !== ' ') i += 1;
-      for (const part of text.slice(start, i).split(',')) positions.push(Number(part));
+      for (const part of text.slice(start, i).split(',')) {
+        const letter = WEIGHT_LETTER.indexOf(part.slice(-1));
+        positions.push(Number(letter > 0 ? part.slice(0, -1) : part));
+        weights.push(Math.max(letter, WEIGHT.D));
+      }
     }
-    out.push({ lexeme, positions });
+    out.push(weights.some((w) => w !== WEIGHT.D) ? { lexeme, positions, weights } : { lexeme, positions });
   }
   return out;
 }
