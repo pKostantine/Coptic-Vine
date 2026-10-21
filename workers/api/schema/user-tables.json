@@ -1,0 +1,6461 @@
+{
+ "tables": [
+  {
+   "schema": "creator",
+   "table": "creator_account_members",
+   "columns": [
+    {
+     "name": "creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "role",
+     "kind": "text",
+     "pgType": "\"creator_account_role\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "invited_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "creator_account_id",
+    "user_id"
+   ],
+   "parents": [
+    "creator.creator_accounts",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "creator",
+   "table": "creator_accounts",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "display_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "status",
+     "kind": "text",
+     "pgType": "\"creator_account_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "identity_artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "music.artists"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "creator",
+   "table": "profiles",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "display_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "preferred_locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "creator",
+   "table": "user_roles",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "role",
+     "kind": "text",
+     "pgType": "\"app_role\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "granted_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "granted_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "revoked_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id",
+    "role"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "album_localizations",
+   "columns": [
+    {
+     "name": "album_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "album_id",
+    "locale"
+   ],
+   "parents": [
+    "learning.albums",
+    "media.locales"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "album_recordings",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "album_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "hymn_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "media_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "duration_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.albums",
+    "auth.users",
+    "learning.hymns",
+    "media.media_assets"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "albums",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "cantor_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "season_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "cover_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "submission_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "release_timing_mode",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "scheduled_release_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "original_release_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.cantors",
+    "media.media_assets",
+    "auth.users",
+    "creator.creator_accounts",
+    "learning.seasons",
+    "media.submissions"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "cantor_localizations",
+   "columns": [
+    {
+     "name": "cantor_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "display_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "biography",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "cantor_id",
+    "locale"
+   ],
+   "parents": [
+    "learning.cantors",
+    "media.locales"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "cantor_permissions",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "cantor_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "role",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.cantors",
+    "creator.creator_accounts"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "cantors",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "profile_image_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "display_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "biography",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "music.artists",
+    "auth.users",
+    "creator.creator_accounts",
+    "media.media_assets"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.publish_public_profile_image",
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "hymn_localizations",
+   "columns": [
+    {
+     "name": "hymn_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "hymn_id",
+    "locale"
+   ],
+   "parents": [
+    "learning.hymns",
+    "media.locales"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "hymn_progress",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "hymn_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "state",
+     "kind": "text",
+     "pgType": "\"progress_state\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "started_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "finished_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id",
+    "hymn_id"
+   ],
+   "parents": [
+    "learning.hymns",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "hymn_relationships",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "hymn_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "related_hymn_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "relationship_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.hymns"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "hymn_seasons",
+   "columns": [
+    {
+     "name": "hymn_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "season_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "hymn_id",
+    "season_id"
+   ],
+   "parents": [
+    "learning.hymns",
+    "learning.seasons"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "hymns",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "source_hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "public.hymn_titles"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "item_likes",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "item_kind",
+     "kind": "text",
+     "pgType": "\"playlist_item_kind\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "album_recording_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "lesson_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.album_recordings",
+    "learning.lessons",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "item_progress",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "item_kind",
+     "kind": "text",
+     "pgType": "\"playlist_item_kind\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "album_recording_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "lesson_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "state",
+     "kind": "text",
+     "pgType": "\"progress_state\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "started_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "finished_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.album_recordings",
+    "learning.lessons",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "lesson_localizations",
+   "columns": [
+    {
+     "name": "lesson_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "lesson_id",
+    "locale"
+   ],
+   "parents": [
+    "learning.lessons",
+    "media.locales"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "lesson_set_localizations",
+   "columns": [
+    {
+     "name": "lesson_set_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "lesson_set_id",
+    "locale"
+   ],
+   "parents": [
+    "learning.lesson_sets",
+    "media.locales"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "lesson_sets",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "cantor_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "season_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "hymn_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "cover_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "submission_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "release_timing_mode",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "scheduled_release_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "original_release_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.cantors",
+    "media.media_assets",
+    "auth.users",
+    "learning.hymns",
+    "creator.creator_accounts",
+    "learning.seasons",
+    "media.submissions"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "lessons",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "lesson_set_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "media_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "media_type",
+     "kind": "text",
+     "pgType": "\"lesson_media_type\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "duration_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "audio_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "media.media_assets",
+    "auth.users",
+    "learning.lesson_sets"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.attach_lesson_audio_asset",
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "lyric_edit_drafts",
+   "columns": [
+    {
+     "name": "item_kind",
+     "kind": "text",
+     "pgType": "\"playlist_item_kind\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "album_recording_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "lesson_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sync_precision",
+     "kind": "text",
+     "pgType": "\"lyric_sync_precision\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "lines",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.album_recordings",
+    "auth.users",
+    "learning.lessons",
+    "media.locales"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "lyric_lines",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "lyric_set_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sequence",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "start_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "end_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "text",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.lyric_sets"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "lyric_sets",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "item_kind",
+     "kind": "text",
+     "pgType": "\"playlist_item_kind\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "album_recording_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "lesson_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sync_precision",
+     "kind": "text",
+     "pgType": "\"lyric_sync_precision\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.album_recordings",
+    "auth.users",
+    "learning.lessons",
+    "media.locales"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "playlist_items",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "playlist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "item_kind",
+     "kind": "text",
+     "pgType": "\"playlist_item_kind\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "album_recording_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "lesson_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "learning.album_recordings",
+    "learning.lessons",
+    "learning.playlists"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "playlists",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "visibility",
+     "kind": "text",
+     "pgType": "\"playlist_visibility\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "cover_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "media.media_assets",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "recording_localizations",
+   "columns": [
+    {
+     "name": "recording_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "recording_id",
+    "locale"
+   ],
+   "parents": [
+    "media.locales",
+    "learning.album_recordings"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "season_localizations",
+   "columns": [
+    {
+     "name": "season_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "season_id",
+    "locale"
+   ],
+   "parents": [
+    "media.locales",
+    "learning.seasons"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "learning",
+   "table": "seasons",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "slug",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "locales",
+   "columns": [
+    {
+     "name": "code",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "english_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "native_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "text_direction",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "enabled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "code"
+   ],
+   "parents": [],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "localized_texts",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "entity_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "entity_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "field_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "text_value",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "is_primary",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "media.locales",
+    "creator.creator_accounts"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "media_asset_versions",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "media_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "version",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "provider",
+     "kind": "text",
+     "pgType": "\"media_provider\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "bucket",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "path",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "mime_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "codec",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "duration_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "file_size_bytes",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "bitrate",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "sample_rate",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "width",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "height",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "checksum",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "processing_status",
+     "kind": "text",
+     "pgType": "\"processing_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "media.media_assets"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "media_assets",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "provider",
+     "kind": "text",
+     "pgType": "\"media_provider\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "bucket",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "path",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "media_type",
+     "kind": "text",
+     "pgType": "\"media_type\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "mime_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "codec",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "duration_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "file_size_bytes",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "bitrate",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "sample_rate",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "width",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "height",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "version",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "checksum",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "processing_status",
+     "kind": "text",
+     "pgType": "\"processing_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "creator.creator_accounts"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "media_processing_jobs",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "upload_intent_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "media_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "media_asset_version_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "job_type",
+     "kind": "text",
+     "pgType": "\"processing_job_type\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "status",
+     "kind": "text",
+     "pgType": "\"processing_job_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "attempt_count",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "max_attempts",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "worker_id",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "input_bucket",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "input_path",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "output_bucket",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "output_path",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "output_mime_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "output_size_bytes",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "output_checksum_sha256",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "probe",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "error_message",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "queued_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "available_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "claimed_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "started_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "finished_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "heartbeat_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "progress",
+     "kind": "float4",
+     "pgType": "real",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "media.media_assets",
+    "media.media_asset_versions",
+    "media.upload_intents"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.wake_media_processor",
+    "private.notify_processing_failure"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "search_aliases",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "entity_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "entity_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "alias",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "normalized_alias",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "media.locales",
+    "creator.creator_accounts"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.normalize_search_alias_trigger"
+   ],
+   "skippedIndexes": [
+    "CREATE INDEX search_aliases_normalized_trgm_idx ON media.search_aliases USING gin (normalized_alias gin_trgm_ops) WHERE (publication_status = 'published'::media.publication_status)"
+   ]
+  },
+  {
+   "schema": "media",
+   "table": "search_documents",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "entity_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "entity_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "kind",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "body",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "alias_text",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "normalized_text",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [
+    "search_vector"
+   ],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "media.locales",
+    "creator.creator_accounts"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": [
+    "CREATE INDEX search_documents_normalized_trgm_idx ON media.search_documents USING gin (normalized_text gin_trgm_ops) WHERE ((publication_status = 'published'::media.publication_status) AND (kind = 'unified_catalog'::text))",
+    "CREATE INDEX search_documents_vector_idx ON media.search_documents USING gin (search_vector)"
+   ]
+  },
+  {
+   "schema": "media",
+   "table": "storage_gc_candidates",
+   "columns": [
+    {
+     "name": "bucket",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "path",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "first_unused_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "last_seen_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "file_size_bytes",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "last_modified_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "reason",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "bucket",
+    "path"
+   ],
+   "parents": [],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "submission_events",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "submission_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "actor_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "action",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "from_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "to_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "media.submissions"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "submission_items",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "submission_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "upload_intent_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "media_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "media_processing_job_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "required",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "role",
+     "kind": "text",
+     "pgType": "\"submission_item_role\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "music_track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "localized_titles",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "audio_only_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "replaces_item_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "media.media_assets",
+    "media.media_processing_jobs",
+    "music.tracks",
+    "media.submissions",
+    "media.upload_intents"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "submissions",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "submission_type",
+     "kind": "text",
+     "pgType": "\"submission_type\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "submitted_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "review_due_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "reviewer_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "reviewed_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "review_notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "approved_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "published_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "rejected_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "creator.creator_accounts"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.notify_submission_status"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "media",
+   "table": "upload_intents",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "requested_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "bucket",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "path",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "media_type",
+     "kind": "text",
+     "pgType": "\"media_type\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "original_filename",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "content_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "content_length",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "checksum_sha256",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "status",
+     "kind": "text",
+     "pgType": "\"upload_intent_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "upload_expires_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "uploaded_size",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "r2_http_etag",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "uploaded_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "completed_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "failed_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "error_message",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "original_deleted_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "creator.creator_accounts",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "artist_follows",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id",
+    "artist_id"
+   ],
+   "parents": [
+    "music.artists",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "artist_localizations",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "display_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "biography",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "is_primary",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "music.artists",
+    "auth.users",
+    "media.locales"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "artist_memberships",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "role",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "music.artists",
+    "creator.creator_accounts"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "artist_pinned_releases",
+   "columns": [
+    {
+     "name": "artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "release_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "artist_id",
+    "release_id"
+   ],
+   "parents": [
+    "music.artists",
+    "music.releases"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "artist_social_links",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "platform",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "url",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "label",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "music.artists"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "artists",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "profile_image_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "display_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "biography",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "is_credit_only",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": false,
+     "generated": true
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "creator.creator_accounts",
+    "media.media_assets"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.publish_public_profile_image",
+    "private.sync_music_artist_image_to_learning_cantor",
+    "private.refresh_unified_search_index_trigger",
+    "private.sync_learning_artist_identity"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "lyric_edit_drafts",
+   "columns": [
+    {
+     "name": "track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "lines",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sync_precision",
+     "kind": "text",
+     "pgType": "\"lyric_sync_precision\"",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "track_id",
+    "locale"
+   ],
+   "parents": [
+    "auth.users",
+    "media.locales",
+    "music.tracks"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "lyric_lines",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "lyric_set_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sequence",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "start_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "end_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "text",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "music.lyric_sets"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "lyric_sets",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "kind",
+     "kind": "text",
+     "pgType": "\"lyric_kind\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sync_precision",
+     "kind": "text",
+     "pgType": "\"lyric_sync_precision\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "source",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "media.locales",
+    "music.tracks"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "lyric_words",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "lyric_line_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sequence",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "start_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "end_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "text",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "music.lyric_lines"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "play_history",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "media_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "played_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "progress_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "completed",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "release_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "media.media_assets",
+    "music.releases",
+    "music.tracks",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "playlist_tracks",
+   "columns": [
+    {
+     "name": "playlist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "added_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "playlist_id",
+    "track_id"
+   ],
+   "parents": [
+    "auth.users",
+    "music.playlists",
+    "music.tracks"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "playlists",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "visibility",
+     "kind": "text",
+     "pgType": "\"playlist_visibility\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "cover_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "media.media_assets",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "release_likes",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "release_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id",
+    "release_id"
+   ],
+   "parents": [
+    "music.releases",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "release_localizations",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "release_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "is_primary",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "media.locales",
+    "music.releases"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "release_tracks",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "release_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "disc_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "track_number",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "music.releases",
+    "music.tracks"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger",
+    "private.sync_music_release_type_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "releases",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "primary_artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "cover_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "release_type",
+     "kind": "text",
+     "pgType": "\"release_type\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "description",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "release_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "scheduled_release_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "original_release_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "release_timing_mode",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "media.media_assets",
+    "auth.users",
+    "creator.creator_accounts",
+    "music.artists"
+   ],
+   "workerChecks": [
+    "CHECK (((original_release_date IS NULL) OR ((original_release_date >= '1900-01-01'::date) AND (original_release_date <= (CURRENT_DATE + 365)))))"
+   ],
+   "workerTriggers": [
+    "private.prepare_music_release_artwork_for_publication",
+    "private.on_music_release_publish_consumer_dependencies",
+    "private.retire_submission_when_music_release_deleted",
+    "private.refresh_unified_search_index_trigger",
+    "private.notify_release_published",
+    "private.enforce_release_identity_artist",
+    "private.enforce_release_scheduling_window"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "track_artists",
+   "columns": [
+    {
+     "name": "track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "artist_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "role",
+     "kind": "text",
+     "pgType": "\"track_artist_role\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "sort_order",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "track_id",
+    "artist_id",
+    "role"
+   ],
+   "parents": [
+    "music.artists",
+    "music.tracks"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "track_likes",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id",
+    "track_id"
+   ],
+   "parents": [
+    "music.tracks",
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "track_localizations",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "track_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "locale",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "is_primary",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "media.locales",
+    "music.tracks"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "music",
+   "table": "tracks",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "owner_creator_account_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "media_asset_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "subtitle",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "duration_ms",
+     "kind": "integer",
+     "pgType": "bigint",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "publication_status",
+     "kind": "text",
+     "pgType": "\"publication_status\"",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "metadata",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "updated_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users",
+    "media.media_assets",
+    "creator.creator_accounts"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [
+    "private.refresh_unified_search_index_trigger"
+   ],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "private",
+   "table": "media_worker_tokens",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "token_hash",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "revoked_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "private",
+   "table": "notification_deliveries",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "notification_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "device_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "provider",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "status",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "attempt_count",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "max_attempts",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "available_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "claimed_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "provider_ticket_id",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "accepted_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "receipt_checked_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "delivered_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "last_error",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "broadcast_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "public.notification_broadcasts",
+    "public.notification_devices",
+    "public.notifications"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "bible_highlights",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "book_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "highlights",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "highlight_deletions",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "notification_broadcasts",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "app_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "body",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "deep_link",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "payload",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_by",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "recipient_count",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "delivery_count",
+     "kind": "integer",
+     "pgType": "integer",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "notification_devices",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "app_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "platform",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "provider",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "push_token",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "provider_data",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "device_name",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "app_version",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "enabled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "last_seen_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "notification_preferences",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "app_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "enabled",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id",
+    "app_key",
+    "category"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "notifications",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "app_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "category",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "event_type",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "title",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "body",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "image_url",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "deep_link",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false,
+     "generated": false
+    },
+    {
+     "name": "payload",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "read_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": false,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "sermon_plans",
+   "columns": [
+    {
+     "name": "id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "document_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "service_date",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "general_notes",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "highlights",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "highlight_deletions",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "spiritual_canon_days",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "day",
+     "kind": "date",
+     "pgType": "date",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "marks",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id",
+    "day"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "spiritual_canons",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "items",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "item_deletions",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  },
+  {
+   "schema": "public",
+   "table": "user_content_preferences",
+   "columns": [
+    {
+     "name": "user_id",
+     "kind": "text",
+     "pgType": "uuid",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "preferences",
+     "kind": "jsonb",
+     "pgType": "jsonb",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "bookmarks",
+     "kind": "array",
+     "pgType": "text[]",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "created_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    },
+    {
+     "name": "updated_at",
+     "kind": "timestamptz",
+     "pgType": "timestamp with time zone",
+     "notNull": true,
+     "generated": false
+    }
+   ],
+   "dropped": [],
+   "primaryKey": [
+    "user_id"
+   ],
+   "parents": [
+    "auth.users"
+   ],
+   "workerChecks": [],
+   "workerTriggers": [],
+   "skippedIndexes": []
+  }
+ ],
+ "enums": {
+  "app_role": [
+   "user",
+   "creator",
+   "admin"
+  ],
+  "creator_account_status": [
+   "active",
+   "suspended",
+   "archived"
+  ],
+  "creator_account_role": [
+   "owner",
+   "manager",
+   "editor",
+   "uploader",
+   "viewer"
+  ],
+  "media_provider": [
+   "cloudflare_r2",
+   "external"
+  ],
+  "media_type": [
+   "audio",
+   "video",
+   "image",
+   "document",
+   "other"
+  ],
+  "processing_status": [
+   "pending",
+   "uploaded",
+   "queued",
+   "processing",
+   "completed",
+   "failed"
+  ],
+  "publication_status": [
+   "draft",
+   "uploading",
+   "ready_to_submit",
+   "pending_review",
+   "changes_requested",
+   "approved",
+   "processing",
+   "published",
+   "rejected",
+   "archived"
+  ],
+  "upload_intent_status": [
+   "authorized",
+   "uploaded",
+   "failed",
+   "expired",
+   "cancelled"
+  ],
+  "release_type": [
+   "single",
+   "ep",
+   "album"
+  ],
+  "track_artist_role": [
+   "primary",
+   "featured",
+   "composer",
+   "lyricist",
+   "arranger",
+   "producer",
+   "artwork"
+  ],
+  "playlist_visibility": [
+   "private",
+   "unlisted",
+   "public"
+  ],
+  "lyric_kind": [
+   "original",
+   "translation",
+   "transliteration"
+  ],
+  "lyric_sync_precision": [
+   "unsynced",
+   "line",
+   "word"
+  ],
+  "submission_item_role": [
+   "artwork",
+   "track",
+   "lesson",
+   "other"
+  ],
+  "processing_job_type": [
+   "audio_delivery",
+   "video_delivery",
+   "metadata_probe",
+   "image_delivery"
+  ],
+  "processing_job_status": [
+   "queued",
+   "processing",
+   "completed",
+   "failed",
+   "cancelled"
+  ],
+  "submission_type": [
+   "music_release",
+   "learning_album",
+   "learning_lesson_set",
+   "artist_update",
+   "cantor_update"
+  ],
+  "lesson_media_type": [
+   "audio",
+   "video"
+  ],
+  "progress_state": [
+   "will_learn",
+   "learning",
+   "finished"
+  ],
+  "playlist_item_kind": [
+   "album_recording",
+   "lesson"
+  ]
+ }
+}

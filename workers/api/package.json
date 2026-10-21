@@ -1,0 +1,14 @@
+{
+  "name": "@coptic-vine/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen:schema": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-schema.ts",
+    "export-sql": "node --experimental-strip-types --disable-warning=ExperimentalWarning -e \"import('./scripts/lib/sql.ts').then(async (m) => { const { userSchema } = await import('./scripts/lib/schema.ts'); process.stdout.write(m.exportSql(userSchema)); })\"",
+    "import": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/import.ts",
+    "verify": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify.ts",
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test tests/*.test.ts",
+    "typecheck": "tsc -p ."
+  }
+}
