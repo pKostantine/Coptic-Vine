@@ -74,8 +74,14 @@ export async function completeMediaUploadIntent(ctx: ApiContext, intentId: strin
     if (intent!.status !== 'authorized') raise('Upload intent is not authorized', '22023');
     if ((intent!.upload_expires_at as string) <= tx.at) raise('Upload intent expired', '22023');
     if (uploadedSize != null && uploadedSize !== intent!.content_length) raise('Uploaded size mismatch', '22023');
-    const done = (await tx.writeFirst(`UPDATE ${INTENTS} SET ${col('status')} = 'uploaded', ${col('uploaded_size')} = ?, ${col('r2_http_etag')} = ?, ${col('uploaded_at')} = ?,
-      ${col('completed_at')} = ?, ${col('error_message')} = NULL WHERE ${col('id')} = ? RETURNING *`, uploadedSize, etag, tx.at, tx.at, intent!.id))!;
+    const done = await tx.writeFirst(`UPDATE ${INTENTS} SET ${col('status')} = 'uploaded', ${col('uploaded_size')} = ?, ${col('r2_http_etag')} = ?, ${col('uploaded_at')} = ?,
+      ${col('completed_at')} = ?, ${col('error_message')} = NULL WHERE ${col('id')} = ? AND ${col('status')} = 'authorized' RETURNING *`, uploadedSize, etag, tx.at, tx.at, intent!.id);
+    // Postgres held the intent's row: a completion that came in meanwhile wins, and this one finds it no longer authorized.
+    if (!done) {
+      const still = await tx.first(`SELECT 1 AS yes FROM ${INTENTS} WHERE ${col('id')} = ?`, intent!.id);
+      if (!still) raise('Upload intent not found', 'P0002');
+      raise('Upload intent is not authorized', '22023');
+    }
     return [{ upload_intent_id: done.id, status: done.status, bucket: done.bucket, object_path: done.path, uploaded_at: done.uploaded_at }];
   });
 }
