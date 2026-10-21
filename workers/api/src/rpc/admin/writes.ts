@@ -21,7 +21,9 @@ import { transaction, type Tx } from '../../db/transaction.ts';
 import { jsonbText, raise } from '../../pg.ts';
 import type { ApiContext } from '../../rest/context.ts';
 import { payload, viewer } from '../common.ts';
-import { addEvent, addHours, attachCompletedJobs, cleanText, deleteReleaseCore, deleteReleaseTrackCore, enqueueJob, jsonbType, requiredReady, SKIPPED, toUuid, trimSpaces } from '../creator/core.ts';
+import {
+  addEvent, attachCompletedJobs, cleanText, deleteReleaseCore, deleteReleaseTrackCore, enqueueJob, jsonbType, requiredReady, SKIPPED, STALE, staleSince, toUuid, trimSpaces,
+} from '../creator/core.ts';
 import { publishLearningSubmission, publishMusicSubmission, publishReleaseParts } from '../creator/publish.ts';
 import { normalizeCreatorName } from '../creator/reads.ts';
 import { queueProfileImage, replaceSocialLinks } from '../creator/writes.ts';
@@ -361,17 +363,6 @@ export async function updateAdminArtistProfile(ctx: ApiContext, a: {
   });
   return adminArtistJson(ctx, a.artistId);
 }
-
-/**
- * private.media_processing_job_is_stale: claimed, and silent too long (five
- * minutes since its heartbeat; without one, two hours for a video, fifteen
- * minutes otherwise). Binds three thresholds: staleSince(at).
- */
-export const STALE = (job: string) => `(${job}.${col('claimed_at')} IS NOT NULL AND CASE
-  WHEN ${job}.${col('heartbeat_at')} IS NOT NULL THEN ${job}.${col('heartbeat_at')} < ?
-  WHEN ${job}.${col('job_type')} = 'video_delivery' THEN ${job}.${col('claimed_at')} < ?
-  ELSE ${job}.${col('claimed_at')} < ? END)`;
-export const staleSince = (at: string) => [addHours(at, -5 / 60), addHours(at, -2), addHours(at, -15 / 60)];
 
 /** Queued again from scratch, its attempts reset once they ran out. Binds available_at, then updated_at. */
 const REQUEUE = `${col('status')} = 'queued', ${col('available_at')} = ?,

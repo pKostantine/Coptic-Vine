@@ -100,8 +100,19 @@ export async function addEvent(tx: Tx, submissionId: unknown, actor: unknown, ac
 }
 
 /** private.media_processing_output_path. */
-const outputPath = (account: unknown, intent: unknown, jobType: string) =>
+export const outputPath = (account: unknown, intent: unknown, jobType: string) =>
   `processed/${account}/${intent}/v1/${jobType === 'audio_delivery' ? 'audio.m4a' : jobType === 'video_delivery' ? 'video.mp4' : jobType === 'image_delivery' ? 'cover.jpg' : 'metadata.json'}`;
+
+/**
+ * private.media_processing_job_is_stale: claimed, and silent too long (five
+ * minutes since its heartbeat; without one, two hours for a video, fifteen
+ * minutes otherwise). Binds three thresholds: staleSince(at).
+ */
+export const STALE = (job: string) => `(${job}.${col('claimed_at')} IS NOT NULL AND CASE
+  WHEN ${job}.${col('heartbeat_at')} IS NOT NULL THEN ${job}.${col('heartbeat_at')} < ?
+  WHEN ${job}.${col('job_type')} = 'video_delivery' THEN ${job}.${col('claimed_at')} < ?
+  ELSE ${job}.${col('claimed_at')} < ? END)`;
+export const staleSince = (at: string) => [addHours(at, -5 / 60), addHours(at, -2), addHours(at, -15 / 60)];
 
 /** private.media_job_skipped_for_silence: a video's audio job cancelled because it has no sound. */
 export const SKIPPED = (job: string) => `(${job}.${col('status')} = 'cancelled' AND coalesce(${job}.${col('error_message')}, '') GLOB 'No audio track*')`;
