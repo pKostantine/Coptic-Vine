@@ -45,5 +45,5 @@ test('search_literal_normalize folds Arabic forms and strips tashkeel', () => {
 test('cover density rank, normalization 32, as a float4', () => {
   const query = buildSearchQuery('love', 'english', 'all', false)!;
   const vector = toTsvector('english', 'But if you love those who love you, what credit is that to you? For even sinners love those who love them.');
-  assert.equal(Number(rankCd(vector, query).toPrecision(6)), 0.285714);
+  assert.equal(Number(rankCd(vector, query, 32).toPrecision(6)), 0.285714);
 });
