@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
+import { USER_DATA_SOURCE } from '@/services/userApi';
 import { supabase } from '@/utils/supabase';
 
 /**
@@ -15,7 +16,8 @@ import { supabase } from '@/utils/supabase';
  * EXPO_PUBLIC_CONTENT_SOURCE=supabase switches back, and EXPO_PUBLIC_CONTENT_API_URL
  * uses another address than https://content.copticvine.ca. Only content reads go through
  * this client (contentDataClient and the home screen's calendar and Synaxarium); signing
- * in, music, learning and everything a user owns stay on Supabase.
+ * in, music, learning and everything a user owns have their own switch
+ * (src/services/userApi.ts).
  */
 export type ContentSource = 'supabase' | 'cloudflare';
 
@@ -23,13 +25,22 @@ export const CONTENT_SOURCE: ContentSource = process.env.EXPO_PUBLIC_CONTENT_SOU
 
 const CONTENT_API_URL = (process.env.EXPO_PUBLIC_CONTENT_API_URL || 'https://content.copticvine.ca').replace(/\/+$/, '');
 
+/** A supabase-js client that never signs in and keeps no session: the content is public. */
+function sessionless(url: string, storageKey: string): typeof supabase {
+  return createClient(url, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'public', {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey },
+  }) as unknown as typeof supabase;
+}
+
 /**
  * The client content reads use. For the Worker it is a supabase-js client of its own,
- * so the app's queries stay exactly as they are; it never signs in (the content is
- * public) and keeps no session, so it can't disturb the signed-in Supabase client.
+ * so the app's queries stay exactly as they are; it can't disturb the signed-in client.
+ * Back on Supabase it is the signed-in client, unless user data has moved to cv-api:
+ * that client then sends everything to cv-api, which keeps no content, so Supabase's
+ * frozen copy gets a client of its own too.
  */
 export const contentApi: typeof supabase = CONTENT_SOURCE === 'cloudflare'
-  ? (createClient(CONTENT_API_URL, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'public', {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'cv-content-api' },
-    }) as unknown as typeof supabase)
-  : supabase;
+  ? sessionless(CONTENT_API_URL, 'cv-content-api')
+  : USER_DATA_SOURCE === 'cloudflare'
+    ? sessionless(process.env.EXPO_PUBLIC_SUPABASE_URL || '', 'cv-content-supabase')
+    : supabase;

@@ -49,15 +49,16 @@ function fakeClient(name, answer = { data: [], error: null }) {
   return client;
 }
 
-function loadContentSource(env) {
+function loadContentSource(env, userDataSource = 'supabase') {
   const saved = { ...process.env };
   delete process.env.EXPO_PUBLIC_CONTENT_SOURCE;
   delete process.env.EXPO_PUBLIC_CONTENT_API_URL;
-  Object.assign(process.env, { EXPO_PUBLIC_SUPABASE_ANON_KEY: 'anon-key' }, env);
+  Object.assign(process.env, { EXPO_PUBLIC_SUPABASE_ANON_KEY: 'anon-key', EXPO_PUBLIC_SUPABASE_URL: 'https://project.supabase.co' }, env);
   const created = [];
   const supabase = fakeClient('supabase');
   try {
     const module = loadModule(source('services/contentSource.ts'), {
+      '@/services/userApi': { USER_DATA_SOURCE: userDataSource },
       '@/utils/supabase': { supabase },
       '@supabase/supabase-js': { createClient: (url, key, options) => { const client = fakeClient('worker'); created.push({ url, key, options, client }); return client; } },
     });
@@ -76,6 +77,20 @@ test('content is read from Supabase only when the source is set to supabase', ()
   const other = loadContentSource({ EXPO_PUBLIC_CONTENT_SOURCE: 'something-else' });
   assert.equal(other.module.CONTENT_SOURCE, 'cloudflare');
   assert.notEqual(other.module.contentApi, other.supabase);
+});
+
+test('back on Supabase once user data is on cv-api, content gets a Supabase client of its own', () => {
+  // The signed-in client then sends everything to cv-api, which keeps no content.
+  const { module, created, supabase } = loadContentSource({ EXPO_PUBLIC_CONTENT_SOURCE: 'supabase' }, 'cloudflare');
+  assert.equal(created.length, 1);
+  assert.equal(created[0].url, 'https://project.supabase.co');
+  assert.equal(created[0].key, 'anon-key');
+  assert.deepEqual(created[0].options.auth, { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'cv-content-supabase' });
+  assert.equal(module.contentApi, created[0].client);
+  assert.notEqual(module.contentApi, supabase);
+
+  const worker = loadContentSource({}, 'cloudflare');
+  assert.equal(worker.created[0].url, 'https://content.copticvine.ca');
 });
 
 test('by default content goes to the Worker, on a client with no session', () => {
