@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import type { DevicePushToken, NotificationResponse } from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { accountAuth } from '@/services/accountAuth';
 import { supabase } from '@/utils/supabase';
 
 export type NotificationPreferenceMap = Record<string, boolean>;
@@ -200,8 +201,7 @@ export async function installNativeNotificationRuntime(
 
 export async function loadNotificationPreferences(categories: string[]): Promise<NotificationPreferenceMap> {
   const result: NotificationPreferenceMap = Object.fromEntries(categories.map((category) => [category, true]));
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
+  const user = await accountAuth.getUser();
   if (!user) return result;
 
   const { data, error } = await supabase
@@ -217,8 +217,7 @@ export async function loadNotificationPreferences(categories: string[]): Promise
 }
 
 export async function setNotificationPreference(category: string, enabled: boolean): Promise<void> {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
+  const user = await accountAuth.getUser();
   if (!user) throw new Error('Sign in to change notification preferences.');
 
   const { error } = await supabase.from('notification_preferences').upsert({

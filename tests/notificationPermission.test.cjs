@@ -46,9 +46,9 @@ function device({ platform = 'ios', status = 'undetermined', signedIn = true } =
     'expo-constants': { __esModule: true, default: { expoConfig: { version: '1.0.0', extra: { eas: { projectId: 'project-1' } } } } },
     'react-native': { Platform: { OS: platform } },
     'expo-notifications': Notifications,
+    '@/services/accountAuth': { accountAuth: { getUser: async () => (signedIn ? { id: 'user-1' } : null) } },
     '@/utils/supabase': {
       supabase: {
-        auth: { getUser: async () => ({ data: { user: signedIn ? { id: 'user-1' } : null }, error: null }) },
         rpc: async (name, args) => {
           calls.registered.push({ name, token: args.p_push_token });
           return { error: null };

@@ -1,14 +1,13 @@
-import { isAuthRetryableFetchError, type Session, type User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { accountAuth } from '@/services/accountAuth';
 import { disableNativeNotificationDevice } from '@/services/notificationService';
 import { disableWebPushDevice } from '@/services/webPushService';
-import { authMessage } from '@/utils/authMessages';
+import type { AccountSession, AccountUser } from '@/types/account';
 import { settleWithin } from '@/utils/settleWithin';
-import { supabase } from '@/utils/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -17,10 +16,14 @@ interface SignUpResult {
 }
 
 interface AuthContextValue {
-  session: Session | null;
-  user: User | null;
+  session: AccountSession | null;
+  user: AccountUser | null;
   loading: boolean;
   recoveryMode: boolean;
+  /** Whether a new password needs the current one beside it (cv-api). */
+  needsCurrentPassword: boolean;
+  /** Whether this user can change their password here: one who only signs in with Google may have none. */
+  canChangePassword: boolean;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<SignUpResult>;
   signInWithGoogle: () => Promise<void>;
@@ -29,7 +32,7 @@ interface AuthContextValue {
   updateDisplayName: (displayName: string) => Promise<void>;
   updateEmail: (email: string) => Promise<void>;
   updateAvatarUrl: (avatarUrl: string | null) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
+  updatePassword: (password: string, currentPassword?: string) => Promise<void>;
   clearRecoveryMode: () => void;
   signOut: () => Promise<void>;
 }
@@ -43,70 +46,39 @@ function accountRedirectUrl() {
   return Linking.createURL('account');
 }
 
-function authError(error: { message: string } | null, fallback: string) {
-  if (!error) return;
-  if (/provider is not enabled|unsupported provider/i.test(error.message)) {
-    throw new Error(authMessage('googleNotEnabled'));
-  }
-  throw new Error(error.message || fallback);
-}
-
-async function applyAuthCallback(url: string) {
-  const parsed = new URL(url);
-  const query = new URLSearchParams(parsed.search);
-  const fragment = new URLSearchParams(parsed.hash.replace(/^#/, ''));
-  const getParameter = (key: string) => query.get(key) ?? fragment.get(key);
-  const callbackError = getParameter('error_description') ?? getParameter('error');
-
-  if (callbackError) {
-    throw new Error(decodeURIComponent(callbackError.replace(/\+/g, ' ')));
-  }
-
-  const code = getParameter('code');
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    authError(error, authMessage('finishSignIn'));
-    return;
-  }
-
-  const accessToken = getParameter('access_token');
-  const refreshToken = getParameter('refresh_token');
-  if (accessToken && refreshToken) {
-    const { error } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
-    authError(error, authMessage('finishSignIn'));
-  }
-}
-
 export function AuthProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<AccountSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [recoveryMode, setRecoveryMode] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+    const unsubscribe = accountAuth.onChange((event, nextSession) => {
       if (!mounted) return;
       setSession(nextSession);
       setLoading(false);
       if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
+      // A reset left unfinished doesn't wait for whoever signs in next.
+      if (event === 'SIGNED_OUT') setRecoveryMode(false);
     });
 
     const initialize = async () => {
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' || accountAuth.readsWebCallbacks) {
         try {
-          const initialUrl = await Linking.getInitialURL();
-          if (initialUrl) await applyAuthCallback(initialUrl);
+          const initialUrl = Platform.OS === 'web' ? window.location.href : await Linking.getInitialURL();
+          if (initialUrl) await accountAuth.applyCallback(initialUrl);
         } catch (error) {
           console.warn('Unable to process the initial Coptic Vine sign-in link:', error);
         }
       }
-      const { data, error } = await supabase.auth.getSession();
-      if (error) console.warn('Unable to restore Coptic Vine session:', error.message);
+      let restored: AccountSession | null = null;
+      try {
+        restored = await accountAuth.getSession();
+      } catch (error) {
+        console.warn('Unable to restore Coptic Vine session:', error instanceof Error ? error.message : error);
+      }
       if (mounted) {
-        setSession(data.session);
+        setSession(restored);
         setLoading(false);
       }
     };
@@ -115,99 +87,39 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const linkSubscription = Platform.OS === 'web'
       ? null
       : Linking.addEventListener('url', ({ url }) => {
-        void applyAuthCallback(url).catch((error) => {
+        void accountAuth.applyCallback(url).catch((error) => {
           console.warn('Unable to process Coptic Vine sign-in link:', error);
         });
       });
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      unsubscribe();
       linkSubscription?.remove();
     };
   }, []);
 
-  const signInWithEmail = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    authError(error, authMessage('signIn'));
-  }, []);
+  const signInWithEmail = useCallback((email: string, password: string) => accountAuth.signInWithEmail(email, password), []);
 
-  const signUpWithEmail = useCallback(async (email: string, password: string, displayName: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: accountRedirectUrl(),
-        data: { full_name: displayName.trim() },
-      },
-    });
-    authError(error, authMessage('createAccount'));
-    return { confirmationRequired: data.session == null };
-  }, []);
+  const signUpWithEmail = useCallback(
+    (email: string, password: string, displayName: string) => accountAuth.signUpWithEmail(email, password, displayName, accountRedirectUrl()),
+    [],
+  );
 
-  const signInWithGoogle = useCallback(async () => {
-    const redirectTo = accountRedirectUrl();
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo,
-        skipBrowserRedirect: Platform.OS !== 'web',
-      },
-    });
-    authError(error, authMessage('startGoogle'));
+  const signInWithGoogle = useCallback(() => accountAuth.signInWithGoogle(accountRedirectUrl()), []);
 
-    if (Platform.OS !== 'web') {
-      if (!data.url) throw new Error(authMessage('googleNoUrl'));
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      if (result.type === 'success') {
-        await applyAuthCallback(result.url);
-      } else if (result.type !== 'dismiss' && result.type !== 'cancel') {
-        throw new Error(authMessage('googleIncomplete'));
-      }
-    }
-  }, []);
+  const sendPasswordReset = useCallback((email: string) => accountAuth.sendPasswordReset(email, accountRedirectUrl()), []);
 
-  const sendPasswordReset = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: accountRedirectUrl(),
-    });
-    authError(error, authMessage('passwordReset'));
-  }, []);
+  const resendSignupConfirmation = useCallback((email: string) => accountAuth.resendSignupConfirmation(email, accountRedirectUrl()), []);
 
-  const resendSignupConfirmation = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email,
-      options: { emailRedirectTo: accountRedirectUrl() },
-    });
-    authError(error, authMessage('resendConfirmation'));
-  }, []);
+  const updateDisplayName = useCallback((displayName: string) => accountAuth.updateDisplayName(displayName), []);
 
-  const updateDisplayName = useCallback(async (displayName: string) => {
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: displayName.trim() },
-    });
-    authError(error, authMessage('updateProfile'));
-  }, []);
+  const updateEmail = useCallback((email: string) => accountAuth.updateEmail(email, accountRedirectUrl()), []);
 
-  const updateEmail = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.updateUser(
-      { email: email.trim().toLowerCase() },
-      { emailRedirectTo: accountRedirectUrl() },
-    );
-    authError(error, authMessage('updateEmail'));
-  }, []);
+  const updateAvatarUrl = useCallback((avatarUrl: string | null) => accountAuth.updateAvatarUrl(avatarUrl), []);
 
-  const updateAvatarUrl = useCallback(async (avatarUrl: string | null) => {
-    const { error } = await supabase.auth.updateUser({
-      data: { chc_avatar_url: avatarUrl },
-    });
-    authError(error, authMessage('updatePhoto'));
-  }, []);
-
-  const updatePassword = useCallback(async (password: string) => {
-    const { error } = await supabase.auth.updateUser({ password });
-    authError(error, authMessage('updatePassword'));
+  const updatePassword = useCallback(async (password: string, currentPassword?: string) => {
+    await accountAuth.updatePassword(password, currentPassword);
     setRecoveryMode(false);
   }, []);
 
@@ -219,20 +131,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
       DEVICE_DETACH_TIMEOUT_MS,
       'Unable to detach this device from Coptic Vine notifications before sign-out',
     );
-
-    const { error } = await supabase.auth.signOut();
-    // The client drops this device's session before it reports that the
-    // server could not be reached, so a sign-out with no connection has
-    // still signed this device out (only the refresh token outlives it on
-    // the server, until it expires). Anything else is a real failure.
-    if (error && !isAuthRetryableFetchError(error)) authError(error, authMessage('signOut'));
+    await accountAuth.signOut();
   }, []);
 
+  const user = session?.user ?? null;
   const value = useMemo<AuthContextValue>(() => ({
     session,
-    user: session?.user ?? null,
+    user,
     loading,
     recoveryMode,
+    needsCurrentPassword: accountAuth.needsCurrentPassword,
+    canChangePassword: user ? accountAuth.canChangePassword(user) : false,
     signInWithEmail,
     signUpWithEmail,
     signInWithGoogle,
@@ -258,6 +167,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     updateEmail,
     updateAvatarUrl,
     updatePassword,
+    user,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
