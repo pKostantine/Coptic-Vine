@@ -44,3 +44,8 @@ example
 # generated native folders
 /ios
 /android
+
+# Wrangler local secrets and overrides (workers/*/.dev.vars)
+.dev.vars
+.dev.vars.*
+!.dev.vars.example

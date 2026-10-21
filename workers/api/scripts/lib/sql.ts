@@ -39,11 +39,11 @@ ${parts.join('\n    union all\n')}
     'rawUserMetaData', coalesce(u.raw_user_meta_data, '{}'::jsonb)::text, 'rawAppMetaData', coalesce(u.raw_app_meta_data, '{}'::jsonb)::text,
     'createdAt', to_json(u.created_at) #>> '{}', 'updatedAt', to_json(coalesce(u.updated_at, u.created_at)) #>> '{}',
     'deletedAt', to_json(u.deleted_at) #>> '{}', 'bannedUntil', to_json(u.banned_until) #>> '{}'
-  ) order by u.id), '[]'::json) from auth.users u),
+  ) order by u.id), '[]'::json) from "auth"."users" u),
   'authIdentities', (select coalesce(json_agg(json_build_object(
     'id', i.id::text, 'userId', i.user_id::text, 'provider', i.provider, 'providerId', i.provider_id,
     'createdAt', to_json(i.created_at) #>> '{}', 'updatedAt', to_json(coalesce(i.updated_at, i.created_at)) #>> '{}'
-  ) order by i.id), '[]'::json) from auth.identities i)
+  ) order by i.id), '[]'::json) from "auth"."identities" i)
 ) as export, repeat('.', 120000) as pad;
 `;
 }
@@ -85,7 +85,7 @@ with copied(s, t) as (
     expression, s, t), false, true, '') as x
   from lines
   union all
-  select 'auth/users', query_to_xml($q$select count(*) as n, encode(sha256(convert_to(coalesce(string_agg(line, E'\\n' order by line collate "C"), ''), 'UTF8')), 'hex') as h from (select '[' || to_json(id::text)::text || ',' || to_json(lower(email))::text || ']' as line from auth.users where deleted_at is null) x$q$, false, true, '')
+  select 'auth/users', query_to_xml($q$select count(*) as n, encode(sha256(convert_to(coalesce(string_agg(line, E'\\n' order by line collate "C"), ''), 'UTF8')), 'hex') as h from (select '[' || to_json(id::text)::text || ',' || to_json(lower(email))::text || ']' as line from "auth"."users" where deleted_at is null) x$q$, false, true, '')
 )
 select json_object_agg(k, json_build_object('rows', (xpath('/row/n/text()', x))[1]::text::bigint, 'sha256', (xpath('/row/h/text()', x))[1]::text) order by k) as checksums, repeat('.', 120000) as pad
 from results;

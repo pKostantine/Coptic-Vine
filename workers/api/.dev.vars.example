@@ -1,0 +1,6 @@
+# Copy to .dev.vars for `npx wrangler dev` (local D1, emails kept in memory).
+BETTER_AUTH_URL=http://localhost:8790
+BETTER_AUTH_SECRET=a-local-development-secret-at-least-32-characters
+EMAIL_MODE=outbox
+TRUSTED_ORIGINS=http://localhost:8081,http://localhost:8095,copticvine://,coptichymnscentre://,copticvineadmin://,copticvineartists://
+# GOOGLE_CLIENT_SECRET=  (the web client's secret, to try Google sign-in locally)
