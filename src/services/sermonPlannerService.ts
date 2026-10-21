@@ -1,4 +1,4 @@
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 import type { SermonPlan } from '@/types/sermonPlanner';
 import { emptySermonPlan, normalizeSermonPlan } from '@/utils/sermonPlanner';
 
@@ -25,7 +25,7 @@ export async function loadCloudSermonPlan(
   documentKey: string,
   serviceDate: string,
 ): Promise<SermonPlan | null> {
-  const { data, error } = await supabase
+  const { data, error } = await api
     .from('sermon_plans')
     .select('document_key, service_date, general_notes, highlights, highlight_deletions, updated_at')
     .eq('document_key', documentKey)
@@ -45,7 +45,7 @@ export async function loadCloudSermonPlan(
 }
 
 export async function saveCloudSermonPlan(userId: string, plan: SermonPlan): Promise<void> {
-  const { error } = await supabase.from('sermon_plans').upsert({
+  const { error } = await api.from('sermon_plans').upsert({
     user_id: userId,
     document_key: plan.documentKey,
     service_date: plan.serviceDate,

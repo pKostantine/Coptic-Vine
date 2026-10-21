@@ -1,4 +1,4 @@
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 export interface CloudContentPreferences {
   exists: boolean;
@@ -15,7 +15,7 @@ function cleanBookmarks(value: unknown): string[] {
 }
 
 export async function getMyContentPreferences(): Promise<CloudContentPreferences> {
-  const { data, error } = await supabase.rpc('get_my_content_preferences');
+  const { data, error } = await api.rpc('get_my_content_preferences');
   if (error) throw new Error(error.message || 'Unable to load account preferences.');
   const payload = data && typeof data === 'object' ? data as Record<string, unknown> : {};
   return {
@@ -32,7 +32,7 @@ export async function saveMyContentPreferences(
   preferences: Record<string, unknown>,
   bookmarks: string[],
 ): Promise<void> {
-  const { error } = await supabase.rpc('save_my_content_preferences', {
+  const { error } = await api.rpc('save_my_content_preferences', {
     p_preferences: preferences,
     p_bookmarks: cleanBookmarks(bookmarks),
   });

@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 export type WebPushSyncResult =
   | 'registered'
@@ -53,7 +53,7 @@ export async function syncWebPushDevice(options: {
   if (result.status === 'denied') return 'denied';
 
   const subscription = result.subscription;
-  const { error } = await supabase.rpc('register_notification_device', {
+  const { error } = await api.rpc('register_notification_device', {
     p_app_key: APP_KEY,
     p_platform: isWindows() ? 'windows' : 'web',
     p_provider: PROVIDER,
@@ -73,7 +73,7 @@ export async function disableWebPushDevice(): Promise<void> {
 
   const endpoint = globalThis.localStorage?.getItem(LAST_ENDPOINT_KEY);
   if (endpoint) {
-    const { error } = await supabase.rpc('disable_notification_device', {
+    const { error } = await api.rpc('disable_notification_device', {
       p_app_key: APP_KEY,
       p_provider: PROVIDER,
       p_push_token: endpoint,

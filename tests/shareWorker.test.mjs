@@ -60,7 +60,7 @@ function makeEnv(assetResponse = new Response(APP_SHELL, {
 
 function mockPreview(preview = PREVIEW, expectedPath = `/music/release/${RELEASE_ID}`) {
   globalThis.fetch = async (input, init) => {
-    assert.equal(String(input), 'https://wtuujmeinzqfikvuofmh.supabase.co/rest/v1/rpc/get_share_preview');
+    assert.equal(String(input), 'https://api.copticvine.ca/rest/v1/rpc/get_share_preview');
     assert.equal(init?.method, 'POST');
     assert.equal(new Headers(init?.headers).get('accept-profile'), 'public');
     assert.equal(new Headers(init?.headers).get('content-profile'), 'public');
@@ -131,7 +131,7 @@ test('artist and track share routes select their entity-specific Open Graph type
 
 test('public playlist share routes use the visibility-safe playlist preview RPC', async () => {
   globalThis.fetch = async (input, init) => {
-    assert.equal(String(input), 'https://wtuujmeinzqfikvuofmh.supabase.co/rest/v1/rpc/get_music_playlist_share_preview');
+    assert.equal(String(input), 'https://api.copticvine.ca/rest/v1/rpc/get_music_playlist_share_preview');
     assert.deepEqual(JSON.parse(init?.body), { p_playlist_id: PLAYLIST_ID });
     return new Response(JSON.stringify({ ...PREVIEW, title: 'Sunday Liturgy' }), {
       headers: { 'Content-Type': 'application/json' },
@@ -231,14 +231,20 @@ test('unrelated routes remain ordinary static asset requests', async () => {
   assert.equal(requests.length, 1);
 });
 
-test('after the Phase 2 cutover, previews come from cv-api (DATA_API_URL), without Supabase\'s key', async () => {
+test('previews come from cv-api with no key, or from where DATA_API_URL says', async () => {
   globalThis.fetch = async (input, init) => {
     assert.equal(String(input), 'https://api.copticvine.ca/rest/v1/rpc/get_share_preview');
     assert.equal(new Headers(init?.headers).get('apikey'), null);
     return new Response(JSON.stringify(PREVIEW), { headers: { 'Content-Type': 'application/json' } });
   };
+  const defaults = await worker.fetch(new Request(`https://copticvine.ca/share/music/release/${RELEASE_ID}`, { headers: { 'User-Agent': 'facebookexternalhit/1.1' } }), makeEnv().env);
+  assert.equal(defaults.status, 200);
+  globalThis.fetch = async (input) => {
+    assert.equal(String(input), 'http://localhost:8790/rest/v1/rpc/get_share_preview');
+    return new Response(JSON.stringify(PREVIEW), { headers: { 'Content-Type': 'application/json' } });
+  };
   const { env } = makeEnv();
-  env.DATA_API_URL = 'https://api.copticvine.ca/';
+  env.DATA_API_URL = 'http://localhost:8790/';
   const response = await worker.fetch(new Request(`https://copticvine.ca/share/music/release/${RELEASE_ID}`, { headers: { 'User-Agent': 'facebookexternalhit/1.1' } }), env);
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Liturgy with Cantor Ibrahim Ayad/);

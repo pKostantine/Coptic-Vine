@@ -1,5 +1,5 @@
 import type { UnifiedSearchPayload, UnifiedSearchScope } from '@/types/unifiedSearch';
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 const EMPTY_RESULTS: UnifiedSearchPayload = {
   query: '',
@@ -18,13 +18,13 @@ export async function searchUnifiedMedia(
   if (!value) return { ...EMPTY_RESULTS, scope };
 
   const { data, error } = scope === 'all'
-    ? await supabase.rpc('search_media_catalog', {
+    ? await api.rpc('search_media_catalog', {
         p_query: value,
         p_locale: locale,
         p_scope: scope,
         p_limit: limit,
       })
-    : await supabase.rpc('search_section_catalog', {
+    : await api.rpc('search_section_catalog', {
         p_query: value,
         p_locale: locale,
         p_section: scope,

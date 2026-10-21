@@ -4,7 +4,6 @@ const test = require('node:test');
 const ts = require('typescript');
 const React = require('react');
 const { renderToString } = require('react-dom/server');
-const { AuthApiError, AuthRetryableFetchError } = require('@supabase/supabase-js');
 
 function compile(path) {
   return ts.transpileModule(fs.readFileSync(path, 'utf8'), {
@@ -23,33 +22,24 @@ function load(path, stubs = {}) {
 }
 
 /**
- * AuthContext over the Supabase backend (src/services/accountAuth.ts), with
- * everything around them stubbed, and the provider rendered once
- * (server-side, which runs its memoized callbacks but no effects) so its
- * `signOut` can be called with a chosen answer from the auth client.
+ * AuthContext with the account backend stubbed (src/services/accountAuth.ts is
+ * cv-api's, whose own sign-out, offline included, workers/api's appAuth tests
+ * cover), and the provider rendered once (server-side, which runs its
+ * memoized callbacks but no effects) so its `signOut` can be called with a
+ * chosen answer from the backend.
  */
-function signOutWith(signOutResult) {
-  const preferences = { getCurrentAppLanguage: () => 'en' };
-  const appText = load('src/utils/appText.ts', { './preferencesStorage': preferences });
-  const authMessages = load('src/utils/authMessages.ts', { './appText': appText });
+function signOutWith(signOutError) {
   const settleWithin = load('src/utils/settleWithin.ts');
   const reactNative = { Platform: { OS: 'web' } };
   const webBrowser = { maybeCompleteAuthSession() {}, openAuthSessionAsync: async () => ({ type: 'cancel' }) };
-  const { accountAuth } = load('src/services/accountAuth.ts', {
-    'react-native': reactNative,
-    'expo-web-browser': webBrowser,
-    '@/services/userApi': { cvApiAuth: null },
-    '@/utils/authMessages': authMessages,
-    '@/utils/supabase': {
-      supabase: {
-        auth: {
-          onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
-          getSession: async () => ({ data: { session: null }, error: null }),
-          signOut: async () => signOutResult,
-        },
-      },
+  const accountAuth = {
+    readsWebCallbacks: true,
+    onChange: () => () => {},
+    getSession: async () => null,
+    signOut: async () => {
+      if (signOutError) throw signOutError;
     },
-  });
+  };
   const { AuthProvider, useAuth } = load('src/context/AuthContext.tsx', {
     'react-native': reactNative,
     'expo-linking': { createURL: (path) => `https://copticvine.ca/${path}`, getInitialURL: async () => null, addEventListener: () => ({ remove() {} }) },
@@ -70,17 +60,10 @@ function signOutWith(signOutResult) {
   return signOut;
 }
 
-test('signing out with no connection still counts as signed out', async () => {
-  // The auth client removes this device's session before it reports that the
-  // server could not be reached, so the device is signed out; raising the
-  // network error would only tell the reader it had failed.
-  await signOutWith({ error: new AuthRetryableFetchError('Failed to fetch', 0) })();
-});
-
-test('signing out reports any other failure', async () => {
-  await assert.rejects(signOutWith({ error: new AuthApiError('server exploded', 500, 'unexpected_failure') })(), /server exploded/);
+test('signing out reports a failure from the backend', async () => {
+  await assert.rejects(signOutWith(new Error('server exploded'))(), /server exploded/);
 });
 
 test('signing out without any error resolves', async () => {
-  await signOutWith({ error: null })();
+  await signOutWith(null)();
 });

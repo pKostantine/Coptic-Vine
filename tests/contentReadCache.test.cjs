@@ -167,8 +167,8 @@ function loadClient({ tables = {}, installed = [], rpcResults = {}, server = {} 
   };
   const client = loadModule('src/services/contentDataClient.ts', {
     '@/services/bookContentDatabase': bookContentDatabase,
-    '@/utils/supabase': { supabase },
-    // Content reads go through the content source (Supabase unless switched).
+    '@/utils/api': { api: supabase },
+    // Content reads go through the content source (the content Worker).
     '@/services/contentSource': { contentApi: supabase },
   }).contentDataClient;
   return { client, calls };

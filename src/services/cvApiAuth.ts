@@ -1,6 +1,6 @@
 /**
- * Signing in to cv-api (workers/api: Better Auth on D1) from Coptic Vine, when
- * EXPO_PUBLIC_USER_DATA_SOURCE=cloudflare (src/services/userApi.ts). It calls
+ * Signing in to cv-api (workers/api: Better Auth on D1) from Coptic Vine
+ * (set up in src/services/userApi.ts). It calls
  * Better Auth's /auth endpoints with fetch, as Better Auth's own Expo client
  * would, and hands the user out in Supabase's shape (src/types/account.ts).
  * CV-Admin and CV-Artists keep a copy of this file, which stays the same.

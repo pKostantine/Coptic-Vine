@@ -17,9 +17,6 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,7 +42,7 @@ jobs:
           src/services/accountAuth.ts
           src/services/cvApiAuth.ts
           src/services/userApi.ts
-          src/utils/supabase.ts
+          src/utils/api.ts
           src/services/offlineDownloadRequests.ts
           src/services/offlineDatabase.ts
           src/services/profileAvatarService.ts

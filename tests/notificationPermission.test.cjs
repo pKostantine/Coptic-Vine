@@ -47,8 +47,8 @@ function device({ platform = 'ios', status = 'undetermined', signedIn = true } =
     'react-native': { Platform: { OS: platform } },
     'expo-notifications': Notifications,
     '@/services/accountAuth': { accountAuth: { getUser: async () => (signedIn ? { id: 'user-1' } : null) } },
-    '@/utils/supabase': {
-      supabase: {
+    '@/utils/api': {
+      api: {
         rpc: async (name, args) => {
           calls.registered.push({ name, token: args.p_push_token });
           return { error: null };

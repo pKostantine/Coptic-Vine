@@ -13,7 +13,7 @@ import type {
 } from '@/types/musicConsumer';
 import type { MusicLyricKind, MusicPlaylistVisibility } from '@/types/mediaPlatform';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
-import { supabase } from '@/utils/supabase';
+import { api } from '@/utils/api';
 
 function assertRpcData<T>(data: T | null, error: { message: string } | null, operation: string): T {
   if (error) {
@@ -46,13 +46,13 @@ export function resolveMusicAsset(asset: MusicConsumerAsset | null | undefined):
 }
 
 export async function getMusicHome(locale = 'en'): Promise<MusicHomePayload> {
-  const { data, error } = await supabase.rpc('get_music_home', { p_locale: locale });
+  const { data, error } = await api.rpc('get_music_home', { p_locale: locale });
   return assertRpcData(data as MusicHomePayload | null, error, 'Load music home');
 }
 
 export async function getMusicRelease(releaseId: string, locale = 'en'): Promise<MusicConsumerRelease> {
   return offlineFallback(async () => {
-    const { data, error } = await supabase.rpc('get_published_music_release_for_locale', {
+    const { data, error } = await api.rpc('get_published_music_release_for_locale', {
       p_release_id: releaseId,
       p_locale: locale,
     });
@@ -61,7 +61,7 @@ export async function getMusicRelease(releaseId: string, locale = 'en'): Promise
 }
 
 export async function getMusicArtist(artistId: string, locale = 'en'): Promise<MusicConsumerArtist> {
-  const { data, error } = await supabase.rpc('get_published_music_artist', {
+  const { data, error } = await api.rpc('get_published_music_artist', {
     p_artist_id: artistId,
     p_locale: locale,
   });
@@ -69,7 +69,7 @@ export async function getMusicArtist(artistId: string, locale = 'en'): Promise<M
 }
 
 export async function getMusicTrack(trackId: string, locale = 'en'): Promise<MusicConsumerTrackDetail> {
-  const { data, error } = await supabase.rpc('get_published_music_track_for_locale', {
+  const { data, error } = await api.rpc('get_published_music_track_for_locale', {
     p_track_id: trackId,
     p_locale: locale,
   });
@@ -77,7 +77,7 @@ export async function getMusicTrack(trackId: string, locale = 'en'): Promise<Mus
 }
 
 export async function getMusicArtistSearchArt(artistId: string): Promise<MusicConsumerAsset | null> {
-  const { data, error } = await supabase.rpc('get_music_artist_search_art', {
+  const { data, error } = await api.rpc('get_music_artist_search_art', {
     p_artist_id: artistId,
   });
   if (error) throw new Error('Load artist search artwork: ' + error.message);
@@ -119,7 +119,7 @@ export async function searchMusic(query: string, locale = 'en'): Promise<MusicSe
 
 export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayload> {
   return offlineFallback(async () => {
-    const { data, error } = await supabase.rpc('get_my_music_library', { p_locale: locale });
+    const { data, error } = await api.rpc('get_my_music_library', { p_locale: locale });
     const library = assertRpcData(data as MusicLibraryPayload | null, error, 'Load music library');
     return {
       ...library,
@@ -135,7 +135,7 @@ export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayloa
 
 export async function getMusicPlaylist(playlistId: string, locale = 'en'): Promise<MusicPlaylistPayload> {
   return offlineFallback(async () => {
-    const { data, error } = await supabase.rpc('get_music_playlist', {
+    const { data, error } = await api.rpc('get_music_playlist', {
       p_playlist_id: playlistId,
       p_locale: locale,
     });
@@ -144,22 +144,22 @@ export async function getMusicPlaylist(playlistId: string, locale = 'en'): Promi
 }
 
 export async function setTrackLiked(trackId: string, liked: boolean): Promise<boolean> {
-  const { data, error } = await supabase.rpc('set_track_liked', { p_track_id: trackId, p_liked: liked });
+  const { data, error } = await api.rpc('set_track_liked', { p_track_id: trackId, p_liked: liked });
   return assertRpcData(data as boolean | null, error, liked ? 'Like track' : 'Unlike track');
 }
 
 export async function getReleaseLiked(releaseId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('get_release_liked', { p_release_id: releaseId });
+  const { data, error } = await api.rpc('get_release_liked', { p_release_id: releaseId });
   return assertRpcData(data as boolean | null, error, 'Load release like');
 }
 
 export async function getArtistFollowed(artistId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('get_artist_followed', { p_artist_id: artistId });
+  const { data, error } = await api.rpc('get_artist_followed', { p_artist_id: artistId });
   return assertRpcData(data as boolean | null, error, 'Load artist follow');
 }
 
 export async function setArtistFollowed(artistId: string, followed: boolean): Promise<boolean> {
-  const { data, error } = await supabase.rpc('set_artist_followed', {
+  const { data, error } = await api.rpc('set_artist_followed', {
     p_artist_id: artistId,
     p_followed: followed,
   });
@@ -167,7 +167,7 @@ export async function setArtistFollowed(artistId: string, followed: boolean): Pr
 }
 
 export async function setReleaseLiked(releaseId: string, liked: boolean): Promise<boolean> {
-  const { data, error } = await supabase.rpc('set_release_liked', { p_release_id: releaseId, p_liked: liked });
+  const { data, error } = await api.rpc('set_release_liked', { p_release_id: releaseId, p_liked: liked });
   return assertRpcData(data as boolean | null, error, liked ? 'Like release' : 'Unlike release');
 }
 
@@ -176,7 +176,7 @@ export async function createMusicPlaylist(
   description?: string | null,
   visibility: MusicPlaylistVisibility = 'private',
 ): Promise<string> {
-  const { data, error } = await supabase.rpc('create_music_playlist', {
+  const { data, error } = await api.rpc('create_music_playlist', {
     p_name: name,
     p_description: description ?? null,
     p_visibility: visibility,
@@ -185,7 +185,7 @@ export async function createMusicPlaylist(
 }
 
 export async function addTrackToMusicPlaylist(playlistId: string, trackId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('add_track_to_music_playlist', {
+  const { data, error } = await api.rpc('add_track_to_music_playlist', {
     p_playlist_id: playlistId,
     p_track_id: trackId,
   });
@@ -193,7 +193,7 @@ export async function addTrackToMusicPlaylist(playlistId: string, trackId: strin
 }
 
 export async function removeTrackFromMusicPlaylist(playlistId: string, trackId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('remove_track_from_music_playlist', {
+  const { data, error } = await api.rpc('remove_track_from_music_playlist', {
     p_playlist_id: playlistId,
     p_track_id: trackId,
   });
@@ -206,7 +206,7 @@ export async function updateMusicPlaylist(
   description: string | null,
   visibility: MusicPlaylistVisibility,
 ): Promise<boolean> {
-  const { data, error } = await supabase.rpc('update_music_playlist', {
+  const { data, error } = await api.rpc('update_music_playlist', {
     p_playlist_id: playlistId,
     p_name: name,
     p_description: description,
@@ -216,12 +216,12 @@ export async function updateMusicPlaylist(
 }
 
 export async function deleteMusicPlaylist(playlistId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_music_playlist', { p_playlist_id: playlistId });
+  const { data, error } = await api.rpc('delete_music_playlist', { p_playlist_id: playlistId });
   return assertRpcData(data as boolean | null, error, 'Delete playlist');
 }
 
 export async function setMusicPlaylistTrackOrder(playlistId: string, trackIds: string[]): Promise<boolean> {
-  const { data, error } = await supabase.rpc('set_music_playlist_track_order', {
+  const { data, error } = await api.rpc('set_music_playlist_track_order', {
     p_playlist_id: playlistId,
     p_track_ids: trackIds,
   });
@@ -229,7 +229,7 @@ export async function setMusicPlaylistTrackOrder(playlistId: string, trackIds: s
 }
 
 export async function recordMusicPlay(trackId: string, releaseId?: string | null): Promise<boolean> {
-  const { data, error } = await supabase.rpc('record_music_play', {
+  const { data, error } = await api.rpc('record_music_play', {
     p_track_id: trackId,
     p_release_id: releaseId ?? null,
   });
@@ -243,7 +243,7 @@ export async function getTrackLyrics(
 ): Promise<PublishedTrackLyricsPayload> {
   const requestedLocale = locale ?? 'en';
   return offlineFallback(async () => {
-    const { data, error } = await supabase.rpc('get_published_track_lyrics', {
+    const { data, error } = await api.rpc('get_published_track_lyrics', {
       p_track_id: trackId,
       p_locale: locale ?? null,
       p_kind: kind ?? null,
