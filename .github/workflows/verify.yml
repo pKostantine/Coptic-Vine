@@ -57,6 +57,9 @@ jobs:
       - name: Content API (D1 schema, quoted table names)
         working-directory: workers/content-api
         run: npm test && ../../node_modules/.bin/tsc -p . && npm run gen:schema -- --check
+      - name: User data API (D1 schema for Phase 2, import)
+        working-directory: workers/api
+        run: npm test && ../../node_modules/.bin/tsc -p . && npm run gen:schema -- --check
       - name: Validate media processor (including multi-GB video)
         working-directory: workers/media-processor
         run: npm ci --no-audit --no-fund && npm test
