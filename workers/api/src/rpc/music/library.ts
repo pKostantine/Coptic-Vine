@@ -208,9 +208,11 @@ export async function recordMusicPlay(ctx: ApiContext, trackId: string, releaseI
     if (!contains) raise('Release does not contain this track', '22023');
   }
   await insertAllowed(ctx, 'play_history', visible.track('?'), trackId);
-  await ctx.db.prepare(`INSERT INTO ${t('music', 'play_history')} (${['id', 'user_id', 'track_id', 'release_id', 'media_asset_id', 'progress_ms', 'completed', 'played_at'].map(col).join(', ')}) VALUES (?, ?, ?, ?, ?, 0, 0, ?)`)
-    .bind(crypto.randomUUID(), userId, trackId, releaseId, track!.asset, now()).run();
-  await ctx.db.prepare(`DELETE FROM ${t('music', 'play_history')} WHERE ${col('id')} IN (
-    SELECT ${col('id')} FROM ${t('music', 'play_history')} WHERE ${col('user_id')} = ? ORDER BY ${col('played_at')} DESC, ${col('id')} DESC LIMIT -1 OFFSET ${HISTORY_KEPT})`).bind(userId).run();
+  await ctx.db.batch([
+    ctx.db.prepare(`INSERT INTO ${t('music', 'play_history')} (${['id', 'user_id', 'track_id', 'release_id', 'media_asset_id', 'progress_ms', 'completed', 'played_at'].map(col).join(', ')}) VALUES (?, ?, ?, ?, ?, 0, 0, ?)`)
+      .bind(crypto.randomUUID(), userId, trackId, releaseId, track!.asset, now()),
+    ctx.db.prepare(`DELETE FROM ${t('music', 'play_history')} WHERE ${col('id')} IN (
+      SELECT ${col('id')} FROM ${t('music', 'play_history')} WHERE ${col('user_id')} = ? ORDER BY ${col('played_at')} DESC, ${col('id')} DESC LIMIT -1 OFFSET ${HISTORY_KEPT})`).bind(userId),
+  ]);
   return true;
 }
