@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { after, before, test } from 'node:test';
 import { ALICE, C1, CAROL, id, job, seedCatalog, T1 } from './lib/creatorCatalog.ts';
+import { d1 } from './lib/d1.ts';
 import { createOracle, type Oracle, type PgAnswer } from './lib/oracle.ts';
 import { seed } from './lib/seed.ts';
 import { bothTables, firstDifferences } from './lib/tables.ts';
@@ -96,7 +97,8 @@ test('a scan: unused objects in the four buckets become candidates (their first 
   const scan = await worked('sync_storage_gc_candidates', { p_objects: [
     { bucket: ' chc-music ', path: 'orphan/160.m4a', file_size_bytes: '2048', last_modified_at: '2026-10-01T10:00:00Z' },
     { bucket: 'chc-submissions', path: UPLOAD_PATH, file_size_bytes: -5 },
-    { bucket: 'chc-music', path: 'audio/5' }, { bucket: 'other', path: 'x', file_size_bytes: 'not checked' }, { bucket: 'chc-images', path: '  ' },
+    // A referenced object's size is never cast, so it can't fail.
+    { bucket: 'chc-music', path: 'audio/5', file_size_bytes: 'not checked either' }, { bucket: 'other', path: 'x', file_size_bytes: 'not checked' }, { bucket: 'chc-images', path: '  ' },
     { bucket: 'chc-images', path: 'new.png', file_size_bytes: '' }, { bucket: 'chc-images', path: 'Zeta.png' }, { bucket: 'chc-images', path: 'alpha.png' }, 7,
   ] });
   assert.deepEqual(scan.data, [{ scanned_count: 9, candidate_count: 5, due_count: 3 }]);
@@ -129,4 +131,22 @@ test('an admin deleting a file: authorized, its jobs cancelled and its objects l
   await sameTables('after the refused deletion');
   for (const jobId of [job(4), job(9), id(699)]) await both(CAROL, 'finalize_admin_processing_file_deletion', { p_job_id: jobId });
   assert.equal((await both(ALICE, 'finalize_admin_processing_file_deletion', { p_job_id: job(9) })).error?.code, '42501');
+});
+
+test('a scan costs the same few D1 calls however many objects it lists', async () => {
+  const listing = (n: number) => [{ bucket: 'chc-music', path: 'audio/5' }, ...Array.from({ length: n }, (_, i) => ({ bucket: 'chc-images', path: `scan/${i}.png`, file_size_bytes: String(i) }))];
+  const kept = worker.env.DB;
+  let calls = 0;
+  worker.env.DB = d1(worker.db, { before: () => { calls += 1; } });
+  try {
+    const counted: number[] = [];
+    for (const n of [2, 60]) {
+      calls = 0;
+      await worked('sync_storage_gc_candidates', { p_objects: listing(n) });
+      counted.push(calls);
+    }
+    assert.equal(counted[1], counted[0], `D1 calls for 2 objects, then 60: ${counted.join(', ')}`);
+  } finally {
+    worker.env.DB = kept;
+  }
 });
