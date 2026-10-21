@@ -10,6 +10,7 @@ import type { FunctionInfo } from '../../scripts/gen-functions.ts';
 import { PgError } from '../pg.ts';
 import type { ApiContext } from '../rest/context.ts';
 import { convert } from './args.ts';
+import { creatorRpcs } from './creator/index.ts';
 import { learningRpcs } from './learning/index.ts';
 import { musicRpcs } from './music/index.ts';
 import { searchRpcs } from './search/index.ts';
@@ -27,6 +28,7 @@ export const RPCS: Record<string, Rpc> = {
   ...musicRpcs,
   ...learningRpcs,
   ...searchRpcs,
+  ...creatorRpcs,
 };
 
 export const FUNCTIONS = functions as Record<string, FunctionInfo>;
