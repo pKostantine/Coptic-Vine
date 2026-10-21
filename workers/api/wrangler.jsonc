@@ -1,0 +1,37 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Sign-in and the user data for Coptic Vine, CV-Admin and CV-Artists
+  // (Phase 2 of docs/coptic-vine-d1-plan.md). Not live until the Phase 2
+  // cutover: the apps still sign in with Supabase.
+  "name": "cv-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-21",
+  // Better Auth uses AsyncLocalStorage (node:async_hooks).
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [{ "pattern": "api.copticvine.ca", "custom_domain": true }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "copticvine",
+      "database_id": "73a769f9-62fe-486d-a3c2-171b9aec274a",
+      // The database keeps one migration history, with the content Worker's.
+      "migrations_dir": "../content-api/migrations"
+    }
+  ],
+  // Cloudflare Email Service: copticvine.ca has to be onboarded for Email Sending.
+  "send_email": [{ "name": "EMAIL" }],
+  "vars": {
+    "BETTER_AUTH_URL": "https://api.copticvine.ca",
+    "EMAIL_FROM": "no-reply@copticvine.ca",
+    // The web apps and the native apps' schemes (app.json of each app).
+    "TRUSTED_ORIGINS": "https://copticvine.ca,https://admin.copticvine.ca,https://artists.copticvine.ca,https://preview.copticvine.ca,copticvine://,coptichymnscentre://,copticvineadmin://,copticvineartists://",
+    // Google's web OAuth client (EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in the app's .env).
+    // GOOGLE_CLIENT_SECRET and BETTER_AUTH_SECRET are secrets.
+    "GOOGLE_CLIENT_ID": "42138677998-dnc84mpjmu5cej8k40vsp1b5l9bgs34k.apps.googleusercontent.com"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
