@@ -42,6 +42,10 @@ jobs:
           src/components/playback/PlaybackQueueList.tsx
           src/components/music/MusicTrackActionsMenu.tsx
           src/context/AuthContext.tsx
+          src/services/accountAuth.ts
+          src/services/cvApiAuth.ts
+          src/services/userApi.ts
+          src/utils/supabase.ts
           src/services/offlineDownloadRequests.ts
           src/services/offlineDatabase.ts
           src/services/profileAvatarService.ts

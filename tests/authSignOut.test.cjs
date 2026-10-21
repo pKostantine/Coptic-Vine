@@ -23,23 +23,23 @@ function load(path, stubs = {}) {
 }
 
 /**
- * AuthContext with everything around it stubbed, and the provider rendered
- * once (server-side, which runs its memoized callbacks but no effects) so
- * its `signOut` can be called with a chosen answer from the auth client.
+ * AuthContext over the Supabase backend (src/services/accountAuth.ts), with
+ * everything around them stubbed, and the provider rendered once
+ * (server-side, which runs its memoized callbacks but no effects) so its
+ * `signOut` can be called with a chosen answer from the auth client.
  */
 function signOutWith(signOutResult) {
   const preferences = { getCurrentAppLanguage: () => 'en' };
   const appText = load('src/utils/appText.ts', { './preferencesStorage': preferences });
   const authMessages = load('src/utils/authMessages.ts', { './appText': appText });
   const settleWithin = load('src/utils/settleWithin.ts');
-  const { AuthProvider, useAuth } = load('src/context/AuthContext.tsx', {
-    'react-native': { Platform: { OS: 'web' } },
-    'expo-linking': { createURL: (path) => `https://copticvine.ca/${path}`, getInitialURL: async () => null, addEventListener: () => ({ remove() {} }) },
-    'expo-web-browser': { maybeCompleteAuthSession() {}, openAuthSessionAsync: async () => ({ type: 'cancel' }) },
-    '@/services/notificationService': { disableNativeNotificationDevice: async () => {} },
-    '@/services/webPushService': { disableWebPushDevice: async () => {} },
+  const reactNative = { Platform: { OS: 'web' } };
+  const webBrowser = { maybeCompleteAuthSession() {}, openAuthSessionAsync: async () => ({ type: 'cancel' }) };
+  const { accountAuth } = load('src/services/accountAuth.ts', {
+    'react-native': reactNative,
+    'expo-web-browser': webBrowser,
+    '@/services/userApi': { cvApiAuth: null },
     '@/utils/authMessages': authMessages,
-    '@/utils/settleWithin': settleWithin,
     '@/utils/supabase': {
       supabase: {
         auth: {
@@ -49,6 +49,15 @@ function signOutWith(signOutResult) {
         },
       },
     },
+  });
+  const { AuthProvider, useAuth } = load('src/context/AuthContext.tsx', {
+    'react-native': reactNative,
+    'expo-linking': { createURL: (path) => `https://copticvine.ca/${path}`, getInitialURL: async () => null, addEventListener: () => ({ remove() {} }) },
+    'expo-web-browser': webBrowser,
+    '@/services/accountAuth': { accountAuth },
+    '@/services/notificationService': { disableNativeNotificationDevice: async () => {} },
+    '@/services/webPushService': { disableWebPushDevice: async () => {} },
+    '@/utils/settleWithin': settleWithin,
   });
 
   let signOut;

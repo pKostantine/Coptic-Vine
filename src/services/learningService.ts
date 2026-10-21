@@ -1,3 +1,4 @@
+import { accountAuth } from '@/services/accountAuth';
 import { mediaService } from '@/services/mediaService';
 import { getOfflineSnapshot } from '@/services/offlineSnapshotStore';
 import type {
@@ -57,9 +58,11 @@ async function offlineFallback<T>(
 }
 
 async function hasAuthenticatedSession(): Promise<boolean> {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw new Error('Read account session: ' + error.message);
-  return Boolean(data.session);
+  try {
+    return Boolean(await accountAuth.getSession());
+  } catch (error) {
+    throw new Error('Read account session: ' + (error instanceof Error ? error.message : String(error)));
+  }
 }
 
 export function resolveLearningAsset(asset: LearningMediaAsset | null | undefined): string | null {

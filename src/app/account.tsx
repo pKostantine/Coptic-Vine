@@ -105,6 +105,8 @@ function SignedOutAccount({ gutter, wide = false }: { gutter: number; wide?: boo
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   const validateEmail = () => {
     const normalized = email.trim().toLowerCase();
@@ -187,6 +189,33 @@ function SignedOutAccount({ gutter, wide = false }: { gutter: number; wide?: boo
     }
   };
 
+  // A reset link signs nobody in with cv-api: the new password is chosen here, then signed in with.
+  const saveNewPassword = async () => {
+    if (busy) return;
+    setError(null);
+    setNotice(null);
+    if (newPassword.length < 8) {
+      setError(tr('Your new password must be at least 8 characters.', 'Votre nouveau mot de passe doit contenir au moins 8 caractères.', 'يجب أن تتكوّن كلمة المرور الجديدة من 8 أحرف على الأقل.'));
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setError(tr('The passwords do not match.', 'Les mots de passe ne correspondent pas.', 'كلمتا المرور غير متطابقتين.'));
+      return;
+    }
+    setBusy(true);
+    try {
+      await auth.updatePassword(newPassword);
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setMode('signIn');
+      setNotice(tr('Your password has been changed. Sign in with your new password.', 'Votre mot de passe a été modifié. Connectez-vous avec votre nouveau mot de passe.', 'تم تغيير كلمة المرور. سجّل الدخول بكلمة المرور الجديدة.'));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : authMessage('updatePassword'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const modes = [
     { key: 'signIn' as const, label: tr('Sign in', 'Se connecter', 'تسجيل الدخول') },
     { key: 'signUp' as const, label: tr('Create account', 'Créer un compte', 'إنشاء حساب') },
@@ -205,63 +234,79 @@ function SignedOutAccount({ gutter, wide = false }: { gutter: number; wide?: boo
         </View>
       </View>
 
-      <View style={[styles.formCard, styles.formAfterCard, { marginHorizontal: gutter }]}>
-        <SegmentNav items={modes} active={mode} arabic={arabic} role="radiogroup" onSelect={(key) => { setMode(key); setError(null); setNotice(null); }} />
-
-        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.googleButton, pressed && styles.pressed]} onPress={() => void googleSignIn()}>
-          <Text style={styles.googleMark}>G</Text>
-          <Text style={[styles.googleButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Continue with Google', 'Continuer avec Google', 'المتابعة عبر Google')}</Text>
-        </Pressable>
-
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={[styles.dividerText, arabic && styles.arabic]}>{tr('or use email', 'ou avec votre e-mail', 'أو عبر البريد الإلكتروني')}</Text>
-          <View style={styles.divider} />
-        </View>
-
-        {mode === 'signUp' ? (
-          <Field label={tr('Name', 'Nom', 'الاسم')}>
-            <TextInput autoCapitalize="words" autoComplete="name" value={displayName} onChangeText={setDisplayName} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
-          </Field>
-        ) : null}
-
-        <Field label={tr('Email', 'E-mail', 'البريد الإلكتروني')}>
-          <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={PLACEHOLDER} style={styles.input} />
-        </Field>
-
-        <Field label={tr('Password', 'Mot de passe', 'كلمة المرور')}>
-          <View style={styles.passwordField}>
-            <TextInput autoCapitalize="none" autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} secureTextEntry={!showPassword} value={password} onChangeText={setPassword} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={PLACEHOLDER} style={[styles.passwordInput, arabic && styles.arabic]} />
-            <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? tr('Hide password', 'Masquer le mot de passe', 'إخفاء كلمة المرور') : tr('Show password', 'Afficher le mot de passe', 'إظهار كلمة المرور')} onPress={() => setShowPassword((current) => !current)} style={styles.showButton}>
-              <Icon name="eye-outline" size={20} color={showPassword ? COLORS.gold : COLORS.muted} />
+      {auth.recoveryMode ? (
+        <>
+          <SectionHeading size="page" title={tr('Choose a new password', 'Choisissez un nouveau mot de passe', 'اختر كلمة مرور جديدة')} arabic={arabic} />
+          <Text style={[styles.sectionBody, { paddingHorizontal: gutter }, arabic && styles.arabic]}>{tr('Finish recovering your account by setting a new password.', 'Terminez la récupération de votre compte en définissant un nouveau mot de passe.', 'أكمل استعادة حسابك بتعيين كلمة مرور جديدة.')}</Text>
+          <View style={[styles.formCard, { marginHorizontal: gutter }]}>
+            <PasswordEditor password={newPassword} confirmation={confirmNewPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmNewPassword} busy={busy} onSave={() => void saveNewPassword()} />
+            {error ? <Text accessibilityRole="alert" style={[styles.errorText, arabic && styles.arabic]}>{error}</Text> : null}
+            <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]} onPress={() => { auth.clearRecoveryMode(); setError(null); }}>
+              <Text style={[styles.textButtonText, arabic && styles.arabic]}>{tr('Cancel', 'Annuler', 'إلغاء')}</Text>
             </Pressable>
           </View>
-        </Field>
+        </>
+      ) : null}
 
-        {mode === 'signUp' ? (
-          <Field label={tr('Confirm password', 'Confirmer le mot de passe', 'تأكيد كلمة المرور')}>
-            <TextInput autoCapitalize="none" autoComplete="new-password" secureTextEntry={!showPassword} value={confirmPassword} onChangeText={setConfirmPassword} placeholder={tr('Enter it again', 'Saisissez-le à nouveau', 'أدخلها مرة أخرى')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
+      {!auth.recoveryMode ? (
+        <View style={[styles.formCard, styles.formAfterCard, { marginHorizontal: gutter }]}>
+          <SegmentNav items={modes} active={mode} arabic={arabic} role="radiogroup" onSelect={(key) => { setMode(key); setError(null); setNotice(null); }} />
+
+          <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.googleButton, pressed && styles.pressed]} onPress={() => void googleSignIn()}>
+            <Text style={styles.googleMark}>G</Text>
+            <Text style={[styles.googleButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Continue with Google', 'Continuer avec Google', 'المتابعة عبر Google')}</Text>
+          </Pressable>
+
+          <View style={styles.dividerRow}>
+            <View style={styles.divider} />
+            <Text style={[styles.dividerText, arabic && styles.arabic]}>{tr('or use email', 'ou avec votre e-mail', 'أو عبر البريد الإلكتروني')}</Text>
+            <View style={styles.divider} />
+          </View>
+
+          {mode === 'signUp' ? (
+            <Field label={tr('Name', 'Nom', 'الاسم')}>
+              <TextInput autoCapitalize="words" autoComplete="name" value={displayName} onChangeText={setDisplayName} placeholder={tr('Your name', 'Votre nom', 'اسمك')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
+            </Field>
+          ) : null}
+
+          <Field label={tr('Email', 'E-mail', 'البريد الإلكتروني')}>
+            <TextInput autoCapitalize="none" autoComplete="email" inputMode="email" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={PLACEHOLDER} style={styles.input} />
           </Field>
-        ) : null}
 
-        {error ? <Text accessibilityRole="alert" style={[styles.errorText, arabic && styles.arabic]}>{error}</Text> : null}
-        {notice ? <Text accessibilityRole="alert" style={[styles.noticeText, arabic && styles.arabic]}>{notice}</Text> : null}
+          <Field label={tr('Password', 'Mot de passe', 'كلمة المرور')}>
+            <View style={styles.passwordField}>
+              <TextInput autoCapitalize="none" autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'} secureTextEntry={!showPassword} value={password} onChangeText={setPassword} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={PLACEHOLDER} style={[styles.passwordInput, arabic && styles.arabic]} />
+              <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? tr('Hide password', 'Masquer le mot de passe', 'إخفاء كلمة المرور') : tr('Show password', 'Afficher le mot de passe', 'إظهار كلمة المرور')} onPress={() => setShowPassword((current) => !current)} style={styles.showButton}>
+                <Icon name="eye-outline" size={20} color={showPassword ? COLORS.gold : COLORS.muted} />
+              </Pressable>
+            </View>
+          </Field>
 
-        <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.saveButton, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void submit()}>
-          {busy ? <ActivityIndicator color={COLORS.greenDeep} /> : <Text style={[styles.saveButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{mode === 'signIn' ? tr('Sign in', 'Se connecter', 'تسجيل الدخول') : tr('Create account', 'Créer un compte', 'إنشاء حساب')}</Text>}
-        </Pressable>
+          {mode === 'signUp' ? (
+            <Field label={tr('Confirm password', 'Confirmer le mot de passe', 'تأكيد كلمة المرور')}>
+              <TextInput autoCapitalize="none" autoComplete="new-password" secureTextEntry={!showPassword} value={confirmPassword} onChangeText={setConfirmPassword} placeholder={tr('Enter it again', 'Saisissez-le à nouveau', 'أدخلها مرة أخرى')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
+            </Field>
+          ) : null}
 
-        {mode === 'signIn' ? (
-          <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]} onPress={() => void resetPassword()}>
-            <Text style={[styles.textButtonText, arabic && styles.arabic]}>{tr('Forgot your password?', 'Mot de passe oublié ?', 'هل نسيت كلمة المرور؟')}</Text>
+          {error ? <Text accessibilityRole="alert" style={[styles.errorText, arabic && styles.arabic]}>{error}</Text> : null}
+          {notice ? <Text accessibilityRole="alert" style={[styles.noticeText, arabic && styles.arabic]}>{notice}</Text> : null}
+
+          <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.saveButton, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void submit()}>
+            {busy ? <ActivityIndicator color={COLORS.greenDeep} /> : <Text style={[styles.saveButtonText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{mode === 'signIn' ? tr('Sign in', 'Se connecter', 'تسجيل الدخول') : tr('Create account', 'Créer un compte', 'إنشاء حساب')}</Text>}
           </Pressable>
-        ) : null}
-        {confirmationEmail ? (
-          <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]} onPress={() => void resendConfirmation()}>
-            <Text style={[styles.textButtonText, arabic && styles.arabic]}>{tr('Resend confirmation email', 'Renvoyer l’e-mail de confirmation', 'إعادة إرسال بريد التأكيد')}</Text>
-          </Pressable>
-        ) : null}
-      </View>
+
+          {mode === 'signIn' ? (
+            <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]} onPress={() => void resetPassword()}>
+              <Text style={[styles.textButtonText, arabic && styles.arabic]}>{tr('Forgot your password?', 'Mot de passe oublié ?', 'هل نسيت كلمة المرور؟')}</Text>
+            </Pressable>
+          ) : null}
+          {confirmationEmail ? (
+            <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]} onPress={() => void resendConfirmation()}>
+              <Text style={[styles.textButtonText, arabic && styles.arabic]}>{tr('Resend confirmation email', 'Renvoyer l’e-mail de confirmation', 'إعادة إرسال بريد التأكيد')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </>
   );
 }
@@ -277,9 +322,12 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
   const avatarUrl = customAvatarUrl || providerAvatarUrl;
   const [displayName, setDisplayName] = useState(currentName);
   const [email, setEmail] = useState(user.email ?? '');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordEditor, setShowPasswordEditor] = useState(recoveryMode);
+  // cv-api asks for the current password beside a new one, except after a reset link.
+  const askCurrentPassword = auth.needsCurrentPassword && !recoveryMode;
   const [busy, setBusy] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -370,9 +418,14 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
       setError(tr('The passwords do not match.', 'Les mots de passe ne correspondent pas.', 'كلمتا المرور غير متطابقتين.'));
       return;
     }
+    if (askCurrentPassword && !currentPassword) {
+      setError(authMessage('currentPasswordRequired'));
+      return;
+    }
     setBusy(true);
     try {
-      await auth.updatePassword(newPassword);
+      await auth.updatePassword(newPassword, askCurrentPassword ? currentPassword : undefined);
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setShowPasswordEditor(false);
@@ -487,7 +540,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
           arabic={arabic}
           compact={tablet}
         />
-        {!recoveryMode ? (
+        {!recoveryMode && auth.canChangePassword ? (
           <SettingsRow
             icon="key-outline"
             label={tr('Change password', 'Changer le mot de passe', 'تغيير كلمة المرور')}
@@ -498,9 +551,9 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
             onPress={() => setShowPasswordEditor((current) => !current)}
           />
         ) : null}
-        {showPasswordEditor && !recoveryMode ? (
+        {showPasswordEditor && !recoveryMode && auth.canChangePassword ? (
           <View style={styles.formCard}>
-            <PasswordEditor password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
+            <PasswordEditor current={askCurrentPassword ? currentPassword : undefined} onCurrentChange={setCurrentPassword} password={newPassword} confirmation={confirmPassword} onPasswordChange={setNewPassword} onConfirmationChange={setConfirmPassword} busy={busy} onSave={() => void savePassword()} />
           </View>
         ) : null}
         <Pressable accessibilityRole="button" disabled={busy} style={({ pressed }) => [styles.signOut, tablet && styles.signOutCompact, busy && styles.disabled, pressed && styles.pressed]} onPress={() => void signOut()}>
@@ -551,7 +604,10 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
   );
 }
 
-function PasswordEditor({ password, confirmation, onPasswordChange, onConfirmationChange, busy, onSave }: {
+function PasswordEditor({ current, onCurrentChange, password, confirmation, onPasswordChange, onConfirmationChange, busy, onSave }: {
+  /** The current password, asked for when it is given. */
+  current?: string;
+  onCurrentChange?: (value: string) => void;
   password: string;
   confirmation: string;
   onPasswordChange: (value: string) => void;
@@ -562,6 +618,11 @@ function PasswordEditor({ password, confirmation, onPasswordChange, onConfirmati
   const arabic = getCurrentAppLanguage() === 'ar';
   return (
     <>
+      {current !== undefined && onCurrentChange ? (
+        <Field label={tr('Current password', 'Mot de passe actuel', 'كلمة المرور الحالية')}>
+          <TextInput secureTextEntry autoComplete="current-password" value={current} onChangeText={onCurrentChange} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
+        </Field>
+      ) : null}
       <Field label={tr('New password', 'Nouveau mot de passe', 'كلمة المرور الجديدة')}>
         <TextInput secureTextEntry autoComplete="new-password" value={password} onChangeText={onPasswordChange} placeholder={tr('At least 8 characters', 'Au moins 8 caractères', '8 أحرف على الأقل')} placeholderTextColor={PLACEHOLDER} style={[styles.input, arabic && styles.arabic]} />
       </Field>

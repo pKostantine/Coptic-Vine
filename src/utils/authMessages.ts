@@ -25,6 +25,12 @@ const MESSAGES = {
   updatePhoto: ['Unable to update your profile photo.', 'Impossible de mettre à jour votre photo de profil.', 'تعذّر تحديث صورة ملفك الشخصي.'],
   removePhoto: ['Unable to remove your profile photo.', 'Impossible de supprimer votre photo de profil.', 'تعذّر إزالة صورة ملفك الشخصي.'],
   updatePassword: ['Unable to update your password.', 'Impossible de mettre à jour votre mot de passe.', 'تعذّر تحديث كلمة المرور.'],
+  currentPasswordRequired: ['Enter your current password.', 'Saisissez votre mot de passe actuel.', 'أدخل كلمة المرور الحالية.'],
+  linkExpired: [
+    'This link has expired or was already used. Ask for a new one.',
+    'Ce lien a expiré ou a déjà été utilisé. Demandez-en un nouveau.',
+    'انتهت صلاحية هذا الرابط أو سبق استخدامه. اطلب رابطًا جديدًا.',
+  ],
   signOut: ['Unable to sign out.', 'Impossible de se déconnecter.', 'تعذّر تسجيل الخروج.'],
 } as const satisfies Record<string, readonly [string, string, string]>;
 

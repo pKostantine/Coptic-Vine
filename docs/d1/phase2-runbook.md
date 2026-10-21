@@ -280,6 +280,62 @@ only) to R2, and rewrites the addresses: users' `image` and
 `raw_user_meta_data.chc_avatar_url`, and uploaded covers' `media_assets.path`.
 `--dry-run` lists what it would do.
 
+## The Coptic Vine app's switch
+
+`EXPO_PUBLIC_USER_DATA_SOURCE` in `.env` picks where the app signs in and keeps
+the user's data: `supabase` (the default until the cutover) or `cloudflare`
+(cv-api). `EXPO_PUBLIC_USER_API_URL` gives another address than
+`https://api.copticvine.ca`, such as `http://localhost:8790` for `npm run dev`
+in `workers/api`. See `src/services/userApi.ts`.
+
+- **Signing in** goes through `src/services/accountAuth.ts`, which AuthContext,
+  the notification sync and the Learn service ask. Nothing calls
+  `supabase.auth` directly any more. With `cloudflare` it is
+  `src/services/cvApiAuth.ts`, which calls Better Auth's endpoints with fetch:
+  - **Phones** keep the session token in storage (the same expo-sqlite
+    localStorage Supabase used) and send it as `Authorization: Bearer`, with
+    `expo-origin` set to the app's scheme. Email links and Google's sign-in
+    come back to `copticvine://account` with the session in their `cookie`
+    parameter (the Expo plugin). Google goes through
+    `/auth/expo-authorization-proxy`.
+  - **The web** uses `api.copticvine.ca`'s cookie, sent with credentials.
+    The page goes to Google and comes back with the cookie.
+  - The session is kept with its user, so the app opens signed in offline.
+    It is checked with the server at start and on each return to the
+    foreground, and dropped once the server no longer knows it.
+  - The user is handed to the screens in Supabase's shape:
+    - `user_metadata.full_name` is the name.
+    - `chc_avatar_url` is the photo, when it is an upload to cv-api's
+      `profile-avatars`; otherwise the photo is Google's `avatar_url`.
+    - `app_metadata.provider` and `providers` come from `/auth/list-accounts`.
+- **The data** keeps its supabase-js calls. `src/utils/supabase.ts` points the
+  client at cv-api, with `accessToken` (the bearer) or the cookie.
+- **What the Account screen does differently with cv-api:**
+  - **A reset link** brings the app back signed out. The new password is
+    chosen on the Account page, then used to sign in. Someone already signed
+    in on that device is signed in again with it, because a reset ends every
+    session.
+  - **A new password** asks for the current one.
+  - **The Change password row** is hidden for someone who only signs in with
+    Google. "Forgot your password?" gives them one.
+  - **A changed email** is approved from the old address first, then
+    confirmed at the new one.
+  - **Removing an uploaded photo** leaves no photo. Better Auth keeps one
+    `image`, so Google's photo doesn't come back.
+- **Tests:**
+  - `workers/api/tests/appAuth.test.ts` drives `cvApiAuth.ts` against the
+    Worker, as a phone and as the web. It covers every flow above, with the
+    links from the emails opened as a browser would open them.
+  - `tests/userDataSource.test.cjs` covers the switch itself.
+- **To try it:** set `EXPO_PUBLIC_USER_DATA_SOURCE=cloudflare` and
+  `EXPO_PUBLIC_USER_API_URL=http://localhost:8790`, and run `npm run dev` in
+  `workers/api` with the local D1 loaded. The emails stay in cv-api's memory
+  locally (`EMAIL_MODE=outbox`), so try sign-up with Google or an imported
+  user.
+
+CV-Admin and CV-Artists, in their own repositories, need the same switch
+before the cutover.
+
 ## The other Workers
 
 They call only `/rest/v1/rpc/…`, which `cv-api` answers at the same paths. At
@@ -305,4 +361,4 @@ the cutover each points at `https://api.copticvine.ca`:
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
 | 5. API (~134 functions, 6 tables) | Done (see below): the six tables and every function. Nothing is deployed until the cutover. |
 | 6. Jobs, storage and Workers that call Supabase | Done in code (see "Storage" and "The other Workers" below); nothing switches until the cutover. |
-| 7. Cutover | Not started. Apply `0009`, `0010` (and any later migration) to the remote D1 before the final import. |
+| 7. Cutover | Not started. The Coptic Vine app can switch (see "The Coptic Vine app's switch"); CV-Admin and CV-Artists still need theirs. Apply `0009`, `0010` (and any later migration) to the remote D1 before the final import. |
