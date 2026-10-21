@@ -24,10 +24,12 @@ const ACCOUNTS = t('creator', 'creator_accounts');
 export async function ensureCreatorWorkspace(ctx: ApiContext, displayName: string | null): Promise<unknown> {
   const userId = requireAuth(ctx);
   return transaction(ctx, async (tx) => {
-    const user = await tx.first(`SELECT ${col('email')}, ${col('raw_user_meta_data')} AS meta FROM ${t('auth', 'users')} WHERE ${col('id')} = ?`, userId);
+    const user = await tx.first(`SELECT ${col('email')}, ${col('name')}, ${col('raw_user_meta_data')} AS meta FROM ${t('auth', 'users')} WHERE ${col('id')} = ?`, userId);
     const meta = user?.meta == null ? null : JSON.parse(user.meta as string);
+    // Supabase kept the name given at sign-up in the metadata; Better Auth keeps it in name (an imported user's name is
+    // the metadata's full_name or name, else the email's start, so this changes nothing for them).
     const resolved = (user ? cleanText(displayName) ?? cleanText(arrowText(meta, 'full_name')) ?? cleanText(arrowText(meta, 'name'))
-      ?? (((user.email as string | null) ?? '').split('@')[0] || null) : null) ?? 'Coptic Vine Creator';
+      ?? cleanText(user.name as string | null) ?? (((user.email as string | null) ?? '').split('@')[0] || null) : null) ?? 'Coptic Vine Creator';
     await tx.batch([
       tx.db.prepare(`INSERT INTO ${t('creator', 'profiles')} (${col('id')}, ${col('display_name')}, ${col('created_at')}, ${col('updated_at')}) VALUES (?, ?, ?, ?)
         ON CONFLICT (${col('id')}) DO UPDATE SET ${col('display_name')} = coalesce(${t('creator', 'profiles')}.${col('display_name')}, excluded.${col('display_name')}), ${col('updated_at')} = ?`)
