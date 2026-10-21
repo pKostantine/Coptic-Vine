@@ -93,7 +93,9 @@ function cycleSchema(): { schema: UserSchema; ddl: string } {
     CREATE TABLE "auth.users" ("id" TEXT PRIMARY KEY, "name" TEXT, "email" TEXT, "email_verified" INTEGER, "image" TEXT, "raw_user_meta_data" TEXT, "raw_app_meta_data" TEXT, "created_at" TEXT, "updated_at" TEXT) STRICT;
     CREATE TABLE "auth.accounts" ("id" TEXT PRIMARY KEY, "user_id" TEXT, "account_id" TEXT, "provider_id" TEXT, "password" TEXT, "created_at" TEXT, "updated_at" TEXT) STRICT;
     CREATE TABLE "auth.sessions" ("id" TEXT PRIMARY KEY) STRICT;
-    CREATE TABLE "auth.verifications" ("id" TEXT PRIMARY KEY) STRICT;`;
+    CREATE TABLE "auth.verifications" ("id" TEXT PRIMARY KEY) STRICT;
+    CREATE TABLE "private.replica_mode" ("id" INTEGER PRIMARY KEY, "depth" INTEGER NOT NULL) STRICT;
+    INSERT INTO "private.replica_mode" VALUES (1, 0);`;
   return { schema: { tables: [accounts, artists], enums: {} }, ddl };
 }
 

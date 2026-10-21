@@ -28,7 +28,7 @@ export class WorkerSide {
     this.db = new DatabaseSync(':memory:');
     this.db.exec('PRAGMA foreign_keys = ON');
     this.db.exec('CREATE TABLE "public.hymn_titles" ("hymn_key" TEXT PRIMARY KEY) STRICT');
-    for (const name of ['0006_auth.sql', '0007_user_schema.sql', '0008_auth_rate_limits.sql']) this.db.exec(migration(name));
+    for (const name of ['0006_auth.sql', '0007_user_schema.sql', '0008_auth_rate_limits.sql', '0009_user_triggers.sql']) this.db.exec(migration(name));
     this.env = {
       DB: d1(this.db), BETTER_AUTH_URL: BASE, BETTER_AUTH_SECRET: 'a-parity-secret-that-is-long-enough-0123456789',
       EMAIL_FROM: 'no-reply@copticvine.ca', TRUSTED_ORIGINS: `${ORIGIN},copticvine://`, EMAIL_MODE: 'outbox',

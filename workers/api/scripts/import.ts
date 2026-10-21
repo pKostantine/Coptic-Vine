@@ -189,7 +189,8 @@ export function importSql(schema: UserSchema, data: UserExport): { sql: string; 
     }
   }
 
-  const statements = ['PRAGMA defer_foreign_keys = true;'];
+  // Triggers off for the whole load (0009's replica mode), as Supabase's own copy would be.
+  const statements = ['PRAGMA defer_foreign_keys = true;', `UPDATE ${t('private', 'replica_mode')} SET ${col('depth')} = ${col('depth')} + 1;`];
   // Empty everything, children first, after unhooking the cycles.
   for (const table of order) {
     for (const name of deferredColumns(table)) statements.push(`UPDATE ${t(table.schema, table.table)} SET ${col(name)} = NULL WHERE ${col(name)} IS NOT NULL;`);
@@ -240,6 +241,7 @@ export function importSql(schema: UserSchema, data: UserExport): { sql: string; 
     }
   }
   statements.push(...afterwards);
+  statements.push(`UPDATE ${t('private', 'replica_mode')} SET ${col('depth')} = ${col('depth')} - 1;`);
   return { sql: `${statements.join('\n')}\n`, counts };
 }
 

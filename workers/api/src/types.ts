@@ -54,4 +54,6 @@ export interface Env {
   TRUSTED_ORIGINS: string;
   /** "outbox": keep emails in memory instead of sending them (local development and tests only). */
   EMAIL_MODE?: string;
+  /** The media processor (cv-media-processor), woken when a job is queued; unset in tests. */
+  MEDIA_PROCESSOR_URL?: string;
 }

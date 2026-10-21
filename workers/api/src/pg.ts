@@ -106,3 +106,13 @@ export function roundNumeric(value: number, places: number): number {
   }
   return Number(`${negative ? '-' : ''}${scaled}e-${places}`);
 }
+
+/**
+ * An error a trigger raised: 0009's triggers (scripts/gen-triggers.ts) raise
+ * 'pg:<SQLSTATE>:<message>', which D1 reports followed by ": SQLITE_CONSTRAINT …".
+ * The PgError Postgres's trigger would have raised, or null.
+ */
+export function triggerError(error: unknown): PgError | null {
+  const match = /pg:([0-9A-Z]{5}):([\s\S]*?)(?:: SQLITE_CONSTRAINT[\s\S]*)?$/.exec((error as Error | null)?.message ?? '');
+  return match ? new PgError(match[1], match[2], httpStatus(match[1], true)) : null;
+}
