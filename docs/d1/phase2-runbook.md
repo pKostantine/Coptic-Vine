@@ -178,6 +178,8 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 - **The Worker:** it implements the working behaviour. The parity tests compare it with Supabase as it was before the revoke (`createOracle({ privateUsage: true })`), and one test records the failure as deployed.
 - **On Supabase:** left as it is (Pierre, 21 Oct 2026); only the new database has to work.
 
+**Another Supabase bug, ported working:** `ensure_creator_workspace` reclaims an artist a user credited before having a workspace by setting `is_credit_only = false`, a generated column Postgres refuses to set, so that branch always fails there. The Worker sets the owner and lets `is_credit_only` follow; the parity test runs the oracle's copy without that assignment.
+
 **Triggers and writes.**
 
 - **Triggers.** `npm run gen:triggers` writes migration `0009_user_triggers.sql` from `scripts/gen-triggers.ts`: Supabase's triggers as SQLite triggers, so D1 applies them to every write, in the same transaction, whoever writes. The script's header says how each kind maps (BEFORE triggers that change the row, the order triggers fire in, errors with their SQLSTATE).
@@ -204,7 +206,7 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 | Music | 21 of 22: the catalog, library, likes, follows, plays and playlists | Ported, at parity. `set_music_playlist_cover` moves with the covers to R2 (step 6). |
 | Learning | 19: the catalog, progress, likes and playlists | Ported, at parity |
 | Search | `search_media_catalog`, `search_section_catalog` | Ported, at parity, and checked on the real catalog (below) |
-| Creator editor and lyrics | 34 | |
+| Creator editor and lyrics | 34: workspaces, artists, cantors and hymns, submissions (create, add, submit, edit, delete), releases, processing jobs, the lyrics studio | Ported, at parity (reads, writes and lyrics have their own parity tests; every table is compared after each write) |
 | Admin | 26 | |
 | Workers (media, uploads, notifications, share previews) | 27 | |
 | Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | |
@@ -237,6 +239,6 @@ Phase 1's, which now also handle weights.
 | 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
 | 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
-| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices, music, learning and search. |
+| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices, music, learning, search, the triggers, and the creator editor with its lyrics studio. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |
 | 7. Cutover | Not started. Apply `0009`, `0010` (and any later migration) to the remote D1 before the final import. |

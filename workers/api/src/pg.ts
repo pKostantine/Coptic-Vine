@@ -4,6 +4,7 @@
  * prints it, and timestamps in the user data's stored form.
  */
 import { PgError } from '../../content-api/src/pg.ts';
+import uniqueKeys from '../schema/unique-keys.json' with { type: 'json' };
 import { pgTimestamp } from './time.ts';
 
 export { PgError };
@@ -115,4 +116,19 @@ export function roundNumeric(value: number, places: number): number {
 export function triggerError(error: unknown): PgError | null {
   const match = /pg:([0-9A-Z]{5}):([\s\S]*?)(?:: SQLITE_CONSTRAINT[\s\S]*)?$/.exec((error as Error | null)?.message ?? '');
   return match ? new PgError(match[1], match[2], httpStatus(match[1], true)) : null;
+}
+
+/**
+ * A UNIQUE failure as Postgres words it, naming the index: SQLite's message
+ * lists the columns ("UNIQUE constraint failed: media.submission_items.submission_id, …"),
+ * and schema/unique-keys.json has Postgres's name for each set.
+ */
+export function uniqueViolation(error: unknown): PgError | null {
+  const match = /UNIQUE constraint failed: ([^:]+?)(?:: SQLITE_CONSTRAINT[\s\S]*)?$/.exec((error as Error | null)?.message ?? '');
+  if (!match) return null;
+  const parts = match[1].split(', ').map((part) => [part.slice(0, part.lastIndexOf('.')), part.slice(part.lastIndexOf('.') + 1)]);
+  const table = parts[0][0];
+  const columns = parts.map(([, column]) => column).join(',');
+  const name = (uniqueKeys as unknown as Record<string, [string, string[]][]>)[table]?.find(([, keyColumns]) => keyColumns.join(',') === columns)?.[0];
+  return new PgError('23505', name ? `duplicate key value violates unique constraint "${name}"` : 'duplicate key value violates unique constraint', 409);
 }

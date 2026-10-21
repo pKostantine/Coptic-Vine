@@ -15,6 +15,7 @@
  * recoverTransactions (run by the cron) rolls back any older than five minutes.
  */
 import { col, t } from '../../../content-api/src/db/names.ts';
+import { now } from '../pg.ts';
 import type { ApiContext } from '../rest/context.ts';
 import type { D1Database, D1PreparedStatement, D1Result } from '../types.ts';
 
@@ -26,10 +27,13 @@ const ABANDONED_AFTER_MS = 5 * 60_000;
 export class Tx {
   readonly db: D1Database;
   readonly id: string;
+  /** now() for the whole transaction, as Postgres's is the transaction's start. */
+  readonly at: string;
 
   constructor(db: D1Database, id: string) {
     this.db = db;
     this.id = id;
+    this.at = now();
   }
 
   private name = () => this.db.prepare(`UPDATE ${TRANSACTION} SET ${col('current')} = ? WHERE ${col('id')} = 1`).bind(this.id);
