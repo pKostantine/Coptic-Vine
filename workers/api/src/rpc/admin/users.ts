@@ -2,7 +2,8 @@
  * CV-Admin's Users page: what Supabase's dashboard gave when someone calls,
  * locked out. Find the account (how it signs in, whether its email is
  * confirmed, when it last signed in), send the password reset or the
- * confirmation email again, confirm the email, or end every session.
+ * confirmation email again, confirm the email, end every session, or delete
+ * the account.
  *
  * Supabase had no such database functions; they are cv-api's own, declared
  * in USER_FUNCTIONS as scripts/gen-functions.ts reads a dump's, so the router
@@ -116,6 +117,55 @@ export async function adminSignOutEverywhere(ctx: ApiContext, userId: string): P
   return { email: user.email, sessionsEnded: Number(sessions?.n ?? 0) };
 }
 
+/**
+ * The account deleted, as Supabase's dashboard deleted a user: the foreign
+ * keys decide the rest (0006, 0007, as Postgres's). What is the person's goes
+ * with it: sign-in methods and sessions, likes, follows, playlists, progress,
+ * notifications, devices, preferences, workspace memberships, and the
+ * submissions they made with their review history. What they made for an
+ * artist workspace stays (releases, tracks, albums and lessons, published or
+ * not), its author fields emptied. Their files in USER_MEDIA (profile photo,
+ * playlist covers) go too, once the database has let the account go.
+ *
+ * Their own submissions are deleted first, in the same batch: SQLite checks a
+ * RESTRICT foreign key at once, so their uploads, which the account's
+ * deletion takes with it, must have no submission item left using them. If
+ * someone else's submission still uses one, nothing is deleted and the admin
+ * is told. An admin's account (the caller's own included) isn't deleted here,
+ * nor one that sent notification broadcasts (their foreign key restricts).
+ */
+export async function adminDeleteUser(ctx: ApiContext, userId: string): Promise<{ email: string; filesRemoved: number }> {
+  const caller = await requireSignedInAdmin(ctx);
+  const user = await findUser(ctx, userId);
+  if (userId === caller) raise("You can't delete your own account", '42501');
+  const admin = await ctx.db.prepare(`SELECT 1 AS yes FROM ${t('creator', 'user_roles')} WHERE ${col('user_id')} = ? AND ${col('role')} = 'admin' AND ${col('revoked_at')} IS NULL LIMIT 1`).bind(userId).first();
+  if (admin) raise("An admin's account can't be deleted", '42501');
+  const broadcasts = await ctx.db.prepare(`SELECT 1 AS yes FROM ${t('public', 'notification_broadcasts')} WHERE ${col('created_by')} = ? LIMIT 1`).bind(userId).first();
+  if (broadcasts) raise("This account sent notification broadcasts, so it can't be deleted", '23503');
+  try {
+    await ctx.db.batch([
+      ctx.db.prepare(`DELETE FROM ${t('auth', 'verifications')} WHERE ${col('value')} = ?`).bind(userId),
+      ctx.db.prepare(`DELETE FROM ${t('media', 'submissions')} WHERE ${col('created_by')} = ?`).bind(userId),
+      ctx.db.prepare(`DELETE FROM ${USERS} WHERE ${col('id')} = ?`).bind(userId),
+    ]);
+  } catch (error) {
+    if (/FOREIGN KEY constraint failed/i.test((error as Error).message)) raise("This account's uploads are used in someone else's submission, so it can't be deleted", '23503');
+    throw error;
+  }
+  let filesRemoved = 0;
+  const bucket = ctx.env.USER_MEDIA;
+  for (const prefix of bucket ? [`profile-avatars/${userId}/`, `playlist-covers/${userId}/`] : []) {
+    let cursor: string | undefined;
+    do {
+      const page = await bucket!.list({ prefix, cursor });
+      if (page.objects.length) await bucket!.delete(page.objects.map((object) => object.key));
+      filesRemoved += page.objects.length;
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+  }
+  return { email: user.email, filesRemoved };
+}
+
 const ADMIN_ONLY = ['authenticated'];
 const USER_ID = [{ name: 'p_user_id', type: 'uuid' }];
 
@@ -126,6 +176,7 @@ export const USER_FUNCTIONS: Record<string, FunctionInfo> = {
   'public.admin_resend_confirmation': { roles: ADMIN_ONLY, returns: 'jsonb', params: USER_ID },
   'public.admin_mark_email_confirmed': { roles: ADMIN_ONLY, returns: 'jsonb', params: USER_ID },
   'public.admin_sign_out_everywhere': { roles: ADMIN_ONLY, returns: 'jsonb', params: USER_ID },
+  'public.admin_delete_user': { roles: ADMIN_ONLY, returns: 'jsonb', params: USER_ID },
 };
 
 const id = (a: Args) => a.p_user_id as string;
@@ -136,4 +187,5 @@ export const userRpcs: Record<string, Rpc> = {
   'public.admin_resend_confirmation': (c, a) => adminResendConfirmation(c, id(a)),
   'public.admin_mark_email_confirmed': (c, a) => adminMarkEmailConfirmed(c, id(a)),
   'public.admin_sign_out_everywhere': (c, a) => adminSignOutEverywhere(c, id(a)),
+  'public.admin_delete_user': (c, a) => adminDeleteUser(c, id(a)),
 };
