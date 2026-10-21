@@ -18,7 +18,7 @@
  * credentials, and exposes set-auth-token for clients that keep a bearer
  * token instead.
  */
-import { createAuth, list, sessionHeaders, type Auth } from './auth/index.ts';
+import { authFor as auth, list, sessionHeaders } from './auth/index.ts';
 import { afterWrites, trackWrites } from './db/afterWrites.ts';
 import { recoverTransactions } from './db/transaction.ts';
 import { publishDueReleases } from './jobs/releases.ts';
@@ -28,13 +28,6 @@ import { tableRequest } from './rest/tables.ts';
 import { callRpc } from './rpc/index.ts';
 import { storageRequest } from './storage.ts';
 import type { Env } from './types.ts';
-
-const auths = new WeakMap<Env, Auth>();
-function auth(env: Env): Auth {
-  let instance = auths.get(env);
-  if (!instance) auths.set(env, (instance = createAuth(env)));
-  return instance;
-}
 
 function cors(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get('origin');

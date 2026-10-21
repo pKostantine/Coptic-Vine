@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { convert } from '../src/rpc/args.ts';
-import { callRpc, FUNCTIONS, RPCS } from '../src/rpc/index.ts';
+import { callRpc, FUNCTIONS, OWN_FUNCTIONS, RPCS, SUPABASE_FUNCTIONS } from '../src/rpc/index.ts';
 import { functionInfo } from '../scripts/gen-functions.ts';
 
 const dump = readFileSync(new URL('../schema/pg-user-schema.sql', import.meta.url), 'utf8');
@@ -16,8 +16,12 @@ test('schema/functions.json is what the dump says', () => {
   assert.equal(readFileSync(new URL('../schema/functions.json', import.meta.url), 'utf8'), `${JSON.stringify(functionInfo(dump), null, 1)}\n`, 'run npm run gen:functions');
 });
 
-test('every port is a Supabase function', () => {
-  for (const key of Object.keys(RPCS)) assert.ok(FUNCTIONS[key], `${key} isn't in the dump`);
+test('every port is a Supabase function, or one of cv-api\'s own, which never takes a Supabase name', () => {
+  for (const key of Object.keys(RPCS)) assert.ok(SUPABASE_FUNCTIONS[key] || OWN_FUNCTIONS[key], `${key} isn't in the dump, nor one of cv-api's own`);
+  for (const key of Object.keys(OWN_FUNCTIONS)) {
+    assert.ok(!SUPABASE_FUNCTIONS[key], `${key} is a Supabase function`);
+    assert.ok(RPCS[key], `${key} has no body`);
+  }
 });
 
 const anon = { db: null as never, env: null as never, userId: null };
