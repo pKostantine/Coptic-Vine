@@ -7,7 +7,16 @@ export function migration(name: string): string {
   return readFileSync(new URL(`../../../content-api/migrations/${name}`, import.meta.url), 'utf8');
 }
 
-export function d1(db: DatabaseSync): D1Database {
+/**
+ * What runs before each call reaches the database: before(sql) is awaited
+ * ahead of every statement, and once ahead of a batch (its statements' SQL
+ * joined). A test makes calls interleave with it as D1's network round trips
+ * let them, or does another request's write at a chosen point.
+ */
+export type D1Hooks = { before?: (sql: string) => void | Promise<void> };
+
+export function d1(db: DatabaseSync, hooks: D1Hooks = {}): D1Database {
+  const pending = new WeakMap<D1PreparedStatement, { sql: string; all: () => D1Result }>();
   const statement = (sql: string, values: unknown[] = []): D1PreparedStatement => {
     const run = () => {
       const prepared = db.prepare(sql);
@@ -19,21 +28,25 @@ export function d1(db: DatabaseSync): D1Database {
       const info = prepared.run(...params);
       return { results: [], changes: { n: Number(info.changes) } };
     };
-    return {
+    const all = () => { const r = run(); return { results: r.results, success: true, meta: { changes: r.changes.n } } as D1Result; };
+    const made: D1PreparedStatement = {
       bind: (...next: unknown[]) => statement(sql, next),
-      all: async <T>() => { const r = run(); return { results: r.results as T[], success: true, meta: { changes: r.changes.n } } as D1Result<T>; },
-      first: async <T>() => (run().results[0] ?? null) as T | null,
-      run: async () => { const r = run(); return { results: [], success: true, meta: { changes: r.changes.n } }; },
+      all: async <T>() => { await hooks.before?.(sql); return all() as D1Result<T>; },
+      first: async <T>() => { await hooks.before?.(sql); return (run().results[0] ?? null) as T | null; },
+      run: async () => { await hooks.before?.(sql); const r = run(); return { results: [], success: true, meta: { changes: r.changes.n } }; },
     };
+    pending.set(made, { sql, all });
+    return made;
   };
   return {
     prepare: (sql: string) => statement(sql),
     // Atomic, as D1's: one transaction, rolled back whole when a statement fails.
     batch: async (statements) => {
+      const each = statements.map((s) => pending.get(s)!);
+      await hooks.before?.(each.map((s) => s.sql).join(';\n'));
       db.exec('BEGIN');
       try {
-        const results = [];
-        for (const s of statements) results.push(await s.all());
+        const results = each.map((s) => s.all());
         db.exec('COMMIT');
         return results as never;
       } catch (error) {

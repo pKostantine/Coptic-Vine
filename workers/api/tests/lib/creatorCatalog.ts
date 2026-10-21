@@ -44,7 +44,9 @@ export function catalog(): Seed {
   });
   const work = (n: number, intentN: number | null, type: string, status: string, day: number, extra: Record<string, unknown> = {}) => ({
     id: job(n), upload_intent_id: intentN == null ? null : intent(intentN), job_type: type, status, input_bucket: 'chc-submissions', input_path: `up/${n}`,
-    output_bucket: type === 'image_delivery' ? 'chc-images' : 'chc-music', attempt_count: 1, max_attempts: 3, ...stamps(day), ...extra,
+    output_bucket: type === 'image_delivery' ? 'chc-images' : 'chc-music', attempt_count: 1, max_attempts: 3, ...stamps(day),
+    // Each its own: get_admin_processing_jobs orders by it with no tie-break, so Postgres's order among equals is its plan's.
+    queued_at: AT(day, `.${String(n).padStart(3, '0')}`), ...extra,
   });
   return [
     ['media.locales', ['en', 'ar', 'fr', 'cop'].map((code, i) => ({ code, english_name: code, native_name: code, text_direction: code === 'ar' ? 'rtl' : 'ltr', sort_order: i, ...stamps() }))],

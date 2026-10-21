@@ -66,15 +66,16 @@ export async function claimMediaProcessingJob(ctx: ApiContext, token: string | n
       WHERE ${col('status')} = 'processing' AND ${col('attempt_count')} >= ${col('max_attempts')} AND ${STALE(JOBS)}
       RETURNING ${col('id')}, ${col('upload_intent_id')}, ${col('job_type')}, ${col('attempt_count')}, ${col('max_attempts')}, ${col('error_message')}`, tx.at, tx.at, ...stale)).results as Row[];
     for (const job of dead) await noteFailure(tx, job, job.error_message as string);
+    // Chosen and claimed in one statement, as Postgres's FOR UPDATE SKIP LOCKED: two workers asking at once never get the same job.
     // A video's audio-only copy is made in the same pass as the video: claimed on its own only once the video job has finished one way or another.
-    const next = await tx.first(`SELECT j.${col('id')} AS id FROM ${JOBS} j WHERE j.${col('status')} = 'queued' AND j.${col('available_at')} <= ? AND j.${col('attempt_count')} < j.${col('max_attempts')}
+    const job = await tx.writeFirst(`UPDATE ${JOBS} SET ${col('status')} = 'processing', ${col('attempt_count')} = ${col('attempt_count')} + 1, ${col('worker_id')} = ?,
+        ${col('claimed_at')} = ?, ${col('heartbeat_at')} = NULL, ${col('progress')} = 0, ${col('started_at')} = coalesce(${col('started_at')}, ?), ${col('error_message')} = NULL
+      WHERE ${col('id')} = (SELECT j.${col('id')} FROM ${JOBS} j WHERE j.${col('status')} = 'queued' AND j.${col('available_at')} <= ? AND j.${col('attempt_count')} < j.${col('max_attempts')}
         AND NOT (j.${col('job_type')} = 'audio_delivery' AND EXISTS (SELECT 1 FROM ${JOBS} video WHERE video.${col('upload_intent_id')} = j.${col('upload_intent_id')}
           AND video.${col('job_type')} = 'video_delivery' AND video.${col('status')} IN ('queued', 'processing')))
-      ORDER BY j.${col('available_at')}, j.${col('created_at')}, j.rowid LIMIT 1`, tx.at);
-    if (!next) return [];
-    const job = (await tx.writeFirst(`UPDATE ${JOBS} SET ${col('status')} = 'processing', ${col('attempt_count')} = ${col('attempt_count')} + 1, ${col('worker_id')} = ?,
-        ${col('claimed_at')} = ?, ${col('heartbeat_at')} = NULL, ${col('progress')} = 0, ${col('started_at')} = coalesce(${col('started_at')}, ?), ${col('error_message')} = NULL
-      WHERE ${col('id')} = ? RETURNING *`, cleanText(workerId), tx.at, tx.at, next.id))!;
+        ORDER BY j.${col('available_at')}, j.${col('created_at')}, j.rowid LIMIT 1)
+      RETURNING *`, cleanText(workerId), tx.at, tx.at, tx.at);
+    if (!job) return [];
     const intent = await tx.first(`SELECT ${col('media_type')}, ${col('content_type')} FROM ${INTENTS} WHERE ${col('id')} = ?`, job.upload_intent_id);
     return [{
       job_id: job.id, upload_intent_id: job.upload_intent_id, job_type: job.job_type, media_type: intent?.media_type ?? null, source_content_type: intent?.content_type ?? null,
@@ -94,14 +95,15 @@ export async function claimCompanionMediaProcessingJob(ctx: ApiContext, token: s
     await tx.run(`INSERT INTO ${JOBS} (${['id', 'upload_intent_id', 'job_type', 'status', 'input_bucket', 'input_path', 'output_bucket', 'output_path'].map(col).join(', ')})
       VALUES (?, ?, 'audio_delivery', 'queued', ?, ?, ?, ?) ON CONFLICT (${col('upload_intent_id')}, ${col('job_type')}) DO NOTHING`,
     crypto.randomUUID(), intent.id, video.input_bucket, video.input_path, video.output_bucket, outputPath(intent.creator_account_id, intent.id, 'audio_delivery'));
-    const companion = await tx.first(`SELECT j.${col('id')} AS id FROM ${JOBS} j WHERE j.${col('upload_intent_id')} = ? AND j.${col('job_type')} = 'audio_delivery'
-      AND (j.${col('status')} IN ('queued', 'failed') OR (j.${col('status')} = 'processing' AND ${STALE('j')}))`, intent.id, ...staleSince(tx.at));
-    if (!companion) return [];
-    const job = (await tx.writeFirst(`UPDATE ${JOBS} SET ${col('status')} = 'processing',
+    // Claimed in one statement, while it is still free, as Postgres's FOR UPDATE SKIP LOCKED: a second worker asking at once gets nothing.
+    const job = await tx.writeFirst(`UPDATE ${JOBS} SET ${col('status')} = 'processing',
         ${col('attempt_count')} = CASE WHEN ${col('attempt_count')} >= ${col('max_attempts')} THEN 1 ELSE ${col('attempt_count')} + 1 END,
         ${col('worker_id')} = ?, ${col('claimed_at')} = ?, ${col('heartbeat_at')} = ?, ${col('progress')} = 0, ${col('started_at')} = coalesce(${col('started_at')}, ?),
         ${col('finished_at')} = NULL, ${col('error_message')} = NULL, ${col('updated_at')} = ?
-      WHERE ${col('id')} = ? RETURNING *`, cleanText(workerId), tx.at, tx.at, tx.at, tx.at, companion.id))!;
+      WHERE ${col('upload_intent_id')} = ? AND ${col('job_type')} = 'audio_delivery'
+        AND (${col('status')} IN ('queued', 'failed') OR (${col('status')} = 'processing' AND ${STALE(JOBS)}))
+      RETURNING *`, cleanText(workerId), tx.at, tx.at, tx.at, tx.at, intent.id, ...staleSince(tx.at));
+    if (!job) return [];
     return [{ job_id: job.id, job_type: job.job_type, attempt_count: job.attempt_count, max_attempts: job.max_attempts, output_bucket: job.output_bucket, output_path: job.output_path }];
   });
 }
@@ -228,9 +230,16 @@ export async function completeMediaProcessingJob(ctx: ApiContext, a: {
       ON CONFLICT (${col('media_asset_id')}, ${col('version')}) DO UPDATE SET ${['mime_type', 'file_size_bytes', 'checksum', 'duration_ms', 'bitrate', 'codec', 'width', 'height']
     .map((name) => `${col(name)} = excluded.${col(name)}`).join(', ')}, ${col('processing_status')} = 'completed'
       RETURNING ${col('id')}`, crypto.randomUUID(), asset, job!.output_bucket, job!.output_path, ...facts, intent!.requested_by))!.id;
-    const done = (await tx.writeFirst(`UPDATE ${JOBS} SET ${col('status')} = 'completed', ${col('media_asset_id')} = ?, ${col('media_asset_version_id')} = ?, ${col('output_mime_type')} = ?,
+    const done = await tx.writeFirst(`UPDATE ${JOBS} SET ${col('status')} = 'completed', ${col('media_asset_id')} = ?, ${col('media_asset_version_id')} = ?, ${col('output_mime_type')} = ?,
         ${col('output_size_bytes')} = ?, ${col('output_checksum_sha256')} = ?, ${col('probe')} = ?, ${col('finished_at')} = ?, ${col('error_message')} = NULL
-      WHERE ${col('id')} = ? RETURNING *`, asset, version, mime, a.sizeBytes, checksum, jsonbText(probe), tx.at, job!.id))!;
+      WHERE ${col('id')} = ? AND ${col('status')} = 'processing' RETURNING *`, asset, version, mime, a.sizeBytes, checksum, jsonbText(probe), tx.at, job!.id);
+    // Postgres held the job's row from the start: an admin's cancellation or deletion that came in meanwhile
+    // wins, as if it had come first, and the asset made here is rolled back with the rest.
+    if (!done) {
+      const still = await tx.first(`SELECT 1 AS yes FROM ${JOBS} WHERE ${col('id')} = ?`, job!.id);
+      if (!still) raise('Processing job not found', 'P0002');
+      raise('Processing job is not claimed', '22023');
+    }
     // The finished file joins its submission item; the last one outstanding takes the submission out of processing.
     await settleSubmissionProcessing(tx, job!.upload_intent_id);
     return [{ job_id: done.id, status: done.status, media_asset_id: done.media_asset_id, media_asset_version_id: done.media_asset_version_id, output_bucket: done.output_bucket, output_path: done.output_path }];
@@ -290,7 +299,10 @@ export async function claimMediaOriginalDeletion(ctx: ApiContext, token: string 
         AND EXISTS (${jobs} AND j.${col('job_type')} = 'audio_delivery' AND ((j.${col('status')} = 'completed' AND j.${col('media_asset_id')} IS NOT NULL) OR ${SKIPPED('j')}))
         AND NOT EXISTS (${jobs} AND j.${col('status')} IN ('queued', 'processing', 'failed')) AS yes`, intent.id, intent.id, intent.id);
     if (!ready!.yes) return [];
-    await tx.run(`UPDATE ${INTENTS} SET ${col('original_deleted_at')} = ?, ${col('updated_at')} = ? WHERE ${col('id')} = ?`, tx.at, tx.at, intent.id);
+    // Taken only while still there to take, as Postgres's row lock: a second call at once gets nothing.
+    const taken = await tx.writeFirst(`UPDATE ${INTENTS} SET ${col('original_deleted_at')} = ?, ${col('updated_at')} = ?
+      WHERE ${col('id')} = ? AND ${col('original_deleted_at')} IS NULL AND ${col('status')} = 'uploaded' RETURNING ${col('id')}`, tx.at, tx.at, intent.id);
+    if (!taken) return [];
     return [{ bucket: intent.bucket, path: intent.path }];
   });
 }

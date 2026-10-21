@@ -78,6 +78,14 @@ function objectReferenced(bucket: string, path: string): string {
 const isReferenced = async (tx: Tx, bucket: unknown, path: unknown) =>
   Boolean((await tx.first(`WITH ${col('o')} (${col('b')}, ${col('p')}) AS (VALUES (?, ?)) SELECT ${objectReferenced(`(SELECT ${col('b')} FROM ${col('o')})`, `(SELECT ${col('p')} FROM ${col('o')})`)} AS yes`, bucket, path))!.yes);
 
+/** Which of these [bucket, path] pairs something refers to, by their place in the list: one query, however long the list. */
+async function referencedOf(tx: Tx, pairs: [string, string][]): Promise<Set<number>> {
+  if (!pairs.length) return new Set();
+  const found = await tx.all<{ i: number }>(`SELECT listed.key AS i FROM json_each(?) listed
+    WHERE ${objectReferenced(`json_extract(listed.value, '$[0]')`, `json_extract(listed.value, '$[1]')`)}`, JSON.stringify(pairs));
+  return new Set(found.map((row) => row.i));
+}
+
 /** Candidates something refers to again: their unused clock is discarded (a later return to unused starts a fresh three days). */
 const forgetReferenced = (tx: Tx) => tx.run(`DELETE FROM ${CANDIDATES} WHERE ${objectReferenced(`${CANDIDATES}.${col('bucket')}`, `${CANDIDATES}.${col('path')}`)}`);
 
@@ -93,22 +101,28 @@ export async function syncStorageGcCandidates(ctx: ApiContext, token: string | n
     if (objects == null || jsonbType(objects) !== 'array') raise('p_objects must be a JSON array', '22023');
     const listed = arrayElements(objects);
     await forgetReferenced(tx);
+    // Postgres's one INSERT … SELECT: the scan's references found in one query and its candidates written in one
+    // statement, so a listing of any size costs the same few D1 calls. A size or time is read only for an
+    // object that passes the filters, as Postgres casts them.
+    const eligible = listed.map((object) => ({ object, bucket: trimSpaces(arrowText(object, 'bucket') ?? ''), path: trimSpaces(arrowText(object, 'path') ?? '') }))
+      .filter(({ bucket, path }) => BUCKETS.includes(bucket) && path.length > 0);
+    const referenced = await referencedOf(tx, eligible.map(({ bucket, path }) => [bucket, path]));
     const kept: [string, string, number | null, string | null][] = [];
-    for (const object of listed) {
-      const bucket = trimSpaces(arrowText(object, 'bucket') ?? '');
-      const path = trimSpaces(arrowText(object, 'path') ?? '');
-      if (!BUCKETS.includes(bucket) || path.length === 0 || await isReferenced(tx, bucket, path)) continue;
+    eligible.forEach(({ object, bucket, path }, i) => {
+      if (referenced.has(i)) return;
       const size = arrowText(object, 'file_size_bytes');
       const modified = arrowText(object, 'last_modified_at');
       kept.push([bucket, path, size == null || size === '' ? null : Math.max(0, toBigint(size)), modified == null || modified === '' ? null : timestampInput(modified, 'last_modified_at')]);
-    }
+    });
     if (new Set(kept.map(([bucket, path]) => JSON.stringify([bucket, path]))).size < kept.length) {
       raise('ON CONFLICT DO UPDATE command cannot affect row a second time', '21000', null, 'Ensure that no rows proposed for insertion within the same command have duplicate constrained values.');
     }
     if (kept.length) {
-      await tx.batch(kept.map(([bucket, path, size, modified]) => tx.db.prepare(`INSERT INTO ${CANDIDATES} (${['bucket', 'path', 'first_unused_at', 'last_seen_at', 'file_size_bytes', 'last_modified_at', 'reason'].map(col).join(', ')})
-        VALUES (?, ?, ?, ?, ?, ?, 'unreferenced') ON CONFLICT (${col('bucket')}, ${col('path')}) DO UPDATE SET ${['last_seen_at', 'file_size_bytes', 'last_modified_at', 'reason'].map((name) => `${col(name)} = excluded.${col(name)}`).join(', ')}`)
-        .bind(bucket, path, tx.at, tx.at, size, modified)));
+      // WHERE true: SQLite's upsert from a SELECT needs one, to parse ON CONFLICT as the upsert's.
+      await tx.run(`INSERT INTO ${CANDIDATES} (${['bucket', 'path', 'first_unused_at', 'last_seen_at', 'file_size_bytes', 'last_modified_at', 'reason'].map(col).join(', ')})
+        SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), ?, ?, json_extract(value, '$[2]'), json_extract(value, '$[3]'), 'unreferenced' FROM json_each(?) WHERE true
+        ON CONFLICT (${col('bucket')}, ${col('path')}) DO UPDATE SET ${['last_seen_at', 'file_size_bytes', 'last_modified_at', 'reason'].map((name) => `${col(name)} = excluded.${col(name)}`).join(', ')}`,
+      tx.at, tx.at, JSON.stringify(kept));
     }
     // A candidate the scan no longer lists has gone from R2 already.
     const seen = listed.map((object) => [trimSpaces(arrowText(object, 'bucket') ?? ''), trimSpaces(arrowText(object, 'path') ?? '')]);
