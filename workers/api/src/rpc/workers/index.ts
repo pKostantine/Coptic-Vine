@@ -1,9 +1,14 @@
-/** The functions the other Workers call (the media processor, the upload authorizer, the web app's link previews), by "schema.name" (src/rpc/index.ts). */
+/** The functions the other Workers call (the media processor and its admin routes, the upload authorizer, the notification dispatcher, the web app's link previews), by "schema.name" (src/rpc/index.ts). */
 import type { Args, Rpc } from '../index.ts';
 import {
   claimCompanionMediaProcessingJob, claimMediaOriginalDeletion, claimMediaProcessingJob, completeMediaProcessingJob, failMediaProcessingJob, heartbeatMediaProcessingJobs,
   mediaProcessingQueueHasWork, releaseMediaProcessingJobs, skipMediaProcessingJob,
 } from './media.ts';
+import { claimNotificationDeliveries, claimNotificationReceipts, claimWebPushDeliveries, completeNotificationDeliveries, completeNotificationReceipts } from './notifications.ts';
+import {
+  authorizeAdminStorageGc, completeStorageGcCandidate, finalizeAdminProcessingFileDeletion, getStorageGcCandidates, prepareAdminProcessingFileDeletion, prepareStorageGcCandidate,
+  syncStorageGcCandidates,
+} from './storage.ts';
 import { getMusicPlaylistSharePreview, getSharePreview } from './share.ts';
 import { completeMediaUploadIntent, createMediaUploadIntent, getAdminSubmissionPreviewItem, getMediaUploadIntentForUpload } from './uploads.ts';
 
@@ -34,4 +39,16 @@ export const workerRpcs: Record<string, Rpc> = {
   'public.get_admin_submission_preview_item': (c, a) => getAdminSubmissionPreviewItem(c, s(a, 'p_item_id')),
   'public.get_share_preview': (c, a) => getSharePreview(c, n(a, 'p_path'), n(a, 'p_locale')),
   'public.get_music_playlist_share_preview': (c, a) => getMusicPlaylistSharePreview(c, s(a, 'p_playlist_id')),
+  'public.claim_notification_deliveries': (c, a) => claimNotificationDeliveries(c, num(a, 'p_limit')),
+  'public.claim_web_push_deliveries': (c, a) => claimWebPushDeliveries(c, num(a, 'p_limit')),
+  'public.complete_notification_deliveries': (c, a) => completeNotificationDeliveries(c, a.p_results),
+  'public.claim_notification_receipts': (c, a) => claimNotificationReceipts(c, num(a, 'p_limit')),
+  'public.complete_notification_receipts': (c, a) => completeNotificationReceipts(c, a.p_results),
+  'public.sync_storage_gc_candidates': (c, a) => syncStorageGcCandidates(c, token(a), a.p_objects),
+  'public.get_storage_gc_candidates': (c, a) => getStorageGcCandidates(c, token(a), a.p_due_only as boolean | null, num(a, 'p_limit')),
+  'public.prepare_storage_gc_candidate': (c, a) => prepareStorageGcCandidate(c, token(a), n(a, 'p_bucket'), n(a, 'p_path')),
+  'public.complete_storage_gc_candidate': (c, a) => completeStorageGcCandidate(c, token(a), n(a, 'p_bucket'), n(a, 'p_path')),
+  'public.authorize_admin_storage_gc': (c) => authorizeAdminStorageGc(c),
+  'public.prepare_admin_processing_file_deletion': (c, a) => prepareAdminProcessingFileDeletion(c, s(a, 'p_job_id')),
+  'public.finalize_admin_processing_file_deletion': (c, a) => finalizeAdminProcessingFileDeletion(c, s(a, 'p_job_id')),
 };

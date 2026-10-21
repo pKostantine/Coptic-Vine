@@ -213,8 +213,26 @@ The Worker sets the owner and lets `is_credit_only` follow. The parity tests run
 | Search | `search_media_catalog`, `search_section_catalog` | Ported, at parity, and checked on the real catalog (below) |
 | Creator editor and lyrics | 34: workspaces, artists, cantors and hymns, submissions (create, add, submit, edit, delete), releases, processing jobs, the lyrics studio | Ported, at parity (reads, writes and lyrics have their own parity tests; every table is compared after each write) |
 | Admin | 26: CV-Admin's review queue, submission detail, publication overview, processing jobs, artists, artist claims and broadcast overview; reviews (approval publishes what is due), publishing, release dates, deletions, artist profiles and claims, forcing and retrying jobs, test and broadcast notifications | Ported, at parity (reads and writes have their own parity tests; every table is compared after each write, refused ones included) |
-| Workers (media, uploads, notifications, share previews) | 27 | 15 ported, at parity: the media processor's queue (claim, companion claim, heartbeat, complete, fail, skip, release, original deletion, has-work), with what a finished file settles; the upload authorizer's four (create, get for upload, complete, the admin's preview of an item's file); the web app's two link previews. The processor still proves itself with its worker token, checked against `"private.media_worker_tokens"`. Left: storage GC (4) and the admin's file deletion (3), notification dispatch (5, granted only to Supabase's service role). |
+| Workers (media, uploads, notifications, share previews) | 27: the media processor's queue (9) and storage clean-up (4), the admin's file deletion (3, through the processor's admin routes), the upload authorizer's (4), the notification dispatcher's (5), the web app's link previews (2) | Ported, at parity. The processor proves itself with its worker token, checked against `"private.media_worker_tokens"`; the dispatcher's functions, which Supabase lets only its service role call, take `SERVICE_TOKEN` (below). |
 | Jobs (release publishing, notification triggers) | 2 cron jobs, 3 triggers | |
+
+**Calls from other Workers.** The notification dispatcher's functions are
+granted only to Supabase's service role. On `cv-api`, a request whose bearer
+token is the `SERVICE_TOKEN` secret (compared in constant time) is that role:
+it passes every function's grant, as the service role does, with no user
+(`auth.uid()` is null). The tables answer it as they answer a signed-out
+request. Unset, nobody can call as the service role. The parity tests call
+the oracle as `service_role` (`SERVICE_ROLE` in `tests/lib/oracle.ts`).
+
+**Answers of `RETURNS TABLE` functions.** PostgREST answers each row as an
+object, even with one column (`authorize_admin_storage_gc` returns
+`[{"authorized": true}]`, which the media processor reads). The oracle now
+does the same.
+
+**Constraint errors.** A CHECK failure in SQLite is reported as Postgres's
+code (23514) with a generic message, without the constraint's name. One
+parity test meets it: an admin's deletion of a published track's file, which
+both refuse.
 
 **Search.** `src/rpc/search` computes what Postgres computed for the two
 functions: `media.normalize_search_text`, `pg_trgm`'s `similarity`, and each
@@ -244,6 +262,6 @@ Phase 1's, which now also handle weights.
 | 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
 | 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
-| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices, music, learning, search, the triggers, the creator editor with its lyrics studio, CV-Admin, the media processor's queue, uploads and link previews. Left: 12 of the Workers' functions. |
+| 5. API (~134 functions, 6 tables) | Done (see below): the six tables and every function, but `set_music_playlist_cover`, which moves with the playlist covers to R2 in step 6. Nothing is deployed until the cutover. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |
 | 7. Cutover | Not started. Apply `0009`, `0010` (and any later migration) to the remote D1 before the final import. |

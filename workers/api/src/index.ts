@@ -83,11 +83,26 @@ async function rest(request: Request, url: URL, env: Env, execution?: Execution)
   return response;
 }
 
+/** Whether the request carries SERVICE_TOKEN as its bearer token, compared in constant time (as digests, so their lengths match). */
+async function isServiceToken(request: Request, env: Env): Promise<boolean> {
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim();
+  if (!env.SERVICE_TOKEN || !bearer) return false;
+  const digest = async (text: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  const [given, expected] = await Promise.all([digest(bearer), digest(env.SERVICE_TOKEN)]);
+  let difference = 0;
+  for (let i = 0; i < expected.length; i += 1) difference |= given[i] ^ expected[i];
+  return difference === 0;
+}
+
 async function restResponse(request: Request, url: URL, env: Env, onWrite: () => void): Promise<Response> {
   let ctx: ApiContext | null = null;
   try {
-    const session = await auth(env).api.getSession({ headers: request.headers });
-    ctx = { db: trackWrites(env.DB, onWrite), env, userId: session?.user.id ?? null };
+    if (await isServiceToken(request, env)) {
+      ctx = { db: trackWrites(env.DB, onWrite), env, userId: null, service: true };
+    } else {
+      const session = await auth(env).api.getSession({ headers: request.headers });
+      ctx = { db: trackWrites(env.DB, onWrite), env, userId: session?.user.id ?? null };
+    }
     const path = url.pathname.slice('/rest/v1/'.length);
     const profile = request.headers.get(request.method === 'GET' || request.method === 'HEAD' ? 'accept-profile' : 'content-profile') ?? 'public';
     const rpc = path.match(/^rpc\/([A-Za-z_]\w*)$/);

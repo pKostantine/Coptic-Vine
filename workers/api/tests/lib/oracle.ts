@@ -66,6 +66,9 @@ create function net.http_post(url text, body jsonb default '{}', params jsonb de
 
 const ISSUER = 'https://wtuujmeinzqfikvuofmh.supabase.co/auth/v1';
 
+/** As a user id: the call is made as Supabase's service role (no user; it may call any function and bypasses row-level security). */
+export const SERVICE_ROLE = 'service_role';
+
 export type PgAnswer = { data: unknown; error: { code: string; message: string; details: string | null; hint: string | null } | null };
 
 export type Oracle = {
@@ -123,19 +126,24 @@ export async function createOracle(options: OracleOptions = {}): Promise<Oracle>
   const grants = cachedSchema.filter((statement) => /^grant execute on function/.test(statement.trim()));
   for (const grant of grants) await pg.exec(grant).catch(() => undefined);
   if (options.privateUsage) await pg.exec('grant usage on schema private to authenticated');
+  // Supabase's service role reaches everything (its default privileges, which the dump leaves out).
+  for (const schema of ['creator', 'learning', 'media', 'music', 'private', 'public']) {
+    await pg.exec(`grant usage on schema ${schema} to service_role; grant all on all tables in schema ${schema} to service_role; grant execute on all functions in schema ${schema} to service_role`);
+  }
 
-  const shapes = new Map<string, { retset: boolean; scalar: boolean; isVoid: boolean; arrays: Set<string>; json: Set<string> }>();
+  const shapes = new Map<string, { retset: boolean; scalar: boolean; table: boolean; isVoid: boolean; arrays: Set<string>; json: Set<string> }>();
   const shape = async (schema: string, fn: string) => {
     const key = `${schema}.${fn}`;
     if (!shapes.has(key)) {
-      const rows = (await pg.query<{ retset: boolean; typtype: string; typname: string; arrays: string[] | null; json: string[] | null }>(
-        `select p.proretset as retset, t.typtype, t.typname,
+      const rows = (await pg.query<{ retset: boolean; typtype: string; typname: string; table: boolean; arrays: string[] | null; json: string[] | null }>(
+        `select p.proretset as retset, t.typtype, t.typname, coalesce('t' = any(p.proargmodes::text[]), false) as table,
            (select array_agg(name) from unnest(p.proargnames, p.proargtypes::oid[]) a(name, type) join pg_type at on at.oid = a.type where at.typcategory = 'A') as arrays,
            (select array_agg(name) from unnest(p.proargnames, p.proargtypes::oid[]) a(name, type) join pg_type at on at.oid = a.type where at.typname in ('json', 'jsonb')) as json
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace join pg_type t on t.oid = p.prorettype where n.nspname = $1 and p.proname = $2 limit 1`, [schema, fn])).rows;
       if (!rows.length) throw new Error(`No function ${key}`);
-      const { retset, typtype, typname, arrays, json } = rows[0];
-      shapes.set(key, { retset, scalar: typtype !== 'c' && typname !== 'record', isVoid: typname === 'void', arrays: new Set(arrays ?? []), json: new Set(json ?? []) });
+      const { retset, typtype, typname, table, arrays, json } = rows[0];
+      // RETURNS TABLE with one column returns that column's type, but PostgREST still answers rows as objects.
+      shapes.set(key, { retset, scalar: typtype !== 'c' && typname !== 'record' && !table, table, isVoid: typname === 'void', arrays: new Set(arrays ?? []), json: new Set(json ?? []) });
     }
     return shapes.get(key)!;
   };
@@ -144,19 +152,22 @@ export async function createOracle(options: OracleOptions = {}): Promise<Oracle>
     pg,
     failures,
     async call(user, fn, args = {}, schema = 'public') {
-      const { retset, scalar, isVoid, arrays, json } = await shape(schema, fn);
+      const { retset, scalar, table, isVoid, arrays, json } = await shape(schema, fn);
       const names = Object.keys(args);
       const call = `${JSON.stringify(schema)}.${JSON.stringify(fn)}(${names.map((name, i) => `${JSON.stringify(name)} := $${i + 1}`).join(', ')})`;
       // As PostgREST: the whole answer is built as JSON by Postgres.
-      const query = retset || !scalar
+      const query = table
+        ? `select coalesce(json_agg(r), '[]'::json) as result from (select * from ${call}) r`
+        : retset || !scalar
         ? `select coalesce(json_agg(r), '[]'::json) as result from ${call} r`
         : `select to_json(${call}) as result`;
-      const role = user ? 'authenticated' : 'anon';
+      const service = user === SERVICE_ROLE;
+      const role = service ? SERVICE_ROLE : user ? 'authenticated' : 'anon';
       // As Supabase's tokens: the issuer is the project's auth URL (playlist covers read it).
-      const claims = JSON.stringify(user ? { sub: user, role, iss: ISSUER } : { role });
+      const claims = JSON.stringify(user && !service ? { sub: user, role, iss: ISSUER } : { role });
       try {
         const result = await pg.transaction(async (tx) => {
-          await tx.query(`select set_config('role', $1, true), set_config('request.jwt.claim.sub', $2, true), set_config('request.jwt.claim.role', $1, true), set_config('request.jwt.claims', $3, true)`, [role, user ?? '', claims]);
+          await tx.query(`select set_config('role', $1, true), set_config('request.jwt.claim.sub', $2, true), set_config('request.jwt.claim.role', $1, true), set_config('request.jwt.claims', $3, true)`, [role, service ? '' : user ?? '', claims]);
           // As PostgREST: a JSON list for an array parameter becomes a Postgres array; a json or jsonb
           // parameter takes the JSON value itself (a string stays a JSON string); other objects are json.
           const values = names.map((name) => (args[name] !== null && (json.has(name) || (typeof args[name] === 'object' && !(arrays.has(name) && Array.isArray(args[name])))) ? JSON.stringify(args[name]) : args[name]));

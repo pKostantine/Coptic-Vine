@@ -48,8 +48,8 @@ export async function callRpc(ctx: ApiContext, schema: string, name: string, arg
     throw new PgError('PGRST202', `Could not find the function ${key}(${given.sort().join(', ')}) in the schema cache`, 404,
       `Searched for the function ${key} with parameters ${given.sort().join(', ') || 'none'} or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.`);
   }
-  // Supabase's EXECUTE grants: a call the role couldn't make there is refused before it runs.
-  if (!info.roles.includes(ctx.userId ? 'authenticated' : 'anon')) {
+  // Supabase's EXECUTE grants: a call the role couldn't make there is refused before it runs. The service role may call anything.
+  if (!ctx.service && !info.roles.includes(ctx.userId ? 'authenticated' : 'anon')) {
     throw new PgError('42501', `permission denied for function ${name}`, ctx.userId ? 403 : 401);
   }
   const full: Args = {};
