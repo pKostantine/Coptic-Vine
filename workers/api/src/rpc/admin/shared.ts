@@ -31,7 +31,8 @@ export function stripNullsDeep(value: unknown): unknown {
   return value;
 }
 
-const escapeRegex = (ch: string) => ch.replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
+// Not "-": it is only special in a class, and the u flag refuses "\-" outside one.
+const escapeRegex = (ch: string) => ch.replace(/[\\^$.*+?()[\]{}|/]/g, '\\$&');
 
 /** value ILIKE pattern: % any run, _ one character, \ escapes the next; letters match in either case. */
 export function ilike(value: string, pattern: string): boolean {

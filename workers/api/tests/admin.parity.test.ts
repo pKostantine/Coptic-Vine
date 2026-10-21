@@ -184,7 +184,9 @@ test('processing jobs: one row per file, the audio-only copy inside its video', 
 });
 
 test('artists: every one or by a search (ILIKE, so % and _ match anything), and one by id', async () => {
-  for (const search of [null, '', '   ', 'mina', 'MINA', ' ibrahim ', 'ib%ad', 'mo_allem', '%', '\\%', 'choir of saint', 'تينين', 'zzz']) {
+  for (const search of [null, '', '   ', 'mina', 'MINA', ' ibrahim ', 'ib%ad', 'mo_allem', '%', '\\%', 'choir of saint', 'تينين', 'zzz',
+    // Regular expressions' own characters, matched as themselves.
+    'Abdel-Messih', '-', 'of.saint', 'a(b)', '[', 'x{2}', 'a|b', 'x/y', '^choir', 'mark$', 'mo+', '\\-']) {
     await both(CAROL, 'get_admin_artists', { p_search: search });
   }
   await both(ALICE, 'get_admin_artists');
