@@ -50,6 +50,8 @@ export type UserTable = {
   primaryKey: string[];
   /** Tables this one references, so the import loads them first where it can. */
   parents: string[];
+  /** Its foreign keys within the user data, for the import to break the cycles. */
+  foreignKeys: { columns: string[]; references: string; referencedColumns: string[] }[];
   /** Postgres CHECKs the Worker enforces because SQLite can't. */
   workerChecks: string[];
   /** Postgres triggers whose work moves into the Worker (all but updated_at). */
@@ -216,10 +218,12 @@ export function generate(catalog: PgCatalog): { migration: string; schema: UserS
       else workerChecks.push(check.definition);
     }
     const parents: string[] = [];
+    const foreignKeys: UserTable['foreignKeys'] = [];
     for (const fk of relation.constraints.filter((c) => c.type === 'f')) {
       if (!known.has(fk.references!) && !outside.has(fk.references!)) throw new Error(`${name} references ${fk.references}, which isn't in D1`);
       const [schema, table] = fk.references!.split('.');
       if (fk.references !== name) parents.push(fk.references!);
+      if (known.has(fk.references!)) foreignKeys.push({ columns: fk.columns, references: fk.references!, referencedColumns: fk.referencedColumns! });
       lines.push(`  FOREIGN KEY (${fk.columns.map(col).join(', ')}) REFERENCES ${t(schema, table)} (${fk.referencedColumns!.map(col).join(', ')}) ON UPDATE ${FK_ACTION[fk.onUpdate!]} ON DELETE ${FK_ACTION[fk.onDelete!]}`);
     }
     if (relation.constraints.some((c) => c.type === 'x')) throw new Error(`${name} has an exclusion constraint`);
@@ -266,6 +270,7 @@ export function generate(catalog: PgCatalog): { migration: string; schema: UserS
       dropped,
       primaryKey: pk.columns,
       parents: [...new Set(parents)],
+      foreignKeys,
       workerChecks,
       workerTriggers: [...new Set(triggerFunctions.filter((fn) => fn !== 'private.set_updated_at'))],
       skippedIndexes,

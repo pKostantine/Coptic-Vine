@@ -67,8 +67,12 @@ npm run verify -- --pg <saved checksums>           # every table's SHA-256 in D1
 - It checks every value first: type, NOT NULL, timestamp form, and JSON.
 - It replaces the user tables and sign-in tables in one D1 import, which
   applies all of it or none.
-- Foreign keys are checked at commit, because two cycles run through creator
-  accounts, artists and media assets.
+- Tables load parents first. D1's remote import checks foreign keys row by
+  row; it doesn't honour `PRAGMA defer_foreign_keys`. So the columns that
+  close the two cycles (`owner_creator_account_id` on artists and media
+  assets) and `media.submission_items.replaces_item_id` are loaded as NULL,
+  then filled in once every row exists. Each row's `updated_at` is put back
+  after that update, so the trigger's stamp doesn't change the data.
 
 **How the sign-in accounts carry over:**
 
@@ -84,7 +88,7 @@ npm run verify -- --pg <saved checksums>           # every table's SHA-256 in D1
 |---|---|
 | 1. Inventory | Done ([phase2-inventory.md](phase2-inventory.md)). |
 | 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
-| 3. Copy and verification | Done on the local D1: 992 rows, and **74 of 74 checksums match** (the 73 tables, plus users by id and email). The remote copy is waiting on a permission: auto mode blocks loading personal data into the production database. |
+| 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
 | 4. Auth Worker | Next. |
 | 5. API (~134 functions, 6 tables) | Not started. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |

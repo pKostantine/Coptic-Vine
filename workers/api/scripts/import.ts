@@ -15,9 +15,11 @@
  *
  * Every value is checked before anything is written: each column's type and
  * NOT NULL, timestamps in the stored form, JSON that parses. The SQL goes to
- * D1 as one file through D1's import API, which applies all of it or none;
- * foreign keys are checked when it commits (two cycles run through creator
- * accounts, artists and media assets). Users sign in again after the cutover,
+ * D1 as one file through D1's import API, which applies all of it or none.
+ * That API checks foreign keys row by row, so tables load parents first, and
+ * the columns closing the two cycles (creator accounts, artists, media
+ * assets) or pointing within their own table are filled in at the end (see
+ * loadPlan). Users sign in again after the cutover,
  * so sessions are not copied. Verify with `npm run verify`.
  *
  * Sign-in accounts: Supabase's email identity becomes a 'credential' account
@@ -103,21 +105,37 @@ export function insertStatements(schema: string, table: string, columns: Pick<Co
   return statements;
 }
 
-/** Parents before children where the foreign keys allow it; the two cycles are left to the deferred check. */
-export function loadOrder(tables: UserTable[]): UserTable[] {
+type ForeignKey = UserTable['foreignKeys'][number];
+
+/**
+ * The order to load the tables in, parents first, and the foreign keys that
+ * order can't satisfy: the ones closing the two cycles (creator accounts,
+ * artists, media assets) and rows pointing at rows of their own table. Their
+ * columns are loaded as NULL and filled in once every row is there, because
+ * D1's remote import checks each row as it goes (PRAGMA defer_foreign_keys
+ * isn't honoured there).
+ */
+export function loadPlan(tables: UserTable[]): { order: UserTable[]; deferred: Map<string, ForeignKey[]> } {
   const byName = new Map(tables.map((table) => [`${table.schema}.${table.table}`, table]));
-  const ordered: UserTable[] = [];
+  const order: UserTable[] = [];
+  const deferred = new Map<string, ForeignKey[]>();
   const state = new Map<string, 'visiting' | 'done'>();
+  const defer = (name: string, fk: ForeignKey) => deferred.set(name, [...(deferred.get(name) ?? []), fk]);
   const visit = (name: string) => {
     if (state.get(name)) return;
     state.set(name, 'visiting');
-    for (const parent of byName.get(name)!.parents) if (byName.has(parent)) visit(parent);
+    for (const fk of byName.get(name)!.foreignKeys) {
+      if (fk.references === name || state.get(fk.references) === 'visiting') defer(name, fk);
+      else visit(fk.references);
+    }
     state.set(name, 'done');
-    ordered.push(byName.get(name)!);
+    order.push(byName.get(name)!);
   };
   for (const name of [...byName.keys()].sort()) visit(name);
-  return ordered;
+  return { order, deferred };
 }
+
+export const loadOrder = (tables: UserTable[]) => loadPlan(tables).order;
 
 type AuthRows = { users: unknown[][]; accounts: unknown[][] };
 
@@ -163,9 +181,21 @@ export function authRows(users: AuthUser[], identities: AuthIdentity[]): AuthRow
 }
 
 export function importSql(schema: UserSchema, data: UserExport): { sql: string; counts: Record<string, number> } {
+  const { order, deferred } = loadPlan(schema.tables);
+  const deferredColumns = (table: UserTable) => new Set((deferred.get(`${table.schema}.${table.table}`) ?? []).flatMap((fk) => fk.columns));
+  for (const table of order) {
+    for (const name of deferredColumns(table)) {
+      if (table.columns.find((column) => column.name === name)?.notNull) throw new Error(`${table.schema}.${table.table}.${name} closes a foreign-key cycle but is NOT NULL`);
+    }
+  }
+
   const statements = ['PRAGMA defer_foreign_keys = true;'];
+  // Empty everything, children first, after unhooking the cycles.
+  for (const table of order) {
+    for (const name of deferredColumns(table)) statements.push(`UPDATE ${t(table.schema, table.table)} SET ${col(name)} = NULL WHERE ${col(name)} IS NOT NULL;`);
+  }
+  for (const table of [...order].reverse()) statements.push(`DELETE FROM ${t(table.schema, table.table)};`);
   for (const [s, tb] of AUTH_TABLES) statements.push(`DELETE FROM ${t(s, tb)};`);
-  for (const table of schema.tables) statements.push(`DELETE FROM ${t(table.schema, table.table)};`);
   const counts: Record<string, number> = {};
 
   const auth = authRows(data.authUsers, data.authIdentities);
@@ -174,12 +204,14 @@ export function importSql(schema: UserSchema, data: UserExport): { sql: string; 
   counts['auth/users'] = auth.users.length;
   counts['auth/accounts'] = auth.accounts.length;
 
-  for (const table of loadOrder(schema.tables)) {
+  const afterwards: string[] = [];
+  for (const table of order) {
     const key = `${table.schema}/${table.table}`;
     const exported = data.tables[key];
     if (!exported) throw new Error(`The export has no ${key}`);
     const columns = table.columns.filter((column) => !column.generated);
     const names = columns.map((column) => column.name);
+    const later = deferredColumns(table);
     const rows = exported.map((row, index) => {
       const keys = Object.keys(row).sort();
       if (JSON.stringify(keys) !== JSON.stringify([...names].sort())) {
@@ -188,9 +220,26 @@ export function importSql(schema: UserSchema, data: UserExport): { sql: string; 
       // text[] arrives as a JSON array; D1 keeps its text, as Postgres's to_json prints it.
       return columns.map((column) => (column.kind === 'array' && Array.isArray(row[column.name]) ? JSON.stringify(row[column.name]) : row[column.name]));
     });
-    statements.push(...insertStatements(table.schema, table.table, columns, rows));
+    statements.push(...insertStatements(table.schema, table.table, columns, rows.map((row) => row.map((value, i) => (later.has(names[i]) ? null : value)))));
     counts[key] = rows.length;
+
+    // The cycle columns, now that every row exists. The updated_at trigger
+    // stamps the row on that update, so its own updated_at goes back after.
+    if (later.size) {
+      const at = (name: string) => names.indexOf(name);
+      for (const [index, row] of rows.entries()) {
+        const set = [...later].filter((name) => row[at(name)] != null);
+        if (!set.length) continue;
+        const where = `${key} row ${index + 1}`;
+        const match = table.primaryKey.map((name) => `${col(name)} = ${literal(row[at(name)], columns[at(name)], where)}`).join(' AND ');
+        afterwards.push(`UPDATE ${t(table.schema, table.table)} SET ${set.map((name) => `${col(name)} = ${literal(row[at(name)], columns[at(name)], where)}`).join(', ')} WHERE ${match};`);
+        if (names.includes('updated_at') && row[at('updated_at')] != null) {
+          afterwards.push(`UPDATE ${t(table.schema, table.table)} SET ${col('updated_at')} = ${literal(row[at('updated_at')], columns[at('updated_at')], where)} WHERE ${match};`);
+        }
+      }
+    }
   }
+  statements.push(...afterwards);
   return { sql: `${statements.join('\n')}\n`, counts };
 }
 

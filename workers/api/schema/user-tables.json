@@ -56,6 +56,17 @@
     "creator.creator_accounts",
     "auth.users"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -129,6 +140,17 @@
     "auth.users",
     "music.artists"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "identity_artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -180,6 +202,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -239,6 +262,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -298,6 +322,26 @@
    "parents": [
     "learning.albums",
     "media.locales"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "album_id"
+     ],
+     "references": "learning.albums",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -417,6 +461,35 @@
     "auth.users",
     "learning.hymns",
     "media.media_assets"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "album_id"
+     ],
+     "references": "learning.albums",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "hymn_id"
+     ],
+     "references": "learning.hymns",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "media_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -558,6 +631,53 @@
     "learning.seasons",
     "media.submissions"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "cantor_id"
+     ],
+     "references": "learning.cantors",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "cover_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "season_id"
+     ],
+     "references": "learning.seasons",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "submission_id"
+     ],
+     "references": "media.submissions",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -620,6 +740,26 @@
     "learning.cantors",
     "media.locales"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "cantor_id"
+     ],
+     "references": "learning.cantors",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -680,6 +820,26 @@
    "parents": [
     "learning.cantors",
     "creator.creator_accounts"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "cantor_id"
+     ],
+     "references": "learning.cantors",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -791,6 +951,35 @@
     "creator.creator_accounts",
     "media.media_assets"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "profile_image_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.publish_public_profile_image",
@@ -861,6 +1050,26 @@
     "learning.hymns",
     "media.locales"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "hymn_id"
+     ],
+     "references": "learning.hymns",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -929,6 +1138,17 @@
    "parents": [
     "learning.hymns",
     "auth.users"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "hymn_id"
+     ],
+     "references": "learning.hymns",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -1002,6 +1222,26 @@
    "parents": [
     "learning.hymns"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "hymn_id"
+     ],
+     "references": "learning.hymns",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "related_hymn_id"
+     ],
+     "references": "learning.hymns",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -1047,6 +1287,26 @@
    "parents": [
     "learning.hymns",
     "learning.seasons"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "hymn_id"
+     ],
+     "references": "learning.hymns",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "season_id"
+     ],
+     "references": "learning.seasons",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -1142,6 +1402,7 @@
     "auth.users",
     "public.hymn_titles"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -1203,6 +1464,26 @@
     "learning.album_recordings",
     "learning.lessons",
     "auth.users"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "album_recording_id"
+     ],
+     "references": "learning.album_recordings",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "lesson_id"
+     ],
+     "references": "learning.lessons",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -1292,6 +1573,26 @@
     "learning.lessons",
     "auth.users"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "album_recording_id"
+     ],
+     "references": "learning.album_recordings",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "lesson_id"
+     ],
+     "references": "learning.lessons",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -1351,6 +1652,26 @@
    "parents": [
     "learning.lessons",
     "media.locales"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "lesson_id"
+     ],
+     "references": "learning.lessons",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -1413,6 +1734,26 @@
    "parents": [
     "learning.lesson_sets",
     "media.locales"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "lesson_set_id"
+     ],
+     "references": "learning.lesson_sets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -1564,6 +1905,62 @@
     "learning.seasons",
     "media.submissions"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "cantor_id"
+     ],
+     "references": "learning.cantors",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "cover_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "hymn_id"
+     ],
+     "references": "learning.hymns",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "season_id"
+     ],
+     "references": "learning.seasons",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "submission_id"
+     ],
+     "references": "media.submissions",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -1689,6 +2086,35 @@
     "auth.users",
     "learning.lesson_sets"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "audio_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "lesson_set_id"
+     ],
+     "references": "learning.lesson_sets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "media_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.attach_lesson_audio_asset",
@@ -1795,6 +2221,35 @@
     "learning.lessons",
     "media.locales"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "album_recording_id"
+     ],
+     "references": "learning.album_recordings",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "lesson_id"
+     ],
+     "references": "learning.lessons",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -1866,6 +2321,17 @@
    ],
    "parents": [
     "learning.lyric_sets"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "lyric_set_id"
+     ],
+     "references": "learning.lyric_sets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -1970,6 +2436,35 @@
     "learning.lessons",
     "media.locales"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "album_recording_id"
+     ],
+     "references": "learning.album_recordings",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "lesson_id"
+     ],
+     "references": "learning.lessons",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -2036,6 +2531,35 @@
     "learning.album_recordings",
     "learning.lessons",
     "learning.playlists"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "album_recording_id"
+     ],
+     "references": "learning.album_recordings",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "lesson_id"
+     ],
+     "references": "learning.lessons",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "playlist_id"
+     ],
+     "references": "learning.playlists",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -2110,6 +2634,17 @@
     "media.media_assets",
     "auth.users"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "cover_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -2170,6 +2705,26 @@
     "media.locales",
     "learning.album_recordings"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "recording_id"
+     ],
+     "references": "learning.album_recordings",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -2229,6 +2784,26 @@
    "parents": [
     "media.locales",
     "learning.seasons"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "season_id"
+     ],
+     "references": "learning.seasons",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -2325,6 +2900,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -2397,6 +2973,7 @@
     "code"
    ],
    "parents": [],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -2505,6 +3082,26 @@
     "auth.users",
     "media.locales",
     "creator.creator_accounts"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -2648,6 +3245,17 @@
    "parents": [
     "auth.users",
     "media.media_assets"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "media_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -2826,6 +3434,17 @@
    "parents": [
     "auth.users",
     "creator.creator_accounts"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -3036,6 +3655,35 @@
     "media.media_asset_versions",
     "media.upload_intents"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "media_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "media_asset_version_id"
+     ],
+     "references": "media.media_asset_versions",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "upload_intent_id"
+     ],
+     "references": "media.upload_intents",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.wake_media_processor",
@@ -3140,6 +3788,26 @@
     "auth.users",
     "media.locales",
     "creator.creator_accounts"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -3269,6 +3937,26 @@
     "media.locales",
     "creator.creator_accounts"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": [
@@ -3336,6 +4024,7 @@
     "path"
    ],
    "parents": [],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -3415,6 +4104,17 @@
    "parents": [
     "auth.users",
     "media.submissions"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "submission_id"
+     ],
+     "references": "media.submissions",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -3540,6 +4240,71 @@
     "music.tracks",
     "media.submissions",
     "media.upload_intents"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "audio_only_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "media_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "media_processing_job_id"
+     ],
+     "references": "media.media_processing_jobs",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "music_track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "replaces_item_id"
+     ],
+     "references": "media.submission_items",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "submission_id"
+     ],
+     "references": "media.submissions",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "upload_intent_id"
+     ],
+     "references": "media.upload_intents",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -3683,6 +4448,17 @@
    "parents": [
     "auth.users",
     "creator.creator_accounts"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -3850,6 +4626,17 @@
     "creator.creator_accounts",
     "auth.users"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -3888,6 +4675,17 @@
    "parents": [
     "music.artists",
     "auth.users"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -3991,6 +4789,26 @@
     "auth.users",
     "media.locales"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -4052,6 +4870,26 @@
     "music.artists",
     "creator.creator_accounts"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -4097,6 +4935,26 @@
    "parents": [
     "music.artists",
     "music.releases"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "release_id"
+     ],
+     "references": "music.releases",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -4169,6 +5027,17 @@
    ],
    "parents": [
     "music.artists"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -4279,6 +5148,26 @@
     "creator.creator_accounts",
     "media.media_assets"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "profile_image_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.publish_public_profile_image",
@@ -4366,6 +5255,26 @@
     "media.locales",
     "music.tracks"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -4437,6 +5346,17 @@
    ],
    "parents": [
     "music.lyric_sets"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "lyric_set_id"
+     ],
+     "references": "music.lyric_sets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -4554,6 +5474,26 @@
     "media.locales",
     "music.tracks"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -4625,6 +5565,17 @@
    ],
    "parents": [
     "music.lyric_lines"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "lyric_line_id"
+     ],
+     "references": "music.lyric_lines",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -4701,6 +5652,35 @@
     "music.tracks",
     "auth.users"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "media_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "release_id"
+     ],
+     "references": "music.releases",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -4754,6 +5734,26 @@
     "auth.users",
     "music.playlists",
     "music.tracks"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "playlist_id"
+     ],
+     "references": "music.playlists",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -4828,6 +5828,17 @@
     "media.media_assets",
     "auth.users"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "cover_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -4866,6 +5877,17 @@
    "parents": [
     "music.releases",
     "auth.users"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "release_id"
+     ],
+     "references": "music.releases",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -4969,6 +5991,26 @@
     "media.locales",
     "music.releases"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "release_id"
+     ],
+     "references": "music.releases",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -5029,6 +6071,26 @@
    "parents": [
     "music.releases",
     "music.tracks"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "release_id"
+     ],
+     "references": "music.releases",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -5178,6 +6240,35 @@
     "creator.creator_accounts",
     "music.artists"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "cover_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "primary_artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [
     "CHECK (((original_release_date IS NULL) OR ((original_release_date >= '1900-01-01'::date) AND (original_release_date <= (CURRENT_DATE + 365)))))"
    ],
@@ -5242,6 +6333,26 @@
     "music.artists",
     "music.tracks"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "artist_id"
+     ],
+     "references": "music.artists",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -5282,6 +6393,17 @@
    "parents": [
     "music.tracks",
     "auth.users"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [],
@@ -5377,6 +6499,26 @@
     "auth.users",
     "media.locales",
     "music.tracks"
+   ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "locale"
+     ],
+     "references": "media.locales",
+     "referencedColumns": [
+      "code"
+     ]
+    },
+    {
+     "columns": [
+      "track_id"
+     ],
+     "references": "music.tracks",
+     "referencedColumns": [
+      "id"
+     ]
+    }
    ],
    "workerChecks": [],
    "workerTriggers": [
@@ -5482,6 +6624,26 @@
     "media.media_assets",
     "creator.creator_accounts"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "media_asset_id"
+     ],
+     "references": "media.media_assets",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "owner_creator_account_id"
+     ],
+     "references": "creator.creator_accounts",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [
     "private.refresh_unified_search_index_trigger"
@@ -5533,6 +6695,7 @@
     "id"
    ],
    "parents": [],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -5670,6 +6833,35 @@
     "public.notification_devices",
     "public.notifications"
    ],
+   "foreignKeys": [
+    {
+     "columns": [
+      "broadcast_id"
+     ],
+     "references": "public.notification_broadcasts",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "device_id"
+     ],
+     "references": "public.notification_devices",
+     "referencedColumns": [
+      "id"
+     ]
+    },
+    {
+     "columns": [
+      "notification_id"
+     ],
+     "references": "public.notifications",
+     "referencedColumns": [
+      "id"
+     ]
+    }
+   ],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -5735,6 +6927,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -5828,6 +7021,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -5935,6 +7129,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -5995,6 +7190,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -6095,6 +7291,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -6174,6 +7371,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -6226,6 +7424,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -6277,6 +7476,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
@@ -6328,6 +7528,7 @@
    "parents": [
     "auth.users"
    ],
+   "foreignKeys": [],
    "workerChecks": [],
    "workerTriggers": [],
    "skippedIndexes": []
