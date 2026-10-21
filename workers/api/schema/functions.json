@@ -60,7 +60,13 @@
    },
    {
     "name": "p_role",
-    "type": "media.submission_item_role"
+    "type": "media.submission_item_role",
+    "enum": [
+     "artwork",
+     "track",
+     "lesson",
+     "other"
+    ]
    },
    {
     "name": "p_title",
@@ -105,11 +111,35 @@
    },
    {
     "name": "p_from_status",
-    "type": "media.publication_status"
+    "type": "media.publication_status",
+    "enum": [
+     "draft",
+     "uploading",
+     "ready_to_submit",
+     "pending_review",
+     "changes_requested",
+     "approved",
+     "processing",
+     "published",
+     "rejected",
+     "archived"
+    ]
    },
    {
     "name": "p_to_status",
-    "type": "media.publication_status"
+    "type": "media.publication_status",
+    "enum": [
+     "draft",
+     "uploading",
+     "ready_to_submit",
+     "pending_review",
+     "changes_requested",
+     "approved",
+     "processing",
+     "published",
+     "rejected",
+     "archived"
+    ]
    },
    {
     "name": "p_notes",
@@ -445,7 +475,12 @@
   "params": [
    {
     "name": "required_role",
-    "type": "creator.app_role"
+    "type": "creator.app_role",
+    "enum": [
+     "user",
+     "creator",
+     "admin"
+    ]
    }
   ]
  },
@@ -481,7 +516,19 @@
    },
    {
     "name": "p_status",
-    "type": "media.publication_status"
+    "type": "media.publication_status",
+    "enum": [
+     "draft",
+     "uploading",
+     "ready_to_submit",
+     "pending_review",
+     "changes_requested",
+     "approved",
+     "processing",
+     "published",
+     "rejected",
+     "archived"
+    ]
    }
   ]
  },
@@ -572,7 +619,19 @@
    },
    {
     "name": "p_status",
-    "type": "media.publication_status"
+    "type": "media.publication_status",
+    "enum": [
+     "draft",
+     "uploading",
+     "ready_to_submit",
+     "pending_review",
+     "changes_requested",
+     "approved",
+     "processing",
+     "published",
+     "rejected",
+     "archived"
+    ]
    }
   ]
  },
@@ -610,7 +669,11 @@
   "params": [
    {
     "name": "p_item_kind",
-    "type": "learning.playlist_item_kind"
+    "type": "learning.playlist_item_kind",
+    "enum": [
+     "album_recording",
+     "lesson"
+    ]
    },
    {
     "name": "p_item_id",
@@ -627,7 +690,19 @@
   "params": [
    {
     "name": "status",
-    "type": "media.publication_status"
+    "type": "media.publication_status",
+    "enum": [
+     "draft",
+     "uploading",
+     "ready_to_submit",
+     "pending_review",
+     "changes_requested",
+     "approved",
+     "processing",
+     "published",
+     "rejected",
+     "archived"
+    ]
    }
   ]
  },
@@ -640,7 +715,19 @@
   "params": [
    {
     "name": "status",
-    "type": "media.publication_status"
+    "type": "media.publication_status",
+    "enum": [
+     "draft",
+     "uploading",
+     "ready_to_submit",
+     "pending_review",
+     "changes_requested",
+     "approved",
+     "processing",
+     "published",
+     "rejected",
+     "archived"
+    ]
    }
   ]
  },
@@ -705,7 +792,14 @@
   "params": [
    {
     "name": "p_status",
-    "type": "media.processing_job_status"
+    "type": "media.processing_job_status",
+    "enum": [
+     "queued",
+     "processing",
+     "completed",
+     "failed",
+     "cancelled"
+    ]
    },
    {
     "name": "p_error",
@@ -759,7 +853,13 @@
   "params": [
    {
     "name": "p_job_type",
-    "type": "media.processing_job_type"
+    "type": "media.processing_job_type",
+    "enum": [
+     "audio_delivery",
+     "video_delivery",
+     "metadata_probe",
+     "image_delivery"
+    ]
    },
    {
     "name": "p_claimed_at",
@@ -785,7 +885,13 @@
    },
    {
     "name": "job_type",
-    "type": "media.processing_job_type"
+    "type": "media.processing_job_type",
+    "enum": [
+     "audio_delivery",
+     "video_delivery",
+     "metadata_probe",
+     "image_delivery"
+    ]
    }
   ]
  },
@@ -912,7 +1018,19 @@
   "params": [
    {
     "name": "status",
-    "type": "media.publication_status"
+    "type": "media.publication_status",
+    "enum": [
+     "draft",
+     "uploading",
+     "ready_to_submit",
+     "pending_review",
+     "changes_requested",
+     "approved",
+     "processing",
+     "published",
+     "rejected",
+     "archived"
+    ]
    }
   ]
  },
@@ -1535,7 +1653,11 @@
    },
    {
     "name": "p_item_kind",
-    "type": "learning.playlist_item_kind"
+    "type": "learning.playlist_item_kind",
+    "enum": [
+     "album_recording",
+     "lesson"
+    ]
    },
    {
     "name": "p_album_recording_id",
@@ -1588,6 +1710,12 @@
    {
     "name": "p_role",
     "type": "media.submission_item_role",
+    "enum": [
+     "artwork",
+     "track",
+     "lesson",
+     "other"
+    ],
     "default": null
    }
   ]
@@ -2087,6 +2215,11 @@
    {
     "name": "p_release_type",
     "type": "music.release_type",
+    "enum": [
+     "single",
+     "ep",
+     "album"
+    ],
     "default": null
    },
    {
@@ -2157,6 +2290,11 @@
    {
     "name": "p_release_type",
     "type": "music.release_type",
+    "enum": [
+     "single",
+     "ep",
+     "album"
+    ],
     "default": null
    },
    {
@@ -2237,6 +2375,11 @@
    {
     "name": "p_release_type",
     "type": "music.release_type",
+    "enum": [
+     "single",
+     "ep",
+     "album"
+    ],
     "default": null
    },
    {
@@ -2314,6 +2457,11 @@
    {
     "name": "p_visibility",
     "type": "learning.playlist_visibility",
+    "enum": [
+     "private",
+     "unlisted",
+     "public"
+    ],
     "default": "private"
    }
   ]
@@ -2330,7 +2478,14 @@
    },
    {
     "name": "p_submission_type",
-    "type": "media.submission_type"
+    "type": "media.submission_type",
+    "enum": [
+     "music_release",
+     "learning_album",
+     "learning_lesson_set",
+     "artist_update",
+     "cantor_update"
+    ]
    },
    {
     "name": "p_title",
@@ -2368,6 +2523,13 @@
    {
     "name": "p_media_type",
     "type": "media.media_type",
+    "enum": [
+     "audio",
+     "video",
+     "image",
+     "document",
+     "other"
+    ],
     "default": "audio"
    },
    {
@@ -2395,6 +2557,11 @@
    {
     "name": "p_visibility",
     "type": "music.playlist_visibility",
+    "enum": [
+     "private",
+     "unlisted",
+     "public"
+    ],
     "default": "private"
    }
   ]
@@ -2538,6 +2705,12 @@
    {
     "name": "p_job_type",
     "type": "media.processing_job_type",
+    "enum": [
+     "audio_delivery",
+     "video_delivery",
+     "metadata_probe",
+     "image_delivery"
+    ],
     "default": "audio_delivery"
    },
    {
@@ -2675,7 +2848,14 @@
    },
    {
     "name": "p_media_type",
-    "type": "media.media_type"
+    "type": "media.media_type",
+    "enum": [
+     "audio",
+     "video",
+     "image",
+     "document",
+     "other"
+    ]
    }
   ]
  },
@@ -3099,7 +3279,11 @@
   "params": [
    {
     "name": "p_item_kind",
-    "type": "learning.playlist_item_kind"
+    "type": "learning.playlist_item_kind",
+    "enum": [
+     "album_recording",
+     "lesson"
+    ]
    },
    {
     "name": "p_item_id",
@@ -3447,7 +3631,11 @@
   "params": [
    {
     "name": "p_item_kind",
-    "type": "learning.playlist_item_kind"
+    "type": "learning.playlist_item_kind",
+    "enum": [
+     "album_recording",
+     "lesson"
+    ]
    },
    {
     "name": "p_item_id",
@@ -3582,6 +3770,11 @@
    {
     "name": "p_kind",
     "type": "music.lyric_kind",
+    "enum": [
+     "original",
+     "translation",
+     "transliteration"
+    ],
     "default": null
    }
   ]
@@ -3768,7 +3961,12 @@
    },
    {
     "name": "p_kind",
-    "type": "music.lyric_kind"
+    "type": "music.lyric_kind",
+    "enum": [
+     "original",
+     "translation",
+     "transliteration"
+    ]
    }
   ]
  },
@@ -3937,7 +4135,11 @@
   "params": [
    {
     "name": "p_item_kind",
-    "type": "learning.playlist_item_kind"
+    "type": "learning.playlist_item_kind",
+    "enum": [
+     "album_recording",
+     "lesson"
+    ]
    },
    {
     "name": "p_item_id",
@@ -3945,7 +4147,12 @@
    },
    {
     "name": "p_sync_precision",
-    "type": "music.lyric_sync_precision"
+    "type": "music.lyric_sync_precision",
+    "enum": [
+     "unsynced",
+     "line",
+     "word"
+    ]
    },
    {
     "name": "p_locales",
@@ -4010,6 +4217,11 @@
    {
     "name": "p_sync_precision",
     "type": "music.lyric_sync_precision",
+    "enum": [
+     "unsynced",
+     "line",
+     "word"
+    ],
     "default": "line"
    }
   ]
@@ -4250,7 +4462,11 @@
   "params": [
    {
     "name": "p_item_kind",
-    "type": "learning.playlist_item_kind"
+    "type": "learning.playlist_item_kind",
+    "enum": [
+     "album_recording",
+     "lesson"
+    ]
    },
    {
     "name": "p_item_id",
@@ -4258,7 +4474,12 @@
    },
    {
     "name": "p_sync_precision",
-    "type": "music.lyric_sync_precision"
+    "type": "music.lyric_sync_precision",
+    "enum": [
+     "unsynced",
+     "line",
+     "word"
+    ]
    },
    {
     "name": "p_languages",
@@ -4315,11 +4536,21 @@
    },
    {
     "name": "p_kind",
-    "type": "music.lyric_kind"
+    "type": "music.lyric_kind",
+    "enum": [
+     "original",
+     "translation",
+     "transliteration"
+    ]
    },
    {
     "name": "p_sync_precision",
-    "type": "music.lyric_sync_precision"
+    "type": "music.lyric_sync_precision",
+    "enum": [
+     "unsynced",
+     "line",
+     "word"
+    ]
    },
    {
     "name": "p_title",
@@ -4392,7 +4623,12 @@
    },
    {
     "name": "p_sync_precision",
-    "type": "music.lyric_sync_precision"
+    "type": "music.lyric_sync_precision",
+    "enum": [
+     "unsynced",
+     "line",
+     "word"
+    ]
    },
    {
     "name": "p_languages",
@@ -4524,7 +4760,11 @@
   "params": [
    {
     "name": "p_item_kind",
-    "type": "learning.playlist_item_kind"
+    "type": "learning.playlist_item_kind",
+    "enum": [
+     "album_recording",
+     "lesson"
+    ]
    },
    {
     "name": "p_item_id",
@@ -4544,7 +4784,11 @@
   "params": [
    {
     "name": "p_item_kind",
-    "type": "learning.playlist_item_kind"
+    "type": "learning.playlist_item_kind",
+    "enum": [
+     "album_recording",
+     "lesson"
+    ]
    },
    {
     "name": "p_item_id",
@@ -4552,7 +4796,12 @@
    },
    {
     "name": "p_state",
-    "type": "learning.progress_state"
+    "type": "learning.progress_state",
+    "enum": [
+     "will_learn",
+     "learning",
+     "finished"
+    ]
    }
   ]
  },
@@ -4568,7 +4817,12 @@
    },
    {
     "name": "p_state",
-    "type": "learning.progress_state"
+    "type": "learning.progress_state",
+    "enum": [
+     "will_learn",
+     "learning",
+     "finished"
+    ]
    }
   ]
  },
@@ -5000,6 +5254,11 @@
    {
     "name": "p_visibility",
     "type": "learning.playlist_visibility",
+    "enum": [
+     "private",
+     "unlisted",
+     "public"
+    ],
     "default": "private"
    }
   ]
@@ -5026,6 +5285,11 @@
    {
     "name": "p_visibility",
     "type": "music.playlist_visibility",
+    "enum": [
+     "private",
+     "unlisted",
+     "public"
+    ],
     "default": "private"
    }
   ]

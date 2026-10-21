@@ -33,8 +33,10 @@ test('calls are matched by name and arguments, and grants are applied before any
 test('arguments are checked as Postgres checks them', () => {
   assert.equal(convert('uuid', '0A1B2C3D-0000-4000-8000-00000000A11C'), '0a1b2c3d-0000-4000-8000-00000000a11c');
   assert.throws(() => convert('uuid', 'not-a-uuid'), refused('22P02', 'invalid input syntax for type uuid: "not-a-uuid"'));
-  assert.throws(() => convert('music.lyric_kind', 'karaoke'), refused('22P02', 'invalid input value for enum music.lyric_kind: "karaoke"'));
-  assert.equal(convert('music.lyric_kind', 'translation'), 'translation');
+  const kinds = FUNCTIONS['public.get_published_track_lyrics'].params.find((param) => param.name === 'p_kind')!.enum;
+  assert.deepEqual(kinds, ['original', 'translation', 'transliteration']);
+  assert.throws(() => convert('music.lyric_kind', 'karaoke', kinds), refused('22P02', 'invalid input value for enum music.lyric_kind: "karaoke"'));
+  assert.equal(convert('music.lyric_kind', 'translation', kinds), 'translation');
   assert.throws(() => convert('integer', 1.5), refused('22P02'));
   assert.deepEqual(convert('uuid[]', ['0A1B2C3D-0000-4000-8000-00000000A11C', null]), ['0a1b2c3d-0000-4000-8000-00000000a11c', null]);
   assert.equal(convert('boolean', 'yes'), true);
