@@ -1,9 +1,11 @@
-/** The functions the other Workers call (the media processor), by "schema.name" (src/rpc/index.ts). */
+/** The functions the other Workers call (the media processor, the upload authorizer, the web app's link previews), by "schema.name" (src/rpc/index.ts). */
 import type { Args, Rpc } from '../index.ts';
 import {
   claimCompanionMediaProcessingJob, claimMediaOriginalDeletion, claimMediaProcessingJob, completeMediaProcessingJob, failMediaProcessingJob, heartbeatMediaProcessingJobs,
   mediaProcessingQueueHasWork, releaseMediaProcessingJobs, skipMediaProcessingJob,
 } from './media.ts';
+import { getMusicPlaylistSharePreview, getSharePreview } from './share.ts';
+import { completeMediaUploadIntent, createMediaUploadIntent, getAdminSubmissionPreviewItem, getMediaUploadIntentForUpload } from './uploads.ts';
 
 const s = (a: Args, name: string) => a[name] as string;
 const n = (a: Args, name: string) => a[name] as string | null;
@@ -23,4 +25,13 @@ export const workerRpcs: Record<string, Rpc> = {
   'public.release_media_processing_jobs': (c, a) => releaseMediaProcessingJobs(c, token(a), list(a, 'p_job_ids'), n(a, 'p_reason')),
   'public.claim_media_original_deletion': (c, a) => claimMediaOriginalDeletion(c, token(a), s(a, 'p_upload_intent_id')),
   'public.media_processing_queue_has_work': (c, a) => mediaProcessingQueueHasWork(c, token(a)),
+  'public.create_media_upload_intent': (c, a) => createMediaUploadIntent(c, {
+    accountId: n(a, 'p_creator_account_id'), filename: n(a, 'p_original_filename'), contentType: n(a, 'p_content_type'), contentLength: num(a, 'p_content_length'),
+    mediaType: n(a, 'p_media_type'), checksum: n(a, 'p_checksum_sha256'),
+  }),
+  'public.get_media_upload_intent_for_upload': (c, a) => getMediaUploadIntentForUpload(c, s(a, 'p_upload_intent_id')),
+  'public.complete_media_upload_intent': (c, a) => completeMediaUploadIntent(c, s(a, 'p_upload_intent_id'), num(a, 'p_uploaded_size'), n(a, 'p_r2_http_etag')),
+  'public.get_admin_submission_preview_item': (c, a) => getAdminSubmissionPreviewItem(c, s(a, 'p_item_id')),
+  'public.get_share_preview': (c, a) => getSharePreview(c, n(a, 'p_path'), n(a, 'p_locale')),
+  'public.get_music_playlist_share_preview': (c, a) => getMusicPlaylistSharePreview(c, s(a, 'p_playlist_id')),
 };
