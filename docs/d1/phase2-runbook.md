@@ -141,9 +141,19 @@ API does, so the apps keep their code:
 - `POST /rest/v1/rpc/<function>`, in `src/rpc`;
 - the six tables the apps use directly, in `src/rest/tables.ts`.
 
-The user always comes from the session. Supabase's grants apply too:
-`schema/function-grants.json`, generated from the dump, refuses a signed-out
-call exactly as Postgres does.
+The user always comes from the session. `schema/functions.json`,
+generated from the dump, gives each function's parameters, defaults and
+types, and Supabase's EXECUTE grants. So calls are matched, arguments are
+checked (uuid syntax, enum values) and signed-out calls are refused, all
+exactly as PostgREST and Postgres do it.
+
+**Visibility.** Supabase's row-level security is written out as SQL
+fragments (`src/rpc/music/shared.ts`): published, or readable by the creator
+account or an admin. They are added to every read the original made as the
+caller.
+
+**Text order.** Text is sorted the way Supabase sorts it (ICU en-US), and
+the oracle collates its text columns the same way.
 
 **How it is checked: the parity oracle.** `tests/lib/oracle.ts` runs
 Supabase's own functions, policies and grants in PGlite (Postgres compiled to
@@ -160,18 +170,25 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 - Writes are compared table by table.
 - Nothing touches Supabase.
 
-**After a change to a Supabase function, until the cutover:**
+****Production bug found by the oracle: playlist editing.**
+
+- **Since when:** migration `20260921221500_notification_infrastructure.sql` (21 Sept 2026) revoked the signed-in role's USAGE on schema `private`.
+- **What breaks:** every SECURITY INVOKER function that calls a `private.*` helper by name now fails with "permission denied for schema private". On Supabase today that means adding, removing and reordering playlist tracks, renaming a playlist and deleting one. Unused creator functions fail too. The last track added to a playlist was on 21 Sept.
+- **The Worker:** it implements the working behaviour. The parity tests compare it with Supabase as it was before the revoke (`createOracle({ privateUsage: true })`), and one test records the failure as deployed.
+- **Fixing it on Supabase until the cutover:** `grant usage on schema private to authenticated;`. That restores the state from 16 to 21 Sept. Functions there still need their own EXECUTE grants, and the tables there have no grants to `authenticated`.
+
+**After a change to a Supabase function, until the cutover:****
 
 1. Re-run the dump and `npm run save-schema-dump -- <result>`.
-2. Run `npm run gen:grants`.
+2. Run `npm run gen:functions`. It regenerates `schema/functions.json`, which records each function's parameters, defaults, types and grants.
 3. Run the tests; they show what the Worker's port has to follow.
 
 | Group | Functions | State |
 |---|---|---|
 | The user's own tables | `notification_preferences`, `notifications` (read, mark read), `spiritual_canons`, `spiritual_canon_days`, `bible_highlights`, `sermon_plans` | Ported, at parity |
 | Settings and devices | `get_my_content_preferences`, `save_my_content_preferences`, `register_notification_device`, `disable_notification_device` | Ported, at parity |
-| Music | 22 | Next |
-| Learning | 19 | |
+| Music | 21 of 22: the catalog, library, likes, follows, plays and playlists | Ported, at parity. `set_music_playlist_cover` moves with the covers to R2 (step 6). |
+| Learning | 19 | Next |
 | Search | 2 | |
 | Creator editor and lyrics | 34 | |
 | Admin | 26 | |
@@ -186,6 +203,6 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 | 2. D1 schema | Done. `0006` and `0007` are applied to the local and remote D1. |
 | 3. Copy and verification | Done on 21 Oct 2026, from the 00:43 UTC export: 992 rows. **74 of 74 checksums match** in both the local and remote D1 (the 73 tables, plus users by id and email). The export was deleted after loading. |
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
-| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences and push devices. |
+| 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices and music. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |
 | 7. Cutover | Not started. |

@@ -76,5 +76,13 @@ export function timestampInput(value: unknown, column: string): string {
   return stored;
 }
 
-/** now() in the stored form. */
-export const now = () => pgTimestamp(new Date());
+let lastNow = 0;
+/**
+ * now() in the stored form. Always later than the last one this isolate gave,
+ * since a millisecond is coarser than Postgres's microseconds and two writes
+ * in the same millisecond would otherwise tie where Postgres orders them.
+ */
+export function now(): string {
+  lastNow = Math.max(Date.now(), lastNow + 1);
+  return pgTimestamp(new Date(lastNow));
+}

@@ -92,6 +92,9 @@ export function createAuth(env: Env) {
     advanced: {
       // New users get UUIDs, like the ones carried over from Supabase.
       database: { generateId: () => crypto.randomUUID() },
+      // Cloudflare gives the client's address in cf-connecting-ip. Without it the rate
+      // limiter can't tell clients apart and counts everyone in one bucket per path.
+      ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] },
     },
     plugins: [bearer(), expo()],
   });

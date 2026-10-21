@@ -12,8 +12,9 @@
     "typecheck": "tsc -p .",
     "dev": "wrangler dev --port 8790 --persist-to ../content-api/.wrangler/state",
     "deploy": "wrangler deploy",
-    "gen:grants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-grants.ts",
-    "save-schema-dump": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/save-schema-dump.ts"
+    "save-schema-dump": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/save-schema-dump.ts",
+    "closure": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/function-closure.ts",
+    "gen:functions": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-functions.ts"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.12",

@@ -1,0 +1,5041 @@
+{
+ "media.normalize_search_text": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "text",
+  "params": [
+   {
+    "name": "p_value",
+    "type": "text"
+   }
+  ]
+ },
+ "music.published_artist_social_links": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "music.release_display_date": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "date",
+  "params": [
+   {
+    "name": "p_original_release_date",
+    "type": "date"
+   },
+   {
+    "name": "p_scheduled_release_at",
+    "type": "timestamp with time zone"
+   },
+   {
+    "name": "p_release_date",
+    "type": "date"
+   }
+  ]
+ },
+ "private.add_edit_submission_item": {
+  "roles": [],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_role",
+    "type": "media.submission_item_role"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_sort_order",
+    "type": "integer"
+   },
+   {
+    "name": "p_localized_titles",
+    "type": "jsonb",
+    "default": {}
+   },
+   {
+    "name": "p_music_track_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_replaces_item_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "private.add_media_submission_event": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_actor_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_action",
+    "type": "text"
+   },
+   {
+    "name": "p_from_status",
+    "type": "media.publication_status"
+   },
+   {
+    "name": "p_to_status",
+    "type": "media.publication_status"
+   },
+   {
+    "name": "p_notes",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_metadata",
+    "type": "jsonb",
+    "default": {}
+   }
+  ]
+ },
+ "private.admin_artist_json": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.admin_artist_upload_account": {
+  "roles": [],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.apply_learning_submission_edits": {
+  "roles": [],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_actor",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "private.apply_music_submission_replacements": {
+  "roles": [],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_actor",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "private.attach_completed_submission_jobs": {
+  "roles": [],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.attach_lesson_audio_asset": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.attach_pending_artist_profile_image": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.broadcast_audience": {
+  "roles": [],
+  "returns": "TABLE(device_id uuid, user_id uuid, provider text, platform text)",
+  "params": [
+   {
+    "name": "p_category",
+    "type": "text"
+   }
+  ]
+ },
+ "private.can_edit_creator_account": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.can_manage_creator_account": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.can_read_media_owner": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.cleanup_orphan_music_track": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.created_creator_account": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.creator_account_is_mine": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.creator_release_preview_cover": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.delete_music_release_core": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.delete_music_release_track_core": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.drop_superseded_artwork": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_cover_asset_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.edit_compact_titles": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_titles",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "private.edit_localized_titles": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_value",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "private.edit_preferred_title": {
+  "roles": [],
+  "returns": "text",
+  "params": [
+   {
+    "name": "p_titles",
+    "type": "jsonb"
+   },
+   {
+    "name": "p_fallback",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "private.enforce_release_identity_artist": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.enforce_release_scheduling_window": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.enqueue_notification": {
+  "roles": [],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_user_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_app_key",
+    "type": "text"
+   },
+   {
+    "name": "p_category",
+    "type": "text"
+   },
+   {
+    "name": "p_event_type",
+    "type": "text"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_body",
+    "type": "text"
+   },
+   {
+    "name": "p_deep_link",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_image_url",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_payload",
+    "type": "jsonb",
+    "default": {}
+   }
+  ]
+ },
+ "private.fill_media_asset_from_probe": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_asset_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.has_app_role": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "required_role",
+    "type": "creator.app_role"
+   }
+  ]
+ },
+ "private.is_admin": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": []
+ },
+ "private.is_creator_account_member": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_album_child_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_album_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_status",
+    "type": "media.publication_status"
+   }
+  ]
+ },
+ "private.learning_album_is_editable": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_album_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_album_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_album_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_cantor_is_editable": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_cantor_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_cantor_is_mine": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_cantor_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_cantor_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_cantor_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_collection_is_mine": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_owner_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_cantor_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_lesson_child_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_lesson_set_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_status",
+    "type": "media.publication_status"
+   }
+  ]
+ },
+ "private.learning_lesson_set_is_editable": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_lesson_set_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_lesson_set_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_lesson_set_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_lyric_item_is_editable": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_item_kind",
+    "type": "learning.playlist_item_kind"
+   },
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.learning_publication_is_creator_mutable": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "status",
+    "type": "media.publication_status"
+   }
+  ]
+ },
+ "private.learning_published_or_admin": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "status",
+    "type": "media.publication_status"
+   }
+  ]
+ },
+ "private.link_submission_item_music_track": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.lyric_artwork_json": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_asset_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.media_asset_is_editable": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "asset_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.media_asset_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "asset_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.media_job_skipped_for_silence": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_status",
+    "type": "media.processing_job_status"
+   },
+   {
+    "name": "p_error",
+    "type": "text"
+   }
+  ]
+ },
+ "private.media_probe_audio_codec": {
+  "roles": [],
+  "returns": "text",
+  "params": [
+   {
+    "name": "p_probe",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "private.media_probe_bitrate": {
+  "roles": [],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_probe",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "private.media_probe_duration_ms": {
+  "roles": [],
+  "returns": "bigint",
+  "params": [
+   {
+    "name": "p_probe",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "private.media_probe_video": {
+  "roles": [],
+  "returns": "TABLE(codec text, width integer, height integer)",
+  "params": [
+   {
+    "name": "p_probe",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "private.media_processing_job_is_stale": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_job_type",
+    "type": "media.processing_job_type"
+   },
+   {
+    "name": "p_claimed_at",
+    "type": "timestamp with time zone"
+   },
+   {
+    "name": "p_heartbeat_at",
+    "type": "timestamp with time zone"
+   }
+  ]
+ },
+ "private.media_processing_output_path": {
+  "roles": [],
+  "returns": "text",
+  "params": [
+   {
+    "name": "creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "upload_intent_id",
+    "type": "uuid"
+   },
+   {
+    "name": "job_type",
+    "type": "media.processing_job_type"
+   }
+  ]
+ },
+ "private.music_artist_is_editable": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_artist_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_lyric_line_is_mutable": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_lyric_line_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_lyric_line_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_lyric_line_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_lyric_set_is_editable": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_lyric_set_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_lyric_set_is_mutable": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_lyric_set_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_lyric_set_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_lyric_set_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_playlist_is_editable": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_playlist_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_publication_is_creator_mutable": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "status",
+    "type": "media.publication_status"
+   }
+  ]
+ },
+ "private.music_release_is_editable": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_release_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_submission_has_pending_edits": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_track_is_editable": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.music_track_is_visible": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.normalize_creator_name": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "text",
+  "params": [
+   {
+    "name": "p_name",
+    "type": "text"
+   }
+  ]
+ },
+ "private.normalize_search_alias_trigger": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.notify_processing_failure": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.notify_release_published": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.notify_submission_status": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.on_music_release_publish_consumer_dependencies": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.prepare_music_release_artwork_for_publication": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.publish_due_learning_releases": {
+  "roles": [],
+  "returns": "integer",
+  "params": []
+ },
+ "private.publish_due_music_releases": {
+  "roles": [],
+  "returns": "integer",
+  "params": []
+ },
+ "private.publish_learning_submission_internal": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_actor_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_reason",
+    "type": "text",
+    "default": "automatic"
+   }
+  ]
+ },
+ "private.publish_music_release_consumer_dependencies": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_actor_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "private.publish_music_submission_internal": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_actor_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_reason",
+    "type": "text",
+    "default": "automatic"
+   }
+  ]
+ },
+ "private.publish_public_profile_image": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.published_media_search_source": {
+  "roles": [],
+  "returns": "TABLE(owner_creator_account_id uuid, entity_type text, entity_id uuid, locale text, title text, subtitle text, body text, metadata jsonb)",
+  "params": []
+ },
+ "private.queue_artist_profile_image": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_actor",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.refresh_unified_search_index": {
+  "roles": [],
+  "returns": "void",
+  "params": []
+ },
+ "private.refresh_unified_search_index_trigger": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.renumber_music_release_tracks": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.replace_artist_social_links": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_social_links",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "private.replace_submission_artwork": {
+  "roles": [],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_current_cover_asset_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.resolve_creator_selected_artist": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_owner_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_display_name",
+    "type": "text"
+   },
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_default_identity",
+    "type": "boolean",
+    "default": false
+   }
+  ]
+ },
+ "private.resolve_learning_submission_artist": {
+  "roles": [],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_display_name",
+    "type": "text"
+   }
+  ]
+ },
+ "private.resolve_track_credit_artist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_owner_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_name",
+    "type": "text"
+   },
+   {
+    "name": "p_default_to_identity",
+    "type": "boolean",
+    "default": false
+   }
+  ]
+ },
+ "private.retire_submission_when_music_release_deleted": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.save_learning_submission_edit": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_edit",
+    "type": "jsonb"
+   },
+   {
+    "name": "p_actor",
+    "type": "uuid"
+   },
+   {
+    "name": "p_is_admin",
+    "type": "boolean"
+   }
+  ]
+ },
+ "private.save_music_submission_edit": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_edit",
+    "type": "jsonb"
+   },
+   {
+    "name": "p_actor",
+    "type": "uuid"
+   },
+   {
+    "name": "p_is_admin",
+    "type": "boolean"
+   }
+  ]
+ },
+ "private.set_track_credit_names": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_owner_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_main_artist_name",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_contributors",
+    "type": "jsonb",
+    "default": []
+   }
+  ]
+ },
+ "private.set_track_credit_refs": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_owner_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_main_artist_name",
+    "type": "text"
+   },
+   {
+    "name": "p_main_artist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_contributors",
+    "type": "jsonb",
+    "default": []
+   }
+  ]
+ },
+ "private.set_track_credits": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_owner_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_main_artist_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_featured_artist_ids",
+    "type": "uuid[]",
+    "default": null
+   }
+  ]
+ },
+ "private.set_updated_at": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.settle_submission_processing": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.storage_asset_is_referenced": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_asset_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.storage_asset_version_is_referenced": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_version_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.storage_object_is_referenced": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_bucket",
+    "type": "text"
+   },
+   {
+    "name": "p_path",
+    "type": "text"
+   }
+  ]
+ },
+ "private.storage_upload_intent_is_referenced": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.submission_item_media_ready": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.submission_item_processing_state": {
+  "roles": [],
+  "returns": "text",
+  "params": [
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.submission_required_items_ready": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.sync_learning_artist_identity": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.sync_music_artist_image_to_learning_cantor": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.sync_music_release_type": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "private.sync_music_release_type_trigger": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ },
+ "private.upload_file_extension": {
+  "roles": [],
+  "returns": "text",
+  "params": [
+   {
+    "name": "filename",
+    "type": "text"
+   }
+  ]
+ },
+ "private.verify_media_worker_token": {
+  "roles": [],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "worker_token",
+    "type": "text"
+   }
+  ]
+ },
+ "private.wake_media_processor": {
+  "roles": [],
+  "returns": "trigger",
+  "params": []
+ },
+ "public.add_learning_playlist_item": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_item_kind",
+    "type": "learning.playlist_item_kind"
+   },
+   {
+    "name": "p_album_recording_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_lesson_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "public.add_media_submission_item": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(item_id uuid, submission_id uuid, upload_intent_id uuid, media_asset_id uuid, media_processing_job_id uuid)",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_media_asset_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_title",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_sort_order",
+    "type": "integer",
+    "default": 0
+   },
+   {
+    "name": "p_required",
+    "type": "boolean",
+    "default": true
+   },
+   {
+    "name": "p_role",
+    "type": "media.submission_item_role",
+    "default": null
+   }
+  ]
+ },
+ "public.add_track_to_music_playlist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.admin_delete_catalog_item": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_kind",
+    "type": "text"
+   },
+   {
+    "name": "p_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.admin_send_notification_broadcast": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_category",
+    "type": "text"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_body",
+    "type": "text"
+   },
+   {
+    "name": "p_deep_link",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_payload",
+    "type": "jsonb",
+    "default": {}
+   }
+  ]
+ },
+ "public.admin_send_notification_test": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_body",
+    "type": "text"
+   },
+   {
+    "name": "p_deep_link",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.admin_update_music_release_dates": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_scheduled_release_at",
+    "type": "timestamp with time zone",
+    "default": null
+   },
+   {
+    "name": "p_original_release_date",
+    "type": "date",
+    "default": null
+   },
+   {
+    "name": "p_clear_scheduled_release_at",
+    "type": "boolean",
+    "default": false
+   },
+   {
+    "name": "p_clear_original_release_date",
+    "type": "boolean",
+    "default": false
+   }
+  ]
+ },
+ "public.apply_french_alignment_updates": {
+  "roles": [],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_book",
+    "type": "text"
+   },
+   {
+    "name": "p_updates",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.authorize_admin_storage_gc": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(authorized boolean)",
+  "params": []
+ },
+ "public.begin_offline_package_snapshot": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.claim_companion_media_processing_job": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, job_type media.processing_job_type, attempt_count integer, max_attempts integer, output_bucket text, output_path text)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_job_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_worker_id",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.claim_media_original_deletion": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(bucket text, path text)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.claim_media_processing_job": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, upload_intent_id uuid, job_type media.processing_job_type, media_type media.media_type, source_content_type text, attempt_count integer, max_attempts integer, input_bucket text, input_path text, output_bucket text, output_path text)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_worker_id",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.claim_notification_deliveries": {
+  "roles": [],
+  "returns": "TABLE(delivery_id uuid, notification_id uuid, device_id uuid, push_token text, title text, body text, image_url text, deep_link text, payload jsonb)",
+  "params": [
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 100
+   }
+  ]
+ },
+ "public.claim_notification_receipts": {
+  "roles": [],
+  "returns": "TABLE(delivery_id uuid, provider_ticket_id text)",
+  "params": [
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 1000
+   }
+  ]
+ },
+ "public.claim_web_push_deliveries": {
+  "roles": [],
+  "returns": "TABLE(delivery_id uuid, notification_id uuid, device_id uuid, subscription jsonb, title text, body text, image_url text, deep_link text, payload jsonb)",
+  "params": [
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 100
+   }
+  ]
+ },
+ "public.clear_music_playlist_cover": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.complete_media_processing_job": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, status media.processing_job_status, media_asset_id uuid, media_asset_version_id uuid, output_bucket text, output_path text)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_job_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_output_mime_type",
+    "type": "text"
+   },
+   {
+    "name": "p_output_size_bytes",
+    "type": "bigint"
+   },
+   {
+    "name": "p_output_checksum_sha256",
+    "type": "text"
+   },
+   {
+    "name": "p_probe",
+    "type": "jsonb",
+    "default": {}
+   }
+  ]
+ },
+ "public.complete_media_upload_intent": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(upload_intent_id uuid, status media.upload_intent_status, bucket text, object_path text, uploaded_at timestamp with time zone)",
+  "params": [
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_uploaded_size",
+    "type": "bigint"
+   },
+   {
+    "name": "p_r2_http_etag",
+    "type": "text"
+   }
+  ]
+ },
+ "public.complete_notification_deliveries": {
+  "roles": [],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_results",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.complete_notification_delivery": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_delivery_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_result",
+    "type": "text"
+   },
+   {
+    "name": "p_ticket_id",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_error",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_retry_after_seconds",
+    "type": "integer",
+    "default": 60
+   }
+  ]
+ },
+ "public.complete_notification_receipt": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_delivery_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_result",
+    "type": "text"
+   },
+   {
+    "name": "p_error",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.complete_notification_receipts": {
+  "roles": [],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_results",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.complete_storage_gc_candidate": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_bucket",
+    "type": "text"
+   },
+   {
+    "name": "p_path",
+    "type": "text"
+   }
+  ]
+ },
+ "public.confirm_admin_creator_artist_claim": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_existing_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.coptic_replace_digits": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "text",
+  "params": [
+   {
+    "name": "txt",
+    "type": "text"
+   }
+  ]
+ },
+ "public.create_creator_artist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_display_name",
+    "type": "text"
+   }
+  ]
+ },
+ "public.create_creator_cantor": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_display_name",
+    "type": "text"
+   },
+   {
+    "name": "p_contributor_type",
+    "type": "text",
+    "default": "cantor"
+   }
+  ]
+ },
+ "public.create_creator_hymn": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   }
+  ]
+ },
+ "public.create_creator_submission": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_mode",
+    "type": "text"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_release_type",
+    "type": "music.release_type",
+    "default": null
+   },
+   {
+    "name": "p_artist_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_cantor_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_season_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_hymn_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_localized_titles",
+    "type": "jsonb",
+    "default": {}
+   },
+   {
+    "name": "p_items",
+    "type": "jsonb",
+    "default": []
+   },
+   {
+    "name": "p_scheduled_release_at",
+    "type": "timestamp with time zone",
+    "default": null
+   },
+   {
+    "name": "p_original_release_date",
+    "type": "date",
+    "default": null
+   }
+  ]
+ },
+ "public.create_creator_submission_v2": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_mode",
+    "type": "text"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_release_type",
+    "type": "music.release_type",
+    "default": null
+   },
+   {
+    "name": "p_music_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_recording_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_artist_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_cantor_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_season_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_hymn_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_localized_titles",
+    "type": "jsonb",
+    "default": {}
+   },
+   {
+    "name": "p_items",
+    "type": "jsonb",
+    "default": []
+   },
+   {
+    "name": "p_scheduled_release_at",
+    "type": "timestamp with time zone",
+    "default": null
+   },
+   {
+    "name": "p_original_release_date",
+    "type": "date",
+    "default": null
+   }
+  ]
+ },
+ "public.create_creator_submission_v3": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_mode",
+    "type": "text"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_release_type",
+    "type": "music.release_type",
+    "default": null
+   },
+   {
+    "name": "p_music_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_recording_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_artist_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_cantor_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_season_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_hymn_id",
+    "type": "uuid",
+    "default": null
+   },
+   {
+    "name": "p_localized_titles",
+    "type": "jsonb",
+    "default": {}
+   },
+   {
+    "name": "p_items",
+    "type": "jsonb",
+    "default": []
+   },
+   {
+    "name": "p_release_timing_mode",
+    "type": "text",
+    "default": "asap"
+   },
+   {
+    "name": "p_scheduled_release_at",
+    "type": "timestamp with time zone",
+    "default": null
+   },
+   {
+    "name": "p_original_release_date",
+    "type": "date",
+    "default": null
+   }
+  ]
+ },
+ "public.create_learning_playlist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_name",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_visibility",
+    "type": "learning.playlist_visibility",
+    "default": "private"
+   }
+  ]
+ },
+ "public.create_media_submission": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(submission_id uuid, status media.publication_status, review_due_at timestamp with time zone)",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_submission_type",
+    "type": "media.submission_type"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.create_media_upload_intent": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(upload_intent_id uuid, bucket text, object_path text, expires_at timestamp with time zone, content_type text, content_length bigint, media_type media.media_type)",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_original_filename",
+    "type": "text"
+   },
+   {
+    "name": "p_content_type",
+    "type": "text"
+   },
+   {
+    "name": "p_content_length",
+    "type": "bigint"
+   },
+   {
+    "name": "p_media_type",
+    "type": "media.media_type",
+    "default": "audio"
+   },
+   {
+    "name": "p_checksum_sha256",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.create_music_playlist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_name",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_visibility",
+    "type": "music.playlist_visibility",
+    "default": "private"
+   }
+  ]
+ },
+ "public.delete_admin_music_release": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.delete_admin_music_release_track": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.delete_creator_music_release": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.delete_creator_music_release_track": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.delete_learning_playlist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.delete_music_playlist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.delete_submission": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.disable_notification_device": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_app_key",
+    "type": "text"
+   },
+   {
+    "name": "p_provider",
+    "type": "text"
+   },
+   {
+    "name": "p_push_token",
+    "type": "text"
+   }
+  ]
+ },
+ "public.earliest_release_at": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "timestamp with time zone",
+  "params": [
+   {
+    "name": "p_submitted_at",
+    "type": "timestamp with time zone",
+    "default": null
+   }
+  ]
+ },
+ "public.enqueue_media_processing_job": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, status media.processing_job_status, input_bucket text, input_path text, output_bucket text, output_path text)",
+  "params": [
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_job_type",
+    "type": "media.processing_job_type",
+    "default": "audio_delivery"
+   },
+   {
+    "name": "p_output_bucket",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.enqueue_user_notification": {
+  "roles": [],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_user_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_app_key",
+    "type": "text"
+   },
+   {
+    "name": "p_category",
+    "type": "text"
+   },
+   {
+    "name": "p_event_type",
+    "type": "text"
+   },
+   {
+    "name": "p_title",
+    "type": "text"
+   },
+   {
+    "name": "p_body",
+    "type": "text"
+   },
+   {
+    "name": "p_deep_link",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_image_url",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_payload",
+    "type": "jsonb",
+    "default": {}
+   }
+  ]
+ },
+ "public.ensure_creator_workspace": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(creator_account_id uuid, display_name text)",
+  "params": [
+   {
+    "name": "p_display_name",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.evaluate_condition": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_condition",
+    "type": "text"
+   },
+   {
+    "name": "p_flags",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.fail_media_processing_job": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, status media.processing_job_status, attempt_count integer, max_attempts integer, available_at timestamp with time zone, error_message text)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_job_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_error_message",
+    "type": "text"
+   }
+  ]
+ },
+ "public.finalize_admin_processing_file_deletion": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, deleted boolean, deleted_job_count integer, deleted_submission_item_count integer, deleted_media_asset_id uuid, deleted_upload_intent_id uuid)",
+  "params": [
+   {
+    "name": "p_job_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.find_reusable_uploaded_media_intent": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_original_filename",
+    "type": "text"
+   },
+   {
+    "name": "p_content_length",
+    "type": "bigint"
+   },
+   {
+    "name": "p_media_type",
+    "type": "media.media_type"
+   }
+  ]
+ },
+ "public.finish_offline_package_snapshot": {
+  "roles": [],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_snapshot_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_success",
+    "type": "boolean"
+   },
+   {
+    "name": "p_error",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.force_media_processing_job": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, status media.processing_job_status, available_at timestamp with time zone, attempt_count integer, max_attempts integer)",
+  "params": [
+   {
+    "name": "p_job_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.force_pending_media_processing_jobs": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "integer",
+  "params": []
+ },
+ "public.force_submission_media_processing": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.french_alignment_chapter_payload": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_book",
+    "type": "text"
+   },
+   {
+    "name": "p_target_ch",
+    "type": "integer"
+   },
+   {
+    "name": "p_source_ch1",
+    "type": "integer"
+   },
+   {
+    "name": "p_source_ch2",
+    "type": "integer",
+    "default": null
+   }
+  ]
+ },
+ "public.french_alignment_payload": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_book",
+    "type": "text"
+   }
+  ]
+ },
+ "public.get_admin_artist_profile": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_admin_artists": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_search",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.get_admin_creator_artist_claims": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_admin_notification_broadcast_overview": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_category",
+    "type": "text",
+    "default": "feast_celebrations"
+   },
+   {
+    "name": "p_history_limit",
+    "type": "integer",
+    "default": 20
+   }
+  ]
+ },
+ "public.get_admin_processing_jobs": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_admin_publication_overview": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_admin_review_queue": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_statuses",
+    "type": "text[]",
+    "default": null
+   }
+  ]
+ },
+ "public.get_admin_submission_detail": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_admin_submission_preview_item": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(item_id uuid, submission_id uuid, bucket text, object_path text, content_type text, content_length bigint, original_filename text)",
+  "params": [
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_admin_unused_storage_summary": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_artist_followed": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_bible_books": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(book_key text, book_order integer, testament text, title_english text, title_arabic text, title_coptic text, title_greek text, title_french text, aliases_json jsonb)",
+  "params": []
+ },
+ "public.get_bible_chapter": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(verse_number integer, english text, coptic text, arabic text)",
+  "params": [
+   {
+    "name": "p_book_key",
+    "type": "text"
+   },
+   {
+    "name": "p_chapter_number",
+    "type": "integer"
+   }
+  ]
+ },
+ "public.get_bible_chapter_list": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(chapter_number integer, verse_count integer)",
+  "params": [
+   {
+    "name": "p_book_key",
+    "type": "text"
+   }
+  ]
+ },
+ "public.get_calendar_context": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "json",
+  "params": [
+   {
+    "name": "p_date",
+    "type": "date"
+   }
+  ]
+ },
+ "public.get_calendar_readings": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_date",
+    "type": "date"
+   }
+  ]
+ },
+ "public.get_creator_artist_profile": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_creator_catalog_options": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_creator_credit_options": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_creator_dashboard": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_creator_release": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_creator_releases": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_creator_submission_items": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_creator_workspaces": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_home_synaxarium_events": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_date",
+    "type": "date"
+   }
+  ]
+ },
+ "public.get_inline_hymn": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(line_order double precision, english text, coptic text, arabic text, person_type text, prayer_type text, line_condition text)",
+  "params": [
+   {
+    "name": "p_schema",
+    "type": "text"
+   },
+   {
+    "name": "p_hymn_key",
+    "type": "text"
+   }
+  ]
+ },
+ "public.get_learning_home": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_learning_lyric_editor_items": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_learning_lyric_language_draft": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_item_kind",
+    "type": "learning.playlist_item_kind"
+   },
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text"
+   }
+  ]
+ },
+ "public.get_learning_playlist": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_lyric_editor_tracks": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_media_upload_intent_for_upload": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(upload_intent_id uuid, creator_account_id uuid, bucket text, object_path text, content_type text, content_length bigint, media_type media.media_type, checksum_sha256 text, expires_at timestamp with time zone)",
+  "params": [
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_media_worker_image_context": {
+  "roles": [
+   "anon"
+  ],
+  "returns": "TABLE(is_profile_image boolean)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_upload_intent_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_music_artist_search_art": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_music_home": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_music_playlist": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_music_playlist_share_preview": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_my_content_preferences": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_my_learning_items": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_my_learning_playlists": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_my_learning_progress": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_my_music_library": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_offline_content_changes": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_offline_package_plan": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": []
+ },
+ "public.get_offline_package_registry": {
+  "roles": [],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_snapshot_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_offline_snapshot_rows": {
+  "roles": [],
+  "returns": "TABLE(row_id bigint, row_kind text, schema_name text, object_name text, args_json jsonb, payload jsonb)",
+  "params": [
+   {
+    "name": "p_snapshot_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_resource_key",
+    "type": "text"
+   },
+   {
+    "name": "p_after_row_id",
+    "type": "bigint",
+    "default": 0
+   },
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 1000
+   }
+  ]
+ },
+ "public.get_offline_table_page": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_resource",
+    "type": "text"
+   },
+   {
+    "name": "p_table",
+    "type": "text"
+   },
+   {
+    "name": "p_offset",
+    "type": "integer"
+   },
+   {
+    "name": "p_limit",
+    "type": "integer"
+   }
+  ]
+ },
+ "public.get_offline_table_rows": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_resource",
+    "type": "text"
+   },
+   {
+    "name": "p_table",
+    "type": "text"
+   },
+   {
+    "name": "p_after",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 500
+   }
+  ]
+ },
+ "public.get_published_learning_album": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_album_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_published_learning_cantor": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_cantor_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_published_learning_hymn": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_hymn_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_published_learning_item_lyrics": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_item_kind",
+    "type": "learning.playlist_item_kind"
+   },
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.get_published_learning_lesson_set": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_lesson_set_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_published_learning_season": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_season_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_published_music_artist": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_published_music_release": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_published_music_release_for_locale": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_published_music_track_for_locale": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_published_track_lyrics": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_kind",
+    "type": "music.lyric_kind",
+    "default": null
+   }
+  ]
+ },
+ "public.get_reading_text": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_reading_reference",
+    "type": "text"
+   }
+  ]
+ },
+ "public.get_readings_for_date": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_date",
+    "type": "date"
+   }
+  ]
+ },
+ "public.get_release_liked": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_service": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_schema",
+    "type": "text"
+   },
+   {
+    "name": "p_table",
+    "type": "text"
+   },
+   {
+    "name": "p_date",
+    "type": "date"
+   },
+   {
+    "name": "p_context",
+    "type": "jsonb",
+    "default": {}
+   },
+   {
+    "name": "p_depth",
+    "type": "integer",
+    "default": 0
+   }
+  ]
+ },
+ "public.get_service_rows": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(item_order double precision, hymn_key text, placement_condition text, placement_item_type text, minimization text, title_english text, title_arabic text, line_order double precision, english text, coptic text, arabic text, person_type text, prayer_type text, line_condition text, line_item_type text, inline_hymn_key text)",
+  "params": [
+   {
+    "name": "p_schema",
+    "type": "text"
+   },
+   {
+    "name": "p_table",
+    "type": "text"
+   }
+  ]
+ },
+ "public.get_share_preview": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_path",
+    "type": "text"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.get_storage_gc_candidates": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(bucket text, path text, file_size_bytes bigint, first_unused_at timestamp with time zone, last_seen_at timestamp with time zone)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_due_only",
+    "type": "boolean",
+    "default": true
+   },
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 250
+   }
+  ]
+ },
+ "public.get_submission_editor": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.get_sunday_message": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "text",
+  "params": [
+   {
+    "name": "p_sunday",
+    "type": "date"
+   }
+  ]
+ },
+ "public.get_synaxarium_year": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_reference_date",
+    "type": "date"
+   }
+  ]
+ },
+ "public.get_track_lyric_draft": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text"
+   },
+   {
+    "name": "p_kind",
+    "type": "music.lyric_kind"
+   }
+  ]
+ },
+ "public.get_track_lyric_language_draft": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text"
+   }
+  ]
+ },
+ "public.heartbeat_media_processing_jobs": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, status media.processing_job_status)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_job_ids",
+    "type": "uuid[]"
+   },
+   {
+    "name": "p_progress",
+    "type": "real",
+    "default": null
+   }
+  ]
+ },
+ "public.is_chc_admin": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": []
+ },
+ "public.learning_asset_json": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "a",
+    "type": "media.media_assets"
+   }
+  ]
+ },
+ "public.learning_lesson_title": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "text",
+  "params": [
+   {
+    "name": "p_locale",
+    "type": "text"
+   },
+   {
+    "name": "p_number",
+    "type": "bigint"
+   }
+  ]
+ },
+ "public.media_processing_queue_has_work": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   }
+  ]
+ },
+ "public.prepare_admin_processing_file_deletion": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, upload_intent_id uuid, media_asset_id uuid, related_job_count integer, objects jsonb)",
+  "params": [
+   {
+    "name": "p_job_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.prepare_storage_gc_candidate": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(authorized boolean, database_rows_removed integer)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_bucket",
+    "type": "text"
+   },
+   {
+    "name": "p_path",
+    "type": "text"
+   }
+  ]
+ },
+ "public.publish_learning_album": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_album_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.publish_learning_cantor": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_cantor_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.publish_learning_lesson_set": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_lesson_set_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.publish_learning_lyric_languages": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_item_kind",
+    "type": "learning.playlist_item_kind"
+   },
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_sync_precision",
+    "type": "music.lyric_sync_precision"
+   },
+   {
+    "name": "p_locales",
+    "type": "text[]"
+   }
+  ]
+ },
+ "public.publish_media_submission": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(submission_id uuid, status media.publication_status, published_at timestamp with time zone, published_asset_count integer)",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.publish_music_release": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(release_id uuid, status media.publication_status, published_track_count integer)",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.publish_track_lyric_languages": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locales",
+    "type": "text[]"
+   }
+  ]
+ },
+ "public.publish_track_lyric_languages_v2": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locales",
+    "type": "text[]"
+   },
+   {
+    "name": "p_sync_precision",
+    "type": "music.lyric_sync_precision",
+    "default": "line"
+   }
+  ]
+ },
+ "public.publish_track_lyric_set": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(lyric_set_id uuid, status media.publication_status, line_count integer, sync_precision music.lyric_sync_precision)",
+  "params": [
+   {
+    "name": "p_lyric_set_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.record_music_play": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_release_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "public.register_notification_device": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "uuid",
+  "params": [
+   {
+    "name": "p_app_key",
+    "type": "text"
+   },
+   {
+    "name": "p_platform",
+    "type": "text"
+   },
+   {
+    "name": "p_provider",
+    "type": "text"
+   },
+   {
+    "name": "p_push_token",
+    "type": "text"
+   },
+   {
+    "name": "p_provider_data",
+    "type": "jsonb",
+    "default": {}
+   },
+   {
+    "name": "p_device_name",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_app_version",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.release_media_processing_jobs": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_job_ids",
+    "type": "uuid[]"
+   },
+   {
+    "name": "p_reason",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.remove_learning_playlist_item": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.remove_track_from_music_playlist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.renumber_item_order": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "schema_name",
+    "type": "text"
+   },
+   {
+    "name": "table_name",
+    "type": "text"
+   }
+  ]
+ },
+ "public.renumber_line_id": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "schema_name",
+    "type": "text"
+   },
+   {
+    "name": "table_name",
+    "type": "text"
+   }
+  ]
+ },
+ "public.renumber_line_order": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "schema_name",
+    "type": "text"
+   },
+   {
+    "name": "table_name",
+    "type": "text"
+   }
+  ]
+ },
+ "public.resolve_subdocument_target": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(schema_name text, table_name text)",
+  "params": [
+   {
+    "name": "p_hymn_key",
+    "type": "text"
+   }
+  ]
+ },
+ "public.retry_media_processing_job": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(job_id uuid, status media.processing_job_status, available_at timestamp with time zone, attempt_count integer, max_attempts integer)",
+  "params": [
+   {
+    "name": "p_job_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.review_media_submission": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(submission_id uuid, status media.publication_status, review_due_at timestamp with time zone, processing_jobs_queued integer)",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_action",
+    "type": "text"
+   },
+   {
+    "name": "p_notes",
+    "type": "text",
+    "default": null
+   }
+  ]
+ },
+ "public.rls_auto_enable": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "event_trigger",
+  "params": []
+ },
+ "public.save_learning_lyric_studio_draft": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_item_kind",
+    "type": "learning.playlist_item_kind"
+   },
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_sync_precision",
+    "type": "music.lyric_sync_precision"
+   },
+   {
+    "name": "p_languages",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.save_my_content_preferences": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_preferences",
+    "type": "jsonb"
+   },
+   {
+    "name": "p_bookmarks",
+    "type": "text[]",
+    "default": []
+   }
+  ]
+ },
+ "public.save_submission_edit": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_edit",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.save_track_lyric_draft": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text"
+   },
+   {
+    "name": "p_kind",
+    "type": "music.lyric_kind"
+   },
+   {
+    "name": "p_sync_precision",
+    "type": "music.lyric_sync_precision"
+   },
+   {
+    "name": "p_title",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_source",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_lines",
+    "type": "jsonb",
+    "default": []
+   }
+  ]
+ },
+ "public.save_track_lyric_language_draft": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_locale",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_lines",
+    "type": "jsonb",
+    "default": []
+   }
+  ]
+ },
+ "public.save_track_lyric_studio_draft": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_languages",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.save_track_lyric_studio_draft_v2": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_sync_precision",
+    "type": "music.lyric_sync_precision"
+   },
+   {
+    "name": "p_languages",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.search_creator_contributors": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_query",
+    "type": "text"
+   },
+   {
+    "name": "p_kind",
+    "type": "text",
+    "default": "artist"
+   },
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 12
+   }
+  ]
+ },
+ "public.search_media_catalog": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_query",
+    "type": "text"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   },
+   {
+    "name": "p_scope",
+    "type": "text",
+    "default": "all"
+   },
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 60
+   }
+  ]
+ },
+ "public.search_published_music": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_query",
+    "type": "text"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   }
+  ]
+ },
+ "public.search_section_catalog": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_query",
+    "type": "text"
+   },
+   {
+    "name": "p_locale",
+    "type": "text",
+    "default": "en"
+   },
+   {
+    "name": "p_section",
+    "type": "text",
+    "default": "music"
+   },
+   {
+    "name": "p_limit",
+    "type": "integer",
+    "default": 48
+   }
+  ]
+ },
+ "public.set_artist_followed": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_followed",
+    "type": "boolean"
+   }
+  ]
+ },
+ "public.set_learning_item_liked": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_item_kind",
+    "type": "learning.playlist_item_kind"
+   },
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_liked",
+    "type": "boolean"
+   }
+  ]
+ },
+ "public.set_learning_item_progress": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_item_kind",
+    "type": "learning.playlist_item_kind"
+   },
+   {
+    "name": "p_item_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_state",
+    "type": "learning.progress_state"
+   }
+  ]
+ },
+ "public.set_learning_progress": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_hymn_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_state",
+    "type": "learning.progress_state"
+   }
+  ]
+ },
+ "public.set_music_playlist_cover": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.set_music_playlist_track_order": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_track_ids",
+    "type": "uuid[]"
+   }
+  ]
+ },
+ "public.set_release_liked": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_liked",
+    "type": "boolean"
+   }
+  ]
+ },
+ "public.set_track_liked": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_track_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_liked",
+    "type": "boolean"
+   }
+  ]
+ },
+ "public.skip_media_processing_job": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "integer",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_job_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_reason",
+    "type": "text"
+   }
+  ]
+ },
+ "public.submit_media_submission": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "TABLE(submission_id uuid, status media.publication_status, submitted_at timestamp with time zone, review_due_at timestamp with time zone)",
+  "params": [
+   {
+    "name": "p_submission_id",
+    "type": "uuid"
+   }
+  ]
+ },
+ "public.sync_storage_gc_candidates": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "TABLE(scanned_count integer, candidate_count integer, due_count integer)",
+  "params": [
+   {
+    "name": "p_worker_token",
+    "type": "text"
+   },
+   {
+    "name": "p_objects",
+    "type": "jsonb"
+   }
+  ]
+ },
+ "public.to_coptic_numeral": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "text",
+  "params": [
+   {
+    "name": "n",
+    "type": "integer"
+   }
+  ]
+ },
+ "public.update_admin_artist_profile": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_artist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_display_name",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_biography",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_social_links",
+    "type": "jsonb",
+    "default": null
+   },
+   {
+    "name": "p_profile_image_upload_intent_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "public.update_creator_artist_profile": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_creator_account_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_display_name",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_sort_name",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_biography",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_social_links",
+    "type": "jsonb",
+    "default": null
+   },
+   {
+    "name": "p_pinned_release_ids",
+    "type": "uuid[]",
+    "default": null
+   },
+   {
+    "name": "p_profile_image_upload_intent_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "public.update_creator_release": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_title",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_scheduled_release_at",
+    "type": "timestamp with time zone",
+    "default": null
+   },
+   {
+    "name": "p_original_release_date",
+    "type": "date",
+    "default": null
+   },
+   {
+    "name": "p_clear_original_release_date",
+    "type": "boolean",
+    "default": false
+   },
+   {
+    "name": "p_localized_titles",
+    "type": "jsonb",
+    "default": null
+   },
+   {
+    "name": "p_tracks",
+    "type": "jsonb",
+    "default": null
+   },
+   {
+    "name": "p_cover_upload_intent_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "public.update_creator_release_metadata": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "void",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_music_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_recording_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_localized_titles",
+    "type": "jsonb",
+    "default": null
+   }
+  ]
+ },
+ "public.update_creator_release_v2": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_title",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_scheduled_release_at",
+    "type": "timestamp with time zone",
+    "default": null
+   },
+   {
+    "name": "p_original_release_date",
+    "type": "date",
+    "default": null
+   },
+   {
+    "name": "p_clear_original_release_date",
+    "type": "boolean",
+    "default": false
+   },
+   {
+    "name": "p_localized_titles",
+    "type": "jsonb",
+    "default": null
+   },
+   {
+    "name": "p_music_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_recording_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_tracks",
+    "type": "jsonb",
+    "default": null
+   },
+   {
+    "name": "p_cover_upload_intent_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "public.update_creator_release_v3": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_release_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_title",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_release_timing_mode",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_scheduled_release_at",
+    "type": "timestamp with time zone",
+    "default": null
+   },
+   {
+    "name": "p_original_release_date",
+    "type": "date",
+    "default": null
+   },
+   {
+    "name": "p_clear_original_release_date",
+    "type": "boolean",
+    "default": false
+   },
+   {
+    "name": "p_localized_titles",
+    "type": "jsonb",
+    "default": null
+   },
+   {
+    "name": "p_music_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_recording_type",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_tracks",
+    "type": "jsonb",
+    "default": null
+   },
+   {
+    "name": "p_cover_upload_intent_id",
+    "type": "uuid",
+    "default": null
+   }
+  ]
+ },
+ "public.update_learning_playlist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "jsonb",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_name",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_visibility",
+    "type": "learning.playlist_visibility",
+    "default": "private"
+   }
+  ]
+ },
+ "public.update_music_playlist": {
+  "roles": [
+   "authenticated"
+  ],
+  "returns": "boolean",
+  "params": [
+   {
+    "name": "p_playlist_id",
+    "type": "uuid"
+   },
+   {
+    "name": "p_name",
+    "type": "text"
+   },
+   {
+    "name": "p_description",
+    "type": "text",
+    "default": null
+   },
+   {
+    "name": "p_visibility",
+    "type": "music.playlist_visibility",
+    "default": "private"
+   }
+  ]
+ },
+ "public.veneration_validate_hymn_key": {
+  "roles": [
+   "anon",
+   "authenticated"
+  ],
+  "returns": "trigger",
+  "params": []
+ }
+}
