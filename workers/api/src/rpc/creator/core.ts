@@ -103,7 +103,8 @@ export async function addEvent(tx: Tx, submissionId: unknown, actor: unknown, ac
 const outputPath = (account: unknown, intent: unknown, jobType: string) =>
   `processed/${account}/${intent}/v1/${jobType === 'audio_delivery' ? 'audio.m4a' : jobType === 'video_delivery' ? 'video.mp4' : jobType === 'image_delivery' ? 'cover.jpg' : 'metadata.json'}`;
 
-const SKIPPED = (job: string) => `(${job}.${col('status')} = 'cancelled' AND coalesce(${job}.${col('error_message')}, '') GLOB 'No audio track*')`;
+/** private.media_job_skipped_for_silence: a video's audio job cancelled because it has no sound. */
+export const SKIPPED = (job: string) => `(${job}.${col('status')} = 'cancelled' AND coalesce(${job}.${col('error_message')}, '') GLOB 'No audio track*')`;
 
 /** public.enqueue_media_processing_job: a delivery job for an upload, or the failed one again; a video's audio-only job with it. */
 export async function enqueueJob(ctx: ApiContext, tx: Tx, intentId: string | null, jobType: string | null, outputBucket: string | null): Promise<Row> {

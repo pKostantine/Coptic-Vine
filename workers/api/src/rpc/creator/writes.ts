@@ -134,7 +134,7 @@ const PLATFORM_URLS: [string, RegExp, string][] = [
 ];
 
 /** private.replace_artist_social_links: the links checked and saved in order (a platform once). */
-async function replaceSocialLinks(tx: Tx, artistId: unknown, links: unknown): Promise<void> {
+export async function replaceSocialLinks(tx: Tx, artistId: unknown, links: unknown): Promise<void> {
   if (!Array.isArray(links)) raise('Social links must be a list', '22023');
   const LINKS = t('music', 'artist_social_links');
   await tx.run(`DELETE FROM ${LINKS} WHERE ${col('artist_id')} = ?`, artistId);
@@ -189,15 +189,19 @@ export async function updateCreatorArtistProfile(ctx: ApiContext, a: {
     if (a.profileIntent != null) {
       const intent = await tx.first(`SELECT * FROM ${t('media', 'upload_intents')} WHERE ${col('id')} = ?`, a.profileIntent);
       if (!intent || intent.creator_account_id !== a.accountId) raise('Profile picture upload not found for this account', 'P0002');
-      // private.queue_artist_profile_image
-      if (intent!.media_type !== 'image') raise('A profile picture must be an image', '22023');
-      await enqueueJob(ctx, tx, a.profileIntent, 'image_delivery', 'chc-images');
-      const artist = (await tx.first(`SELECT ${col('metadata')} FROM ${ARTISTS} WHERE ${col('id')} = ?`, artistId))!;
-      const metadata = { ...(JSON.parse((artist.metadata as string) ?? '{}') as Row), pendingProfileImageUploadIntentId: a.profileIntent };
-      await tx.run(`UPDATE ${ARTISTS} SET ${col('metadata')} = ?, ${col('updated_by')} = ?, ${col('updated_at')} = ? WHERE ${col('id')} = ?`, jsonbText(metadata), userId, tx.at, artistId);
+      await queueProfileImage(ctx, tx, artistId, intent!, userId);
     }
   });
   return getCreatorArtistProfile(ctx, a.accountId);
+}
+
+/** private.queue_artist_profile_image, for an upload the caller found: its image job queued, and the artist waiting for it. */
+export async function queueProfileImage(ctx: ApiContext, tx: Tx, artistId: unknown, intent: Row, actor: unknown): Promise<void> {
+  if (intent.media_type !== 'image') raise('A profile picture must be an image', '22023');
+  await enqueueJob(ctx, tx, intent.id as string, 'image_delivery', 'chc-images');
+  const artist = (await tx.first(`SELECT ${col('metadata')} FROM ${ARTISTS} WHERE ${col('id')} = ?`, artistId))!;
+  const metadata = { ...(JSON.parse((artist.metadata as string) ?? '{}') as Row), pendingProfileImageUploadIntentId: intent.id };
+  await tx.run(`UPDATE ${ARTISTS} SET ${col('metadata')} = ?, ${col('updated_by')} = ?, ${col('updated_at')} = ? WHERE ${col('id')} = ?`, jsonbText(metadata), actor, tx.at, artistId);
 }
 
 export async function enqueueMediaProcessingJob(ctx: ApiContext, intentId: string | null, jobType: string | null, outputBucket: string | null): Promise<unknown> {
