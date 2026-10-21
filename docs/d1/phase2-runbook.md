@@ -333,8 +333,12 @@ in `workers/api`. See `src/services/userApi.ts`.
   locally (`EMAIL_MODE=outbox`), so try sign-up with Google or an imported
   user.
 
-CV-Admin and CV-Artists, in their own repositories, need the same switch
-before the cutover.
+**CV-Admin and CV-Artists** have the same switch, with a copy of
+`cvApiAuth.ts` kept identical (pKostantine/CV-Admin#10,
+pKostantine/CV-Artists#21). Their web apps keep a bearer token as well as the
+cookie (the `bearer` option): they hand the session to the media processor's
+admin routes and to the upload authorizer. CV-Artists reads Google's link back
+on any page, because Google returns to the page it left.
 
 ## The other Workers
 
@@ -351,6 +355,79 @@ the cutover each points at `https://api.copticvine.ca`:
 `cv-api` itself wakes the media processor after a job is queued
 (`MEDIA_PROCESSOR_URL`), where `pg_net` did.
 
+## Cutover (step 7)
+
+There are four users, so this is a short freeze. Everyone signs in again once
+afterwards, because sessions aren't copied. The apps write to D1 from step 5
+on the day.
+
+**Beforehand, with no downtime:**
+
+1. **Sign-in prerequisites:** the email domain, Google's redirect URIs and
+   `GOOGLE_CLIENT_SECRET`. See "Before the cutover, Pierre" under Sign-in.
+2. **The R2 bucket:** `npx wrangler r2 bucket create cv-user-media`.
+3. **The remote D1's migrations.** In `workers/api`, run
+   `npx wrangler d1 migrations apply copticvine --remote`. This applies `0009`,
+   `0010` and any later migration (the one history in
+   `workers/content-api/migrations`).
+4. **cv-api's secrets,** each with `npx wrangler secret put <NAME>` in
+   `workers/api`:
+   - `BETTER_AUTH_SECRET`: `openssl rand -base64 32`.
+   - `SERVICE_TOKEN`: `openssl rand -base64 32`. Keep it for the notification
+     dispatcher in step 6.
+   - `GOOGLE_CLIENT_SECRET`, if it isn't set yet.
+
+**On the day:**
+
+1. **Tell the four users.** Supabase needs no freeze of its own: once the apps
+   and Workers point elsewhere, nothing that matters writes to it. Its two
+   pg_cron jobs may go on publishing into the old copy, which nobody reads any
+   more.
+2. **The final copy.** Follow "Copying the user data": `export-sql`, `import`,
+   then `verify`. Every checksum has to match. Delete the export once it is
+   loaded.
+3. **cv-api goes live.**
+   - Run `npm run deploy` in `workers/api`.
+   - `https://api.copticvine.ca/health` should answer `{"ok":true}`.
+4. **The files.** Run `npm run move-storage` in `workers/api`; `--dry-run`
+   first shows the plan. It comes after `verify`, because it rewrites the
+   photo and cover addresses that the checksums compare.
+5. **Coptic Vine:**
+   - In `.env`, set `EXPO_PUBLIC_USER_DATA_SOURCE=cloudflare` and merge. The
+     web app deploys on merge.
+   - For the phones, run `eas update --channel production`.
+     `runtimeVersion` follows the app version, so the installed builds take
+     it. An install picks the update up on one launch and runs it on the next.
+6. **The other Workers.** Point each one at `https://api.copticvine.ca` (see
+   "The other Workers"), then deploy it:
+   - `cv-media-processor` and `cv-upload-authorizer`: `SUPABASE_URL` in their
+     `wrangler.jsonc`.
+   - `cv-notification-dispatcher`: `SUPABASE_URL`, and the
+     `SUPABASE_SERVICE_ROLE_KEY` secret set to cv-api's `SERVICE_TOKEN`.
+   - `coptic-vine` (the link previews): `DATA_API_URL` under `vars` in the
+     root `wrangler.jsonc`.
+7. **CV-Admin and CV-Artists.**
+   - For each Worker (`cv-admin`, `cv-artists`), go to Settings > Build >
+     Variables and secrets. Set `EXPO_PUBLIC_USER_DATA_SOURCE=cloudflare`,
+     then retry the latest build.
+   - Their phone builds, if any, take it with `eas update`.
+8. **Check every app, signed in again:**
+   - **Coptic Vine:** sign in, like a track, change the profile photo, and
+     follow an artist.
+   - **CV-Admin:** open a submission's preview.
+   - **CV-Artists:** upload a file.
+   - **Each app:** sign in with Google, and use a password reset link.
+
+**Afterwards:**
+
+- Supabase stays as it is, unused, for 30 days as the fallback. A phone that
+  hasn't run the update yet still signs in and writes there, and none of that
+  is carried over. So ask the four users to open the app twice.
+- Going back means flipping the switches back: the apps' source and the
+  Workers' `SUPABASE_URL`. Anything written to D1 since would then be missing
+  from Supabase, so it only makes sense in the first hours.
+- Then Supabase is retired, once Pierre confirms nothing reads it.
+
 ## Status
 
 | Step | State |
@@ -361,4 +438,4 @@ the cutover each points at `https://api.copticvine.ca`:
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
 | 5. API (~134 functions, 6 tables) | Done (see below): the six tables and every function. Nothing is deployed until the cutover. |
 | 6. Jobs, storage and Workers that call Supabase | Done in code (see "Storage" and "The other Workers" below); nothing switches until the cutover. |
-| 7. Cutover | Not started. The Coptic Vine app can switch (see "The Coptic Vine app's switch"); CV-Admin and CV-Artists still need theirs. Apply `0009`, `0010` (and any later migration) to the remote D1 before the final import. |
+| 7. Cutover | Ready to run (see "Cutover (step 7)"). All three apps can switch to cv-api; Supabase stays their default until then. |
