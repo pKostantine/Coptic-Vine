@@ -57,6 +57,16 @@ export function storagePlan(users: { id: string; image: string | null; raw_user_
   return { copies: [...copies.values()], sql };
 }
 
+/** Whether Supabase's answer says the object isn't there. */
+export function missingObject(status: number, answer: string): boolean {
+  if (status === 404) return true;
+  try {
+    return status === 400 && (JSON.parse(answer) as { statusCode?: unknown }).statusCode === '404';
+  } catch {
+    return false;
+  }
+}
+
 function r2Put(target: Target, key: string, file: string, contentType: string): void {
   const result = spawnSync('npx', ['wrangler', 'r2', 'object', 'put', `${R2_BUCKET}/${key}`, '--file', file, '--content-type', contentType, `--${target}`], {
     cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
@@ -80,7 +90,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     for (const copy of plan.copies) {
       const response = await fetch(copy.from);
-      if (!response.ok) throw new Error(`${copy.from}: ${response.status}`);
+      if (!response.ok) {
+        const answer = await response.text();
+        // Gone from Supabase already (a cleared playlist cover keeps its archived row): nothing to
+        // copy, and its address is still rewritten, to answer the same 404 from cv-api. Supabase
+        // answers a missing object with a 400 whose statusCode is "404".
+        if (!missingObject(response.status, answer)) throw new Error(`${copy.from}: ${response.status} ${answer.slice(0, 200)}`);
+        console.warn(`  missing on Supabase, not copied: ${copy.from}`);
+        continue;
+      }
       const file = join(dir, 'object');
       writeFileSync(file, new Uint8Array(await response.arrayBuffer()));
       r2Put(target, copy.key, file, response.headers.get('content-type') ?? 'application/octet-stream');

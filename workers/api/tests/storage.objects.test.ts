@@ -73,6 +73,35 @@ test('uploads: the user\'s own avatar folder, their own playlists\' covers; JPEG
   assert.equal((await worker.fetch(null, 'GET', '/storage/v1/object/public/profile-avatars/nobody/avatar')).status, 404);
 });
 
+test('an upload is refused at its declared size unread, and a stream is read no further than the limit', async () => {
+  const MB = 1024 * 1024;
+  /** An endless body, counting what was read of it. */
+  const endless = () => {
+    const stream = { pulled: 0, body: null as unknown as ReadableStream };
+    stream.body = new ReadableStream({ pull(controller) { stream.pulled += 1; controller.enqueue(png(MB)); } });
+    return stream;
+  };
+  const declared = endless();
+  const refused = await worker.fetch(ALICE, 'POST', `/storage/v1/object/profile-avatars/${ALICE}/declared`, { body: declared.body, headers: { 'content-type': 'image/png', 'content-length': String(6 * MB) } });
+  assert.equal(refused.status, 413);
+  assert.ok(declared.pulled <= 1, `read ${declared.pulled} MB of a body declared too large`);
+  const undeclared = endless();
+  assert.equal((await worker.fetch(ALICE, 'POST', `/storage/v1/object/profile-avatars/${ALICE}/streamed`, { body: undeclared.body, headers: { 'content-type': 'image/png' } })).status, 413);
+  assert.ok(undeclared.pulled <= 7, `read ${undeclared.pulled} MB of an endless body`);
+  // A form's boundary is case-sensitive.
+  const boundary = 'CvBoundaryAbC123';
+  const text = (s: string) => new TextEncoder().encode(s);
+  const parts = [text(`--${boundary}\r\nContent-Disposition: form-data; name="cacheControl"\r\n\r\n60\r\n--${boundary}\r\nContent-Disposition: form-data; name=""; filename="blob"\r\nContent-Type: image/png\r\n\r\n`), png(50), text(`\r\n--${boundary}--\r\n`)];
+  const form = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  parts.reduce((offset, p) => (form.set(p, offset), offset + p.length), 0);
+  assert.equal((await worker.fetch(ALICE, 'POST', `/storage/v1/object/profile-avatars/${ALICE}/form`, { body: form, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } })).status, 200);
+  const stored = await worker.fetch(null, 'HEAD', `/storage/v1/object/public/profile-avatars/${ALICE}/form`);
+  assert.deepEqual([stored.status, stored.headers.get('content-length'), stored.headers.get('cache-control')], [200, '50', 'max-age=60']);
+  // A malformed escape is a refusal, not a crash.
+  assert.equal((await worker.fetch(null, 'GET', '/storage/v1/object/public/profile-avatars/%E0%A4%A')).status, 404);
+  assert.equal((await upload(ALICE, 'profile-avatars', `${ALICE}/%E0%A4%A`, png(10))).status, 400);
+});
+
 test('removing: only what the user may delete, and is there', async () => {
   const removed = await worker.fetch(ALICE, 'DELETE', '/storage/v1/object/profile-avatars', {
     body: JSON.stringify({ prefixes: [`${ALICE}/avatar`, `${BOB}/avatar`, `${ALICE}/missing`] }), headers: { 'content-type': 'application/json' },

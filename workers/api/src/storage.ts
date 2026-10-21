@@ -41,16 +41,63 @@ async function mayWrite(env: Env, userId: string, bucket: string, path: string):
   return Boolean(playlist);
 }
 
-/** The uploaded file and its type, from a raw body or supabase-js's multipart form. */
-async function uploaded(request: Request): Promise<{ bytes: ArrayBuffer; type: string; cacheControl: string | null }> {
-  const contentType = (request.headers.get('content-type') ?? '').toLowerCase();
-  if (contentType.startsWith('multipart/form-data')) {
-    const form = await request.formData();
+/** Room for a form's boundaries and fields around the file, on top of the bucket's limit. */
+const FORM_SLACK = 64 * 1024;
+
+/**
+ * The body, or null once it is longer than limit: a declared length is refused
+ * before reading, and the stream is read no further than the limit, as
+ * Supabase stopped an upload while it was still streaming.
+ */
+async function readCapped(request: Request, limit: number): Promise<Uint8Array<ArrayBuffer> | null> {
+  if (Number(request.headers.get('content-length')) > limit) return null;
+  if (!request.body) return new Uint8Array(0);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = request.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+/** The uploaded file and its type, from a raw body or supabase-js's multipart form; null when too large. */
+async function uploaded(request: Request, maxBytes: number): Promise<{ bytes: Uint8Array<ArrayBuffer>; type: string; cacheControl: string | null } | null> {
+  const header = request.headers.get('content-type') ?? '';
+  const contentType = header.toLowerCase();
+  const multipart = contentType.startsWith('multipart/form-data');
+  const body = await readCapped(request, maxBytes + (multipart ? FORM_SLACK : 0));
+  if (!body) return null;
+  if (multipart) {
+    // The boundary is case-sensitive: the header as sent.
+    const form = await new Response(body, { headers: { 'content-type': header } }).formData();
     const file = [...form.values()].find((value) => typeof value !== 'string') as Blob | undefined;
     const cache = form.get('cacheControl');
-    return { bytes: file ? await file.arrayBuffer() : new ArrayBuffer(0), type: (file?.type ?? '').toLowerCase(), cacheControl: typeof cache === 'string' ? `max-age=${cache}` : null };
+    return { bytes: new Uint8Array(file ? await file.arrayBuffer() : new ArrayBuffer(0)), type: (file?.type ?? '').toLowerCase(), cacheControl: typeof cache === 'string' ? `max-age=${cache}` : null };
   }
-  return { bytes: await request.arrayBuffer(), type: contentType.split(';')[0].trim(), cacheControl: request.headers.get('cache-control') };
+  return { bytes: body, type: contentType.split(';')[0].trim(), cacheControl: request.headers.get('cache-control') };
+}
+
+/** A path's percent-decoding, or null for a malformed one ("%E0%A4%A"). */
+function decoded(path: string): string | null {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return null;
+  }
 }
 
 export async function storageRequest(request: Request, url: URL, env: Env, userId: string | null): Promise<Response> {
@@ -61,7 +108,8 @@ export async function storageRequest(request: Request, url: URL, env: Env, userI
   const reading = /^object\/public\/([^/]+)\/(.+)$/.exec(route);
   if (reading && (request.method === 'GET' || request.method === 'HEAD')) {
     const [, bucket, path] = reading;
-    const key = BUCKETS[bucket] ? objectKey(bucket, decodeURIComponent(path)) : null;
+    const name = decoded(path);
+    const key = BUCKETS[bucket] && name != null ? objectKey(bucket, name) : null;
     const object = key ? await bucketStore.get(key) : null;
     if (!object) return failure(404, 'not_found', 'Object not found');
     const headers = {
@@ -78,10 +126,12 @@ export async function storageRequest(request: Request, url: URL, env: Env, userI
     const [, bucket, rawPath] = writing;
     const rules = BUCKETS[bucket];
     if (!rules) return failure(404, 'Bucket not found', 'Bucket not found');
-    const path = decodeURIComponent(rawPath);
+    const path = decoded(rawPath);
+    if (path == null) return failure(400, 'InvalidKey', 'Invalid key');
     const key = objectKey(bucket, path);
     if (!userId || !key || !(await mayWrite(env, userId, bucket, path))) return denied();
-    const file = await uploaded(request);
+    const file = await uploaded(request, rules.maxBytes);
+    if (!file) return failure(413, 'Payload too large', 'The object exceeded the maximum allowed size');
     if (!rules.types.includes(file.type)) return failure(415, 'invalid_mime_type', `mime type ${file.type || 'unknown'} is not supported`);
     if (file.bytes.byteLength > rules.maxBytes) return failure(413, 'Payload too large', 'The object exceeded the maximum allowed size');
     // POST makes a new object unless x-upsert says to replace it; PUT replaces one.

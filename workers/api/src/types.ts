@@ -43,7 +43,7 @@ export interface R2ObjectBody extends R2Object {
 export interface R2Bucket {
   head(key: string): Promise<R2Object | null>;
   get(key: string): Promise<R2ObjectBody | null>;
-  put(key: string, value: ArrayBuffer | ReadableStream | string, options?: { httpMetadata?: { contentType?: string; cacheControl?: string }; customMetadata?: Record<string, string> }): Promise<R2Object>;
+  put(key: string, value: ArrayBuffer | ArrayBufferView<ArrayBuffer> | ReadableStream | string, options?: { httpMetadata?: { contentType?: string; cacheControl?: string }; customMetadata?: Record<string, string> }): Promise<R2Object>;
   delete(keys: string | string[]): Promise<void>;
 }
 
