@@ -124,17 +124,18 @@ export async function createOracle(options: OracleOptions = {}): Promise<Oracle>
   for (const grant of grants) await pg.exec(grant).catch(() => undefined);
   if (options.privateUsage) await pg.exec('grant usage on schema private to authenticated');
 
-  const shapes = new Map<string, { retset: boolean; scalar: boolean; isVoid: boolean; arrays: Set<string> }>();
+  const shapes = new Map<string, { retset: boolean; scalar: boolean; isVoid: boolean; arrays: Set<string>; json: Set<string> }>();
   const shape = async (schema: string, fn: string) => {
     const key = `${schema}.${fn}`;
     if (!shapes.has(key)) {
-      const rows = (await pg.query<{ retset: boolean; typtype: string; typname: string; arrays: string[] | null }>(
+      const rows = (await pg.query<{ retset: boolean; typtype: string; typname: string; arrays: string[] | null; json: string[] | null }>(
         `select p.proretset as retset, t.typtype, t.typname,
-           (select array_agg(name) from unnest(p.proargnames, p.proargtypes::oid[]) a(name, type) join pg_type at on at.oid = a.type where at.typcategory = 'A') as arrays
+           (select array_agg(name) from unnest(p.proargnames, p.proargtypes::oid[]) a(name, type) join pg_type at on at.oid = a.type where at.typcategory = 'A') as arrays,
+           (select array_agg(name) from unnest(p.proargnames, p.proargtypes::oid[]) a(name, type) join pg_type at on at.oid = a.type where at.typname in ('json', 'jsonb')) as json
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace join pg_type t on t.oid = p.prorettype where n.nspname = $1 and p.proname = $2 limit 1`, [schema, fn])).rows;
       if (!rows.length) throw new Error(`No function ${key}`);
-      const { retset, typtype, typname, arrays } = rows[0];
-      shapes.set(key, { retset, scalar: typtype !== 'c' && typname !== 'record', isVoid: typname === 'void', arrays: new Set(arrays ?? []) });
+      const { retset, typtype, typname, arrays, json } = rows[0];
+      shapes.set(key, { retset, scalar: typtype !== 'c' && typname !== 'record', isVoid: typname === 'void', arrays: new Set(arrays ?? []), json: new Set(json ?? []) });
     }
     return shapes.get(key)!;
   };
@@ -143,7 +144,7 @@ export async function createOracle(options: OracleOptions = {}): Promise<Oracle>
     pg,
     failures,
     async call(user, fn, args = {}, schema = 'public') {
-      const { retset, scalar, isVoid, arrays } = await shape(schema, fn);
+      const { retset, scalar, isVoid, arrays, json } = await shape(schema, fn);
       const names = Object.keys(args);
       const call = `${JSON.stringify(schema)}.${JSON.stringify(fn)}(${names.map((name, i) => `${JSON.stringify(name)} := $${i + 1}`).join(', ')})`;
       // As PostgREST: the whole answer is built as JSON by Postgres.
@@ -156,8 +157,9 @@ export async function createOracle(options: OracleOptions = {}): Promise<Oracle>
       try {
         const result = await pg.transaction(async (tx) => {
           await tx.query(`select set_config('role', $1, true), set_config('request.jwt.claim.sub', $2, true), set_config('request.jwt.claim.role', $1, true), set_config('request.jwt.claims', $3, true)`, [role, user ?? '', claims]);
-          // As PostgREST: a JSON list for an array parameter becomes a Postgres array; other objects are json.
-          const values = names.map((name) => (args[name] !== null && typeof args[name] === 'object' && !(arrays.has(name) && Array.isArray(args[name])) ? JSON.stringify(args[name]) : args[name]));
+          // As PostgREST: a JSON list for an array parameter becomes a Postgres array; a json or jsonb
+          // parameter takes the JSON value itself (a string stays a JSON string); other objects are json.
+          const values = names.map((name) => (args[name] !== null && (json.has(name) || (typeof args[name] === 'object' && !(arrays.has(name) && Array.isArray(args[name])))) ? JSON.stringify(args[name]) : args[name]));
           return (await tx.query<{ result: unknown }>(query, values)).rows[0].result;
         });
         let data = result;
