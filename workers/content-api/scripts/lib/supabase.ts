@@ -2,15 +2,21 @@
  * Reads Supabase through its REST API, read-only: GET requests with the
  * app's public anon key, so nothing here can write, whatever it asks for. A
  * table anon can't read needs SUPABASE_SERVICE_ROLE_KEY (still only GETs).
+ * Phase 1's copy only: D1 is the content master, and the repository's .env no
+ * longer holds Supabase's address or key, so they are given in the environment
+ * when this is run, and read only then (the tests load these scripts).
  */
 import { loadEnv } from './env.ts';
 import type { TableInfo } from './schema.ts';
 
-const env = loadEnv();
-export const SUPABASE_URL = env('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
-const ANON_KEY = env('EXPO_PUBLIC_SUPABASE_ANON_KEY');
-const SERVICE_KEY = env('SUPABASE_SERVICE_ROLE_KEY');
-if (!SUPABASE_URL || !ANON_KEY) throw new Error('EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are needed (from the repository .env).');
+/** Supabase's address and keys, from the environment, when a read needs them. */
+function source(): { url: string; anonKey: string; serviceKey: string } {
+  const env = loadEnv();
+  const url = env('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
+  const anonKey = env('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  if (!url || !anonKey) throw new Error('EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are needed in the environment.');
+  return { url, anonKey, serviceKey: env('SUPABASE_SERVICE_ROLE_KEY') };
+}
 
 const PAGE = 1000; // PostgREST's max-rows on this project
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,7 +28,7 @@ async function get(path: string, schema: string, key: string, headers: Record<st
   for (let attempt = 0; ; attempt += 1) {
     let response: Response;
     try {
-      response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      response = await fetch(`${source().url}/rest/v1/${path}`, {
         // Accept-Profile picks the schema; without it PostgREST looks in
         // graphql_public first on this project and finds nothing.
         headers: { apikey: key, authorization: `Bearer ${key}`, 'accept-profile': schema, ...headers },
@@ -56,7 +62,8 @@ export type SourceRow = Record<string, unknown>;
 
 /** Every row of a table, in row-key order, a page at a time; the page count is checked against Postgres's own count. */
 export async function readTable(table: TableInfo): Promise<SourceRow[]> {
-  const key = table.public || !SERVICE_KEY ? ANON_KEY : SERVICE_KEY;
+  const { anonKey, serviceKey } = source();
+  const key = table.public || !serviceKey ? anonKey : serviceKey;
   const order = table.rowKey.map((name) => `${name}.asc`).join(',');
   const rows: SourceRow[] = [];
   let total: number | null = null;
