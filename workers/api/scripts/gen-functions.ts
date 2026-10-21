@@ -16,7 +16,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export type Param = { name: string; type: string; default?: unknown };
+export type Param = { name: string; type: string; default?: unknown; /** An enum parameter's values, from its schema-qualified type. */ enum?: string[] };
 export type FunctionInfo = { roles: string[]; returns: string; params: Param[] };
 
 const root = new URL('..', import.meta.url);
@@ -63,6 +63,10 @@ export function parseDefault(expression: string, type: string): unknown {
 
 export function functionInfo(dump: string): Record<string, FunctionInfo> {
   const out: Record<string, FunctionInfo> = {};
+  const enums = new Map<string, string[]>();
+  for (const match of dump.matchAll(/^create type ([a-z_]+\.[a-z_]+) as enum \((.*)\);$/gm)) {
+    enums.set(match[1], [...match[2].matchAll(/'((?:[^']|'')*)'/g)].map((value) => value[1].replaceAll("''", "'")));
+  }
   const roles: Record<string, Set<string>> = {};
   for (const match of dump.matchAll(/^grant execute on function ([a-z_]+)\.([a-z_0-9]+)\(.*\) to ([a-z_]+);$/gm)) {
     (roles[`${match[1]}.${match[2]}`] ??= new Set()).add(match[3]);
@@ -78,6 +82,8 @@ export function functionInfo(dump: string): Record<string, FunctionInfo> {
       if (!paramName) throw new Error(`${key}: unparsed parameter ${part}`);
       const [type, defaultExpression] = rest.split(' DEFAULT ');
       const param: Param = { name: paramName, type: type.trim() };
+      const values = enums.get(param.type.replace(/\[\]$/, ''));
+      if (values) param.enum = values;
       if (defaultExpression !== undefined) param.default = parseDefault(defaultExpression.trim(), param.type);
       return param;
     });

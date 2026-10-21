@@ -10,6 +10,7 @@ import type { FunctionInfo } from '../../scripts/gen-functions.ts';
 import { PgError } from '../pg.ts';
 import type { ApiContext } from '../rest/context.ts';
 import { convert } from './args.ts';
+import { learningRpcs } from './learning/index.ts';
 import { musicRpcs } from './music/index.ts';
 import { disableNotificationDevice, getMyContentPreferences, registerNotificationDevice, saveMyContentPreferences } from './user.ts';
 
@@ -23,6 +24,7 @@ export const RPCS: Record<string, Rpc> = {
   'public.register_notification_device': (c, a) => registerNotificationDevice(c, a as never),
   'public.disable_notification_device': (c, a) => disableNotificationDevice(c, a as never),
   ...musicRpcs,
+  ...learningRpcs,
 };
 
 export const FUNCTIONS = functions as Record<string, FunctionInfo>;
@@ -43,6 +45,6 @@ export async function callRpc(ctx: ApiContext, schema: string, name: string, arg
     throw new PgError('42501', `permission denied for function ${name}`, ctx.userId ? 403 : 401);
   }
   const full: Args = {};
-  for (const param of info.params) full[param.name] = given.includes(param.name) ? convert(param.type, args[param.name]) : structuredClone(param.default);
+  for (const param of info.params) full[param.name] = given.includes(param.name) ? convert(param.type, args[param.name], param.enum) : structuredClone(param.default);
   return { result: await run(ctx, full), returnsVoid: info.returns === 'void' };
 }

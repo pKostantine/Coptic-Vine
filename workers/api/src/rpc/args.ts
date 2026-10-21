@@ -6,20 +6,18 @@
  * lowercase, booleans as booleans, timestamps in the stored form, jsonb as
  * the parsed value.
  */
-import schema from '../../schema/user-tables.json' with { type: 'json' };
 import { PgError, timestampInput } from '../pg.ts';
-
-const enums = (schema as { enums: Record<string, string[]> }).enums;
 const UUID = /^\{?([0-9a-f]{8})-?([0-9a-f]{4})-?([0-9a-f]{4})-?([0-9a-f]{4})-?([0-9a-f]{12})\}?$/i;
 
 const display = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 const syntax = (type: string, value: unknown) => new PgError('22P02', `invalid input syntax for type ${type}: "${display(value)}"`);
 
-export function convert(type: string, value: unknown): unknown {
+/** A value of the parameter's type; enumValues are the type's values when it's an enum (schema/functions.json). */
+export function convert(type: string, value: unknown, enumValues?: string[]): unknown {
   if (value === null || value === undefined) return null;
   if (type.endsWith('[]')) {
     if (!Array.isArray(value)) throw new PgError('22P02', `malformed array literal: "${display(value)}"`, 400, 'Array value must start with "{" or dimension information.');
-    return value.map((item) => convert(type.slice(0, -2), item));
+    return value.map((item) => convert(type.slice(0, -2), item, enumValues));
   }
   switch (type) {
     case 'uuid': {
@@ -50,14 +48,11 @@ export function convert(type: string, value: unknown): unknown {
       return value;
     case 'timestamp with time zone': return timestampInput(value, 'argument');
     case 'jsonb': case 'json': return value;
-    default: {
-      const [schemaName, typeName] = type.split('.');
-      const values = typeName ? enums[typeName] : undefined;
-      if (values) {
-        if (typeof value !== 'string' || !values.includes(value)) throw new PgError('22P02', `invalid input value for enum ${schemaName}.${typeName}: "${display(value)}"`);
+    default:
+      if (enumValues) {
+        if (typeof value !== 'string' || !enumValues.includes(value)) throw new PgError('22P02', `invalid input value for enum ${type}: "${display(value)}"`);
         return value;
       }
       return value;
-    }
   }
 }
