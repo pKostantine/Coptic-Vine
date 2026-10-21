@@ -64,6 +64,8 @@ create function net.http_post(url text, body jsonb default '{}', params jsonb de
   returns bigint language sql as $$ insert into net.http_requests (url, body, headers) values (url, body, headers) returning id $$;
 `;
 
+const ISSUER = 'https://wtuujmeinzqfikvuofmh.supabase.co/auth/v1';
+
 export type PgAnswer = { data: unknown; error: { code: string; message: string; details: string | null; hint: string | null } | null };
 
 export type Oracle = {
@@ -83,7 +85,19 @@ export type Oracle = {
 
 let cachedSchema: string[] | null = null;
 
-export async function createOracle(): Promise<Oracle> {
+export type OracleOptions = {
+  /**
+   * Give authenticated USAGE on schema private, as Supabase had it until
+   * 21 Sept 2026. Migration 20260921221500 revoked it, and since then the
+   * SECURITY INVOKER functions that call private.* by name (adding, removing,
+   * reordering and deleting playlist tracks and playlists among them) fail
+   * in production with "permission denied for schema private". The Worker
+   * implements the working behaviour, so its parity tests compare with this.
+   */
+  privateUsage?: boolean;
+};
+
+export async function createOracle(options: OracleOptions = {}): Promise<Oracle> {
   const pg = await PGlite.create({ extensions: { pg_trgm, unaccent, pgcrypto, uuid_ossp } });
   await pg.exec(SETUP());
   // Supabase's database and PostgREST work in UTC.
@@ -91,7 +105,10 @@ export async function createOracle(): Promise<Oracle> {
   cachedSchema ??= read('../../schema/pg-user-schema.sql').split('\n--;;\n');
   const failures: Oracle['failures'] = [];
   for (const statement of cachedSchema) {
-    const body = statement.replace(/^--[^\n]*\n/gm, '').trim();
+    let body = statement.replace(/^--[^\n]*\n/gm, '').trim();
+    // Supabase's database collates text with ICU en-US; PGlite's default is C. ICU's root
+    // collation (und-x-icu) orders as en-US does, so every text column gets it.
+    if (body.startsWith('create table ')) body = body.replace(/ (text|character varying(?:\(\d+\))?)(?=( not null)?(, |\);$))/g, ' $1 collate "und-x-icu"');
     if (!body) continue;
     try {
       await pg.exec(body);
@@ -105,6 +122,7 @@ export async function createOracle(): Promise<Oracle> {
   }
   const grants = cachedSchema.filter((statement) => /^grant execute on function/.test(statement.trim()));
   for (const grant of grants) await pg.exec(grant).catch(() => undefined);
+  if (options.privateUsage) await pg.exec('grant usage on schema private to authenticated');
 
   const shapes = new Map<string, { retset: boolean; scalar: boolean; isVoid: boolean; arrays: Set<string> }>();
   const shape = async (schema: string, fn: string) => {
@@ -133,7 +151,8 @@ export async function createOracle(): Promise<Oracle> {
         ? `select coalesce(json_agg(r), '[]'::json) as result from ${call} r`
         : `select to_json(${call}) as result`;
       const role = user ? 'authenticated' : 'anon';
-      const claims = JSON.stringify(user ? { sub: user, role } : { role });
+      // As Supabase's tokens: the issuer is the project's auth URL (playlist covers read it).
+      const claims = JSON.stringify(user ? { sub: user, role, iss: ISSUER } : { role });
       try {
         const result = await pg.transaction(async (tx) => {
           await tx.query(`select set_config('role', $1, true), set_config('request.jwt.claim.sub', $2, true), set_config('request.jwt.claim.role', $1, true), set_config('request.jwt.claims', $3, true)`, [role, user ?? '', claims]);
@@ -151,7 +170,7 @@ export async function createOracle(): Promise<Oracle> {
     },
     async asUser(user, query, params = []) {
       const role = user ? 'authenticated' : 'anon';
-      const claims = JSON.stringify(user ? { sub: user, role } : { role });
+      const claims = JSON.stringify(user ? { sub: user, role, iss: ISSUER } : { role });
       try {
         const rows = await pg.transaction(async (tx) => {
           await tx.query(`select set_config('role', $1, true), set_config('request.jwt.claim.sub', $2, true), set_config('request.jwt.claim.role', $1, true), set_config('request.jwt.claims', $3, true)`, [role, user ?? '', claims]);

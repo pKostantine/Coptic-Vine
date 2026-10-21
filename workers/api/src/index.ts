@@ -84,8 +84,8 @@ async function rest(request: Request, url: URL, env: Env): Promise<Response> {
         ? Object.fromEntries(url.searchParams)
         : ((await request.text()) || '{}');
       const parsed = typeof args === 'string' ? JSON.parse(args) as Record<string, unknown> : args;
-      const { rpc: fn, result } = await callRpc(ctx, profile, rpc[1], parsed);
-      if (fn.returnsVoid) return new Response(null, { status: 204 });
+      const { result, returnsVoid } = await callRpc(ctx, profile, rpc[1], parsed);
+      if (returnsVoid) return new Response(null, { status: 204 });
       return new Response(JSON.stringify(result ?? null), { headers: { 'content-type': 'application/json; charset=utf-8' } });
     }
     const table = path.match(/^([A-Za-z_]\w*)$/);
