@@ -15,6 +15,7 @@ import { creatorRpcs } from './creator/index.ts';
 import { learningRpcs } from './learning/index.ts';
 import { musicRpcs } from './music/index.ts';
 import { searchRpcs } from './search/index.ts';
+import { workerRpcs } from './workers/index.ts';
 import { disableNotificationDevice, getMyContentPreferences, registerNotificationDevice, saveMyContentPreferences } from './user.ts';
 
 export type Args = Record<string, unknown>;
@@ -31,6 +32,7 @@ export const RPCS: Record<string, Rpc> = {
   ...searchRpcs,
   ...creatorRpcs,
   ...adminRpcs,
+  ...workerRpcs,
 };
 
 export const FUNCTIONS = functions as Record<string, FunctionInfo>;
