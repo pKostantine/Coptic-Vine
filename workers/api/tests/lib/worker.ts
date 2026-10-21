@@ -9,12 +9,14 @@ import bcrypt from 'bcryptjs';
 import { handle } from '../../src/index.ts';
 import type { Env } from '../../src/types.ts';
 import { d1, migration } from './d1.ts';
+import { SERVICE_ROLE } from './oracle.ts';
 
 export const BASE = 'http://localhost:8790';
 const ORIGIN = 'http://localhost:8081';
 const PASSWORD = 'parity test password';
 const HASH = bcrypt.hashSync(PASSWORD, 4);
 const STAMP = '2026-10-01T00:00:00+00:00';
+const SERVICE_TOKEN = 'parity-service-token';
 
 export type Answer = { status: number; data: unknown; error: { code: string; message: string } | null };
 
@@ -31,7 +33,7 @@ export class WorkerSide {
     for (const name of ['0006_auth.sql', '0007_user_schema.sql', '0008_auth_rate_limits.sql', '0009_user_triggers.sql', '0010_undo_log.sql']) this.db.exec(migration(name));
     this.env = {
       DB: d1(this.db), BETTER_AUTH_URL: BASE, BETTER_AUTH_SECRET: 'a-parity-secret-that-is-long-enough-0123456789',
-      EMAIL_FROM: 'no-reply@copticvine.ca', TRUSTED_ORIGINS: `${ORIGIN},copticvine://`, EMAIL_MODE: 'outbox',
+      EMAIL_FROM: 'no-reply@copticvine.ca', TRUSTED_ORIGINS: `${ORIGIN},copticvine://`, EMAIL_MODE: 'outbox', SERVICE_TOKEN,
     };
   }
 
@@ -52,10 +54,10 @@ export class WorkerSide {
     this.tokens.set(id, token);
   }
 
-  /** A request as supabase-js makes it, as the user (or signed out with null). */
+  /** A request as supabase-js makes it, as the user (signed out with null; as another Worker with SERVICE_ROLE). */
   async request(user: string | null, method: string, path: string, init: { body?: unknown; headers?: Record<string, string> } = {}): Promise<Answer> {
     const headers = this.headers({ ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}), ...init.headers });
-    if (user) headers.authorization = `Bearer ${this.tokens.get(user)}`;
+    if (user) headers.authorization = `Bearer ${user === SERVICE_ROLE ? SERVICE_TOKEN : this.tokens.get(user)}`;
     const response = await handle(new Request(`${BASE}${path}`, { method, headers, body: init.body === undefined ? undefined : JSON.stringify(init.body) }), this.env);
     const text = await response.text();
     const json = text ? JSON.parse(text) : null;

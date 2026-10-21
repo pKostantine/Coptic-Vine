@@ -56,4 +56,9 @@ export interface Env {
   EMAIL_MODE?: string;
   /** The media processor (cv-media-processor), woken when a job is queued; unset in tests. */
   MEDIA_PROCESSOR_URL?: string;
+  /**
+   * Secret: the bearer token the other Workers (the notification dispatcher)
+   * send to call functions as Supabase's service role. Unset, nobody can.
+   */
+  SERVICE_TOKEN?: string;
 }

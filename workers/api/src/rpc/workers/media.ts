@@ -36,7 +36,7 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 /** private.verify_media_worker_token, refusing as each function does. */
-async function verifyWorker(tx: Tx, token: string | null): Promise<void> {
+export async function verifyWorker(tx: Tx, token: string | null): Promise<void> {
   const hash = await sha256Hex(token ?? '');
   const known = await tx.first(`SELECT 1 AS yes FROM ${t('private', 'media_worker_tokens')} WHERE ${col('revoked_at')} IS NULL AND ${col('token_hash')} = ?`, hash);
   if (!known) raise('Invalid media worker token', '28000');
