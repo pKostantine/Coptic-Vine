@@ -25,10 +25,10 @@ function readBody(request) {
 }
 
 /**
- * Stands in for Supabase: `handlers` maps an RPC name to a function returning
+ * Stands in for cv-api: `handlers` maps an RPC name to a function returning
  * either rows or `{ status, rows }` for an error response.
  */
-async function startFakeSupabase(handlers) {
+async function startFakeApi(handlers) {
   const calls = [];
   const server = http.createServer(async (request, response) => {
     const name = request.url.replace('/rest/v1/rpc/', '');
@@ -69,12 +69,11 @@ async function freePort() {
   return port;
 }
 
-async function startWorker(supabaseUrl, env = {}) {
+async function startWorker(apiUrl, env = {}) {
   const child = spawn(process.execPath, [workerEntry], {
     env: {
       ...process.env,
-      SUPABASE_URL: supabaseUrl,
-      SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
+      API_URL: apiUrl,
       MEDIA_WORKER_TOKEN: 'test-worker-token',
       MEDIA_WORKER_ID: 'test-worker',
       MEDIA_POLL_INTERVAL_MS: '100',
@@ -154,7 +153,7 @@ describe('worker loop', () => {
       },
     ];
 
-    const supabase = await startFakeSupabase({
+    const api = await startFakeApi({
       claim_media_processing_job: () => (queued.length ? [queued.shift()] : []),
       fail_media_processing_job: (payload) => [{
         job_id: payload.p_job_id,
@@ -168,8 +167,8 @@ describe('worker loop', () => {
 
     // A long idle poll, so a claim made straight after a job stands apart from one made after a wait.
     const idlePollMs = 1500;
-    const { child, lines } = await startWorker(supabase.url, { MEDIA_POLL_INTERVAL_MS: String(idlePollMs) });
-    const claims = () => supabase.calls.filter((call) => call.name === 'claim_media_processing_job');
+    const { child, lines } = await startWorker(api.url, { MEDIA_POLL_INTERVAL_MS: String(idlePollMs) });
+    const claims = () => api.calls.filter((call) => call.name === 'claim_media_processing_job');
 
     try {
       await waitFor(() => lines.filter((line) => line.status === 'failed').length === 2);
@@ -191,7 +190,7 @@ describe('worker loop', () => {
       // (The worker prints a job's result just before that claim reaches the
       // fake, so it is waited for rather than counted at once.)
       await waitFor(() => claims().length >= 3);
-      const reported = supabase.calls.filter((call) => call.name === 'fail_media_processing_job');
+      const reported = api.calls.filter((call) => call.name === 'fail_media_processing_job');
       for (const [index, report] of reported.entries()) {
         const gapMs = claims()[index + 1].at - report.at;
         assert.ok(gapMs < idlePollMs / 2, `claim ${index + 2} came ${gapMs} ms after job ${index + 1} was reported`);
@@ -200,7 +199,7 @@ describe('worker loop', () => {
       // And the worker keeps polling an empty queue instead of exiting.
       await waitFor(() => claims().length > 3);
 
-      const claim = supabase.calls.find((call) => call.name === 'claim_media_processing_job');
+      const claim = api.calls.find((call) => call.name === 'claim_media_processing_job');
       assert.equal(claim.payload.p_worker_token, 'test-worker-token');
       assert.equal(claim.payload.p_worker_id, 'test-worker');
 
@@ -209,14 +208,14 @@ describe('worker loop', () => {
       assert.ok(lines.some((line) => line.status === 'worker_stopped'));
     } finally {
       child.kill('SIGKILL');
-      await supabase.close();
+      await api.close();
     }
   });
 
   it('backs off and recovers when the queue is unreachable', async () => {
     let failClaims = 3;
 
-    const supabase = await startFakeSupabase({
+    const api = await startFakeApi({
       claim_media_processing_job: () => {
         if (failClaims > 0) {
           failClaims -= 1;
@@ -227,7 +226,7 @@ describe('worker loop', () => {
       },
     });
 
-    const { child, lines } = await startWorker(supabase.url);
+    const { child, lines } = await startWorker(api.url);
 
     try {
       await waitFor(() => lines.filter((line) => line.status === 'queue_unavailable').length === 3);
@@ -237,15 +236,15 @@ describe('worker loop', () => {
       assert.match(outages[0].error, /database unavailable/);
 
       // Once the queue answers again the worker returns to normal polling.
-      const claimsAfterOutage = supabase.calls.length;
-      await waitFor(() => supabase.calls.length > claimsAfterOutage + 1);
+      const claimsAfterOutage = api.calls.length;
+      await waitFor(() => api.calls.length > claimsAfterOutage + 1);
       assert.equal(lines.filter((line) => line.status === 'queue_unavailable').length, 3);
 
       const exit = await stopWorker(child);
       assert.equal(exit.code, 0);
     } finally {
       child.kill('SIGKILL');
-      await supabase.close();
+      await api.close();
     }
   });
 });

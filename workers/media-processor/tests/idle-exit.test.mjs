@@ -10,7 +10,7 @@ import { describe, it } from 'node:test';
 
 const workerEntry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'worker.mjs');
 
-async function startFakeSupabase(handlers) {
+async function startFakeApi(handlers) {
   const calls = [];
   const server = http.createServer((request, response) => {
     let raw = '';
@@ -45,13 +45,12 @@ async function freePort() {
   return port;
 }
 
-async function startWorker(supabaseUrl, env = {}) {
+async function startWorker(apiUrl, env = {}) {
   const adminPort = await freePort();
   const child = spawn(process.execPath, [workerEntry], {
     env: {
       ...process.env,
-      SUPABASE_URL: supabaseUrl,
-      SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
+      API_URL: apiUrl,
       MEDIA_WORKER_TOKEN: 'test-worker-token',
       MEDIA_WORKER_ID: 'test-worker',
       MEDIA_POLL_INTERVAL_MS: '50',
@@ -99,9 +98,9 @@ const failingJob = (id) => ({
 
 describe('exit when idle (Cloudflare)', () => {
   it('exits cleanly once the queue has been empty for the idle window', async () => {
-    const supabase = await startFakeSupabase({ claim_media_processing_job: () => [] });
+    const api = await startFakeApi({ claim_media_processing_job: () => [] });
     const startedAt = Date.now();
-    const { child, lines, exited } = await startWorker(supabase.url, { MEDIA_EXIT_WHEN_IDLE_MS: '600' });
+    const { child, lines, exited } = await startWorker(api.url, { MEDIA_EXIT_WHEN_IDLE_MS: '600' });
     try {
       const exit = await exited;
       assert.equal(exit.code, 0);
@@ -111,19 +110,19 @@ describe('exit when idle (Cloudflare)', () => {
       assert.equal(lines.find((line) => line.status === 'worker_started').exitWhenIdleMs, 600);
     } finally {
       child.kill('SIGKILL');
-      await supabase.close();
+      await api.close();
     }
   });
 
   it('each job restarts the idle window', async () => {
     const queued = [failingJob('11111111-1111-4111-8111-111111111111'), failingJob('33333333-3333-4333-8333-333333333333')];
     const releaseAt = Date.now() + 900;
-    const supabase = await startFakeSupabase({
+    const api = await startFakeApi({
       // The first job arrives after the worker has idled for most of its window.
       claim_media_processing_job: () => (Date.now() >= releaseAt && queued.length ? [queued.shift()] : []),
       fail_media_processing_job: (payload) => [{ job_id: payload.p_job_id, status: 'queued', attempt_count: 1, max_attempts: 3 }],
     });
-    const { child, lines, exited } = await startWorker(supabase.url, { MEDIA_EXIT_WHEN_IDLE_MS: '1200' });
+    const { child, lines, exited } = await startWorker(api.url, { MEDIA_EXIT_WHEN_IDLE_MS: '1200' });
     try {
       const exit = await exited;
       assert.equal(exit.code, 0);
@@ -133,17 +132,17 @@ describe('exit when idle (Cloudflare)', () => {
       assert.ok(exit.at - lastJobAt >= 1000, 'it waited a full window after the last job');
     } finally {
       child.kill('SIGKILL');
-      await supabase.close();
+      await api.close();
     }
   });
 
   it('reports busy and stays up while an admin request is under way', async () => {
     let finishAuthorization;
-    const supabase = await startFakeSupabase({
+    const api = await startFakeApi({
       claim_media_processing_job: () => [],
       authorize_admin_storage_gc: () => new Promise((resolve) => { finishAuthorization = () => resolve([{ authorized: false }]); }),
     });
-    const { child, lines, exited, adminUrl } = await startWorker(supabase.url, { MEDIA_EXIT_WHEN_IDLE_MS: '400' });
+    const { child, lines, exited, adminUrl } = await startWorker(api.url, { MEDIA_EXIT_WHEN_IDLE_MS: '400' });
     try {
       await waitFor(() => lines.some((line) => line.status === 'admin_api_started'));
       const idleHealth = await (await fetch(`${adminUrl}/health`)).json();
@@ -164,20 +163,20 @@ describe('exit when idle (Cloudflare)', () => {
       assert.equal(exit.code, 0);
     } finally {
       child.kill('SIGKILL');
-      await supabase.close();
+      await api.close();
     }
   });
 
   it('does not keep a container up while the queue is unreachable', async () => {
-    const supabase = await startFakeSupabase({ claim_media_processing_job: () => ({ status: 500, rows: { message: 'database unavailable' } }) });
-    const { child, lines, exited } = await startWorker(supabase.url, { MEDIA_EXIT_WHEN_IDLE_MS: '500' });
+    const api = await startFakeApi({ claim_media_processing_job: () => ({ status: 500, rows: { message: 'database unavailable' } }) });
+    const { child, lines, exited } = await startWorker(api.url, { MEDIA_EXIT_WHEN_IDLE_MS: '500' });
     try {
       const exit = await exited;
       assert.equal(exit.code, 0);
       assert.ok(lines.some((line) => line.status === 'queue_unavailable'));
     } finally {
       child.kill('SIGKILL');
-      await supabase.close();
+      await api.close();
     }
   });
 });

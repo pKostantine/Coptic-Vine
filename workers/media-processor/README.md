@@ -8,9 +8,9 @@ settings, deploying and checking on it.
 
 ## Runtime
 
-The worker claims a queued Supabase processing job, downloads the source object
+The worker claims a queued processing job from cv-api, downloads the source object
 from private R2, probes it, produces the delivery rendition, uploads it to the
-delivery bucket, and completes the job in Supabase. Completing a job writes the
+delivery bucket, and completes the job in cv-api. Completing a job writes the
 `media.media_assets` row, links it to the submission item, and — when it was the
 last item a submission was waiting on — takes that submission out of
 `processing` so it can be published.
@@ -29,8 +29,7 @@ being upscaled.
 
 Required environment:
 
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
+- `API_URL` (cv-api, `https://api.copticvine.ca`)
 - `MEDIA_WORKER_TOKEN`
 
 Production R2 S3 mode:
@@ -49,7 +48,7 @@ Optional:
 
 - `MEDIA_WORKER_ID` — identifies this worker on claimed jobs (default `media-processor-<pid>`)
 - `MEDIA_POLL_INTERVAL_MS` — idle poll interval, default `1000`
-- `MEDIA_ERROR_BACKOFF_MS` / `MEDIA_MAX_ERROR_BACKOFF_MS` — backoff when Supabase is unreachable, default `5000` / `300000`
+- `MEDIA_ERROR_BACKOFF_MS` / `MEDIA_MAX_ERROR_BACKOFF_MS` — backoff when cv-api is unreachable, default `5000` / `300000`
 - `MEDIA_WORK_DIR` — scratch directory, default the OS temp dir
 - `MEDIA_KEEP_WORK_DIR=1` — keep the per-job scratch directory for debugging
 - `STORAGE_GC_INTERVAL_MS` — physical R2 inventory interval, default 15 minutes

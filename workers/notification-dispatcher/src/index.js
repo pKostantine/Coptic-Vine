@@ -11,20 +11,18 @@ function json(data, status = 200) {
 }
 
 function requireEnv(env) {
-  for (const key of ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) {
+  for (const key of ['API_URL', 'SERVICE_TOKEN']) {
     if (!env[key]) throw new Error(`Missing required Worker binding: ${key}`);
   }
 }
 
 async function rpc(env, name, body = {}) {
   requireEnv(env);
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${name}`, {
+  const response = await fetch(`${env.API_URL.replace(/\/+$/, '')}/rest/v1/rpc/${name}`, {
     method: 'POST',
     headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      // graphql_public is the project's first exposed schema, so without a
-      // profile PostgREST looks for these functions there and answers 404.
+      // cv-api's service token: these functions answer only the service (workers/api).
+      authorization: `Bearer ${env.SERVICE_TOKEN}`,
       'accept-profile': 'public',
       'content-profile': 'public',
       'content-type': 'application/json',
@@ -34,7 +32,7 @@ async function rpc(env, name, body = {}) {
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Supabase RPC ${name} failed (${response.status}): ${detail}`);
+    throw new Error(`cv-api RPC ${name} failed (${response.status}): ${detail}`);
   }
   if (response.status === 204) return null;
   const text = await response.text();
@@ -152,7 +150,7 @@ async function dispatchWebPush(env) {
   }
 
   // Keep this below the conservative free-plan subrequest ceiling: each Web
-  // Push delivery is one outbound request, plus the Supabase claim/completion calls.
+  // Push delivery is one outbound request, plus cv-api's claim/completion calls.
   const deliveries = await rpc(env, 'claim_web_push_deliveries', { p_limit: 40 }) || [];
   if (!deliveries.length) return { claimed: 0, configured: true };
 

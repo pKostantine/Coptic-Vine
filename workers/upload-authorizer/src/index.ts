@@ -5,8 +5,8 @@ interface Env {
   MUSIC_BUCKET: R2Bucket;
   LEARNING_BUCKET: R2Bucket;
   IMAGES_BUCKET: R2Bucket;
-  SUPABASE_URL: string;
-  SUPABASE_PUBLISHABLE_KEY: string;
+  /** cv-api, which answers the upload functions. */
+  API_URL: string;
   MAX_UPLOAD_BYTES?: string;
   CORS_ALLOWED_ORIGIN?: string;
 }
@@ -73,7 +73,7 @@ interface AuthorizeUploadBody {
   checksumSha256?: string | null;
 }
 
-interface SupabaseUploadIntentRow {
+interface UploadIntentRow {
   upload_intent_id: string;
   creator_account_id?: string;
   bucket: 'chc-submissions';
@@ -85,7 +85,7 @@ interface SupabaseUploadIntentRow {
   checksum_sha256?: string | null;
 }
 
-interface SupabaseCompletedUploadRow {
+interface CompletedUploadRow {
   upload_intent_id: string;
   status: 'uploaded';
   bucket: 'chc-submissions';
@@ -125,7 +125,7 @@ interface AdminDeleteFinalizeRow {
   deleted_upload_intent_id?: string | null;
 }
 
-interface SupabaseErrorBody {
+interface ApiErrorBody {
   code?: string;
   message?: string;
   details?: string;
@@ -195,7 +195,7 @@ function requireBearerToken(request: Request): string {
   const match = authorization.match(/^Bearer\s+(.+)$/i);
 
   if (!match?.[1]) {
-    throw new HttpError(401, 'auth_required', 'A Supabase bearer token is required.');
+    throw new HttpError(401, 'auth_required', 'A sign-in token is required.');
   }
 
   return match[1].trim();
@@ -305,16 +305,15 @@ function getMaxUploadBytes(env: Env): number {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_UPLOAD_BYTES;
 }
 
-async function callSupabaseRpc<T>(
+async function callApiRpc<T>(
   env: Env,
   bearerToken: string,
   rpcName: string,
   payload: Record<string, unknown>,
 ): Promise<T[]> {
-  const response = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/rpc/${rpcName}`, {
+  const response = await fetch(`${env.API_URL.replace(/\/+$/, '')}/rest/v1/rpc/${rpcName}`, {
     method: 'POST',
     headers: {
-      apikey: env.SUPABASE_PUBLISHABLE_KEY,
       authorization: `Bearer ${bearerToken}`,
       'accept-profile': 'public',
       'content-profile': 'public',
@@ -326,24 +325,24 @@ async function callSupabaseRpc<T>(
   const responseBody = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const supabaseError = isSupabaseErrorBody(responseBody) ? responseBody : null;
+    const apiError = isApiErrorBody(responseBody) ? responseBody : null;
     const upstreamStatus = response.status >= 400 && response.status < 500 ? response.status : 502;
 
     throw new HttpError(
       upstreamStatus,
-      supabaseError?.code ?? 'supabase_rpc_failed',
-      supabaseError?.message ?? `Supabase RPC ${rpcName} failed.`,
+      apiError?.code ?? 'api_rpc_failed',
+      apiError?.message ?? `cv-api RPC ${rpcName} failed.`,
     );
   }
 
   if (!Array.isArray(responseBody)) {
-    throw new HttpError(502, 'invalid_supabase_response', `Supabase RPC ${rpcName} returned an unexpected response.`);
+    throw new HttpError(502, 'invalid_api_response', `cv-api RPC ${rpcName} returned an unexpected response.`);
   }
 
   return responseBody as T[];
 }
 
-function isSupabaseErrorBody(value: unknown): value is SupabaseErrorBody {
+function isApiErrorBody(value: unknown): value is ApiErrorBody {
   return Boolean(value && typeof value === 'object' && 'message' in value);
 }
 
@@ -351,7 +350,7 @@ async function handleAuthorize(request: Request, env: Env): Promise<Response> {
   const bearerToken = requireBearerToken(request);
   const body = parseAuthorizeBody(await readJsonObject(request), env);
 
-  const rows = await callSupabaseRpc<SupabaseUploadIntentRow>(env, bearerToken, 'create_media_upload_intent', {
+  const rows = await callApiRpc<UploadIntentRow>(env, bearerToken, 'create_media_upload_intent', {
     p_creator_account_id: body.creatorAccountId,
     p_original_filename: body.originalFilename,
     p_content_type: body.contentType,
@@ -387,8 +386,8 @@ async function getActiveUploadIntent(
   env: Env,
   bearerToken: string,
   uploadIntentId: string,
-): Promise<SupabaseUploadIntentRow> {
-  const rows = await callSupabaseRpc<SupabaseUploadIntentRow>(
+): Promise<UploadIntentRow> {
+  const rows = await callApiRpc<UploadIntentRow>(
     env,
     bearerToken,
     'get_media_upload_intent_for_upload',
@@ -538,7 +537,7 @@ async function handleMultipartComplete(request: Request, env: Env, route: Multip
   }
 
   try {
-    const completedRows = await callSupabaseRpc<SupabaseCompletedUploadRow>(
+    const completedRows = await callApiRpc<CompletedUploadRow>(
       env,
       bearerToken,
       'complete_media_upload_intent',
@@ -614,7 +613,7 @@ async function handleUpload(request: Request, env: Env, uploadIntentId: string):
   });
 
   try {
-    const completedRows = await callSupabaseRpc<SupabaseCompletedUploadRow>(env, bearerToken, 'complete_media_upload_intent', {
+    const completedRows = await callApiRpc<CompletedUploadRow>(env, bearerToken, 'complete_media_upload_intent', {
       p_upload_intent_id: intent.upload_intent_id,
       p_uploaded_size: requestContentLength,
       p_r2_http_etag: object.httpEtag ?? object.etag ?? '',
@@ -696,7 +695,7 @@ function previewBucketFor(env: Env, bucketName: string): R2Bucket {
 
 async function handleAdminPreview(request: Request, env: Env, itemId: string): Promise<Response> {
   const bearerToken = requireBearerToken(request);
-  const rows = await callSupabaseRpc<AdminPreviewItemRow>(
+  const rows = await callApiRpc<AdminPreviewItemRow>(
     env,
     bearerToken,
     'get_admin_submission_preview_item',
@@ -786,7 +785,7 @@ async function handleAdminProcessingFileDelete(
   jobId: string,
 ): Promise<Response> {
   const bearerToken = requireBearerToken(request);
-  const preparedRows = await callSupabaseRpc<AdminDeletePrepareRow>(
+  const preparedRows = await callApiRpc<AdminDeletePrepareRow>(
     env,
     bearerToken,
     'prepare_admin_processing_file_deletion',
@@ -812,7 +811,7 @@ async function handleAdminProcessingFileDelete(
     deletedObjects.push({ bucket: bucketName, path: objectPath });
   }
 
-  const finalizedRows = await callSupabaseRpc<AdminDeleteFinalizeRow>(
+  const finalizedRows = await callApiRpc<AdminDeleteFinalizeRow>(
     env,
     bearerToken,
     'finalize_admin_processing_file_deletion',

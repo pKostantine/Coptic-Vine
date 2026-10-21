@@ -49,7 +49,7 @@ after(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-async function fakeSupabase(handlers) {
+async function fakeApi(handlers) {
   const calls = [];
   const server = http.createServer((request, response) => {
     let raw = '';
@@ -104,10 +104,9 @@ function setup(original) {
   return { storage, videoJob, companion };
 }
 
-function configFor(supabase) {
+function configFor(api) {
   return {
-    supabaseUrl: supabase.url,
-    supabasePublishableKey: 'test',
+    apiUrl: api.url,
     mediaWorkerToken: 'worker-token',
     mediaWorkerId: 'test-worker',
     r2Driver: 's3',
@@ -118,7 +117,7 @@ function configFor(supabase) {
 test('a lesson video, its audio-only copy and the original\'s removal, in one claim', async () => {
   const { storage, videoJob, companion } = setup(phone);
   let claimed = false;
-  const supabase = await fakeSupabase({
+  const api = await fakeApi({
     claim_media_processing_job: () => (claimed ? [] : ((claimed = true), [videoJob])),
     claim_companion_media_processing_job: (payload) => {
       assert.equal(payload.p_job_id, 'video-1');
@@ -132,12 +131,12 @@ test('a lesson video, its audio-only copy and the original\'s removal, in one cl
     },
   });
   try {
-    const result = await claimAndProcessOne(configFor(supabase));
+    const result = await claimAndProcessOne(configFor(api));
     assert.equal(result.status, 'completed', JSON.stringify(result));
     assert.equal(result.audioOnly.status, 'completed');
     assert.equal(result.originalDeleted, true);
 
-    const completions = supabase.named('complete_media_processing_job');
+    const completions = api.named('complete_media_processing_job');
     assert.deepEqual(completions.map((call) => call.payload.p_job_id), ['audio-1', 'video-1']);
     assert.equal(completions[0].payload.p_output_mime_type, 'audio/mp4');
     assert.equal(completions[0].payload.p_probe.transcode.madeWith, 'video_pass');
@@ -145,42 +144,42 @@ test('a lesson video, its audio-only copy and the original\'s removal, in one cl
     assert.equal(completions[1].payload.p_probe.transcode.preset, 'veryfast');
     assert.match(completions[1].payload.p_output_checksum_sha256, /^[a-f0-9]{64}$/);
 
-    const beats = supabase.named('heartbeat_media_processing_jobs');
+    const beats = api.named('heartbeat_media_processing_jobs');
     assert.ok(beats.length >= 1);
     assert.deepEqual(beats[0].payload.p_job_ids, ['video-1', 'audio-1']);
 
     assert.equal(storage.objects.has('chc-submissions/submissions/a/intent-1/original.mov'), false, 'the original is gone');
     assert.ok(storage.objects.get('chc-learning/processed/a/intent-1/v1/video.mp4').length > 0);
     assert.ok(storage.objects.get('chc-learning/processed/a/intent-1/v1/audio.m4a').length > 0);
-    assert.equal(supabase.named('fail_media_processing_job').length, 0);
+    assert.equal(api.named('fail_media_processing_job').length, 0);
   } finally {
-    await supabase.close();
+    await api.close();
   }
 });
 
 test('before the database migration the video still converts and the original is kept', async () => {
   const { storage, videoJob } = setup(phone);
   let claimed = false;
-  const supabase = await fakeSupabase({
+  const api = await fakeApi({
     claim_media_processing_job: () => (claimed ? [] : ((claimed = true), [videoJob])),
     complete_media_processing_job: () => [{ status: 'completed' }],
   });
   try {
-    const result = await claimAndProcessOne(configFor(supabase));
+    const result = await claimAndProcessOne(configFor(api));
     assert.equal(result.status, 'completed', JSON.stringify(result));
     assert.equal(result.audioOnly, null);
     assert.equal(result.originalDeleted, false);
-    assert.deepEqual(supabase.named('complete_media_processing_job').map((call) => call.payload.p_job_id), ['video-1']);
+    assert.deepEqual(api.named('complete_media_processing_job').map((call) => call.payload.p_job_id), ['video-1']);
     assert.ok(storage.objects.has('chc-submissions/submissions/a/intent-1/original.mov'));
   } finally {
-    await supabase.close();
+    await api.close();
   }
 });
 
 test('a job an admin cancels stops at the next heartbeat without completing or failing', async () => {
   const { videoJob, companion } = setup(long);
   let beats = 0;
-  const supabase = await fakeSupabase({
+  const api = await fakeApi({
     claim_media_processing_job: () => [{ ...videoJob, job_id: 'video-cancel' }],
     claim_companion_media_processing_job: () => [companion],
     heartbeat_media_processing_jobs: (payload) => {
@@ -190,18 +189,18 @@ test('a job an admin cancels stops at the next heartbeat without completing or f
     complete_media_processing_job: () => { throw new Error('must not complete'); },
   });
   try {
-    const result = await claimAndProcessOne(configFor(supabase));
+    const result = await claimAndProcessOne(configFor(api));
     assert.equal(result.status, 'cancelled', JSON.stringify(result));
-    assert.equal(supabase.named('complete_media_processing_job').length, 0);
-    assert.equal(supabase.named('fail_media_processing_job').length, 0);
+    assert.equal(api.named('complete_media_processing_job').length, 0);
+    assert.equal(api.named('fail_media_processing_job').length, 0);
   } finally {
-    await supabase.close();
+    await api.close();
   }
 });
 
 test('a worker shutting down hands both jobs back without spending an attempt', async () => {
   const { videoJob, companion } = setup(long);
-  const supabase = await fakeSupabase({
+  const api = await fakeApi({
     claim_media_processing_job: () => [{ ...videoJob, job_id: 'video-stop' }],
     claim_companion_media_processing_job: () => [companion],
     heartbeat_media_processing_jobs: (payload) => payload.p_job_ids.map((id) => ({ job_id: id, status: 'processing' })),
@@ -209,13 +208,13 @@ test('a worker shutting down hands both jobs back without spending an attempt', 
   });
   try {
     setTimeout(() => abortActiveJobs('shutdown'), 1500);
-    const result = await claimAndProcessOne(configFor(supabase));
+    const result = await claimAndProcessOne(configFor(api));
     assert.equal(result.status, 'released', JSON.stringify(result));
-    const releases = supabase.named('release_media_processing_jobs');
+    const releases = api.named('release_media_processing_jobs');
     assert.equal(releases.length, 1);
     assert.deepEqual(releases[0].payload.p_job_ids, ['video-stop', 'audio-1']);
-    assert.equal(supabase.named('fail_media_processing_job').length, 0);
+    assert.equal(api.named('fail_media_processing_job').length, 0);
   } finally {
-    await supabase.close();
+    await api.close();
   }
 });

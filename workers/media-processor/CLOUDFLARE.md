@@ -9,9 +9,9 @@ each file. This document covers where and when it runs.
 ## How it works
 
 ```
-upload or retry queued in Supabase
-  └─ database trigger ──► POST https://cv-media-processor.hrmpdd8d6c.workers.dev/wake
-                            └─ Worker asks Supabase: is a job ready?
+upload or retry queued in cv-api (D1)
+  └─ cv-api's wake-up ──► POST https://cv-media-processor.hrmpdd8d6c.workers.dev/wake
+                            └─ Worker asks cv-api: is a job ready?
                                  └─ yes ─► start the container (1–3 s)
                                              └─ processes every waiting job,
                                                 then exits after 20 s with nothing to do
@@ -80,13 +80,12 @@ cv-media-processor → Containers.
 | `Dockerfile`, `src/` | The container: the processor itself |
 | `src/worker.mjs` | `MEDIA_EXIT_WHEN_IDLE_MS`: exit when idle |
 | `src/admin-server.mjs` | `/health` reports `busy` |
-| `../../supabase/migrations/20261020000000_media_processor_on_cloudflare.sql` | `media_processing_queue_has_work` and the wake-up triggers |
+| `../api/src/rpc/workers/media.ts`, `../api/src/db/afterWrites.ts` | `media_processing_queue_has_work`, and cv-api's wake-up after a job is queued |
 | `tests/cloudflare-host.test.mjs`, `tests/idle-exit.test.mjs` | Tests for all of the above |
 
 ## Settings
 
-Public settings are in `wrangler.jsonc` under `vars`: `SUPABASE_URL`,
-`SUPABASE_PUBLISHABLE_KEY` (the same key the web app ships) and
+Public settings are in `wrangler.jsonc` under `vars`: `API_URL` (cv-api) and
 `R2_ACCOUNT_ID`.
 
 Three secrets are set once and kept by Cloudflare across deploys. Run these
@@ -125,7 +124,7 @@ moment starts over. To avoid this, check Admin's Processing screen first.
 | ----- | ---- |
 | `POST /wake` | Starts the container if a job is due. Returns `{ woke, started }` |
 | `GET /health` | The Worker's health and the container's state, including any crash record. Does not start it |
-| `DELETE /admin/processing-jobs/:id/file`, `DELETE /admin/storage/unused` | Coptic Vine Admin's deletions. They start the container; it checks the admin's Supabase session |
+| `DELETE /admin/processing-jobs/:id/file`, `DELETE /admin/storage/unused` | Coptic Vine Admin's deletions. They start the container; it checks the admin's cv-api session |
 
 ## Checking on it
 
@@ -142,7 +141,7 @@ Worker. To run the real Worker and container locally, with Docker running:
 
 ```bash
 npx wrangler dev -c workers/media-processor/wrangler.jsonc --port 8799 --test-scheduled \
-  --var SUPABASE_URL:http://<a stand-in Supabase> --var MEDIA_WORKER_TOKEN:test-token \
+  --var API_URL:http://localhost:8790 --var MEDIA_WORKER_TOKEN:test-token \
   --var R2_ACCESS_KEY_ID:x --var R2_SECRET_ACCESS_KEY:y
 ```
 

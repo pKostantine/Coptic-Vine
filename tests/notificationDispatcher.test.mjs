@@ -5,8 +5,8 @@ const { default: worker } = await import('../workers/notification-dispatcher/src
 
 const SECRET = 'test-worker-secret';
 const ENV = {
-  SUPABASE_URL: 'https://project.supabase.co',
-  SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+  API_URL: 'https://api.copticvine.ca',
+  SERVICE_TOKEN: 'service-token',
   NOTIFICATION_WORKER_SECRET: SECRET,
 };
 
@@ -16,9 +16,8 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-test('every Supabase RPC names the public schema', async () => {
-  // The project exposes graphql_public first; an RPC without a profile is
-  // looked up there and fails with PGRST202, so nothing is ever claimed.
+test('every cv-api RPC names the public schema and carries the service token', async () => {
+  // cv-api, as PostgREST did, reads an RPC's schema from its profile headers.
   const calls = [];
   globalThis.fetch = async (input, init = {}) => {
     const headers = new Headers(init.headers);
@@ -35,7 +34,7 @@ test('every Supabase RPC names the public schema', async () => {
   );
 
   assert.equal(response.status, 200);
-  const rpcCalls = calls.filter((call) => call.url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/rpc/`));
+  const rpcCalls = calls.filter((call) => call.url.startsWith(`${ENV.API_URL}/rest/v1/rpc/`));
   assert.deepEqual(
     rpcCalls.map((call) => call.url.split('/').pop()),
     ['claim_notification_deliveries', 'claim_notification_receipts'],
@@ -43,5 +42,7 @@ test('every Supabase RPC names the public schema', async () => {
   for (const call of rpcCalls) {
     assert.equal(call.headers.get('content-profile'), 'public', call.url);
     assert.equal(call.headers.get('accept-profile'), 'public', call.url);
+    assert.equal(call.headers.get('authorization'), `Bearer ${ENV.SERVICE_TOKEN}`, call.url);
+    assert.equal(call.headers.get('apikey'), null, call.url);
   }
 });
