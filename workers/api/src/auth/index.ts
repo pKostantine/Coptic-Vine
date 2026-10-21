@@ -138,3 +138,12 @@ export function createAuth(env: Env) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+const auths = new WeakMap<Env, Auth>();
+
+/** The environment's instance, made once: the requests (src/index.ts) and the admin functions (src/rpc/admin/users.ts) share it. */
+export function authFor(env: Env): Auth {
+  let instance = auths.get(env);
+  if (!instance) auths.set(env, (instance = createAuth(env)));
+  return instance;
+}

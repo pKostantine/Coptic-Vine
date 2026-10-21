@@ -14,7 +14,7 @@ import { r2 } from './r2.ts';
 
 export const BASE = 'http://localhost:8790';
 const ORIGIN = 'http://localhost:8081';
-const PASSWORD = 'parity test password';
+export const PASSWORD = 'parity test password';
 const HASH = bcrypt.hashSync(PASSWORD, 4);
 const STAMP = '2026-10-01T00:00:00+00:00';
 const SERVICE_TOKEN = 'parity-service-token';

@@ -4,12 +4,18 @@
  * types and grants come from Supabase itself (schema/functions.json,
  * generated from the dump), so a call is matched, checked and refused the
  * way PostgREST and Postgres do it; each port supplies only the body.
+ *
+ * A few functions are cv-api's own, which Supabase never had (CV-Admin's
+ * Users page, src/rpc/admin/users.ts). Their signatures are declared next to
+ * them in the same form (OWN_FUNCTIONS) and go through the same matching and
+ * grants; none may take a Supabase function's name (tests/rpc.test.ts).
  */
 import functions from '../../schema/functions.json' with { type: 'json' };
 import type { FunctionInfo } from '../../scripts/gen-functions.ts';
 import { PgError } from '../pg.ts';
 import type { ApiContext } from '../rest/context.ts';
 import { adminRpcs } from './admin/index.ts';
+import { USER_FUNCTIONS, userRpcs } from './admin/users.ts';
 import { convert } from './args.ts';
 import { creatorRpcs } from './creator/index.ts';
 import { learningRpcs } from './learning/index.ts';
@@ -33,9 +39,15 @@ export const RPCS: Record<string, Rpc> = {
   ...creatorRpcs,
   ...adminRpcs,
   ...workerRpcs,
+  ...userRpcs,
 };
 
-export const FUNCTIONS = functions as Record<string, FunctionInfo>;
+/** cv-api's own functions' signatures. */
+export const OWN_FUNCTIONS: Record<string, FunctionInfo> = { ...USER_FUNCTIONS };
+
+/** The dump's functions, then cv-api's own. */
+export const SUPABASE_FUNCTIONS = functions as Record<string, FunctionInfo>;
+export const FUNCTIONS: Record<string, FunctionInfo> = { ...SUPABASE_FUNCTIONS, ...OWN_FUNCTIONS };
 
 export async function callRpc(ctx: ApiContext, schema: string, name: string, args: Args): Promise<{ result: unknown; returnsVoid: boolean }> {
   const key = `${schema}.${name}`;
