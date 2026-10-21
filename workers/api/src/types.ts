@@ -45,6 +45,7 @@ export interface R2Bucket {
   get(key: string): Promise<R2ObjectBody | null>;
   put(key: string, value: ArrayBuffer | ArrayBufferView<ArrayBuffer> | ReadableStream | string, options?: { httpMetadata?: { contentType?: string; cacheControl?: string }; customMetadata?: Record<string, string> }): Promise<R2Object>;
   delete(keys: string | string[]): Promise<void>;
+  list(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
 }
 
 /** Cloudflare Email Service's send binding (wrangler.jsonc "send_email"). */
