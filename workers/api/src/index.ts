@@ -19,6 +19,7 @@
  */
 import { createAuth, list, type Auth } from './auth/index.ts';
 import { afterWrites, trackWrites } from './db/afterWrites.ts';
+import { recoverTransactions } from './db/transaction.ts';
 import { httpStatus, PgError, triggerError } from './pg.ts';
 import type { ApiContext } from './rest/context.ts';
 import { tableRequest } from './rest/tables.ts';
@@ -125,8 +126,9 @@ async function restResponse(request: Request, url: URL, env: Env, onWrite: () =>
 
 export default {
   fetch: handle,
-  /** Every minute: whatever a request's after-write step missed. */
+  /** Every minute: transactions a Worker never finished, then whatever a request's after-write step missed. */
   async scheduled(_controller: unknown, env: Env): Promise<void> {
+    await recoverTransactions(env.DB);
     await afterWrites(env);
   },
 };

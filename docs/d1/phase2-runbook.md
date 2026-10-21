@@ -183,10 +183,13 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 - **Triggers.** `npm run gen:triggers` writes migration `0009_user_triggers.sql` from `scripts/gen-triggers.ts`: Supabase's triggers as SQLite triggers, so D1 applies them to every write, in the same transaction, whoever writes. The script's header says how each kind maps (BEFORE triggers that change the row, the order triggers fire in, errors with their SQLSTATE).
 - **Replica mode.** `"private.replica_mode"` turns every trigger off while it is above 0, as `session_replication_role = replica` does. The import raises it for its whole run.
 - **After the write.** Two things Supabase did outside the transaction, the Worker does once the write has committed (`src/db/afterWrites.ts`): rebuild the catalog search index when the catalog changed (the triggers count changes in `"private.search_index_state"`), and wake the media processor when a job is queued (`"private.outbox"`). A cron runs the same step every minute, in case a request missed it.
-- **Atomic.** A Supabase function runs in one transaction. D1 has none across statements, so a ported function that writes more than once checks everything first and then writes in one `db.batch()`, which D1 applies whole or not at all. The tests' D1 stand-in does the same.
+- **Atomic.** A Supabase function runs in one transaction. D1 has none across statements (only a `db.batch()` is atomic), so:
+  - a ported function that can check everything first writes in one batch;
+  - one that must read what it wrote (the creator editor's, the admin's) runs in `transaction()` (`src/db/transaction.ts`): migration `0010`'s triggers record the inverse of each of its writes in `"private.undo_log"`, cascades and trigger writes included, and a failure plays them back. The minute cron rolls back any transaction a Worker never finished. Unlike Postgres, other requests can see a transaction's writes before it ends.
+  - The tests' D1 stand-in makes batches atomic as D1 does; `tests/transaction.test.ts` checks that a rollback restores every row, and it was also checked on workerd's D1.
 - **Checked by** `tests/triggers.parity.test.ts`: the same writes on the oracle and on SQLite, every table compared after each. The search index rebuilt from the real D1 copy matched Supabase's, 103 documents of 103, field by field.
 - **Not ported:** `media.search_aliases`' normalization trigger. Nothing writes that table; whatever does must store `normalized_alias` with `normalizeSearchText`.
-- **Applied** to the local D1. The remote D1 gets it at the cutover, before the final import (which needs it).
+- **Applied** (`0009`, `0010`) to the local D1. The remote D1 gets them at the cutover, before the final import (which needs `0009`).
 
 **After a change to a Supabase function, until the cutover:**
 
@@ -236,4 +239,4 @@ Phase 1's, which now also handle weights.
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
 | 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices, music, learning and search. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |
-| 7. Cutover | Not started. Apply `0009` (and any later migration) to the remote D1 before the final import. |
+| 7. Cutover | Not started. Apply `0009`, `0010` (and any later migration) to the remote D1 before the final import. |
