@@ -399,9 +399,15 @@ on the day.
 5. **Coptic Vine:**
    - In `.env`, set `EXPO_PUBLIC_USER_DATA_SOURCE=cloudflare` and merge. The
      web app deploys on merge.
-   - For the phones, run `eas update --channel production`.
-     `runtimeVersion` follows the app version, so the installed builds take
-     it. An install picks the update up on one launch and runs it on the next.
+   - The phones need a new build, not `eas update`. The only store build
+     (Android, version code 2, 19 Oct 2026) predates two native modules
+     (`@react-native-google-signin/google-signin`, `expo-task-manager`), so
+     `eas fingerprint:compare` differs and an update with today's code would
+     call native code that build doesn't have. That build also still reads
+     content from Supabase (it predates Phase 1's cutover). Run
+     `eas build --platform android --profile production`, then
+     `eas submit --platform android --latest` (Play's internal testing track,
+     the default). There is no iOS build on EAS.
 6. **The other Workers.** Point each one at `https://api.copticvine.ca` (see
    "The other Workers"), then deploy it:
    - `cv-media-processor` and `cv-upload-authorizer`: `SUPABASE_URL` in their
@@ -415,10 +421,13 @@ on the day.
    session must never reach Workers that still forward it to Supabase. So
    don't switch either one before then, not even to try it. Between steps 6
    and 7 their uploads and previews are refused; keep the gap short.
-   - For each Worker (`cv-admin`, `cv-artists`), go to Settings > Build >
-     Variables and secrets. Set `EXPO_PUBLIC_USER_DATA_SOURCE=cloudflare`,
-     then retry the latest build.
-   - Their phone builds, if any, take it with `eas update`.
+   - Both switch in code: `src/services/userApi.ts` reads cv-api unless
+     `EXPO_PUBLIC_USER_DATA_SOURCE` is `supabase`, as Phase 1 did for content.
+   - **CV-Admin** builds on Workers Builds when `main` is pushed (the
+     "Workers Builds: cv-admin" check on GitHub): merge and push.
+   - **CV-Artists** has no Workers Builds: after merging, deploy it by hand
+     with `npm run deploy`, the public values of `.env.example` in the
+     environment (they are what its live bundle holds).
 8. **Check every app, signed in again:**
    - **Coptic Vine:** sign in, like a track, change the profile photo, and
      follow an artist.
@@ -428,9 +437,10 @@ on the day.
 
 **Afterwards:**
 
-- Supabase stays as it is, unused, for 30 days as the fallback. A phone that
-  hasn't run the update yet still signs in and writes there, and none of that
-  is carried over. So ask the four users to open the app twice.
+- Supabase stays as it is, unused, for 30 days as the fallback. The Android
+  app still signs in and writes there until its new build is installed, and
+  none of that is carried over. So ask the four users to update the app (or
+  use copticvine.ca) and sign in again.
 - Going back means flipping the switches back: the apps' source and the
   Workers' `SUPABASE_URL`. Anything written to D1 since would then be missing
   from Supabase, so it only makes sense in the first hours.
