@@ -22,5 +22,9 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    // The link previews' data (workers/web-app): cv-api since the Phase 2 cutover; unset, Supabase.
+    "DATA_API_URL": "https://api.copticvine.ca"
+  },
   "previews": {}
 }

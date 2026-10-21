@@ -8,7 +8,8 @@
     "enabled": true
   },
   "vars": {
-    "SUPABASE_URL": "https://wtuujmeinzqfikvuofmh.supabase.co",
+    // cv-api since the Phase 2 cutover (docs/d1/phase2-runbook.md); Supabase was https://wtuujmeinzqfikvuofmh.supabase.co.
+    "SUPABASE_URL": "https://api.copticvine.ca",
     "MAX_UPLOAD_BYTES": "21474836480"
   },
   "r2_buckets": [
