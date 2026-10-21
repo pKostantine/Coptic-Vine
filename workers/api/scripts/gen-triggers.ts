@@ -29,6 +29,17 @@
  * - set_updated_at. Postgres stamps updated_at before every update. 0007's
  *   triggers stamp it after an update that didn't set it; they are made again
  *   here with the on/off guard, and stamp with the triggers off.
+ * - now(). Postgres's is the transaction's start, the same for every row it
+ *   writes. "private.transaction".at holds the Worker's transaction time while
+ *   one is named (src/db/transaction.ts); these triggers stamp with it, and
+ *   with the clock outside one. A column whose default is now() takes the
+ *   clock when it is left out, so each table with one gets an AFTER INSERT
+ *   fix-up: inside a transaction, a value equal to the statement's clock was
+ *   defaulted (SQLite's 'now' is one value for a whole statement, its triggers
+ *   included, and differs between statements) and becomes the transaction's
+ *   time. A value written out, such as a copied created_at, is left as it is.
+ *   An INSERT's RETURNING shows the row before the fix-up: a port that hands
+ *   back a timestamp it inserted writes tx.at itself.
  * - private.enqueue_notification is written out at each call: the
  *   notifications (unless the user turned the category off), then a delivery
  *   for each of the user's enabled devices, for the notifications just added
@@ -69,6 +80,9 @@ const sql = (text: string) => `'${text.split("'").join("''")}'`;
 const raise = (code: string, message: string) => `RAISE(ABORT, 'pg:${code}:' || ${message})`;
 const NEW = (name: string) => `NEW.${col(name)}`;
 const OLD = (name: string) => `OLD.${col(name)}`;
+const TX_AT = `(SELECT ${col('at')} FROM ${t('private', 'transaction')} WHERE ${col('id')} = 1)`;
+/** Postgres's now(): the transaction's time while one is named (src/db/transaction.ts), else the statement's. */
+const NOW = `coalesce(${TX_AT}, ${NOW_SQL})`;
 
 /** jsonb_build_object as Postgres prints it: keys by length, then bytes; ", " and ": " between. */
 function jsonbObject(entries: Record<string, string>): string {
@@ -107,7 +121,7 @@ const publishProfileImage = (table: [string, string]): Trigger => ({
   name: table[0] === 'music' ? 'music_artist_publish_profile_image' : 'learning_cantor_publish_profile_image',
   table, timing: 'AFTER', events: ['INSERT', 'UPDATE'], of: ['profile_image_asset_id', 'publication_status'],
   when: () => `${NEW('publication_status')} = 'published' AND ${NEW('profile_image_asset_id')} IS NOT NULL`,
-  body: () => [`UPDATE ${t('media', 'media_assets')} SET ${col('publication_status')} = 'published', ${col('updated_at')} = ${NOW_SQL}
+  body: () => [`UPDATE ${t('media', 'media_assets')} SET ${col('publication_status')} = 'published', ${col('updated_at')} = ${NOW}
     WHERE ${col('id')} = ${NEW('profile_image_asset_id')} AND ${col('processing_status')} = 'completed';`],
 });
 
@@ -115,7 +129,7 @@ const publishProfileImage = (table: [string, string]): Trigger => ({
 function syncReleaseType(release: string): string {
   const count = `(SELECT count(*) FROM ${t('music', 'release_tracks')} rt WHERE rt.${col('release_id')} = ${release})`;
   const inferred = `(CASE WHEN ${count} = 1 THEN 'single' WHEN ${count} BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END)`;
-  return `UPDATE ${t('music', 'releases')} SET ${col('release_type')} = ${inferred}, ${col('updated_at')} = ${NOW_SQL}
+  return `UPDATE ${t('music', 'releases')} SET ${col('release_type')} = ${inferred}, ${col('updated_at')} = ${NOW}
     WHERE ${col('id')} = ${release} AND ${count} > 0 AND ${col('release_type')} IS NOT ${inferred};`;
 }
 
@@ -126,7 +140,7 @@ const releaseTracks = (release: string) => `SELECT rt.${col('track_id')} FROM ${
 
 /** private.publish_music_release_consumer_dependencies(release, actor). */
 function publishReleaseDependencies(release: string, actor: string): string[] {
-  const publish = (table: [string, string], key: string, ids: string, extra = '') => `UPDATE ${t(...table)} SET ${col('publication_status')} = 'published', ${col('updated_by')} = coalesce(${actor}, ${col('updated_by')}), ${col('updated_at')} = ${NOW_SQL}
+  const publish = (table: [string, string], key: string, ids: string, extra = '') => `UPDATE ${t(...table)} SET ${col('publication_status')} = 'published', ${col('updated_by')} = coalesce(${actor}, ${col('updated_by')}), ${col('updated_at')} = ${NOW}
     WHERE ${col(key)} IN (${ids}) AND ${col('publication_status')} <> 'published'${extra};`;
   const lines = t('music', 'lyric_lines');
   const set = t('music', 'lyric_sets');
@@ -161,7 +175,7 @@ const TRIGGERS: Trigger[] = [
         PAUSE,
         `UPDATE ${t('learning', 'lessons')} SET ${col('audio_asset_id')} = ${audio} WHERE rowid = NEW.rowid;`,
         RESUME,
-        `UPDATE ${ASSETS} SET ${col('publication_status')} = 'published', ${col('updated_by')} = coalesce(${NEW('updated_by')}, ${NEW('created_by')}), ${col('updated_at')} = ${NOW_SQL}
+        `UPDATE ${ASSETS} SET ${col('publication_status')} = 'published', ${col('updated_by')} = coalesce(${NEW('updated_by')}, ${NEW('created_by')}), ${col('updated_at')} = ${NOW}
     WHERE ${col('id')} = ${audio} AND ${NEW('publication_status')} = 'published';`,
       ];
     },
@@ -211,7 +225,7 @@ const TRIGGERS: Trigger[] = [
   {
     name: 'music_artist_sync_learning_cantor_image', table: ['music', 'artists'], timing: 'AFTER', events: ['INSERT', 'UPDATE'], of: ['profile_image_asset_id', 'display_name'],
     when: () => `${NEW('profile_image_asset_id')} IS NOT NULL`,
-    body: (event) => [`UPDATE ${t('learning', 'cantors')} SET ${col('profile_image_asset_id')} = ${NEW('profile_image_asset_id')}, ${col('updated_at')} = ${NOW_SQL}
+    body: (event) => [`UPDATE ${t('learning', 'cantors')} SET ${col('profile_image_asset_id')} = ${NEW('profile_image_asset_id')}, ${col('updated_at')} = ${NOW}
     WHERE lower(trim(${col('display_name')})) = lower(trim(${NEW('display_name')}))
       AND (${col('profile_image_asset_id')} IS NULL${event === 'UPDATE' ? ` OR ${col('profile_image_asset_id')} = ${OLD('profile_image_asset_id')}` : ''});`],
   },
@@ -220,7 +234,7 @@ const TRIGGERS: Trigger[] = [
     when: () => ['display_name', 'profile_image_asset_id', 'publication_status', 'owner_creator_account_id'].map((c) => `${OLD(c)} IS NOT ${NEW(c)}`).join(' OR '),
     body: () => [`UPDATE ${t('learning', 'cantors')} SET ${col('display_name')} = ${NEW('display_name')}, ${col('profile_image_asset_id')} = ${NEW('profile_image_asset_id')},
       ${col('publication_status')} = CASE WHEN ${NEW('publication_status')} = 'published' OR ${NEW('is_credit_only')} THEN 'published' ELSE ${col('publication_status')} END,
-      ${col('updated_at')} = ${NOW_SQL}
+      ${col('updated_at')} = ${NOW}
     WHERE ${col('artist_id')} = ${NEW('id')}
       AND (${col('display_name')} IS NOT ${NEW('display_name')} OR ${col('profile_image_asset_id')} IS NOT ${NEW('profile_image_asset_id')}
         OR (${NEW('publication_status')} = 'published' AND ${col('publication_status')} <> 'published'));`],
@@ -233,8 +247,8 @@ const TRIGGERS: Trigger[] = [
   },
   {
     name: 'music_release_retire_submission_on_delete', table: ['music', 'releases'], timing: 'BEFORE', events: ['DELETE'],
-    body: () => [`UPDATE ${t('media', 'submissions')} SET ${col('status')} = 'rejected', ${col('rejected_at')} = coalesce(${col('rejected_at')}, ${NOW_SQL}),
-      ${col('review_notes')} = coalesce(nullif(${col('review_notes')}, ''), 'The linked music release was deleted from the catalog.'), ${col('updated_at')} = ${NOW_SQL}
+    body: () => [`UPDATE ${t('media', 'submissions')} SET ${col('status')} = 'rejected', ${col('rejected_at')} = coalesce(${col('rejected_at')}, ${NOW}),
+      ${col('review_notes')} = coalesce(nullif(${col('review_notes')}, ''), 'The linked music release was deleted from the catalog.'), ${col('updated_at')} = ${NOW}
     WHERE ${col('id')} = nullif(json_extract(${OLD('metadata')}, '$.submissionId'), '') AND ${col('status')} NOT IN ('published', 'rejected');`],
   },
   {
@@ -270,12 +284,12 @@ const TRIGGERS: Trigger[] = [
         PAUSE,
         `UPDATE ${RELEASES} SET ${col('cover_asset_id')} = coalesce(${newest}, ${col('cover_asset_id')}) WHERE rowid = NEW.rowid;`,
         RESUME,
-        `UPDATE ${ASSETS} SET ${col('publication_status')} = 'published', ${col('updated_at')} = ${NOW_SQL} WHERE ${col('id')} = ${cover} AND ${col('processing_status')} = 'completed';`,
-        `UPDATE ${ASSETS} SET ${col('publication_status')} = 'archived', ${col('updated_at')} = ${NOW_SQL}
+        `UPDATE ${ASSETS} SET ${col('publication_status')} = 'published', ${col('updated_at')} = ${NOW} WHERE ${col('id')} = ${cover} AND ${col('processing_status')} = 'completed';`,
+        `UPDATE ${ASSETS} SET ${col('publication_status')} = 'archived', ${col('updated_at')} = ${NOW}
     WHERE ${col('id')} = ${old} AND ${cover} IS NOT ${old}
       AND NOT ${inUse(['music', 'releases'], 'cover_asset_id', ` AND x.${col('id')} <> ${NEW('id')}`)}
       AND NOT ${inUse(['music', 'artists'], 'profile_image_asset_id')} AND NOT ${inUse(['learning', 'cantors'], 'profile_image_asset_id')};`,
-        `UPDATE ${ASSETS} SET ${col('publication_status')} = 'published', ${col('updated_at')} = ${NOW_SQL}
+        `UPDATE ${ASSETS} SET ${col('publication_status')} = 'published', ${col('updated_at')} = ${NOW}
     WHERE ${col('id')} IN (SELECT a.${col('profile_image_asset_id')} FROM ${t('music', 'artists')} a WHERE a.${col('profile_image_asset_id')} IS NOT NULL AND a.${col('id')} IN (${releaseArtists(NEW('id'))}))
       AND ${col('processing_status')} = 'completed';`,
       ];
@@ -335,6 +349,9 @@ export function generate(): string {
     `CREATE TABLE ${t('private', 'search_index_state')} (${col('id')} INTEGER PRIMARY KEY CHECK (${col('id')} = 1), ${col('version')} INTEGER NOT NULL, ${col('built_version')} INTEGER NOT NULL) STRICT;`,
     `INSERT INTO ${t('private', 'search_index_state')} VALUES (1, 0, 0);`,
     `CREATE TABLE ${t('private', 'outbox')} (${col('kind')} TEXT PRIMARY KEY, ${col('requested_at')} TEXT NOT NULL) STRICT;`,
+    '-- The transaction src/db/transaction.ts is writing for, and its time (now() for these triggers); 0010 logs its writes.',
+    `CREATE TABLE ${t('private', 'transaction')} (${col('id')} INTEGER PRIMARY KEY CHECK (${col('id')} = 1), ${col('current')} TEXT, ${col('at')} TEXT) STRICT;`,
+    `INSERT INTO ${t('private', 'transaction')} VALUES (1, NULL, NULL);`,
     '',
     '-- set_updated_at, with the on/off guard.',
   ];
@@ -346,12 +363,31 @@ export function generate(): string {
       `FOR EACH ROW WHEN NEW.${col('updated_at')} IS OLD.${col('updated_at')} AND ${ACTIVE}`,
       'BEGIN',
       `  ${PAUSE}`,
-      `  UPDATE ${match[2]} SET ${col('updated_at')} = ${NOW_SQL} WHERE rowid = NEW.rowid;`,
+      `  UPDATE ${match[2]} SET ${col('updated_at')} = ${NOW} WHERE rowid = NEW.rowid;`,
       `  ${RESUME}`,
       'END;',
     );
   }
   if (out.filter((line) => line.startsWith('DROP TRIGGER')).length !== 50) throw new Error('0007 should have 50 updated_at triggers');
+
+  out.push('', "-- now() defaults inside a transaction: the transaction's time.");
+  let fixups = 0;
+  for (const block of schema0007.matchAll(/^CREATE TABLE ("([a-z_]+)\.([a-z_]+)") \(\n([\s\S]*?)\n\) STRICT;/gm)) {
+    const defaulted = [...block[4].matchAll(/^ {2}"([a-z_]+)" TEXT[^\n]* DEFAULT (\(rtrim\(rtrim\(strftime[^\n]*?\+00:00'\))/gm)]
+      .filter((column) => column[2] === NOW_SQL).map((column) => column[1]);
+    if (!defaulted.length) continue;
+    fixups += 1;
+    out.push(
+      `CREATE TRIGGER ${indexName(block[2], `${block[3]}_transaction_time_insert`)} AFTER INSERT ON ${block[1]}`,
+      `FOR EACH ROW WHEN ${TX_AT} IS NOT NULL AND ${ACTIVE} AND (${defaulted.map((name) => `${NEW(name)} IS ${NOW_SQL}`).join(' OR ')})`,
+      'BEGIN',
+      `  ${PAUSE}`,
+      `  UPDATE ${block[1]} SET ${defaulted.map((name) => `${col(name)} = CASE WHEN ${col(name)} IS ${NOW_SQL} THEN ${TX_AT} ELSE ${col(name)} END`).join(', ')} WHERE rowid = NEW.rowid;`,
+      `  ${RESUME}`,
+      'END;',
+    );
+  }
+  if (fixups < 50) throw new Error(`0007 should have more tables with now() defaults than ${fixups}`);
 
   out.push('', "-- private.refresh_unified_search_index_trigger: the index is rebuilt after the write (src/db/searchIndex.ts).");
   const search = users.tables.filter((table) => table.workerTriggers.includes('private.refresh_unified_search_index_trigger'));
@@ -413,9 +449,8 @@ export function generateUndo(): string {
   const out = [
     '-- Generated by workers/api/scripts/gen-triggers.ts (npm run gen:triggers); do not edit.',
     '-- The undo log of src/db/transaction.ts: what a transaction wrote, to roll it back.',
+    '-- "private.transaction" names the transaction (0009, whose triggers stamp with its time).',
     '',
-    `CREATE TABLE ${t('private', 'transaction')} (${col('id')} INTEGER PRIMARY KEY CHECK (${col('id')} = 1), ${col('current')} TEXT) STRICT;`,
-    `INSERT INTO ${t('private', 'transaction')} VALUES (1, NULL);`,
     `CREATE TABLE ${t('private', 'undo_log')} (${col('seq')} INTEGER PRIMARY KEY AUTOINCREMENT, ${col('txn')} TEXT NOT NULL, ${col('table_name')} TEXT NOT NULL,`,
     `  ${col('op')} TEXT NOT NULL CHECK (${col('op')} IN ('insert', 'update', 'delete')), ${col('row')} INTEGER NOT NULL, ${col('old')} TEXT, ${col('at')} TEXT NOT NULL DEFAULT ${NOW_SQL}) STRICT;`,
     `CREATE INDEX ${indexName('private', 'undo_log_txn_idx')} ON ${t('private', 'undo_log')} (${col('txn')}, ${col('seq')});`,

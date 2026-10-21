@@ -36,8 +36,9 @@ export class Tx {
     this.at = now();
   }
 
-  private name = () => this.db.prepare(`UPDATE ${TRANSACTION} SET ${col('current')} = ? WHERE ${col('id')} = 1`).bind(this.id);
-  private unname = () => this.db.prepare(`UPDATE ${TRANSACTION} SET ${col('current')} = NULL WHERE ${col('id')} = 1`);
+  // With its time, which 0009's triggers stamp as Postgres's now().
+  private name = () => this.db.prepare(`UPDATE ${TRANSACTION} SET ${col('current')} = ?, ${col('at')} = ? WHERE ${col('id')} = 1`).bind(this.id, this.at);
+  private unname = () => this.db.prepare(`UPDATE ${TRANSACTION} SET ${col('current')} = NULL, ${col('at')} = NULL WHERE ${col('id')} = 1`);
 
   /** Writes, recorded so they can be undone. */
   async batch<T = Row>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {

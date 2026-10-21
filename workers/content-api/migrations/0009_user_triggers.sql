@@ -8,6 +8,9 @@ INSERT INTO "private.trigger_marks" VALUES ('notifications', 0);
 CREATE TABLE "private.search_index_state" ("id" INTEGER PRIMARY KEY CHECK ("id" = 1), "version" INTEGER NOT NULL, "built_version" INTEGER NOT NULL) STRICT;
 INSERT INTO "private.search_index_state" VALUES (1, 0, 0);
 CREATE TABLE "private.outbox" ("kind" TEXT PRIMARY KEY, "requested_at" TEXT NOT NULL) STRICT;
+-- The transaction src/db/transaction.ts is writing for, and its time (now() for these triggers); 0010 logs its writes.
+CREATE TABLE "private.transaction" ("id" INTEGER PRIMARY KEY CHECK ("id" = 1), "current" TEXT, "at" TEXT) STRICT;
+INSERT INTO "private.transaction" VALUES (1, NULL, NULL);
 
 -- set_updated_at, with the on/off guard.
 DROP TRIGGER "creator.creator_account_members_set_updated_at";
@@ -15,7 +18,7 @@ CREATE TRIGGER "creator.creator_account_members_set_updated_at" AFTER UPDATE ON 
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "creator.creator_account_members" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "creator.creator_account_members" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "creator.creator_accounts_set_updated_at";
@@ -23,7 +26,7 @@ CREATE TRIGGER "creator.creator_accounts_set_updated_at" AFTER UPDATE ON "creato
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "creator.creator_accounts" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "creator.creator_accounts" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "creator.profiles_set_updated_at";
@@ -31,7 +34,7 @@ CREATE TRIGGER "creator.profiles_set_updated_at" AFTER UPDATE ON "creator.profil
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "creator.profiles" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "creator.profiles" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.album_localizations_set_updated_at";
@@ -39,7 +42,7 @@ CREATE TRIGGER "learning.album_localizations_set_updated_at" AFTER UPDATE ON "le
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.album_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.album_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.album_recordings_set_updated_at";
@@ -47,7 +50,7 @@ CREATE TRIGGER "learning.album_recordings_set_updated_at" AFTER UPDATE ON "learn
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.album_recordings" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.album_recordings" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.albums_set_updated_at";
@@ -55,7 +58,7 @@ CREATE TRIGGER "learning.albums_set_updated_at" AFTER UPDATE ON "learning.albums
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.albums" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.albums" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.cantor_localizations_set_updated_at";
@@ -63,7 +66,7 @@ CREATE TRIGGER "learning.cantor_localizations_set_updated_at" AFTER UPDATE ON "l
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.cantor_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.cantor_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.cantor_permissions_set_updated_at";
@@ -71,7 +74,7 @@ CREATE TRIGGER "learning.cantor_permissions_set_updated_at" AFTER UPDATE ON "lea
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.cantor_permissions" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.cantor_permissions" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.cantors_set_updated_at";
@@ -79,7 +82,7 @@ CREATE TRIGGER "learning.cantors_set_updated_at" AFTER UPDATE ON "learning.canto
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.cantors" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.cantors" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.hymn_localizations_set_updated_at";
@@ -87,7 +90,7 @@ CREATE TRIGGER "learning.hymn_localizations_set_updated_at" AFTER UPDATE ON "lea
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.hymn_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.hymn_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.hymn_progress_set_updated_at";
@@ -95,7 +98,7 @@ CREATE TRIGGER "learning.hymn_progress_set_updated_at" AFTER UPDATE ON "learning
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.hymn_progress" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.hymn_progress" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.hymn_relationships_set_updated_at";
@@ -103,7 +106,7 @@ CREATE TRIGGER "learning.hymn_relationships_set_updated_at" AFTER UPDATE ON "lea
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.hymn_relationships" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.hymn_relationships" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.hymns_set_updated_at";
@@ -111,7 +114,7 @@ CREATE TRIGGER "learning.hymns_set_updated_at" AFTER UPDATE ON "learning.hymns"
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.hymns" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.hymns" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.item_progress_set_updated_at";
@@ -119,7 +122,7 @@ CREATE TRIGGER "learning.item_progress_set_updated_at" AFTER UPDATE ON "learning
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.item_progress" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.item_progress" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.lesson_localizations_set_updated_at";
@@ -127,7 +130,7 @@ CREATE TRIGGER "learning.lesson_localizations_set_updated_at" AFTER UPDATE ON "l
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.lesson_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.lesson_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.lesson_set_localizations_set_updated_at";
@@ -135,7 +138,7 @@ CREATE TRIGGER "learning.lesson_set_localizations_set_updated_at" AFTER UPDATE O
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.lesson_set_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.lesson_set_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.lesson_sets_set_updated_at";
@@ -143,7 +146,7 @@ CREATE TRIGGER "learning.lesson_sets_set_updated_at" AFTER UPDATE ON "learning.l
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.lesson_sets" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.lesson_sets" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.lessons_set_updated_at";
@@ -151,7 +154,7 @@ CREATE TRIGGER "learning.lessons_set_updated_at" AFTER UPDATE ON "learning.lesso
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.lessons" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.lessons" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.lyric_edit_drafts_set_updated_at";
@@ -159,7 +162,7 @@ CREATE TRIGGER "learning.lyric_edit_drafts_set_updated_at" AFTER UPDATE ON "lear
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.lyric_edit_drafts" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.lyric_edit_drafts" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.lyric_lines_set_updated_at";
@@ -167,7 +170,7 @@ CREATE TRIGGER "learning.lyric_lines_set_updated_at" AFTER UPDATE ON "learning.l
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.lyric_lines" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.lyric_lines" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.lyric_sets_set_updated_at";
@@ -175,7 +178,7 @@ CREATE TRIGGER "learning.lyric_sets_set_updated_at" AFTER UPDATE ON "learning.ly
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.lyric_sets" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.lyric_sets" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.playlists_set_updated_at";
@@ -183,7 +186,7 @@ CREATE TRIGGER "learning.playlists_set_updated_at" AFTER UPDATE ON "learning.pla
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.playlists" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.playlists" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.recording_localizations_set_updated_at";
@@ -191,7 +194,7 @@ CREATE TRIGGER "learning.recording_localizations_set_updated_at" AFTER UPDATE ON
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.recording_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.recording_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.season_localizations_set_updated_at";
@@ -199,7 +202,7 @@ CREATE TRIGGER "learning.season_localizations_set_updated_at" AFTER UPDATE ON "l
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.season_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.season_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "learning.seasons_set_updated_at";
@@ -207,7 +210,7 @@ CREATE TRIGGER "learning.seasons_set_updated_at" AFTER UPDATE ON "learning.seaso
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "learning.seasons" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "learning.seasons" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.locales_set_updated_at";
@@ -215,7 +218,7 @@ CREATE TRIGGER "media.locales_set_updated_at" AFTER UPDATE ON "media.locales"
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.locales" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.locales" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.localized_texts_set_updated_at";
@@ -223,7 +226,7 @@ CREATE TRIGGER "media.localized_texts_set_updated_at" AFTER UPDATE ON "media.loc
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.localized_texts" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.localized_texts" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.media_assets_set_updated_at";
@@ -231,7 +234,7 @@ CREATE TRIGGER "media.media_assets_set_updated_at" AFTER UPDATE ON "media.media_
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.media_assets" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.media_assets" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.media_processing_jobs_set_updated_at";
@@ -239,7 +242,7 @@ CREATE TRIGGER "media.media_processing_jobs_set_updated_at" AFTER UPDATE ON "med
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.media_processing_jobs" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.media_processing_jobs" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.search_aliases_set_updated_at";
@@ -247,7 +250,7 @@ CREATE TRIGGER "media.search_aliases_set_updated_at" AFTER UPDATE ON "media.sear
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.search_aliases" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.search_aliases" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.search_documents_set_updated_at";
@@ -255,7 +258,7 @@ CREATE TRIGGER "media.search_documents_set_updated_at" AFTER UPDATE ON "media.se
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.search_documents" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.search_documents" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.submission_items_set_updated_at";
@@ -263,7 +266,7 @@ CREATE TRIGGER "media.submission_items_set_updated_at" AFTER UPDATE ON "media.su
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.submission_items" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.submission_items" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.submissions_set_updated_at";
@@ -271,7 +274,7 @@ CREATE TRIGGER "media.submissions_set_updated_at" AFTER UPDATE ON "media.submiss
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.submissions" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.submissions" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "media.upload_intents_set_updated_at";
@@ -279,7 +282,7 @@ CREATE TRIGGER "media.upload_intents_set_updated_at" AFTER UPDATE ON "media.uplo
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "media.upload_intents" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "media.upload_intents" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.artist_localizations_set_updated_at";
@@ -287,7 +290,7 @@ CREATE TRIGGER "music.artist_localizations_set_updated_at" AFTER UPDATE ON "musi
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.artist_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.artist_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.artist_memberships_set_updated_at";
@@ -295,7 +298,7 @@ CREATE TRIGGER "music.artist_memberships_set_updated_at" AFTER UPDATE ON "music.
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.artist_memberships" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.artist_memberships" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.artists_set_updated_at";
@@ -303,7 +306,7 @@ CREATE TRIGGER "music.artists_set_updated_at" AFTER UPDATE ON "music.artists"
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.artists" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.artists" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.lyric_edit_drafts_set_updated_at";
@@ -311,7 +314,7 @@ CREATE TRIGGER "music.lyric_edit_drafts_set_updated_at" AFTER UPDATE ON "music.l
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.lyric_edit_drafts" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.lyric_edit_drafts" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.lyric_lines_set_updated_at";
@@ -319,7 +322,7 @@ CREATE TRIGGER "music.lyric_lines_set_updated_at" AFTER UPDATE ON "music.lyric_l
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.lyric_lines" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.lyric_lines" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.lyric_sets_set_updated_at";
@@ -327,7 +330,7 @@ CREATE TRIGGER "music.lyric_sets_set_updated_at" AFTER UPDATE ON "music.lyric_se
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.lyric_sets" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.lyric_sets" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.lyric_words_set_updated_at";
@@ -335,7 +338,7 @@ CREATE TRIGGER "music.lyric_words_set_updated_at" AFTER UPDATE ON "music.lyric_w
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.lyric_words" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.lyric_words" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.playlists_set_updated_at";
@@ -343,7 +346,7 @@ CREATE TRIGGER "music.playlists_set_updated_at" AFTER UPDATE ON "music.playlists
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.playlists" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.playlists" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.release_localizations_set_updated_at";
@@ -351,7 +354,7 @@ CREATE TRIGGER "music.release_localizations_set_updated_at" AFTER UPDATE ON "mus
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.release_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.release_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.releases_set_updated_at";
@@ -359,7 +362,7 @@ CREATE TRIGGER "music.releases_set_updated_at" AFTER UPDATE ON "music.releases"
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.releases" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.releases" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.track_localizations_set_updated_at";
@@ -367,7 +370,7 @@ CREATE TRIGGER "music.track_localizations_set_updated_at" AFTER UPDATE ON "music
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.track_localizations" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.track_localizations" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "music.tracks_set_updated_at";
@@ -375,7 +378,7 @@ CREATE TRIGGER "music.tracks_set_updated_at" AFTER UPDATE ON "music.tracks"
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "music.tracks" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "music.tracks" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "public.bible_highlights_set_updated_at";
@@ -383,7 +386,7 @@ CREATE TRIGGER "public.bible_highlights_set_updated_at" AFTER UPDATE ON "public.
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "public.bible_highlights" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "public.bible_highlights" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "public.sermon_plans_set_updated_at";
@@ -391,7 +394,7 @@ CREATE TRIGGER "public.sermon_plans_set_updated_at" AFTER UPDATE ON "public.serm
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "public.sermon_plans" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "public.sermon_plans" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "public.spiritual_canon_days_set_updated_at";
@@ -399,7 +402,7 @@ CREATE TRIGGER "public.spiritual_canon_days_set_updated_at" AFTER UPDATE ON "pub
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "public.spiritual_canon_days" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "public.spiritual_canon_days" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 DROP TRIGGER "public.spiritual_canons_set_updated_at";
@@ -407,7 +410,520 @@ CREATE TRIGGER "public.spiritual_canons_set_updated_at" AFTER UPDATE ON "public.
 FOR EACH ROW WHEN NEW."updated_at" IS OLD."updated_at" AND (SELECT "depth" FROM "private.replica_mode") = 0
 BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
-  UPDATE "public.spiritual_canons" SET "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE rowid = NEW.rowid;
+  UPDATE "public.spiritual_canons" SET "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+
+-- now() defaults inside a transaction: the transaction's time.
+CREATE TRIGGER "creator.creator_account_members_transaction_time_insert" AFTER INSERT ON "creator.creator_account_members"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "creator.creator_account_members" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "creator.creator_accounts_transaction_time_insert" AFTER INSERT ON "creator.creator_accounts"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "creator.creator_accounts" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "creator.profiles_transaction_time_insert" AFTER INSERT ON "creator.profiles"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "creator.profiles" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "creator.user_roles_transaction_time_insert" AFTER INSERT ON "creator.user_roles"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."granted_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "creator.user_roles" SET "granted_at" = CASE WHEN "granted_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "granted_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.album_localizations_transaction_time_insert" AFTER INSERT ON "learning.album_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.album_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.album_recordings_transaction_time_insert" AFTER INSERT ON "learning.album_recordings"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.album_recordings" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.albums_transaction_time_insert" AFTER INSERT ON "learning.albums"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.albums" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.cantor_localizations_transaction_time_insert" AFTER INSERT ON "learning.cantor_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.cantor_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.cantor_permissions_transaction_time_insert" AFTER INSERT ON "learning.cantor_permissions"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.cantor_permissions" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.cantors_transaction_time_insert" AFTER INSERT ON "learning.cantors"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.cantors" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.hymn_localizations_transaction_time_insert" AFTER INSERT ON "learning.hymn_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.hymn_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.hymn_progress_transaction_time_insert" AFTER INSERT ON "learning.hymn_progress"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.hymn_progress" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.hymn_relationships_transaction_time_insert" AFTER INSERT ON "learning.hymn_relationships"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.hymn_relationships" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.hymn_seasons_transaction_time_insert" AFTER INSERT ON "learning.hymn_seasons"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.hymn_seasons" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.hymns_transaction_time_insert" AFTER INSERT ON "learning.hymns"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.hymns" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.item_likes_transaction_time_insert" AFTER INSERT ON "learning.item_likes"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.item_likes" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.item_progress_transaction_time_insert" AFTER INSERT ON "learning.item_progress"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.item_progress" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.lesson_localizations_transaction_time_insert" AFTER INSERT ON "learning.lesson_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.lesson_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.lesson_set_localizations_transaction_time_insert" AFTER INSERT ON "learning.lesson_set_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.lesson_set_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.lesson_sets_transaction_time_insert" AFTER INSERT ON "learning.lesson_sets"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.lesson_sets" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.lessons_transaction_time_insert" AFTER INSERT ON "learning.lessons"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.lessons" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.lyric_edit_drafts_transaction_time_insert" AFTER INSERT ON "learning.lyric_edit_drafts"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.lyric_edit_drafts" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.lyric_lines_transaction_time_insert" AFTER INSERT ON "learning.lyric_lines"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.lyric_lines" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.lyric_sets_transaction_time_insert" AFTER INSERT ON "learning.lyric_sets"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.lyric_sets" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.playlist_items_transaction_time_insert" AFTER INSERT ON "learning.playlist_items"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.playlist_items" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.playlists_transaction_time_insert" AFTER INSERT ON "learning.playlists"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.playlists" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.recording_localizations_transaction_time_insert" AFTER INSERT ON "learning.recording_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.recording_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.season_localizations_transaction_time_insert" AFTER INSERT ON "learning.season_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.season_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "learning.seasons_transaction_time_insert" AFTER INSERT ON "learning.seasons"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "learning.seasons" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.locales_transaction_time_insert" AFTER INSERT ON "media.locales"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.locales" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.localized_texts_transaction_time_insert" AFTER INSERT ON "media.localized_texts"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.localized_texts" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.media_asset_versions_transaction_time_insert" AFTER INSERT ON "media.media_asset_versions"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.media_asset_versions" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.media_assets_transaction_time_insert" AFTER INSERT ON "media.media_assets"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.media_assets" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.media_processing_jobs_transaction_time_insert" AFTER INSERT ON "media.media_processing_jobs"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."queued_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."available_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.media_processing_jobs" SET "queued_at" = CASE WHEN "queued_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "queued_at" END, "available_at" = CASE WHEN "available_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "available_at" END, "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.search_aliases_transaction_time_insert" AFTER INSERT ON "media.search_aliases"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.search_aliases" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.search_documents_transaction_time_insert" AFTER INSERT ON "media.search_documents"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.search_documents" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.storage_gc_candidates_transaction_time_insert" AFTER INSERT ON "media.storage_gc_candidates"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."first_unused_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."last_seen_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.storage_gc_candidates" SET "first_unused_at" = CASE WHEN "first_unused_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "first_unused_at" END, "last_seen_at" = CASE WHEN "last_seen_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "last_seen_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.submission_events_transaction_time_insert" AFTER INSERT ON "media.submission_events"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.submission_events" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.submission_items_transaction_time_insert" AFTER INSERT ON "media.submission_items"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.submission_items" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.submissions_transaction_time_insert" AFTER INSERT ON "media.submissions"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.submissions" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "media.upload_intents_transaction_time_insert" AFTER INSERT ON "media.upload_intents"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "media.upload_intents" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.artist_follows_transaction_time_insert" AFTER INSERT ON "music.artist_follows"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.artist_follows" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.artist_localizations_transaction_time_insert" AFTER INSERT ON "music.artist_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.artist_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.artist_memberships_transaction_time_insert" AFTER INSERT ON "music.artist_memberships"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.artist_memberships" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.artist_pinned_releases_transaction_time_insert" AFTER INSERT ON "music.artist_pinned_releases"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.artist_pinned_releases" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.artist_social_links_transaction_time_insert" AFTER INSERT ON "music.artist_social_links"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.artist_social_links" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.artists_transaction_time_insert" AFTER INSERT ON "music.artists"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.artists" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.lyric_edit_drafts_transaction_time_insert" AFTER INSERT ON "music.lyric_edit_drafts"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.lyric_edit_drafts" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.lyric_lines_transaction_time_insert" AFTER INSERT ON "music.lyric_lines"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.lyric_lines" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.lyric_sets_transaction_time_insert" AFTER INSERT ON "music.lyric_sets"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.lyric_sets" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.lyric_words_transaction_time_insert" AFTER INSERT ON "music.lyric_words"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.lyric_words" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.play_history_transaction_time_insert" AFTER INSERT ON "music.play_history"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."played_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.play_history" SET "played_at" = CASE WHEN "played_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "played_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.playlist_tracks_transaction_time_insert" AFTER INSERT ON "music.playlist_tracks"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.playlist_tracks" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.playlists_transaction_time_insert" AFTER INSERT ON "music.playlists"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.playlists" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.release_likes_transaction_time_insert" AFTER INSERT ON "music.release_likes"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.release_likes" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.release_localizations_transaction_time_insert" AFTER INSERT ON "music.release_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.release_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.release_tracks_transaction_time_insert" AFTER INSERT ON "music.release_tracks"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.release_tracks" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.releases_transaction_time_insert" AFTER INSERT ON "music.releases"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.releases" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.track_artists_transaction_time_insert" AFTER INSERT ON "music.track_artists"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.track_artists" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.track_likes_transaction_time_insert" AFTER INSERT ON "music.track_likes"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.track_likes" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.track_localizations_transaction_time_insert" AFTER INSERT ON "music.track_localizations"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.track_localizations" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "music.tracks_transaction_time_insert" AFTER INSERT ON "music.tracks"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "music.tracks" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "private.media_worker_tokens_transaction_time_insert" AFTER INSERT ON "private.media_worker_tokens"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "private.media_worker_tokens" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "private.notification_deliveries_transaction_time_insert" AFTER INSERT ON "private.notification_deliveries"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."available_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "private.notification_deliveries" SET "available_at" = CASE WHEN "available_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "available_at" END, "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.bible_highlights_transaction_time_insert" AFTER INSERT ON "public.bible_highlights"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.bible_highlights" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.notification_broadcasts_transaction_time_insert" AFTER INSERT ON "public.notification_broadcasts"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.notification_broadcasts" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.notification_devices_transaction_time_insert" AFTER INSERT ON "public.notification_devices"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."last_seen_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.notification_devices" SET "last_seen_at" = CASE WHEN "last_seen_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "last_seen_at" END, "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.notification_preferences_transaction_time_insert" AFTER INSERT ON "public.notification_preferences"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.notification_preferences" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.notifications_transaction_time_insert" AFTER INSERT ON "public.notifications"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.notifications" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.sermon_plans_transaction_time_insert" AFTER INSERT ON "public.sermon_plans"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.sermon_plans" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.spiritual_canon_days_transaction_time_insert" AFTER INSERT ON "public.spiritual_canon_days"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.spiritual_canon_days" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.spiritual_canons_transaction_time_insert" AFTER INSERT ON "public.spiritual_canons"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.spiritual_canons" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
+  UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
+END;
+CREATE TRIGGER "public.user_content_preferences_transaction_time_insert" AFTER INSERT ON "public.user_content_preferences"
+FOR EACH ROW WHEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) IS NOT NULL AND (SELECT "depth" FROM "private.replica_mode") = 0 AND (NEW."created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') OR NEW."updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
+BEGIN
+  UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
+  UPDATE "public.user_content_preferences" SET "created_at" = CASE WHEN "created_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "created_at" END, "updated_at" = CASE WHEN "updated_at" IS (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') THEN (SELECT "at" FROM "private.transaction" WHERE "id" = 1) ELSE "updated_at" END WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
 END;
 
@@ -732,13 +1248,13 @@ END;
 CREATE TRIGGER "learning.cantors_learning_cantor_publish_profile_image_insert" AFTER INSERT ON "learning.cantors"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (NEW."publication_status" = 'published' AND NEW."profile_image_asset_id" IS NOT NULL)
 BEGIN
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = NEW."profile_image_asset_id" AND "processing_status" = 'completed';
 END;
 CREATE TRIGGER "learning.cantors_learning_cantor_publish_profile_image_update" AFTER UPDATE OF "profile_image_asset_id", "publication_status" ON "learning.cantors"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (NEW."publication_status" = 'published' AND NEW."profile_image_asset_id" IS NOT NULL)
 BEGIN
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = NEW."profile_image_asset_id" AND "processing_status" = 'completed';
 END;
 
@@ -749,7 +1265,7 @@ BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
   UPDATE "learning.lessons" SET "audio_asset_id" = (SELECT si."audio_only_asset_id" FROM "media.submission_items" si WHERE si."id" = json_extract(NEW."metadata", '$.submissionItemId')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_by" = coalesce(NEW."updated_by", NEW."created_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_by" = coalesce(NEW."updated_by", NEW."created_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = (SELECT si."audio_only_asset_id" FROM "media.submission_items" si WHERE si."id" = json_extract(NEW."metadata", '$.submissionItemId')) AND NEW."publication_status" = 'published';
 END;
 CREATE TRIGGER "learning.lessons_learning_lesson_attach_audio_asset_update" AFTER UPDATE OF "publication_status" ON "learning.lessons"
@@ -758,7 +1274,7 @@ BEGIN
   UPDATE "private.replica_mode" SET "depth" = "depth" + 1;
   UPDATE "learning.lessons" SET "audio_asset_id" = (SELECT si."audio_only_asset_id" FROM "media.submission_items" si WHERE si."id" = json_extract(NEW."metadata", '$.submissionItemId')) WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_by" = coalesce(NEW."updated_by", NEW."created_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_by" = coalesce(NEW."updated_by", NEW."created_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = (SELECT si."audio_only_asset_id" FROM "media.submission_items" si WHERE si."id" = json_extract(NEW."metadata", '$.submissionItemId')) AND NEW."publication_status" = 'published';
 END;
 
@@ -890,7 +1406,7 @@ FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (OLD."d
 BEGIN
   UPDATE "learning.cantors" SET "display_name" = NEW."display_name", "profile_image_asset_id" = NEW."profile_image_asset_id",
       "publication_status" = CASE WHEN NEW."publication_status" = 'published' OR NEW."is_credit_only" THEN 'published' ELSE "publication_status" END,
-      "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+      "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "artist_id" = NEW."id"
       AND ("display_name" IS NOT NEW."display_name" OR "profile_image_asset_id" IS NOT NEW."profile_image_asset_id"
         OR (NEW."publication_status" = 'published' AND "publication_status" <> 'published'));
@@ -898,27 +1414,27 @@ END;
 CREATE TRIGGER "music.artists_music_artist_sync_learning_cantor_image_insert" AFTER INSERT ON "music.artists"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (NEW."profile_image_asset_id" IS NOT NULL)
 BEGIN
-  UPDATE "learning.cantors" SET "profile_image_asset_id" = NEW."profile_image_asset_id", "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "learning.cantors" SET "profile_image_asset_id" = NEW."profile_image_asset_id", "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE lower(trim("display_name")) = lower(trim(NEW."display_name"))
       AND ("profile_image_asset_id" IS NULL);
 END;
 CREATE TRIGGER "music.artists_music_artist_sync_learning_cantor_image_update" AFTER UPDATE OF "profile_image_asset_id", "display_name" ON "music.artists"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (NEW."profile_image_asset_id" IS NOT NULL)
 BEGIN
-  UPDATE "learning.cantors" SET "profile_image_asset_id" = NEW."profile_image_asset_id", "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "learning.cantors" SET "profile_image_asset_id" = NEW."profile_image_asset_id", "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE lower(trim("display_name")) = lower(trim(NEW."display_name"))
       AND ("profile_image_asset_id" IS NULL OR "profile_image_asset_id" = OLD."profile_image_asset_id");
 END;
 CREATE TRIGGER "music.artists_music_artist_publish_profile_image_insert" AFTER INSERT ON "music.artists"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (NEW."publication_status" = 'published' AND NEW."profile_image_asset_id" IS NOT NULL)
 BEGIN
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = NEW."profile_image_asset_id" AND "processing_status" = 'completed';
 END;
 CREATE TRIGGER "music.artists_music_artist_publish_profile_image_update" AFTER UPDATE OF "profile_image_asset_id", "publication_status" ON "music.artists"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (NEW."publication_status" = 'published' AND NEW."profile_image_asset_id" IS NOT NULL)
 BEGIN
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = NEW."profile_image_asset_id" AND "processing_status" = 'completed';
 END;
 
@@ -926,21 +1442,21 @@ END;
 CREATE TRIGGER "music.release_tracks_release_tracks_sync_release_type_insert" AFTER INSERT ON "music.release_tracks"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0)
 BEGIN
-  UPDATE "music.releases" SET "release_type" = (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.releases" SET "release_type" = (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = NEW."release_id" AND (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") > 0 AND "release_type" IS NOT (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END);
 END;
 CREATE TRIGGER "music.release_tracks_release_tracks_sync_release_type_update" AFTER UPDATE OF "release_id" ON "music.release_tracks"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0)
 BEGIN
-  UPDATE "music.releases" SET "release_type" = (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.releases" SET "release_type" = (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = NEW."release_id" AND (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") > 0 AND "release_type" IS NOT (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END);
-  UPDATE "music.releases" SET "release_type" = (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.releases" SET "release_type" = (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = OLD."release_id" AND (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") > 0 AND "release_type" IS NOT (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END) AND OLD."release_id" IS NOT NEW."release_id";
 END;
 CREATE TRIGGER "music.release_tracks_release_tracks_sync_release_type_delete" AFTER DELETE ON "music.release_tracks"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0)
 BEGIN
-  UPDATE "music.releases" SET "release_type" = (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.releases" SET "release_type" = (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = OLD."release_id" AND (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") > 0 AND "release_type" IS NOT (CASE WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") = 1 THEN 'single' WHEN (SELECT count(*) FROM "music.release_tracks" rt WHERE rt."release_id" = OLD."release_id") BETWEEN 2 AND 6 THEN 'ep' ELSE 'album' END);
 END;
 
@@ -1024,24 +1540,24 @@ END;
 CREATE TRIGGER "music.releases_music_release_retire_submission_on_delete_delete" BEFORE DELETE ON "music.releases"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0)
 BEGIN
-  UPDATE "media.submissions" SET "status" = 'rejected', "rejected_at" = coalesce("rejected_at", (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')),
-      "review_notes" = coalesce(nullif("review_notes", ''), 'The linked music release was deleted from the catalog.'), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.submissions" SET "status" = 'rejected', "rejected_at" = coalesce("rejected_at", coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))),
+      "review_notes" = coalesce(nullif("review_notes", ''), 'The linked music release was deleted from the catalog.'), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = nullif(json_extract(OLD."metadata", '$.submissionId'), '') AND "status" NOT IN ('published', 'rejected');
 END;
 CREATE TRIGGER "music.releases_music_release_publish_consumer_dependencies_insert" AFTER INSERT ON "music.releases"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (NEW."publication_status" = 'published')
 BEGIN
-  UPDATE "music.artists" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.artists" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" IN (SELECT r."primary_artist_id" FROM "music.releases" r WHERE r."id" = NEW."id" AND r."primary_artist_id" IS NOT NULL
       UNION SELECT ta."artist_id" FROM "music.release_tracks" rt JOIN "music.track_artists" ta ON ta."track_id" = rt."track_id" WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published';
-  UPDATE "music.artist_localizations" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.artist_localizations" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "artist_id" IN (SELECT r."primary_artist_id" FROM "music.releases" r WHERE r."id" = NEW."id" AND r."primary_artist_id" IS NOT NULL
       UNION SELECT ta."artist_id" FROM "music.release_tracks" rt JOIN "music.track_artists" ta ON ta."track_id" = rt."track_id" WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published';
-  UPDATE "music.tracks" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.tracks" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" IN (SELECT rt."track_id" FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published';
-  UPDATE "music.track_localizations" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.track_localizations" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "track_id" IN (SELECT rt."track_id" FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published';
-  UPDATE "music.lyric_sets" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.lyric_sets" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "track_id" IN (SELECT rt."track_id" FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published'
       AND "sync_precision" IN ('line', 'word')
       AND EXISTS (SELECT 1 FROM "music.lyric_lines" l WHERE l."lyric_set_id" = "music.lyric_sets"."id")
@@ -1054,17 +1570,17 @@ END;
 CREATE TRIGGER "music.releases_music_release_publish_consumer_dependencies_update" AFTER UPDATE OF "publication_status" ON "music.releases"
 FOR EACH ROW WHEN ((SELECT "depth" FROM "private.replica_mode") = 0) AND (NEW."publication_status" = 'published')
 BEGIN
-  UPDATE "music.artists" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.artists" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" IN (SELECT r."primary_artist_id" FROM "music.releases" r WHERE r."id" = NEW."id" AND r."primary_artist_id" IS NOT NULL
       UNION SELECT ta."artist_id" FROM "music.release_tracks" rt JOIN "music.track_artists" ta ON ta."track_id" = rt."track_id" WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published';
-  UPDATE "music.artist_localizations" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.artist_localizations" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "artist_id" IN (SELECT r."primary_artist_id" FROM "music.releases" r WHERE r."id" = NEW."id" AND r."primary_artist_id" IS NOT NULL
       UNION SELECT ta."artist_id" FROM "music.release_tracks" rt JOIN "music.track_artists" ta ON ta."track_id" = rt."track_id" WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published';
-  UPDATE "music.tracks" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.tracks" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" IN (SELECT rt."track_id" FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published';
-  UPDATE "music.track_localizations" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.track_localizations" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "track_id" IN (SELECT rt."track_id" FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published';
-  UPDATE "music.lyric_sets" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "music.lyric_sets" SET "publication_status" = 'published', "updated_by" = coalesce(coalesce(NEW."updated_by", NEW."created_by"), "updated_by"), "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "track_id" IN (SELECT rt."track_id" FROM "music.release_tracks" rt WHERE rt."release_id" = NEW."id") AND "publication_status" <> 'published'
       AND "sync_precision" IN ('line', 'word')
       AND EXISTS (SELECT 1 FROM "music.lyric_lines" l WHERE l."lyric_set_id" = "music.lyric_sets"."id")
@@ -1082,12 +1598,12 @@ BEGIN
       WHERE item."submission_id" = nullif(json_extract(NEW."metadata", '$.submissionId'), '') AND item."role" = 'artwork' AND item."media_asset_id" IS NOT NULL
       ORDER BY item."created_at" DESC, item."id" DESC LIMIT 1), "cover_asset_id") WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE "id" = (SELECT "cover_asset_id" FROM "music.releases" WHERE rowid = NEW.rowid) AND "processing_status" = 'completed';
-  UPDATE "media.media_assets" SET "publication_status" = 'archived', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE "id" = (SELECT "cover_asset_id" FROM "music.releases" WHERE rowid = NEW.rowid) AND "processing_status" = 'completed';
+  UPDATE "media.media_assets" SET "publication_status" = 'archived', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = NEW."cover_asset_id" AND (SELECT "cover_asset_id" FROM "music.releases" WHERE rowid = NEW.rowid) IS NOT NEW."cover_asset_id"
       AND NOT EXISTS (SELECT 1 FROM "music.releases" x WHERE x."cover_asset_id" = NEW."cover_asset_id" AND x."id" <> NEW."id")
       AND NOT EXISTS (SELECT 1 FROM "music.artists" x WHERE x."profile_image_asset_id" = NEW."cover_asset_id") AND NOT EXISTS (SELECT 1 FROM "learning.cantors" x WHERE x."profile_image_asset_id" = NEW."cover_asset_id");
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" IN (SELECT a."profile_image_asset_id" FROM "music.artists" a WHERE a."profile_image_asset_id" IS NOT NULL AND a."id" IN (SELECT r."primary_artist_id" FROM "music.releases" r WHERE r."id" = NEW."id" AND r."primary_artist_id" IS NOT NULL
       UNION SELECT ta."artist_id" FROM "music.release_tracks" rt JOIN "music.track_artists" ta ON ta."track_id" = rt."track_id" WHERE rt."release_id" = NEW."id"))
       AND "processing_status" = 'completed';
@@ -1100,12 +1616,12 @@ BEGIN
       WHERE item."submission_id" = nullif(json_extract(NEW."metadata", '$.submissionId'), '') AND item."role" = 'artwork' AND item."media_asset_id" IS NOT NULL
       ORDER BY item."created_at" DESC, item."id" DESC LIMIT 1), "cover_asset_id") WHERE rowid = NEW.rowid;
   UPDATE "private.replica_mode" SET "depth" = "depth" - 1;
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00') WHERE "id" = (SELECT "cover_asset_id" FROM "music.releases" WHERE rowid = NEW.rowid) AND "processing_status" = 'completed';
-  UPDATE "media.media_assets" SET "publication_status" = 'archived', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')) WHERE "id" = (SELECT "cover_asset_id" FROM "music.releases" WHERE rowid = NEW.rowid) AND "processing_status" = 'completed';
+  UPDATE "media.media_assets" SET "publication_status" = 'archived', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" = NEW."cover_asset_id" AND (SELECT "cover_asset_id" FROM "music.releases" WHERE rowid = NEW.rowid) IS NOT NEW."cover_asset_id"
       AND NOT EXISTS (SELECT 1 FROM "music.releases" x WHERE x."cover_asset_id" = NEW."cover_asset_id" AND x."id" <> NEW."id")
       AND NOT EXISTS (SELECT 1 FROM "music.artists" x WHERE x."profile_image_asset_id" = NEW."cover_asset_id") AND NOT EXISTS (SELECT 1 FROM "learning.cantors" x WHERE x."profile_image_asset_id" = NEW."cover_asset_id");
-  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00')
+  UPDATE "media.media_assets" SET "publication_status" = 'published', "updated_at" = coalesce((SELECT "at" FROM "private.transaction" WHERE "id" = 1), (rtrim(rtrim(strftime('%Y-%m-%dT%H:%M:%f', 'now'), '0'), '.') || '+00:00'))
     WHERE "id" IN (SELECT a."profile_image_asset_id" FROM "music.artists" a WHERE a."profile_image_asset_id" IS NOT NULL AND a."id" IN (SELECT r."primary_artist_id" FROM "music.releases" r WHERE r."id" = NEW."id" AND r."primary_artist_id" IS NOT NULL
       UNION SELECT ta."artist_id" FROM "music.release_tracks" rt JOIN "music.track_artists" ta ON ta."track_id" = rt."track_id" WHERE rt."release_id" = NEW."id"))
       AND "processing_status" = 'completed';
