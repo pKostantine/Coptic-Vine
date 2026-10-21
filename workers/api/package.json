@@ -15,7 +15,8 @@
     "save-schema-dump": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/save-schema-dump.ts",
     "closure": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/function-closure.ts",
     "gen:functions": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-functions.ts",
-    "search-parity": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/search-parity.ts"
+    "search-parity": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/search-parity.ts",
+    "gen:triggers": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/gen-triggers.ts"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.12",

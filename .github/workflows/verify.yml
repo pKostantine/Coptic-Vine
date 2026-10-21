@@ -59,7 +59,7 @@ jobs:
         run: npm test && ../../node_modules/.bin/tsc -p . && npm run gen:schema -- --check
       - name: User data API (D1 schema for Phase 2, import, sign-in)
         working-directory: workers/api
-        run: npm ci --no-audit --no-fund && npm test && ../../node_modules/.bin/tsc -p . && npm run gen:schema -- --check && npm run gen:functions -- --check
+        run: npm ci --no-audit --no-fund && npm test && ../../node_modules/.bin/tsc -p . && npm run gen:schema -- --check && npm run gen:functions -- --check && npm run gen:triggers -- --check
       - name: Validate media processor (including multi-GB video)
         working-directory: workers/media-processor
         run: npm ci --no-audit --no-fund && npm test

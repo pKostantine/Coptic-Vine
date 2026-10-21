@@ -39,9 +39,10 @@ and the inventory is [phase2-inventory.md](phase2-inventory.md).
   signed-in user.
 - **Triggers.**
   - The 50 `updated_at` triggers are SQLite triggers.
-  - The other 30 are application logic, and move into the Worker: search
-    index refresh, notifications, artwork, and release rules. They are
-    listed per table in `workers/api/schema/user-tables.json`.
+  - The other 37 (search index refresh, notifications, artwork, release
+    rules, artist and cantor syncing) are listed per table in
+    `workers/api/schema/user-tables.json`. They are SQLite triggers too, in
+    migration `0009` (see "Triggers and writes" below).
   - One CHECK reads today's date (a release date at most a year ahead), so
     the Worker enforces it too.
 - **Not copied.**
@@ -170,14 +171,24 @@ dump made by `schema/pg-schema-dump.sql` and saved with
 - Writes are compared table by table.
 - Nothing touches Supabase.
 
-****Production bug found by the oracle: playlist editing.**
+**Production bug found by the oracle: playlist editing.**
 
 - **Since when:** migration `20260921221500_notification_infrastructure.sql` (21 Sept 2026) revoked the signed-in role's USAGE on schema `private`.
 - **What breaks:** every SECURITY INVOKER function that calls a `private.*` helper by name now fails with "permission denied for schema private". On Supabase today that means adding, removing and reordering playlist tracks, renaming a playlist and deleting one. Unused creator functions fail too. The last track added to a playlist was on 21 Sept.
 - **The Worker:** it implements the working behaviour. The parity tests compare it with Supabase as it was before the revoke (`createOracle({ privateUsage: true })`), and one test records the failure as deployed.
-- **Fixing it on Supabase until the cutover:** `grant usage on schema private to authenticated;`. That restores the state from 16 to 21 Sept. Functions there still need their own EXECUTE grants, and the tables there have no grants to `authenticated`.
+- **On Supabase:** left as it is (Pierre, 21 Oct 2026); only the new database has to work.
 
-**After a change to a Supabase function, until the cutover:****
+**Triggers and writes.**
+
+- **Triggers.** `npm run gen:triggers` writes migration `0009_user_triggers.sql` from `scripts/gen-triggers.ts`: Supabase's triggers as SQLite triggers, so D1 applies them to every write, in the same transaction, whoever writes. The script's header says how each kind maps (BEFORE triggers that change the row, the order triggers fire in, errors with their SQLSTATE).
+- **Replica mode.** `"private.replica_mode"` turns every trigger off while it is above 0, as `session_replication_role = replica` does. The import raises it for its whole run.
+- **After the write.** Two things Supabase did outside the transaction, the Worker does once the write has committed (`src/db/afterWrites.ts`): rebuild the catalog search index when the catalog changed (the triggers count changes in `"private.search_index_state"`), and wake the media processor when a job is queued (`"private.outbox"`). A cron runs the same step every minute, in case a request missed it.
+- **Atomic.** A Supabase function runs in one transaction. D1 has none across statements, so a ported function that writes more than once checks everything first and then writes in one `db.batch()`, which D1 applies whole or not at all. The tests' D1 stand-in does the same.
+- **Checked by** `tests/triggers.parity.test.ts`: the same writes on the oracle and on SQLite, every table compared after each. The search index rebuilt from the real D1 copy matched Supabase's, 103 documents of 103, field by field.
+- **Not ported:** `media.search_aliases`' normalization trigger. Nothing writes that table; whatever does must store `normalized_alias` with `normalizeSearchText`.
+- **Applied** to the local D1. The remote D1 gets it at the cutover, before the final import (which needs it).
+
+**After a change to a Supabase function, until the cutover:**
 
 1. Re-run the dump and `npm run save-schema-dump -- <result>`.
 2. Run `npm run gen:functions`. It regenerates `schema/functions.json`, which records each function's parameters, defaults, types and grants.
@@ -225,4 +236,4 @@ Phase 1's, which now also handle weights.
 | 4. Sign-in Worker | Built and tested; not deployed until the cutover (see below). |
 | 5. API (~134 functions, 6 tables) | In progress (see below). Done: the six tables, content preferences, push devices, music, learning and search. |
 | 6. Jobs, storage and Workers that call Supabase | Not started. |
-| 7. Cutover | Not started. |
+| 7. Cutover | Not started. Apply `0009` (and any later migration) to the remote D1 before the final import. |

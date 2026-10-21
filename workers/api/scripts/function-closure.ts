@@ -19,7 +19,7 @@ for (const statement of dump.split('\n--;;\n')) {
   }
 }
 
-const ported = new Set(Object.entries(RPCS).flatMap(([schema, fns]) => Object.keys(fns).map((name) => `${schema}.${name}`)));
+const ported = new Set(Object.keys(RPCS));
 
 function calls(body: string): string[] {
   const out = new Set<string>();

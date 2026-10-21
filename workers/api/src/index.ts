@@ -18,7 +18,8 @@
  * token instead.
  */
 import { createAuth, list, type Auth } from './auth/index.ts';
-import { httpStatus, PgError } from './pg.ts';
+import { afterWrites, trackWrites } from './db/afterWrites.ts';
+import { httpStatus, PgError, triggerError } from './pg.ts';
 import type { ApiContext } from './rest/context.ts';
 import { tableRequest } from './rest/tables.ts';
 import { callRpc } from './rpc/index.ts';
@@ -52,7 +53,10 @@ function withHeaders(response: Response, headers: Record<string, string>): Respo
   return out;
 }
 
-export async function handle(request: Request, env: Env): Promise<Response> {
+/** The Workers runtime's ExecutionContext, the part used here. */
+type Execution = { waitUntil(promise: Promise<unknown>): void };
+
+export async function handle(request: Request, env: Env, execution?: Execution): Promise<Response> {
   const url = new URL(request.url);
   const corsHeaders = cors(request, env);
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
@@ -61,7 +65,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     return withHeaders(await auth(env).handler(request), corsHeaders);
   }
   if (url.pathname.startsWith('/rest/v1/')) {
-    return withHeaders(await rest(request, url, env), corsHeaders);
+    return withHeaders(await rest(request, url, env, execution), corsHeaders);
   }
   if (url.pathname === '/health') {
     const db = await env.DB.prepare('SELECT 1 AS ok').first<{ ok: number }>();
@@ -70,11 +74,19 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   return withHeaders(Response.json({ code: 'PGRST125', message: 'Not found', details: null, hint: null }, { status: 404 }), corsHeaders);
 }
 
-async function rest(request: Request, url: URL, env: Env): Promise<Response> {
+async function rest(request: Request, url: URL, env: Env, execution?: Execution): Promise<Response> {
+  let wrote = false;
+  const response = await restResponse(request, url, env, () => { wrote = true; });
+  // What Supabase did after a write (the search index, the media processor); the write itself has committed.
+  if (wrote) await afterWrites(env, execution?.waitUntil.bind(execution)).catch((error) => console.error('After the write:', error));
+  return response;
+}
+
+async function restResponse(request: Request, url: URL, env: Env, onWrite: () => void): Promise<Response> {
   let ctx: ApiContext | null = null;
   try {
     const session = await auth(env).api.getSession({ headers: request.headers });
-    ctx = { db: env.DB, env, userId: session?.user.id ?? null };
+    ctx = { db: trackWrites(env.DB, onWrite), env, userId: session?.user.id ?? null };
     const path = url.pathname.slice('/rest/v1/'.length);
     const profile = request.headers.get(request.method === 'GET' || request.method === 'HEAD' ? 'accept-profile' : 'content-profile') ?? 'public';
     const rpc = path.match(/^rpc\/([A-Za-z_]\w*)$/);
@@ -97,6 +109,8 @@ async function rest(request: Request, url: URL, env: Env): Promise<Response> {
       const status = error.code === '42501' ? httpStatus(error.code, Boolean(ctx?.userId)) : error.status;
       return Response.json(error.body(), { status });
     }
+    const raised = triggerError(error);
+    if (raised) return Response.json(raised.body(), { status: raised.code === '42501' ? httpStatus(raised.code, Boolean(ctx?.userId)) : raised.status });
     const message = (error as Error).message ?? String(error);
     // D1's constraint failures, as Postgres would report them.
     if (/UNIQUE constraint failed/.test(message)) return Response.json({ code: '23505', details: null, hint: null, message: 'duplicate key value violates unique constraint' }, { status: 409 });
@@ -109,4 +123,10 @@ async function rest(request: Request, url: URL, env: Env): Promise<Response> {
   }
 }
 
-export default { fetch: handle };
+export default {
+  fetch: handle,
+  /** Every minute: whatever a request's after-write step missed. */
+  async scheduled(_controller: unknown, env: Env): Promise<void> {
+    await afterWrites(env);
+  },
+};

@@ -4,9 +4,9 @@
  * (timestamps in ISO, jsonb as JSON values, text[] as lists) and converted
  * for SQLite as the Worker converts its inputs (src/rest/tables.ts).
  *
- * Postgres's triggers are paused while seeding (session_replication_role =
- * replica): they are application logic that runs on writes the Worker makes
- * itself, and seeding is setting up a state, not exercising them.
+ * Triggers are paused while seeding, Postgres's (session_replication_role =
+ * replica) and the Worker's (0009's "private.replica_mode"): seeding sets up
+ * a state, it doesn't exercise them.
  */
 import schema from '../../schema/user-tables.json' with { type: 'json' };
 import type { UserTable } from '../../scripts/gen-schema.ts';
@@ -20,6 +20,7 @@ export type Seed = [table: string, rows: Record<string, unknown>[]][];
 
 export async function seed(oracle: Oracle, worker: WorkerSide, data: Seed): Promise<void> {
   await oracle.sql('set session_replication_role = replica');
+  worker.db.exec('UPDATE "private.replica_mode" SET "depth" = "depth" + 1');
   try {
     for (const [name, rows] of data) {
       const table = tables.get(name);
@@ -43,5 +44,6 @@ export async function seed(oracle: Oracle, worker: WorkerSide, data: Seed): Prom
     }
   } finally {
     await oracle.sql('set session_replication_role = origin');
+    worker.db.exec('UPDATE "private.replica_mode" SET "depth" = "depth" - 1');
   }
 }

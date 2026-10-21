@@ -28,7 +28,19 @@ export function d1(db: DatabaseSync): D1Database {
   };
   return {
     prepare: (sql: string) => statement(sql),
-    batch: async (statements) => Promise.all(statements.map((s) => s.all())) as never,
+    // Atomic, as D1's: one transaction, rolled back whole when a statement fails.
+    batch: async (statements) => {
+      db.exec('BEGIN');
+      try {
+        const results = [];
+        for (const s of statements) results.push(await s.all());
+        db.exec('COMMIT');
+        return results as never;
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
   };
 }
 
