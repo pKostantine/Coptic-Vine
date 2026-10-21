@@ -4,9 +4,11 @@
  * the way the apps will call it, with emails kept in the outbox.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { beforeEach, test } from 'node:test';
 import bcrypt from 'bcryptjs';
 import { outbox } from '../src/auth/email.ts';
+import { list } from '../src/auth/index.ts';
 import { handle } from '../src/index.ts';
 import type { Env } from '../src/types.ts';
 import { authDatabase } from './lib/d1.ts';
@@ -166,4 +168,46 @@ test('sign-in attempts are rate limited per address', async () => {
   }
   assert.ok(statuses.includes(429), `got ${statuses.join(', ')}`);
   assert.ok((db.prepare('SELECT count(*) AS n FROM "auth.rate_limits"').get() as { n: number }).n > 0);
+});
+
+test('every address the web apps are served at is trusted, as Supabase\'s redirect list had them', () => {
+  const config = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  const trusted = list(/"TRUSTED_ORIGINS":\s*"([^"]+)"/.exec(config)![1]);
+  for (const origin of ['https://copticvine.ca', 'https://admin.copticvine.ca', 'https://artists.copticvine.ca', 'https://cv-artists.hrmpdd8d6c.workers.dev', 'https://preview.copticvine.ca']) {
+    assert.ok(trusted.includes(origin), origin);
+  }
+});
+
+test('the Expo proxy only sends a browser on to Google\'s own sign-in page, never elsewhere', async () => {
+  const proxy = (target: string) => call(`/auth/expo-authorization-proxy?${new URLSearchParams({ authorizationURL: target })}`);
+  // Elsewhere, it would be an open redirect, and a way to plant the state of someone else's Google sign-in in a victim's browser.
+  for (const target of ['https://evil.example/?state=planted', 'https://accounts.google.com.evil.example/?state=planted', 'http://accounts.google.com/?state=planted']) {
+    const refused = await proxy(target);
+    assert.equal(refused.status, 400, target);
+    assert.equal(refused.headers.get('location'), null, target);
+    assert.doesNotMatch(refused.headers.get('set-cookie') ?? '', /state/, target);
+  }
+  const google = await proxy('https://accounts.google.com/o/oauth2/v2/auth?client_id=x&state=abc');
+  assert.equal(google.status, 302);
+  assert.equal(new URL(google.headers.get('location')!).origin, 'https://accounts.google.com');
+  assert.match(google.headers.get('set-cookie') ?? '', /better-auth\.state=/);
+});
+
+test('a bearer that is not a session token never hides the cookie\'s session (supabase-js sends its key as one)', async () => {
+  const signedIn = await signIn('reader@example.com', 'old password 1');
+  const cookie = /better-auth\.session_token=[^;]+/.exec(signedIn.headers.get('set-cookie')!)![0];
+  const whoWith = async (authorization: string | null) => {
+    const headers: Record<string, string> = { cookie };
+    if (authorization) headers.authorization = authorization;
+    return ((await (await call('/auth/get-session', { headers })).json()) as { user?: { id: string } } | null)?.user?.id ?? null;
+  };
+  assert.equal(await whoWith(null), SUPABASE_USER);
+  // supabase-js with no token of its own sends its publishable key; an old anon key is a JWT.
+  assert.equal(await whoWith('Bearer sb_publishable_AbCdEf0123456789_xyz'), SUPABASE_USER);
+  assert.equal(await whoWith('Bearer eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.c2lnbmF0dXJl'), SUPABASE_USER);
+  // A session token still signs in on its own: the signed form, and the bare one.
+  const signed = signedIn.headers.get('set-auth-token')!;
+  const bare = ((await (await call('/auth/get-session', { headers: { authorization: `Bearer ${signed}` } })).json()) as { session: { token: string } }).session.token;
+  assert.match(bare, /^[A-Za-z0-9]{32}$/);
+  assert.equal(((await (await call('/auth/get-session', { headers: { authorization: `Bearer ${bare}` } })).json()) as { user: { id: string } }).user.id, SUPABASE_USER);
 });

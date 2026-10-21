@@ -18,7 +18,7 @@
  * credentials, and exposes set-auth-token for clients that keep a bearer
  * token instead.
  */
-import { createAuth, list, type Auth } from './auth/index.ts';
+import { createAuth, list, sessionHeaders, type Auth } from './auth/index.ts';
 import { afterWrites, trackWrites } from './db/afterWrites.ts';
 import { recoverTransactions } from './db/transaction.ts';
 import { publishDueReleases } from './jobs/releases.ts';
@@ -66,14 +66,15 @@ export async function handle(request: Request, env: Env, execution?: Execution):
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
 
   if (url.pathname === '/auth' || url.pathname.startsWith('/auth/')) {
-    return withHeaders(await auth(env).handler(request), corsHeaders);
+    const headers = sessionHeaders(request.headers);
+    return withHeaders(await auth(env).handler(headers === request.headers ? request : new Request(request, { headers })), corsHeaders);
   }
   if (url.pathname.startsWith('/rest/v1/')) {
     return withHeaders(await rest(request, url, env, execution), corsHeaders);
   }
   if (url.pathname.startsWith('/storage/v1/')) {
     const isRead = request.method === 'GET' || request.method === 'HEAD';
-    const session = isRead ? null : await auth(env).api.getSession({ headers: request.headers });
+    const session = isRead ? null : await auth(env).api.getSession({ headers: sessionHeaders(request.headers) });
     return withHeaders(await storageRequest(request, url, env, session?.user.id ?? null), corsHeaders);
   }
   if (url.pathname === '/health') {
@@ -108,7 +109,7 @@ async function restResponse(request: Request, url: URL, env: Env, onWrite: () =>
     if (await isServiceToken(request, env)) {
       ctx = { db: trackWrites(env.DB, onWrite), env, userId: null, service: true };
     } else {
-      const session = await auth(env).api.getSession({ headers: request.headers });
+      const session = await auth(env).api.getSession({ headers: sessionHeaders(request.headers) });
       ctx = { db: trackWrites(env.DB, onWrite), env, userId: session?.user.id ?? null };
     }
     const path = url.pathname.slice('/rest/v1/'.length);

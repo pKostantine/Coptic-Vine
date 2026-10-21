@@ -19,6 +19,7 @@
 import { expo } from '@better-auth/expo';
 import bcrypt from 'bcryptjs';
 import { betterAuth } from 'better-auth';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import { bearer } from 'better-auth/plugins';
 import type { Env } from '../types.ts';
@@ -34,6 +35,27 @@ export async function checkPassword({ hash, password }: { hash: string; password
 }
 
 export const list = (value: string | undefined) => (value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+
+/** Where the Expo plugin's proxy may send a phone's browser: the providers' own sign-in pages (Apple's too, once it is added). */
+const PROVIDER_ORIGINS = ['https://accounts.google.com'];
+
+/**
+ * The headers a session is read from. Better Auth's bearer plugin takes a
+ * bearer without a dot as an unsigned session token: it signs it itself and
+ * puts it in place of the session cookie. supabase-js sends its publishable
+ * key as the bearer when it has no token of its own (the web, which signs in
+ * with the cookie; a phone signed out), which would hide the cookie's session.
+ * So a bearer is only kept when it is shaped as a session token: Better Auth's
+ * own (32 letters and digits), or with a dot (its signed form, which the
+ * plugin checks; a JWT fails that check and is ignored).
+ */
+export function sessionHeaders(headers: Headers): Headers {
+  const bearer = /^Bearer\s+(.+)$/i.exec(headers.get('authorization') ?? '')?.[1]?.trim();
+  if (!bearer || bearer.includes('.') || /^[A-Za-z0-9]{32}$/.test(bearer)) return headers;
+  const kept = new Headers(headers);
+  kept.delete('authorization');
+  return kept;
+}
 
 export function createAuth(env: Env) {
   const googleClients = list(env.GOOGLE_CLIENT_ID);
@@ -95,6 +117,21 @@ export function createAuth(env: Env) {
       // Cloudflare gives the client's address in cf-connecting-ip. Without it the rate
       // limiter can't tell clients apart and counts everyone in one bucket per path.
       ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] },
+    },
+    hooks: {
+      // The Expo plugin's proxy leaves a signed cookie for any address's state, then goes there. Anywhere but
+      // a provider's page, that is an open redirect, and a way to plant the state of someone else's Google
+      // sign-in in a victim's browser, which Google's answer then signs in as that someone.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/expo-authorization-proxy') return;
+        let origin: string | null = null;
+        try {
+          origin = new URL(String(ctx.query?.authorizationURL)).origin;
+        } catch {
+          origin = null;
+        }
+        if (!origin || !PROVIDER_ORIGINS.includes(origin)) throw new APIError('BAD_REQUEST', { message: 'Invalid authorizationURL' });
+      }),
     },
     plugins: [bearer(), expo()],
   });

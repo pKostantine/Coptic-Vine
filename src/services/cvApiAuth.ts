@@ -10,7 +10,9 @@
  *                     (an email's confirmation, Google's sign-in) come back to
  *                     the app's scheme with the session cookie in their
  *                     `cookie` parameter (Better Auth's Expo plugin, on the
- *                     server).
+ *                     server). One is taken only within two hours of this
+ *                     device starting such a sign-in, and never in place of
+ *                     another account's session.
  *   web               the session is api.copticvine.ca's cookie, same-site
  *                     with copticvine.ca: every request is sent with
  *                     credentials, and the app never sees the token.
@@ -72,6 +74,10 @@ type ServerUser = { id: string; email: string; name: string; image?: string | nu
 
 const TOKEN_KEY = 'cv-api.session-token';
 const SESSION_KEY = 'cv-api.session';
+/** Until when a phone waits for a link with a session: set when it starts a sign-in that ends in one. */
+const PENDING_KEY = 'cv-api.pending-link';
+/** A little over the links' hour (Better Auth's email tokens), and Google's sign-in by far. */
+const PENDING_MS = 2 * 60 * 60 * 1000;
 /** The parameters a link back to the app carries: the session, a reset token, a failure. */
 const LINK_PARAMETERS = ['cookie', 'token', 'error', 'error_description'];
 
@@ -116,12 +122,12 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
     for (const listener of [...listeners]) listener(event, session);
   };
 
-  /** A request to /auth with this device's session: its bearer token, or the cookie. */
-  async function request(path: string, body?: unknown): Promise<Response> {
+  /** A request to /auth with this device's session (its bearer token, or the cookie), or with another token, looked at without keeping it. */
+  async function request(path: string, body?: unknown, as?: string): Promise<Response> {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (options.native) headers['expo-origin'] = options.appOrigin;
-    const token = keepsToken ? read(TOKEN_KEY) : null;
+    const token = as ?? (keepsToken ? read(TOKEN_KEY) : null);
     if (token) headers.authorization = `Bearer ${token}`;
     const response = await send(`${base}/auth${path}`, {
       method: body === undefined ? 'GET' : 'POST',
@@ -130,14 +136,17 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
       credentials: options.native ? 'omit' : 'include',
     });
     // A new session's token (a sign-in), for the bearer.
-    const issued = keepsToken ? response.headers.get('set-auth-token') : null;
+    const issued = keepsToken && !as ? response.headers.get('set-auth-token') : null;
     if (issued) write(TOKEN_KEY, issued);
     return response;
   }
 
   /** The answer's JSON; a failure, as an Error with Better Auth's message. */
   async function answer<T>(response: Response, fallback: CvApiMessage): Promise<T> {
-    const body = await response.json().catch(() => null) as (T & { code?: string; message?: string }) | null;
+    const parsed = await response.json().then((body: unknown) => ({ body }), () => null);
+    const body = (parsed?.body ?? null) as (T & { code?: string; message?: string }) | null;
+    // A success that isn't JSON isn't cv-api's answer (a page in its place, a wrong address): the server failing, never "signed out".
+    if (response.ok && !parsed && response.status !== 204) throw new Error(options.message(fallback));
     if (response.ok) return body as T;
     if (body?.code === 'PROVIDER_NOT_FOUND') throw new Error(options.message('googleNotEnabled'));
     throw new Error(body?.message || options.message(fallback));
@@ -211,6 +220,10 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
     return current ?? null;
   }
 
+  /** About to start a sign-in that ends in a link with a session (sign-up, Google, an email change). */
+  const awaitLink = () => write(PENDING_KEY, String(Date.now() + PENDING_MS));
+  const awaitingLink = () => Number(read(PENDING_KEY)) > Date.now();
+
   /** After a sign-in: the new session, from the server. */
   async function signedIn(): Promise<void> {
     generation += 1;
@@ -273,9 +286,17 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
       emit('PASSWORD_RECOVERY', await getSession());
       return;
     }
+    // A session in a link is only taken by a phone that started a sign-in ending in one, so a link
+    // someone else made can't sign it in to their account. Never on the web: there the redirect sets
+    // the cookie itself, and the Expo plugin only adds `cookie` to links to the app's own scheme.
     const sessionToken = cookie ? sessionTokenFromCookie(cookie) : null;
-    if (!sessionToken) return;
-    if (keepsToken) write(TOKEN_KEY, sessionToken);
+    if (!sessionToken || !options.native || !awaitingLink()) return;
+    // And never in place of another account's session (an email change's link is the same user's).
+    if (current) {
+      const theirs = await answer<{ user?: ServerUser } | null>(await request('/get-session', undefined, sessionToken), 'finishSignIn');
+      if (theirs?.user?.id !== current.user.id) throw new Error(options.message('finishSignIn'));
+    }
+    write(TOKEN_KEY, sessionToken);
     await signedIn();
   }
 
@@ -297,11 +318,17 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
     async accessToken() {
       return keepsToken ? read(TOKEN_KEY) : null;
     },
-    fetch: options.native ? send : (input, init) => send(input, { ...init, credentials: 'include' }),
+    fetch: options.native ? send : (input, init) => {
+      // Without a token of its own, supabase-js sends its key as the bearer; on the web without one, the cookie is the session.
+      const headers = new Headers(init?.headers);
+      if (!keepsToken) headers.delete('authorization');
+      return send(input, { ...init, headers, credentials: 'include' });
+    },
 
     signInWithEmail,
 
     async signUpWithEmail(email, password, displayName, redirectTo) {
+      awaitLink();
       const body = await post<{ token?: string | null }>('/sign-up/email', { email, password, name: displayName.trim(), callbackURL: redirectTo }, 'createAccount');
       // An email to confirm comes first: the account has no session until its link is opened.
       if (!body?.token) return { confirmationRequired: true };
@@ -321,6 +348,7 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
       // Through the server first, which leaves the sign-in's state in the browser for Google's answer to be checked against.
       const proxy = `${base}/auth/expo-authorization-proxy?${new URLSearchParams({ authorizationURL: body.url })}`;
       if (!options.openAuthSession) throw new Error(options.message('startGoogle'));
+      awaitLink();
       const result = await options.openAuthSession(proxy, redirectTo);
       if (result.type === 'success' && result.url) {
         await applyCallback(result.url);
@@ -335,6 +363,7 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
     },
 
     async resendSignupConfirmation(email, redirectTo) {
+      awaitLink();
       await post('/send-verification-email', { email, callbackURL: redirectTo }, 'resendConfirmation');
     },
 
@@ -345,6 +374,7 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
 
     async updateEmail(email, redirectTo) {
       // Approved from the current address, then confirmed at the new one, whose link signs this device in again.
+      awaitLink();
       await post('/change-email', { newEmail: email.trim().toLowerCase(), callbackURL: redirectTo }, 'updateEmail');
     },
 
@@ -359,7 +389,10 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
         await post('/reset-password', { newPassword: password, token: resetToken }, 'updatePassword');
         resetToken = null;
         if (!current) return;
-        // A reset ends every session, this one too: whoever is signed in here signs in again, with the new password.
+        // A reset ends every session of its account. This device's still standing, the link was another account's: it stays as it is.
+        const still = await fetchSession().catch(() => null);
+        if (still?.user.id === current.user.id) return;
+        // This one's was ended too: whoever is signed in here signs in again, with the new password.
         write(TOKEN_KEY, null);
         try {
           if (!email) throw new Error(options.message('signIn'));
@@ -385,6 +418,7 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
       }
       if (response && response.status >= 500) await answer(response, 'signOut');
       resetToken = null;
+      write(PENDING_KEY, null);
       settle(null);
     },
   };
