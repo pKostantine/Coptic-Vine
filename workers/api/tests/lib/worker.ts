@@ -43,8 +43,8 @@ export class WorkerSide {
     return { origin: ORIGIN, 'cf-connecting-ip': `198.18.${Math.floor(this.address / 250) % 250}.${this.address % 250}`, ...extra };
   }
 
-  /** A signed-up, confirmed user with this id, signed in. */
-  async addUser(id: string, email: string, name = 'Parity'): Promise<void> {
+  /** A signed-up, confirmed user with this id, signed in; named as the import names a user with no name in its metadata. */
+  async addUser(id: string, email: string, name = email.split('@')[0]): Promise<void> {
     this.db.prepare('INSERT INTO "auth.users" ("id", "name", "email", "email_verified", "created_at", "updated_at") VALUES (?, ?, ?, 1, ?, ?)').run(id, name, email, STAMP, STAMP);
     this.db.prepare('INSERT INTO "auth.accounts" ("id", "user_id", "account_id", "provider_id", "password", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?)').run(`acc-${id}`, id, id, 'credential', HASH, STAMP, STAMP);
     const response = await handle(new Request(`${BASE}/auth/sign-in/email`, {

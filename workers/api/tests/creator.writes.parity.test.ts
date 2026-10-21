@@ -307,3 +307,11 @@ test('deleting tracks, releases and submissions', async () => {
   await both(ERIN, 'delete_submission', { p_submission_id: S2 });
   assert.ok(A1 && C2 && BOB && R3);
 });
+
+test('a workspace made after the cutover is named as its creator signed up (Better Auth keeps the name where Supabase kept the metadata)', async () => {
+  const signedUp = id(690);
+  await worker.addUser(signedUp, 'new.artist@example.com', 'Mina the Chanter');
+  const created = await worker.rpc(signedUp, 'ensure_creator_workspace', {});
+  assert.equal(created.error, null);
+  assert.deepEqual(worker.rows(`SELECT "display_name" FROM "creator.profiles" WHERE "id" = ?`, signedUp), [{ display_name: 'Mina the Chanter' }]);
+});
