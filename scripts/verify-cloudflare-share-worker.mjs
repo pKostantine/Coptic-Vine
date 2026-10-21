@@ -1,4 +1,5 @@
 import { access, readFile } from 'node:fs/promises';
+import ts from 'typescript';
 
 const requiredRoutes = [
   '/share/*',
@@ -17,7 +18,10 @@ const [worker, configSource, appShell] = await Promise.all([
   readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'),
   readFile(new URL('../dist/index.html', import.meta.url), 'utf8'),
 ]);
-const config = JSON.parse(configSource);
+// wrangler.jsonc may hold comments, which JSON.parse refuses.
+const parsed = ts.parseConfigFileTextToJson('wrangler.jsonc', configSource);
+if (parsed.error) throw new Error(`wrangler.jsonc does not parse: ${ts.flattenDiagnosticMessageText(parsed.error.messageText, ' ')}`);
+const config = parsed.config;
 
 if (!appShell.includes('COPTIC_VINE_SHARE_META_START')) {
   throw new Error('Expo app shell is missing the replaceable share metadata block.');
