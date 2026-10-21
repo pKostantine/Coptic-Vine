@@ -76,20 +76,21 @@ export async function registerNotificationDevice(ctx: ApiContext, a: {
     if (!['ios', 'android'].includes(a.p_platform)) raise('invalid_expo_push_platform');
     if (!/^Expo(nent)?PushToken\[[A-Za-z0-9_-]{8,}\]$/.test(token)) raise('invalid_expo_push_token');
   }
-  // An install that changes hands leaves its old queued deliveries behind with its old row.
-  await ctx.db.prepare(`DELETE FROM ${DEVICES} WHERE ${col('app_key')} = ? AND ${col('provider')} = ? AND ${col('push_token')} = ? AND ${col('user_id')} IS NOT ?`)
-    .bind(a.p_app_key, a.p_provider, token, userId).run();
   const stamp = now();
-  const row = await ctx.db.prepare(`INSERT INTO ${DEVICES} (${['id', 'user_id', 'app_key', 'platform', 'provider', 'push_token', 'provider_data', 'device_name', 'app_version', 'enabled', 'last_seen_at', 'updated_at'].map(col).join(', ')})
+  // One batch: an install that changes hands leaves its old queued deliveries behind with its old row.
+  const [, inserted] = await ctx.db.batch<{ id: string }>([
+    ctx.db.prepare(`DELETE FROM ${DEVICES} WHERE ${col('app_key')} = ? AND ${col('provider')} = ? AND ${col('push_token')} = ? AND ${col('user_id')} IS NOT ?`)
+      .bind(a.p_app_key, a.p_provider, token, userId),
+    ctx.db.prepare(`INSERT INTO ${DEVICES} (${['id', 'user_id', 'app_key', 'platform', 'provider', 'push_token', 'provider_data', 'device_name', 'app_version', 'enabled', 'last_seen_at', 'updated_at'].map(col).join(', ')})
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     ON CONFLICT (${col('app_key')}, ${col('provider')}, ${col('push_token')}) DO UPDATE SET
       ${col('user_id')} = excluded.${col('user_id')}, ${col('platform')} = excluded.${col('platform')}, ${col('provider_data')} = excluded.${col('provider_data')},
       ${col('device_name')} = excluded.${col('device_name')}, ${col('app_version')} = excluded.${col('app_version')}, ${col('enabled')} = 1,
       ${col('last_seen_at')} = excluded.${col('last_seen_at')}, ${col('updated_at')} = excluded.${col('updated_at')}
     RETURNING ${col('id')}`)
-    .bind(crypto.randomUUID(), userId, a.p_app_key, a.p_platform, a.p_provider, token, jsonbText(providerData), a.p_device_name, a.p_app_version, stamp, stamp)
-    .first<{ id: string }>();
-  return row!.id;
+      .bind(crypto.randomUUID(), userId, a.p_app_key, a.p_platform, a.p_provider, token, jsonbText(providerData), a.p_device_name, a.p_app_version, stamp, stamp),
+  ]);
+  return inserted.results[0].id;
 }
 
 export async function disableNotificationDevice(ctx: ApiContext, a: { p_app_key: string; p_provider: string; p_push_token: string }): Promise<boolean> {

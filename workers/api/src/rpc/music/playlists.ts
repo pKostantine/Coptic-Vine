@@ -106,8 +106,9 @@ async function requireEditable(ctx: ApiContext, playlistId: string): Promise<voi
   if (!own) raise(NOT_EDITABLE, '42501');
 }
 
+/** The playlist's updated_at, as a statement for the batch that changes its tracks. */
 const touch = (ctx: ApiContext, playlistId: string) =>
-  ctx.db.prepare(`UPDATE ${t('music', 'playlists')} SET ${col('updated_at')} = ? WHERE ${col('id')} = ?`).bind(now(), playlistId).run();
+  ctx.db.prepare(`UPDATE ${t('music', 'playlists')} SET ${col('updated_at')} = ? WHERE ${col('id')} = ?`).bind(now(), playlistId);
 
 export async function createMusicPlaylist(ctx: ApiContext, name: string | null, description: string | null, visibility: string | null): Promise<string> {
   const userId = requireUser(ctx);
@@ -143,17 +144,21 @@ export async function addTrackToMusicPlaylist(ctx: ApiContext, playlistId: strin
   const v = await viewer(ctx);
   const allowed = await first(ctx, `${ME} SELECT ${visible.track('?')} AS ok`, ...meParams(v), trackId);
   if (!allowed?.ok) raise('new row violates row-level security policy for table "playlist_tracks"', '42501');
-  await ctx.db.prepare(`INSERT INTO ${t('music', 'playlist_tracks')} (${col('playlist_id')}, ${col('track_id')}, ${col('sort_order')}, ${col('added_by')}, ${col('created_at')}) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT (${col('playlist_id')}, ${col('track_id')}) DO NOTHING`).bind(playlistId, trackId, next!.next, userId, now()).run();
-  await touch(ctx, playlistId);
+  await ctx.db.batch([
+    ctx.db.prepare(`INSERT INTO ${t('music', 'playlist_tracks')} (${col('playlist_id')}, ${col('track_id')}, ${col('sort_order')}, ${col('added_by')}, ${col('created_at')}) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT (${col('playlist_id')}, ${col('track_id')}) DO NOTHING`).bind(playlistId, trackId, next!.next, userId, now()),
+    touch(ctx, playlistId),
+  ]);
   return true;
 }
 
 export async function removeTrackFromMusicPlaylist(ctx: ApiContext, playlistId: string, trackId: string): Promise<boolean> {
   requireUser(ctx);
   await requireEditable(ctx, playlistId);
-  await ctx.db.prepare(`DELETE FROM ${t('music', 'playlist_tracks')} WHERE ${col('playlist_id')} = ? AND ${col('track_id')} = ?`).bind(playlistId, trackId).run();
-  await touch(ctx, playlistId);
+  await ctx.db.batch([
+    ctx.db.prepare(`DELETE FROM ${t('music', 'playlist_tracks')} WHERE ${col('playlist_id')} = ? AND ${col('track_id')} = ?`).bind(playlistId, trackId),
+    touch(ctx, playlistId),
+  ]);
   return true;
 }
 
@@ -166,10 +171,11 @@ export async function setMusicPlaylistTrackOrder(ctx: ApiContext, playlistId: st
   if (supplied.length !== existing.length || distinct.size !== existing.length || supplied.some((id) => !existing.includes(id))) {
     raise('Track order must contain every playlist track exactly once', '22023');
   }
-  for (const [index, trackId] of supplied.entries()) {
-    await ctx.db.prepare(`UPDATE ${t('music', 'playlist_tracks')} SET ${col('sort_order')} = ? WHERE ${col('playlist_id')} = ? AND ${col('track_id')} = ?`).bind(index, playlistId, trackId).run();
-  }
-  await touch(ctx, playlistId);
+  // The whole order or none of it.
+  await ctx.db.batch([
+    ...supplied.map((trackId, index) => ctx.db.prepare(`UPDATE ${t('music', 'playlist_tracks')} SET ${col('sort_order')} = ? WHERE ${col('playlist_id')} = ? AND ${col('track_id')} = ?`).bind(index, playlistId, trackId)),
+    touch(ctx, playlistId),
+  ]);
   return true;
 }
 
@@ -178,16 +184,17 @@ export async function clearMusicPlaylistCover(ctx: ApiContext, playlistId: strin
   const playlist = await first(ctx, `SELECT ${col('cover_asset_id')} AS cover FROM ${t('music', 'playlists')} WHERE ${col('id')} = ? AND ${col('owner_user_id')} = ?`, playlistId, userId);
   if (!playlist) raise(NOT_EDITABLE, '42501');
   const stamp = now();
-  await ctx.db.prepare(`UPDATE ${t('music', 'playlists')} SET ${col('cover_asset_id')} = NULL, ${col('updated_at')} = ? WHERE ${col('id')} = ? AND ${col('owner_user_id')} = ?`).bind(stamp, playlistId, userId).run();
+  const statements = [ctx.db.prepare(`UPDATE ${t('music', 'playlists')} SET ${col('cover_asset_id')} = NULL, ${col('updated_at')} = ? WHERE ${col('id')} = ? AND ${col('owner_user_id')} = ?`).bind(stamp, playlistId, userId)];
   if (playlist!.cover != null) {
     // The uploaded cover is archived, if it's the caller's own, as media_assets_update_owner_or_admin allows
     // (the policy's check of the Supabase Storage URL doesn't carry over: covers move to R2).
     const v = await viewer(ctx);
-    await ctx.db.prepare(`${ME} UPDATE ${t('media', 'media_assets')} SET ${col('publication_status')} = 'archived', ${col('updated_by')} = ?, ${col('updated_at')} = ?
+    statements.push(ctx.db.prepare(`${ME} UPDATE ${t('media', 'media_assets')} SET ${col('publication_status')} = 'archived', ${col('updated_by')} = ?, ${col('updated_at')} = ?
       WHERE ${col('id')} = ? AND ${col('provider')} = 'external' AND ${col('bucket')} = 'playlist-covers' AND ${col('created_by')} = ?
         AND (${'(SELECT ' + col('admin') + ' FROM ' + col('me') + ')'} = 1 OR (${col('owner_creator_account_id')} IS NULL AND EXISTS (
           SELECT 1 FROM ${t('music', 'playlists')} p WHERE p.${col('id')} = json_extract(${t('media', 'media_assets')}.${col('metadata')}, '$.playlistId') AND p.${col('owner_user_id')} = ${UID})))`)
-      .bind(...meParams(v), userId, stamp, playlist!.cover, userId).run();
+      .bind(...meParams(v), userId, stamp, playlist!.cover, userId));
   }
+  await ctx.db.batch(statements);
   return true;
 }
