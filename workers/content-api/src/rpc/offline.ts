@@ -18,7 +18,7 @@ import { contentTable, type Table } from '../content.ts';
 import { col, t } from '../db/names.ts';
 import { int4, jsonb, PgError } from '../pg.ts';
 import type { ContentContext, Row } from '../types.ts';
-import schema from '../../schema/content-tables.json';
+import schema from '../../schema/content-tables.json' with { type: 'json' };
 
 const EXCLUDED_NAMES = /(backup|archive|history|working|staging|admin|draft|audit)/i;
 

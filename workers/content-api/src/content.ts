@@ -1,4 +1,4 @@
-import schema from '../schema/content-tables.json';
+import schema from '../schema/content-tables.json' with { type: 'json' };
 
 /** How a copied column is stored in D1 (scripts/gen-schema.ts). */
 export type ColumnKind = 'text' | 'integer' | 'numeric' | 'float8' | 'float4' | 'boolean' | 'jsonb' | 'date';
