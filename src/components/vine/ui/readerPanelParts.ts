@@ -81,9 +81,9 @@ export function readerPanelLayout({ width, height, native, mobileWebBreakpoint, 
   const landscape = width > height;
   if (phone && landscape) return { width: Math.min(340 + Math.max(rightInset, 24), Math.round(width * 0.6)), compact: true, belowStatusBar: false };
   if (phone) return { width: Math.round(width * 0.86), compact: false, belowStatusBar: false };
+  // A tablet or a desktop window: at least 600 wide, so 420 always leaves the page in view.
   const tablet = native;
-  const wide = tablet && !landscape ? 400 : 420;
-  return { width: Math.min(wide, width - 48), compact: false, belowStatusBar: tablet };
+  return { width: tablet && !landscape ? 400 : 420, compact: false, belowStatusBar: tablet };
 }
 
 const PANEL_TEXT: Record<AppLanguage, {
@@ -170,13 +170,16 @@ export function pickRowText(text: Title | null, language: AppLanguage): { text: 
   return { text: text.french || '', arabic: false };
 }
 
-/** Lower case without accents, and Arabic without its vowel marks and with one alef: what a search compares. */
+/**
+ * Lower case without accents, and Arabic without its vowel marks: what a
+ * search compares. Decomposed, أ إ آ are a bare alef and a mark, so they come
+ * out as one alef too.
+ */
 export function foldForSearch(text: string): string {
   return String(text || '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[ً-ٰٟـ]/g, '')
-    .replace(/[أإآ]/g, 'ا')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();

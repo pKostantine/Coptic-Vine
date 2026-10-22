@@ -147,10 +147,10 @@ test('the panel is 420 wide on a desktop or tablet, most of a phone held upright
   // An iPad: 400 held upright, 420 on its side, and below the status bar either way.
   assert.deepEqual(readerPanelLayout({ ...native, width: 834, height: 1112 }), { width: 400, compact: false, belowStatusBar: true });
   assert.deepEqual(readerPanelLayout({ ...native, width: 1112, height: 834 }), { width: 420, compact: false, belowStatusBar: true });
-  // Never wider than the window leaves room for.
-  assert.deepEqual(readerPanelLayout({ ...web, width: 720, height: 600 }), { width: 420, compact: false, belowStatusBar: false });
+  // The smallest a window gets before it counts as a phone still leaves the page in view.
+  assert.deepEqual(readerPanelLayout({ ...web, width: 700, height: 500 }), { width: 420, compact: false, belowStatusBar: false });
   assert.equal(readerPanelLayout({ ...native, width: 600, height: 960 }).width, 400);
-  assert.equal(readerPanelLayout({ ...web, width: 460, height: 400 }).width, 276);
+  assert.equal(readerPanelLayout({ ...web, width: 460, height: 400 }).width, 276, 'a small phone on its side keeps 40% for the page');
 });
 
 test("the panels take the page's colours, and the Up next card's title reads on its fill", () => {
