@@ -259,12 +259,16 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
 
   // Gregorian to Coptic and back, the calendar keeps to the month on screen
   // rather than going back to the day selected: it shows the month of the
-  // other calendar that holds the first day of the month being viewed.
+  // other calendar that holds the first day of the month being viewed. When
+  // the selected day is in that month, it shows the month holding that day
+  // instead, so the day stays marked.
   const switchMode = async (next: Mode) => {
     if (next === mode) return;
     if (next === 'coptic') {
-      const firstDay = new Date(Date.UTC(gregorianYear, gregorianMonth - 1, 1));
-      const month = await getCopticMonthForDate(firstDay).catch(() => null);
+      const selectedInView = rawDate.getUTCFullYear() === gregorianYear && rawDate.getUTCMonth() + 1 === gregorianMonth;
+      // The Coptic grid marks the liturgical day (see selectedIso).
+      const anchor = selectedInView ? effectiveDate : new Date(Date.UTC(gregorianYear, gregorianMonth - 1, 1));
+      const month = await getCopticMonthForDate(anchor).catch(() => null);
       if (month) {
         setCopticYear(month.coptic_year);
         setCopticMonth(month.coptic_month);
@@ -273,9 +277,11 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
     } else if (copticYear !== null && copticMonth !== null) {
       const showing = shownMonth?.mode === 'coptic' && shownMonth.year === copticYear && shownMonth.month === copticMonth;
       const grid = showing && days ? days : await getCopticMonthGrid(copticYear, copticMonth).catch(() => null);
-      const firstDay = grid?.[0]?.gregorianDate;
-      if (firstDay) {
-        const date = new Date(`${firstDay}T00:00:00Z`);
+      const selectedInView = grid?.some((calendarDay) => calendarDay.gregorianDate === selectedIso);
+      // The Gregorian grid marks the civil day.
+      const anchor = selectedInView ? rawDate.toISOString().slice(0, 10) : grid?.[0]?.gregorianDate;
+      if (anchor) {
+        const date = new Date(`${anchor}T00:00:00Z`);
         setGregorianYear(date.getUTCFullYear());
         setGregorianMonth(date.getUTCMonth() + 1);
       }
