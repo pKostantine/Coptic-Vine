@@ -20,6 +20,7 @@ function loadDocumentBuilder() {
     '../../constants/theme': theme,
     '../../constants/documentThemes': themes,
     '../../constants/copticInitialArt': art,
+    './copticInitial': loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? loadFile('src/constants/copticInitialArt.ts') : require(name))),
     '../../constants/documentOrnaments': loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name))),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),
@@ -71,12 +72,16 @@ test('the letter carries its jinkim into the copied text', () => {
   assert.ok(body(html).includes('<span class="coptic-initial-text">Ⲁ̀</span></span>ⲙⲏⲛ ⲁⲗⲗⲏⲗⲟⲩⲓⲁ'));
 });
 
-test('only the first Coptic paragraph under a title, and only when it opens on a decorated capital', () => {
+test('the hymn\'s capital takes the initial: the first Coptic paragraph under a title to open on one, and only that one', () => {
   // Untitled: a hymn's continuation, which never gets a capital.
   assert.deepEqual(initials(build([hymn([verse('Ⲙⲁⲣⲉⲛ')], { english: '', arabic: '' })], OPTIONS)), []);
-  // The first paragraph opens otherwise: no initial, and none further down either.
-  assert.deepEqual(initials(build([hymn([verse('(Ⲙⲁⲣⲉⲛ)'), verse('Ⲙⲁⲣⲉⲛ')])], OPTIONS)), []);
-  assert.deepEqual(initials(build([hymn([verse('ⲙⲁⲣⲉⲛ'), verse('Ⲙⲁⲣⲉⲛ')])], OPTIONS)), []);
+  // The people's Kyrie kept in lower case before the Verses of the Cymbals: the capital after it takes the initial.
+  const cymbals = build([hymn([verse('ⲕⲩⲣⲓⲉ ⲉ̀ⲗⲉⲏ̀ⲥⲟⲛ'), verse('Ⲧⲉⲛⲟⲩⲱϣⲧ ⲙ̀Ⲫⲓⲱⲧ'), verse('Ⲭⲉⲣⲉ ⲧⲉⲕⲕⲗⲏⲥⲓⲁ')])], OPTIONS);
+  assert.deepEqual(initials(cymbals), ['<span class="coptic-initial" data-fit>']);
+  assert.ok(body(cymbals).includes('<span class="coptic-initial-text">Ⲧ</span></span>ⲉⲛⲟⲩⲱϣⲧ'));
+  assert.ok(body(cymbals).includes('>Ⲭⲉⲣⲉ ⲧⲉⲕⲕⲗⲏⲥⲓⲁ<'), 'one initial a hymn');
+  // A capital that doesn't open its paragraph stays in its line.
+  assert.deepEqual(initials(build([hymn([verse('(Ⲙⲁⲣⲉⲛ)'), verse('ⲙⲁⲣⲉⲛ')])], OPTIONS)), []);
   // A reading's verse opens on its number.
   assert.deepEqual(initials(build([hymn([verse('Ⲡⲁⲩⲗⲟⲥ', { bibleVerseNumber: '1' })])], OPTIONS)), []);
   // A line with no Coptic of its own leaves the initial to the paragraph that has some.

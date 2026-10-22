@@ -222,6 +222,7 @@ function loadDocumentBuilder() {
     '../../constants/theme': theme,
     '../../constants/documentThemes': themes,
     '../../constants/copticInitialArt': loadFile('src/constants/copticInitialArt.ts'),
+    './copticInitial': loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? loadFile('src/constants/copticInitialArt.ts') : require(name))),
     '../../constants/documentOrnaments': loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name))),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),

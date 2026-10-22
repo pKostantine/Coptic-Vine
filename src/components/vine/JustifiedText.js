@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 
-import { annotateNativeLines, splitParagraphs, splitWords } from "./textLines";
+import { annotateNativeLines, countInitialLines, splitParagraphs, splitWords, textAfterLines } from "./textLines";
 
 const IS_WEB = Platform.OS === "web";
 
@@ -41,6 +41,8 @@ const DISABLED_SELECTION_STYLE = IS_WEB
 // "space-between" alone produces true word-only justification with no
 // pixel math of our own needed at render time.
 const WORD_INTRINSIC_STYLE = { width: "auto", flexBasis: "auto", flexShrink: 0, alignSelf: "flex-start" };
+const INITIAL_ROW_STYLE = { alignItems: "flex-start", flexDirection: "row" };
+const BESIDE_INITIAL_STYLE = { flex: 1, minWidth: 0 };
 
 function getLineWordOffsets(lines) {
   let offset = 0;
@@ -211,6 +213,70 @@ function computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxW
   });
 }
 
+/**
+ * Lines each as wide as `widthOf(lineIndex)` says -- the first ones beside a
+ * decorated initial narrower than the rest -- with a word wider than its own
+ * line broken there, as the browser breaks it.
+ */
+function computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, widthOf) {
+  const measure = (token) => measureWidthWeb(token, fontSize, fontFamily, fontWeight, fontStyle);
+  const spaceWidth = measure(" ");
+  const lines = [];
+  splitParagraphs(text).forEach((paragraph) => {
+    const queue = splitWords(paragraph);
+    if (!queue.length) {
+      lines.push({ words: [], isBlank: true, isParagraphEnd: true });
+      return;
+    }
+    let current = [];
+    let currentWidth = 0;
+    while (queue.length) {
+      const limit = widthOf(lines.length);
+      const word = queue.shift();
+      const wordWidth = measure(word);
+      if (!current.length && wordWidth > limit) {
+        const [head, ...rest] = splitOverwidthWord(word, limit, fontSize, fontFamily, fontWeight, fontStyle);
+        if (rest.length) {
+          lines.push({ words: [head], isParagraphEnd: false });
+          queue.unshift(rest.join(""));
+        } else {
+          current = [word];
+          currentWidth = wordWidth;
+        }
+        continue;
+      }
+      const additional = current.length ? spaceWidth + wordWidth : wordWidth;
+      if (current.length && currentWidth + additional > limit) {
+        lines.push({ words: current, isParagraphEnd: false });
+        current = [];
+        currentWidth = 0;
+        queue.unshift(word);
+        continue;
+      }
+      current.push(word);
+      currentWidth += additional;
+    }
+    if (current.length) lines.push({ words: current, isParagraphEnd: false });
+    lines[lines.length - 1].isParagraphEnd = true;
+  });
+  return lines;
+}
+
+/**
+ * A paragraph opened by a decorated initial (ui/CopticInitial.tsx): one line
+ * tall beside it if the whole of it fits there, else its first two lines
+ * narrowed beside the initial two lines tall and the rest at full width.
+ * Each line beside it says which ("one" or "two"), which is how pagination
+ * keeps those lines together and the render knows to set it beside them.
+ */
+function computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, initial) {
+  const short = computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, () => width - initial.one.room);
+  if (short.length <= 1) return short.map((line) => ({ ...line, initial: "one" }));
+  const narrow = width - initial.two.room;
+  return computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, (index) => (index < 2 ? narrow : width))
+    .map((line, index) => (index < 2 ? { ...line, initial: "two" } : line));
+}
+
 // Web-only line measurement for text that is NOT rendered through this
 // component -- namely VerseBlock.js's plain-Text justified path, which uses
 // real CSS text-align:justify (cheaper and more accurate than this
@@ -305,6 +371,33 @@ function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle
 }
 
 /**
+ * The lines of a paragraph opened by a decorated initial, from the platform's
+ * own text engine as computeInitialLinesWeb works them out on the web. The
+ * engine lays a Text out at one width, so the paragraph is laid out at the
+ * two narrowed widths at once -- beside the initial one line tall, and two --
+ * and, when it wraps beside the short one, what follows its first two lines
+ * beside the tall one is laid out again at the column's full width. Each
+ * layout is cached like any other (useNativeLines), so the slide shown after
+ * the measuring pass has them at once. Null when there is no initial.
+ */
+function useNativeInitialLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, initial) {
+  const active = Boolean(initial);
+  const short = useNativeLines(active ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - (initial?.one.room ?? 0), null, false);
+  const narrow = useNativeLines(active ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - (initial?.two.room ?? 0), null, false);
+  const fitsBesideShort = Boolean(short.lines && short.lines.length <= 1);
+  const besideTall = narrow.lines ? narrow.lines.slice(0, 2) : null;
+  const restText = active && besideTall && short.lines && !fitsBesideShort ? textAfterLines(text, besideTall) : "";
+  const rest = useNativeLines(restText, style, fontSize, fontFamily, fontWeight, fontStyle, width, null, false);
+  if (!active) return null;
+
+  const probes = [short.measuringNode, narrow.measuringNode, rest.measuringNode];
+  if (!short.lines || !narrow.lines) return { lines: null, probes };
+  if (fitsBesideShort) return { lines: short.lines.map((line) => ({ ...line, initial: "one" })), probes: [] };
+  if (!rest.lines) return { lines: null, probes };
+  return { lines: [...besideTall.map((line) => ({ ...line, initial: "two" })), ...rest.lines], probes: [] };
+}
+
+/**
  * React Native's own textAlign:"justify" has no equivalent to CSS's
  * text-justify:"inter-word" -- native justification (iOS's
  * NSTextAlignment.justified, and historically absent on Android) stretches
@@ -358,40 +451,54 @@ export default function JustifiedText({
   // The font size whose glyphs may reach past their lines (the Coptic
   // column's): each drawn line gets room for them (glyphRoomStyle).
   glyphRoomFontSize = 0,
+  // A decorated initial opening the text (ui/CopticInitial.tsx): the room it
+  // takes from a line set one or two lines tall ({ one: { room }, two: { room } },
+  // copticInitialMetrics), and render(mode) drawing it. Its lines are worked
+  // out around it and it is set beside them.
+  initial = null,
 }) {
   const fallbackAlign = rtl ? "right" : "left";
   const reportedLinesForRef = useRef(null);
   const firstWordWeight = firstWordStyle?.fontWeight || fontWeight;
+  const initialRoom = initial ? `${initial.one.room}/${initial.two.room}` : "";
 
   const webLines = useMemo(
     () => (IS_WEB && !forceLines
-      ? computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordWeight)
+      ? initial
+        ? computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, initial)
+        : computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordWeight)
       : null),
-    [text, fontSize, fontFamily, fontWeight, fontStyle, width, forceLines, firstWordWeight],
+    // initialRoom stands for the initial: its render changes every time, its room doesn't.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [text, fontSize, fontFamily, fontWeight, fontStyle, width, forceLines, firstWordWeight, initialRoom],
   );
   // Always called (never skipped), even when its result goes unused (web,
   // or forceLines supplied) -- calling a hook conditionally is a
   // Rules-of-Hooks violation regardless of whether the branch it feeds ever
   // actually runs.
-  const native = useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordStyle, measureOnly && !forceLines);
+  const measuresInitial = Boolean(initial) && !forceLines && !IS_WEB;
+  const native = useNativeLines(measuresInitial ? "" : text, style, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordStyle, measureOnly && !forceLines && !measuresInitial);
+  const nativeInitial = useNativeInitialLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, measuresInitial ? initial : null);
 
   const forcedLines = useMemo(
     () => (forceLines ? forceLines.map((line) => ({
       words: splitWords(line.text),
       isBlank: Boolean(line.isBlank),
       isParagraphEnd: Boolean(line.isParagraphEnd),
+      ...(line.initial ? { initial: line.initial } : null),
     })) : null),
     [forceLines],
   );
-  const lines = forcedLines ?? (IS_WEB ? webLines : native.lines);
+  const lines = forcedLines ?? (IS_WEB ? webLines : nativeInitial ? nativeInitial.lines : native.lines);
   const lineWordOffsets = useMemo(() => getLineWordOffsets(lines), [lines]);
 
-  const reportKey = `${fontFamily}|${fontSize}|${fontWeight}/${firstWordWeight}|${fontStyle}|${width}|${text}`;
+  const reportKey = `${fontFamily}|${fontSize}|${fontWeight}/${firstWordWeight}|${fontStyle}|${width}|${initialRoom}|${text}`;
   const reportableLines = useMemo(
     () => lines?.map((line) => ({
       text: line.words.join(" "),
       isBlank: Boolean(line.isBlank),
       isParagraphEnd: Boolean(line.isParagraphEnd),
+      ...(line.initial ? { initial: line.initial } : null),
     })),
     [lines],
   );
@@ -402,7 +509,14 @@ export default function JustifiedText({
     onLines(reportableLines);
   }, [forceLines, onLines, reportKey, reportableLines]);
 
-  if (!forceLines && !IS_WEB && (native.isMeasuring || measureOnly)) {
+  if (nativeInitial && !nativeInitial.lines) {
+    // Its layouts still under way: nothing is reported until the lines are
+    // known. Then it is drawn as it will be, in the measuring layer too,
+    // since no single layout of the text is as tall as the paragraph set
+    // around its initial.
+    return <View style={{ width }}>{nativeInitial.probes}</View>;
+  }
+  if (!forceLines && !IS_WEB && !nativeInitial && (native.isMeasuring || measureOnly)) {
     // The invisible measuring Text stays in flow so its parent reports the
     // real paragraph height on this first pass. We still wait for
     // onTextLayout before reporting language lines; that second metric gives
@@ -420,84 +534,95 @@ export default function JustifiedText({
   const selectionStyle = selectable ? null : DISABLED_SELECTION_STYLE;
   const glyphRoom = glyphRoomStyle(glyphRoomFontSize);
 
-  return (
-    <View style={[{ width }, selectionStyle]} onLayout={onLayout}>
-      {lines.map((line, index) => {
-        const lineWords = line.words;
-        const isFirstLine = index === firstContentLineIndex;
-        // Only a paragraph's own last line is left ragged. Lines handed in by
-        // pagination carry that from the measurement, so the last line of a
-        // page whose paragraph carries on over the turn stays justified like
-        // the lines above it.
-        const isLastLine = forceLines ? Boolean(line.isParagraphEnd) : index === lastIndex || line.isParagraphEnd;
+  const renderLine = (line, index) => {
+    const lineWords = line.words;
+    const isFirstLine = index === firstContentLineIndex;
+    // Only a paragraph's own last line is left ragged. Lines handed in by
+    // pagination carry that from the measurement, so the last line of a
+    // page whose paragraph carries on over the turn stays justified like
+    // the lines above it.
+    const isLastLine = forceLines ? Boolean(line.isParagraphEnd) : index === lastIndex || line.isParagraphEnd;
 
-        if (line.isBlank) {
-          return (
-            <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }, glyphRoom]}>
-              {"\u00a0"}
-            </Text>
-          );
-        }
+    if (line.isBlank) {
+      return (
+        <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }, glyphRoom]}>
+          {"\u00a0"}
+        </Text>
+      );
+    }
 
-        // A right-to-left line with a run of Latin inside it (a name, a
-        // reference) keeps that run left-to-right only as one piece of text:
-        // word by word, the row would turn the run round.
-        const mixesDirections = rtl && lineWords.some((word) => /[A-Za-z]/.test(word));
-        if (isLastLine || mixesDirections || lineWords.length < minWordsToJustify) {
-          const needsRichWords = Boolean(firstWordStyle && isFirstLine) || Boolean(wordStyles);
-          return (
-            <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }, glyphRoom]}>
-              {needsRichWords ? lineWords.map((word, wordIndex) => {
-                const globalWordIndex = lineWordOffsets[index] + wordIndex;
-                return (
-                  <Text
-                    key={wordIndex}
-                    allowFontScaling={false}
-                    selectable={selectable}
-                    style={[
-                      isFirstLine && wordIndex === 0 ? firstWordStyle : null,
-                      wordStyles?.[globalWordIndex],
-                    ]}
-                  >
-                    {wordIndex ? ` ${word}` : word}
-                  </Text>
-                );
-              }) : lineWords.join(" ")}
-            </Text>
-          );
-        }
-
-        return (
-          <View
-            key={index}
-            style={{
-              flexDirection: rtl ? "row-reverse" : "row",
-              justifyContent: "space-between",
-              width: "100%",
-            }}
-          >
-            {lineWords.map((word, wordIndex) => (
+    // A right-to-left line with a run of Latin inside it (a name, a
+    // reference) keeps that run left-to-right only as one piece of text:
+    // word by word, the row would turn the run round.
+    const mixesDirections = rtl && lineWords.some((word) => /[A-Za-z]/.test(word));
+    if (isLastLine || mixesDirections || lineWords.length < minWordsToJustify) {
+      const needsRichWords = Boolean(firstWordStyle && isFirstLine) || Boolean(wordStyles);
+      return (
+        <Text key={index} allowFontScaling={false} selectable={selectable} style={[style, selectionStyle, { textAlign: fallbackAlign }, glyphRoom]}>
+          {needsRichWords ? lineWords.map((word, wordIndex) => {
+            const globalWordIndex = lineWordOffsets[index] + wordIndex;
+            return (
               <Text
                 key={wordIndex}
                 allowFontScaling={false}
                 selectable={selectable}
-                style={
-                  [
-                    style,
-                    WORD_INTRINSIC_STYLE,
-                    selectionStyle,
-                    isFirstLine && wordIndex === 0 ? firstWordStyle : null,
-                    wordStyles?.[lineWordOffsets[index] + wordIndex],
-                    glyphRoom,
-                  ]
-                }
+                style={[
+                  isFirstLine && wordIndex === 0 ? firstWordStyle : null,
+                  wordStyles?.[globalWordIndex],
+                ]}
               >
-                {word}
+                {wordIndex ? ` ${word}` : word}
               </Text>
-            ))}
-          </View>
-        );
-      })}
+            );
+          }) : lineWords.join(" ")}
+        </Text>
+      );
+    }
+
+    return (
+      <View
+        key={index}
+        style={{
+          flexDirection: rtl ? "row-reverse" : "row",
+          justifyContent: "space-between",
+          width: "100%",
+        }}
+      >
+        {lineWords.map((word, wordIndex) => (
+          <Text
+            key={wordIndex}
+            allowFontScaling={false}
+            selectable={selectable}
+            style={
+              [
+                style,
+                WORD_INTRINSIC_STYLE,
+                selectionStyle,
+                isFirstLine && wordIndex === 0 ? firstWordStyle : null,
+                wordStyles?.[lineWordOffsets[index] + wordIndex],
+                glyphRoom,
+              ]
+            }
+          >
+            {word}
+          </Text>
+        ))}
+      </View>
+    );
+  };
+
+  // Lines beside a decorated initial are set in a narrower column beside it.
+  const besideCount = initial ? countInitialLines(lines) : 0;
+
+  return (
+    <View style={[{ width }, selectionStyle]} onLayout={onLayout}>
+      {besideCount ? (
+        <View style={INITIAL_ROW_STYLE}>
+          {initial.render(lines[0].initial)}
+          <View style={BESIDE_INITIAL_STYLE}>{lines.slice(0, besideCount).map((line, index) => renderLine(line, index))}</View>
+        </View>
+      ) : null}
+      {lines.slice(besideCount).map((line, index) => renderLine(line, besideCount + index))}
     </View>
   );
 }

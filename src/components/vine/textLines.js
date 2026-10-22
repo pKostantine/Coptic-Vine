@@ -55,6 +55,36 @@ export function annotateNativeLines(nativeLines, text) {
   });
 }
 
+/**
+ * What of a text is left after its first lines (as annotateNativeLines reads
+ * them): the lines beside a decorated initial were laid out narrower than the
+ * rest, so the rest is laid out again on its own at the column's full width.
+ * Counted in characters, as annotateNativeLines counts them, so a word the
+ * engine broke at the end of those lines carries on from where it broke; the
+ * paragraph break after them, if they ended one, goes with them.
+ */
+export function textAfterLines(text, lines) {
+  const value = String(text || "");
+  let remaining = (lines || []).reduce((count, line) => count + (line.words || []).join("").length, 0);
+  let index = 0;
+  while (index < value.length && remaining > 0) {
+    if (!/\s/.test(value[index])) remaining -= 1;
+    index += 1;
+  }
+  return value.slice(index).replace(/^[^\S\n]*\n?/, "").replace(/^[^\S\n]+/, "");
+}
+
+/**
+ * How many of a column's first lines stand beside a decorated initial
+ * (JustifiedText.js): they are set beside it, and turned over the page only
+ * together.
+ */
+export function countInitialLines(lines) {
+  let count = 0;
+  while (count < (lines?.length || 0) && lines[count]?.initial) count += 1;
+  return count;
+}
+
 /** The shape pagination keeps for a language's lines (see normalizeLanguageMetric). */
 export function toReportedLines(lines) {
   return (lines || []).map((line) => ({

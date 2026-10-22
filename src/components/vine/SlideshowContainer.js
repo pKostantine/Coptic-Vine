@@ -9,6 +9,7 @@ import { Headpiece, headpieceSize, Medallion, medallionSize } from "./ui/Documen
 import { DOCUMENT_CONTROL_METRICS, getLanguageColumnGap } from "./documentPresentationMetrics";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
+import { splitCopticInitial } from "./copticInitial";
 import {
   createSlideAnchor,
   estimateItemHeight,
@@ -28,9 +29,11 @@ import {
   getSlideRenderLayers,
   getSlideshowChromeMetrics,
   getTitlePairedVerseCount,
+  getVisibleVerseLanguages,
   hashSlideshowText,
   isSlideSettled,
   isSlideshowItemMeasured,
+  isSlideshowLanguageJustified,
   normalizeLanguageMetric,
   paginateItems,
 } from "./slideshowLayout";
@@ -138,8 +141,8 @@ export default function SlideshowContainer({
   const lastItemSignaturesRef = useRef(new Map());
 
   const items = useMemo(
-    () => flattenSections(sections, bishopPresent, suppressAllSpeakerLabels),
-    [sections, bishopPresent, suppressAllSpeakerLabels],
+    () => flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visibleLanguages),
+    [sections, bishopPresent, suppressAllSpeakerLabels, visibleLanguages],
   );
   const itemSignatures = useMemo(
     () => new Map(items.map((item) => [
@@ -1456,6 +1459,7 @@ const SlideItem = memo(function SlideItem({
         usePeopleLineColor={Boolean(item.usePeopleLineColor)}
         selectableText={false}
         bishopPresent={item.bishopPresent}
+        copticInitial={item.copticInitial}
         onLanguageLayout={(language, metric) =>
           onLanguageMeasured?.(language, metric, measurementSignature)
         }
@@ -1510,7 +1514,7 @@ const MeasurementItem = memo(function MeasurementItem({
 // verse show its Priest:/Deacon:/etc. indicator". `sections` here is already
 // the pre-filtered, displayed-only view (see DocumentSurface's
 // buildSlideshowSections), so it can be passed straight through.
-function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
+function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visibleLanguages) {
   const suppressMap = computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent, suppressAllSpeakerLabels);
 
   return sections.flatMap((section, sectionIndex) => {
@@ -1568,6 +1572,7 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
     }
 
     const verses = section.verses || [];
+    const opening = findOpeningInitial(section, visibleLanguages);
 
     return [
       {
@@ -1609,15 +1614,9 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels) {
         // uses too.
         usePeopleLineColor: shouldUsePeopleLineColor(section, verse, bishopPresent, suppressAllSpeakerLabels),
         bishopPresent,
-        // Recited Prayer is a per-verse type (a verse's own effective type
-        // after inheritance — see resolveEffectiveVerseType), not a
-        // whole-section flag. Silent Prayer/silent Comment verses are
-        // grouped in here too — despite the prop name, this really means
-        // "Coptic is gated by the Coptic Recited Prayers toggle", which
-        // applies to both Recited and Silent Prayer content alike.
-        isRecitedPrayer:
-          verse.type === "recitedPrayer" || verse.type === "silentPrayer" || verse.type === "silentComment",
+        isRecitedPrayer: isCopticGatedVerse(verse),
         isReading: Boolean(section.isReading),
+        copticInitial: opening?.index === verseIndex ? opening.initial : null,
         forceWhiteVerses: Boolean(section.forceWhiteVerses),
         verseIndex: sectionIndex + verseIndex,
       })),
@@ -1631,6 +1630,36 @@ function getSpeakerRole(type, bishopPresent) {
     return resolved === "bishop" ? "priest" : resolved;
   }
   return "";
+}
+
+// Recited Prayer is a per-verse type (a verse's own effective type after
+// inheritance — see resolveEffectiveVerseType), not a whole-section flag.
+// Silent Prayer/silent Comment verses are grouped in here too — despite the
+// prop it feeds (isRecitedPrayer), this really means "Coptic is gated by the
+// Coptic Recited Prayers toggle", which applies to both Recited and Silent
+// Prayer content alike.
+function isCopticGatedVerse(verse) {
+  return verse.type === "recitedPrayer" || verse.type === "silentPrayer" || verse.type === "silentComment";
+}
+
+/**
+ * The decorated initial a titled hymn opens with, as the scrolling reader sets
+ * it (documentHtml.ts): the hymn's capital, on the first of its verses whose
+ * Coptic, as shown, opens on a capital there is an initial for -- never after
+ * a Bible verse number. Which verse that is depends on the languages shown.
+ * One centred on a line of its own keeps the face's own capital.
+ */
+function findOpeningInitial(section, visibleLanguages = {}) {
+  if (!(section.title?.english || section.title?.french || section.title?.arabic)) return null;
+  const verses = section.verses || [];
+  for (let index = 0; index < verses.length; index += 1) {
+    const verse = verses[index];
+    const showsCoptic = getVisibleVerseLanguages({ verse, isRecitedPrayer: isCopticGatedVerse(verse) }, visibleLanguages).includes("coptic");
+    const split = showsCoptic && !verse.bibleVerseNumber ? splitCopticInitial(String(verse.coptic || "")) : null;
+    if (!split) continue;
+    return isSlideshowLanguageJustified(verse, "coptic") ? { index, initial: { letter: split.letter, marks: split.marks } } : null;
+  }
+  return null;
 }
 
 function findSlideSectionId(slide = []) {
