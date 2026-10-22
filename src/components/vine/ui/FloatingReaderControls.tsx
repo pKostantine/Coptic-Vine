@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import type { DocumentTheme } from '../../../constants/documentThemes';
@@ -60,7 +60,7 @@ export default function FloatingReaderControls({
 }: FloatingReaderControlsProps) {
   const { preferences } = useReadingPreferences();
   const colors = floatingControlsColors(theme, reader);
-  const opacity = useRef(new Animated.Value(titleVisible ? 1 : 0)).current;
+  const [opacity] = useState(() => new Animated.Value(titleVisible ? 1 : 0));
   useEffect(() => {
     Animated.timing(opacity, { toValue: titleVisible ? 1 : 0, duration: 180, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [opacity, titleVisible]);
