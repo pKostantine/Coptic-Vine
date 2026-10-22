@@ -22,24 +22,33 @@ function loadModule(file, stubs) {
   return moduleObject.exports;
 }
 
-/** useSheetDragToClose with React's hooks run once and PanResponder recording what each responder was made with. */
+/**
+ * useSheetDragToClose with React's hooks run once, PanResponder recording what
+ * each responder was made with, and what the hook last set its hold state to
+ * (the sheet's scroll view reads it), where the sheet was dragged, and whether
+ * it closed.
+ */
 function sheetDrag() {
   const created = [];
+  const seen = { held: false, drag: 0, closed: false, sprung: false };
   const react = {
     createContext: (value) => ({ value }),
     useEffect: () => {},
     useRef: (current) => ({ current }),
-    useState: (init) => [typeof init === 'function' ? init() : init, () => {}],
+    useState: (init) => {
+      const value = typeof init === 'function' ? init() : init;
+      return [value, typeof value === 'boolean' ? (next) => { seen.held = next; } : () => {}];
+    },
   };
   const reactNative = {
-    Animated: { spring: () => ({ start() {} }) },
+    Animated: { spring: () => ({ start() { seen.sprung = true; } }) },
     PanResponder: { create: (config) => { created.push(config); return { panHandlers: config }; } },
   };
   const { useSheetDragToClose } = loadModule('components/vine/ui/useSheetDragToClose.ts', { react, 'react-native': reactNative });
-  const drag = { setValue() {} };
-  const result = useSheetDragToClose(true, drag, () => {});
+  const drag = { setValue(value) { seen.drag = value; } };
+  const result = useSheetDragToClose(true, drag, () => { seen.closed = true; });
   const sheet = created.find((config) => config.onMoveShouldSetPanResponderCapture);
-  return { result, sheet };
+  return { result, sheet, seen };
 }
 
 const pullDown = { dx: 2, dy: 20 };
@@ -60,13 +69,43 @@ test('a pull-down on the sheet closes it, unless a control under the finger hold
   assert.equal(sheet.onMoveShouldSetPanResponderCapture({}, pullDown), true);
 });
 
-test('the app\'s slider holds the sheet while touched, and the sheet hands its contents the hold', () => {
+test('a hold also stops the sheet scrolling, and keeps it still if it lands once a pull has begun', () => {
+  const { result, sheet, seen } = sheetDrag();
+  sheet.onStartShouldSetPanResponderCapture();
+  result.hold.hold();
+  assert.equal(seen.held, true, 'the scroll view stops while the slider is held');
+  // A pull the sheet took before the hold arrived (iOS saying the slide has started).
+  sheet.onPanResponderMove({}, { dx: 2, dy: 40 });
+  assert.equal(seen.drag, 0, 'held, the sheet stays where it is');
+  sheet.onPanResponderRelease({}, { dx: 2, dy: 120, vy: 2 });
+  assert.equal(seen.closed, false, 'and a held pull never closes it');
+  assert.equal(seen.sprung, true);
+  result.hold.release();
+  assert.equal(seen.held, false, 'released, it scrolls again');
+  // A hold whose end went unseen is cleared, scrolling and all, by the next finger.
+  result.hold.hold();
+  sheet.onStartShouldSetPanResponderCapture();
+  assert.equal(seen.held, false);
+  // Unheld, a pull drags the sheet and a long one closes it.
+  sheet.onPanResponderMove({}, { dx: 2, dy: 40 });
+  assert.equal(seen.drag, 40);
+  sheet.onPanResponderRelease({}, { dx: 2, dy: 120, vy: 2 });
+  assert.equal(seen.closed, true);
+});
+
+test('the app\'s slider holds the sheet from the finger landing until both it lifts and the slide ends', () => {
   const slider = source('components/vine/ui/FontScaleControl.tsx');
   assert.match(slider, /useContext\(SheetDragHoldContext\)/);
-  assert.match(slider, /onTouchStart=\{sheet\?\.hold\}/);
-  assert.match(slider, /onTouchEnd=\{sheet\?\.release\}/);
-  assert.match(slider, /onTouchCancel=\{sheet\?\.release\}/);
-  assert.match(source('components/vine/ui/SheetFrame.tsx'), /<SheetDragHoldContext\.Provider value=\{sheetDrag\.hold\}>/);
+  assert.match(slider, /if \(holding\.current\.touch \|\| holding\.current\.slide\) sheet\?\.hold\(\);\s+else sheet\?\.release\(\);/);
+  assert.match(slider, /onTouchStart=\{\(\) => holdSheet\('touch', true\)\}/);
+  assert.match(slider, /onTouchEnd=\{\(\) => holdSheet\('touch', false\)\}/);
+  assert.match(slider, /onTouchCancel=\{\(\) => holdSheet\('touch', false\)\}/);
+  assert.match(slider, /onSlidingChange=\{\(sliding\) => holdSheet\('slide', sliding\)\}/);
+  // iOS's own slider says when a slide starts and ends; the universal one doesn't pass it on.
+  assert.match(source('components/vine/ui/FontScaleSlider.ios.tsx'), /from '@expo\/ui\/swift-ui'[\s\S]+onEditingChanged=\{onSlidingChange\}/);
+  const frame = source('components/vine/ui/SheetFrame.tsx');
+  assert.match(frame, /<SheetDragHoldContext\.Provider value=\{sheetDrag\.hold\}>/);
+  assert.match(frame, /<ScrollView scrollEnabled=\{!sheetDrag\.held\}/);
 });
 
 test('every browser sizes text with − and + buttons; only the apps get a slider', () => {
@@ -75,7 +114,7 @@ test('every browser sizes text with − and + buttons; only the apps get a slide
   assert.doesNotMatch(web, /if \(stepper\)/, 'the buttons are not only a desktop\'s');
   assert.match(web, /'Decrease font size'/);
   assert.match(web, /'Increase font size'/);
-  assert.match(source('components/vine/ui/FontScaleControl.tsx'), /<Slider/);
+  assert.match(source('components/vine/ui/FontScaleControl.tsx'), /<FontScaleSlider/);
 });
 
 test('the Bible title pill opens the book\'s chapters; the list button opens the verses', () => {

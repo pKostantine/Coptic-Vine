@@ -1,11 +1,12 @@
-import { Host, Slider } from '@expo/ui';
-import { useContext } from 'react';
+import { Host } from '@expo/ui';
+import { useContext, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { toEasternArabicDigits } from '@/utils/localeFormat';
 import { FONT_SCALE_STEP, fontScaleToLevel, MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
 
+import FontScaleSlider from './FontScaleSlider';
 import { SheetDragHoldContext } from './useSheetDragToClose';
 
 export interface FontScaleControlProps {
@@ -59,9 +60,17 @@ export default function FontScaleControl({
   compact = false,
 }: FontScaleControlProps) {
   const level = fontScaleToLevel(fontScale);
-  // In a sheet, the slider's finger is the slider's: the sheet's pull-down
-  // to close would otherwise take a slide that dips, and move the sheet down.
+  // In a sheet, the slider's finger is the slider's: the sheet's pull-down to
+  // close, or its scrolling, would otherwise take a slide that dips and move
+  // the page under it. Held from the moment the finger lands until both it
+  // has lifted and the slide has ended (iOS says when, FontScaleSlider.ios.tsx).
   const sheet = useContext(SheetDragHoldContext);
+  const holding = useRef({ touch: false, slide: false });
+  const holdSheet = (source: 'touch' | 'slide', on: boolean) => {
+    holding.current[source] = on;
+    if (holding.current.touch || holding.current.slide) sheet?.hold();
+    else sheet?.release();
+  };
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
       <View style={styles.header}>
@@ -72,9 +81,9 @@ export default function FontScaleControl({
       </View>
       <View
         style={styles.track}
-        onTouchStart={sheet?.hold}
-        onTouchEnd={sheet?.release}
-        onTouchCancel={sheet?.release}
+        onTouchStart={() => holdSheet('touch', true)}
+        onTouchEnd={() => holdSheet('touch', false)}
+        onTouchCancel={() => holdSheet('touch', false)}
       >
         {/* Anchors the two ends of the track as smallest/largest, so the control
             reads without having to drag it first. */}
@@ -96,12 +105,13 @@ export default function FontScaleControl({
           layoutDirection="leftToRight"
           style={styles.sliderHost}
         >
-          <Slider
+          <FontScaleSlider
             value={fontScale}
             min={MIN_FONT_SCALE}
             max={MAX_FONT_SCALE}
             step={FONT_SCALE_STEP}
             onValueChange={onSetValue}
+            onSlidingChange={(sliding) => holdSheet('slide', sliding)}
           />
         </Host>
         <Text style={[styles.endMarker, styles.endMarkerLarge]}>A</Text>
