@@ -8,6 +8,7 @@
  */
 
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from "./documentPresentationMetrics.js";
+import { countInitialLines } from "./textLines.js";
 
 const SPACING_XS = 4;
 const SPACING_SM = 8;
@@ -166,6 +167,7 @@ export function getItemSignature(item, displayedTitle = "") {
       verse.italic,
       item.suppressSpeakerLabel,
       item.hasSpeakerLabel,
+      item.copticInitial?.letter,
     ].join("\u241f")),
   ].join(":");
 }
@@ -811,7 +813,13 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
   state.languages.forEach((entry) => {
     const start = entry.offset;
     const remainingCount = entry.end - start;
-    const takeCount = Math.max(0, Math.min(lineCapacities[entry.language] || 0, remainingCount));
+    let takeCount = Math.max(0, Math.min(lineCapacities[entry.language] || 0, remainingCount));
+    // The lines beside a decorated initial are turned over the page only
+    // together: the initial stands beside both, so a page taking either takes both.
+    const besideInitial = countInitialLines(entry.lines);
+    if (takeCount > 0 && start < besideInitial && start + takeCount < besideInitial) {
+      takeCount = Math.min(besideInitial - start, remainingCount);
+    }
     const lines = entry.lines.slice(start, start + takeCount);
     if (lines.length) segmentEntries.push({ entry, lines, start });
     entry.offset += takeCount;
@@ -1114,11 +1122,13 @@ export function normalizeLanguageMetric(metric) {
     text: line.text || "",
     isBlank: Boolean(line.isBlank),
     isParagraphEnd: Boolean(line.isParagraphEnd),
+    // Set beside a decorated initial ("one" or "two" lines tall; JustifiedText.js).
+    ...(line.initial ? { initial: line.initial } : null),
   }));
   return {
     ...metric,
     lines,
-    lineSignature: lines.map((line) => `${line.text}${line.isParagraphEnd ? "¶" : ""}`).join("\n"),
+    lineSignature: lines.map((line) => `${line.initial ? `[${line.initial}]` : ""}${line.text}${line.isParagraphEnd ? "¶" : ""}`).join("\n"),
   };
 }
 

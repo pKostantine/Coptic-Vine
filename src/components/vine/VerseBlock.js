@@ -3,7 +3,9 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { resolveRubricKey } from "../../utils/verseRubric";
+import { copticInitialMetrics } from "./copticInitial";
 import JustifiedText, { glyphRoomStyle, measureJustifiedLinesWeb } from "./JustifiedText";
+import { CopticInitial } from "./ui/CopticInitial";
 import { getLanguageColumnGap } from "./documentPresentationMetrics";
 import {
   copticStandsAlone as isCopticStandingAlone,
@@ -45,6 +47,9 @@ export default function VerseBlock({
   usePeopleLineColor = false,
   selectableText = false,
   bishopPresent = false,
+  // The decorated initial this verse's Coptic opens its hymn with ({ letter,
+  // marks }, see flattenSections in SlideshowContainer.js), or none.
+  copticInitial = null,
 }) {
   const isRefrainLabel = verse.type === "refrainLabel";
   const isReadingReference = verse.type === "readingReference";
@@ -100,6 +105,11 @@ export default function VerseBlock({
   // isSlideshowLanguageJustified), since only a justified column is rendered
   // line by line and so can be turned over the page between its lines.
   const alignmentFor = (language) => (isSlideshowLanguageJustified(verse, language) ? "justify" : "center");
+  // The initial stands in for the Coptic's first letter, so the column's text
+  // starts after it -- unless the lines were handed in from pagination,
+  // which measured the text that way already.
+  const initial = copticInitial && isSlideshowLanguageJustified(verse, "coptic") ? copticInitial : null;
+  const copticText = formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd();
   const bibleNumberFor = (language) =>
     !Array.isArray(verse.slideshowBibleNumberLanguages) ||
     verse.slideshowBibleNumberLanguages.includes(language)
@@ -138,7 +148,10 @@ export default function VerseBlock({
     },
     {
       key: "coptic",
-      text: formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd(),
+      text: initial && !verse.slideshowForcedLines?.coptic
+        ? copticText.trimStart().slice(initial.letter.length + initial.marks.length)
+        : copticText,
+      initial,
       bibleVerseNumber: bibleNumberFor("coptic"),
       seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine
         ? verse.seasonalHoosVersePrefix
@@ -274,7 +287,7 @@ export default function VerseBlock({
           // pagination measured, on web as on the phone: given the joined
           // text back, the browser could wrap it a line longer or shorter
           // than the page was budgeted for.
-          Platform.OS === "web" && !language.forceLines ? (
+          Platform.OS === "web" && !language.forceLines && !language.initial ? (
             <CssJustifiedVerseBody
               theme={theme}
               language={language}
@@ -297,6 +310,18 @@ export default function VerseBlock({
               fontStyle={languageFontStyle}
               fontWeight={bodyFontWeight}
               glyphRoomFontSize={language.key === "coptic" ? language.fontSize : 0}
+              initial={language.initial ? {
+                ...copticInitialMetrics(language.lineHeight),
+                render: (mode) => (
+                  <CopticInitial
+                    letter={language.initial.letter}
+                    mode={mode}
+                    lineHeight={language.lineHeight}
+                    vineColor={theme.colors.gold}
+                    letterColor={theme.colors.ornament || theme.colors.gold}
+                  />
+                ),
+              } : null}
               measureOnly={isMeasuring}
               onMetric={(metric) => reportLanguageMetric(language.key, metric)}
             />
@@ -494,7 +519,7 @@ function PlainVerseBody({ language, textStyle, selectableText, columnWidth, font
   );
 }
 
-function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, glyphRoomFontSize = 0, measureOnly, onMetric, theme }) {
+function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, glyphRoomFontSize = 0, initial = null, measureOnly, onMetric, theme }) {
   const parts = getSeasonalHoosPrefixParts(language.text, language.seasonalHoosVersePrefix);
   const prefixStyle = getSeasonalHoosPrefixStyle(language.fontSize);
   const bibleVerseNumber = formatBibleVerseNumber(language.bibleVerseNumber, language.key);
@@ -522,6 +547,7 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         selectable={selectableText}
         measureOnly={measureOnly}
         glyphRoomFontSize={glyphRoomFontSize}
+        initial={initial}
         onLayout={(event) => onMetric({ height: event.nativeEvent.layout.height })}
         onLines={(lines) => onMetric({ lines })}
       />

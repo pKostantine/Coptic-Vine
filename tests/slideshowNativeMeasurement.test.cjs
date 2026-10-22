@@ -108,14 +108,15 @@ test('no guessed line breaks reach the page, and the deck shows only settled sli
 test('forced lines render line for line on every platform', () => {
   const verseBlock = fs.readFileSync('src/components/vine/VerseBlock.js', 'utf8');
   const justified = fs.readFileSync('src/components/vine/JustifiedText.js', 'utf8');
-  assert.match(verseBlock, /Platform\.OS === "web" && !language\.forceLines \? \(\s*<CssJustifiedVerseBody/);
+  // A column opened by a decorated initial is set line by line on the web too, around it.
+  assert.match(verseBlock, /Platform\.OS === "web" && !language\.forceLines && !language\.initial \? \(\s*<CssJustifiedVerseBody/);
   assert.match(verseBlock, /textAlign: alignmentFor\("coptic"\)/);
   assert.match(verseBlock, /annotateNativeLines\(event\.nativeEvent\.lines \|\| \[\], renderedText\)/);
   // A centered column measures its lines on web too, and a page's share of it renders line by line.
   assert.match(verseBlock, /measureJustifiedLinesWeb\(renderedText, language\.fontSize, language\.fontFamily, columnWidth, fontWeight, fontStyle\)/);
   assert.match(verseBlock, /language\.forceLines\.map\(\(line, index\) => \(\s*<Text key=\{index\} allowFontScaling=\{false\}/);
   assert.match(justified, /const isLastLine = forceLines \? Boolean\(line\.isParagraphEnd\) : index === lastIndex \|\| line\.isParagraphEnd;/);
-  assert.match(justified, /import \{ annotateNativeLines, splitParagraphs, splitWords \} from "\.\/textLines";/);
+  assert.match(justified, /import \{ annotateNativeLines, countInitialLines, splitParagraphs, splitWords, textAfterLines \} from "\.\/textLines";/);
   // Text with no words never waits on a layout event that cannot come.
   assert.match(justified, /splitWords\(text\)\.length \? nativeLineCache\.get\(cacheKey\) : NO_LINES/);
 });
