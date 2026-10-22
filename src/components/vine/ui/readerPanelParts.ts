@@ -62,7 +62,7 @@ export interface ReaderPanelLayout {
 
 /**
  * 420 on a desktop or a tablet (400 on an iPad held upright), 86% of a phone
- * held upright, and on a phone on its side a narrow 336 beside the room the
+ * held upright, and on a phone on its side a narrow 340 beside the room the
  * screen's edge needs — so the text on the notch side stays in view.
  */
 export function readerPanelLayout({ width, height, native, mobileWebBreakpoint, rightInset = 0 }: {
@@ -73,9 +73,11 @@ export function readerPanelLayout({ width, height, native, mobileWebBreakpoint, 
   rightInset?: number;
 }): ReaderPanelLayout {
   const shortest = Math.min(width, height);
-  const phone = native ? shortest < 600 : width < mobileWebBreakpoint;
+  // A phone browser on its side is wider than the mobile breakpoint, but its
+  // short side still gives it away.
+  const phone = native ? shortest < 600 : width < mobileWebBreakpoint || shortest < 500;
   const landscape = width > height;
-  if (phone && landscape) return { width: Math.min(336 + rightInset, Math.round(width * 0.6)), compact: true, belowStatusBar: false };
+  if (phone && landscape) return { width: Math.min(340 + Math.max(rightInset, 24), Math.round(width * 0.6)), compact: true, belowStatusBar: false };
   if (phone) return { width: Math.round(width * 0.86), compact: false, belowStatusBar: false };
   const tablet = native;
   const wide = tablet && !landscape ? 400 : 420;

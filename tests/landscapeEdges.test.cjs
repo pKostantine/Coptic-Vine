@@ -88,10 +88,17 @@ test('the sheets are centred between the notch and the far edge, never by their 
 
 test('the drawers run to the edge with their rows and buttons clear of the notch and the home indicator', () => {
   // The content list's Calendar and Settings buttons sat in the home indicator's strip, its rows under the notch.
-  for (const file of ['src/components/vine/ui/ContentSelectorDrawer.tsx', 'src/app/bible/[bookKey]/[chapter].tsx']) {
-    const source = read(file);
-    assert.match(source, /paddingRight: SPACING\.md \+ insets\.right,/, file);
-    assert.match(source, /marginRight: -\(SPACING\.md \+ insets\.right\),\n\s+paddingRight: SPACING\.xl \+ insets\.right,\n\s+paddingBottom: SPACING\.sm \+ insets\.bottom,/, file);
+  // Both lists now sit on the one sheet, which keeps its rows clear of the notch
+  // (and of a phone's rounded corner when it lies on its side) and its footer
+  // above the home indicator.
+  const sheet = read('src/components/vine/ui/ReaderPanel.tsx');
+  assert.match(sheet, /rightInset: insets\.right,/);
+  assert.match(sheet, /const edge = layout\.compact \? Math\.max\(insets\.right, 24\) : insets\.right;/);
+  assert.match(sheet, /paddingRight: edge,/);
+  assert.match(sheet, /paddingBottom: \(layout\.compact \? 12 : 20\) \+ insets\.bottom/);
+  assert.match(sheet, /<View style=\{\{ height: insets\.bottom \}\} \/>/);
+  for (const file of ['src/components/vine/ui/ContentSelectorDrawer.tsx', 'src/components/vine/ui/BibleVersePanel.tsx']) {
+    assert.match(read(file), /<ReaderPanel\b/, file);
   }
   const sermon = read('src/components/vine/ui/SermonPlannerDrawer.tsx');
   assert.match(sermon, /<View style=\{\[styles\.header, \{ paddingRight: SPACING\.md \+ insets\.right \}\]\}>/);
@@ -112,14 +119,13 @@ test('every full-screen modal draws to the edges on Android as on iOS, and pads 
   // the notch: the subdocument's page stopped short of the notch's strip.
   const files = [
     'src/components/vine/screens/DocumentModal.tsx',
-    'src/components/vine/ui/ContentSelectorDrawer.tsx',
+    'src/components/vine/ui/ReaderPanel.tsx',
     'src/components/vine/ui/SermonPlannerDrawer.tsx',
     'src/components/vine/ui/SaintHymnPicker.tsx',
     'src/components/vine/ui/SheetFrame.tsx',
     'src/components/vine/ui/CalendarSheet.tsx',
     'src/components/vine/ui/CalendarPanel.tsx',
     'src/components/playback/ActionSheetFrame.tsx',
-    'src/app/bible/[bookKey]/[chapter].tsx',
   ];
   for (const file of files) {
     const source = read(file);
