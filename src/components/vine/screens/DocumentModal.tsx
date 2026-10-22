@@ -527,6 +527,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
               displaySilentPrayers={preferences.displaySilentPrayers}
               appLanguage={preferences.appLanguage}
               theme={documentTheme}
+              title={title}
             />
           </>
         )}

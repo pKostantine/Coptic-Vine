@@ -64,6 +64,11 @@ const MARK_COLORS: Record<string, { wash: string; swatch: string }> = {
   purple: { wash: 'rgba(155, 109, 214, 0.44)', swatch: '#9b6dd6' },
 };
 
+/** A highlight colour's wash, as the page lays it over the text (gold for a colour it doesn't know). */
+export function highlightWash(color: string | null | undefined): string {
+  return (MARK_COLORS[color ?? ''] ?? MARK_COLORS.gold).wash;
+}
+
 /**
  * The layer's styles. `columns` names the language columns a page sets side
  * by side: while a selection is made in one, the others can't be selected,

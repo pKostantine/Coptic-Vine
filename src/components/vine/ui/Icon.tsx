@@ -11,6 +11,7 @@ export type IconName =
   | 'checkmark-done'
   | 'chevron-back'
   | 'chevron-forward'
+  | 'arrow-forward'
   | 'chevron-down'
   | 'home-outline'
   | 'bookmark'
@@ -97,6 +98,12 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
       return (
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="m184 112 144 144-144 144" fill="none" stroke={color} strokeWidth={48} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'arrow-forward':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M268 112l144 144-144 144M392 256H100" fill="none" stroke={color} strokeWidth={48} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case 'eye-outline':
