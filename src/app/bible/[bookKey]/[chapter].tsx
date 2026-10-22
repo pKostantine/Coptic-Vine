@@ -1,22 +1,19 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Head from 'expo-router/head';
-import { StatusBar } from 'expo-status-bar';
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import BibleWebView, { BibleWebViewHandle } from '@/components/vine/BibleWebView';
 import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/vine/bibleDocumentHtml';
+import BibleVersePanel from '@/components/vine/ui/BibleVersePanel';
 import BleedPage from '@/components/vine/ui/BleedPage';
 import DocumentStatusBar from '@/components/vine/ui/DocumentStatusBar';
 import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
-import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
 import LoadingScreen from '@/components/vine/ui/LoadingScreen';
-import { documentSelectorColors } from '@/constants/documentSelectorColors';
-import { getDocumentTheme, withAlpha, type DocumentTheme } from '@/constants/documentThemes';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { getDocumentTheme, type DocumentTheme } from '@/constants/documentThemes';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useBottomChrome, useReportDocumentTheme } from '@/context/BottomChromeContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -27,7 +24,6 @@ import {
     getBibleChapterHeaderTitle,
     getBibleChapterReferences,
     getBibleChapterKeys,
-    getBibleVerseDisplayLabel,
     getDisplayedChapterVerses,
     getDisplayedPsalmPreface,
     PsalmNumbering,
@@ -35,43 +31,20 @@ import {
 import { goBack } from '@/utils/navigation';
 import { writeRichClipboard } from '@/utils/richClipboard';
 import { swipeEdge, swipeStartX } from '@/utils/edgeSwipe';
-import { arabicItalicStyle } from '@/utils/arabicItalic';
-import { appText, type AppText } from '@/utils/appText';
 import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useReadingKeepAwake } from '@/utils/useReadingKeepAwake';
 import { useCopticFontDataUri, useCopticItalicFontDataUri } from '@/utils/useCopticFontDataUri';
-import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
 import { isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
 import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
-import { useModalOrientations } from '@/hooks/useModalOrientations';
 
-type EnabledBibleLanguages = Record<BibleLanguageKey, boolean>;
 type LoadedBibleVerses = { requestKey: string; verses: BibleDisplayVerse[] };
 
-const LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: AppText }[] = [
-  { key: 'english', label: { english: 'English', arabic: 'الإنجليزية', french: 'Anglais' } },
-  { key: 'englishNkjv', label: { english: 'English (NKJV)', arabic: 'الإنجليزية (NKJV)', french: 'Anglais (NKJV)' } },
-  { key: 'englishFromCoptic', label: { english: 'English (from Coptic)', arabic: 'الإنجليزية (من القبطية)', french: 'Anglais (du copte)' } },
-  { key: 'coptic', label: { english: 'Coptic', arabic: 'القبطية', french: 'Copte' } },
-  { key: 'greek', label: { english: 'Greek', arabic: 'اليونانية', french: 'Grec' } },
-  { key: 'arabic', label: { english: 'Arabic', arabic: 'العربية', french: 'Arabe' } },
-  { key: 'arabicFromCoptic', label: { english: 'Arabic (from Coptic)', arabic: 'العربية (من القبطية)', french: 'Arabe (du copte)' } },
-  { key: 'french', label: { english: 'French', arabic: 'الفرنسية', french: 'Français' } },
-];
-
 const PSALMS_BOOK_KEY = 'psalms';
-const PSALM_118_STANZA_LETTERS = [
-  'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ',
-  'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת',
-] as const;
 
 const SELECTOR_TEXT: Record<AppLanguage, {
-  verses: string;
-  previous: string;
   previousChapter: string;
-  next: string;
   nextChapter: string;
   openSelector: string;
   closeSelector: string;
@@ -81,10 +54,7 @@ const SELECTOR_TEXT: Record<AppLanguage, {
   removeHighlight: string;
 }> = {
   en: {
-    verses: 'Verses',
-    previous: 'Previous',
     previousChapter: 'Previous chapter',
-    next: 'Next',
     nextChapter: 'Next chapter',
     openSelector: 'Open verse selector',
     closeSelector: 'Close verse selector',
@@ -94,10 +64,7 @@ const SELECTOR_TEXT: Record<AppLanguage, {
     removeHighlight: 'Remove',
   },
   ar: {
-    verses: 'الآيات',
-    previous: 'السابق',
     previousChapter: 'الإصحاح السابق',
-    next: 'التالي',
     nextChapter: 'الإصحاح التالي',
     openSelector: 'فتح محدد الآيات',
     closeSelector: 'إغلاق محدد الآيات',
@@ -107,10 +74,7 @@ const SELECTOR_TEXT: Record<AppLanguage, {
     removeHighlight: 'إزالة',
   },
   fr: {
-    verses: 'Versets',
-    previous: 'Précédent',
     previousChapter: 'Chapitre précédent',
-    next: 'Suivant',
     nextChapter: 'Chapitre suivant',
     openSelector: 'Ouvrir la liste des versets',
     closeSelector: 'Fermer la liste des versets',
@@ -139,70 +103,13 @@ function getAvailableLanguages(verses: BibleDisplayVerse[], bookKey: string | nu
   return languages;
 }
 
-function isArabicBibleLanguage(language: BibleLanguageKey): boolean {
-  return language === 'arabic' || language === 'arabicFromCoptic';
-}
-
-function getPsalmStanza(
-  bookKey: string | null | undefined,
-  chapterNumber: number,
-  psalmNumbering: PsalmNumbering,
-  verseNumber: number | string,
-): { letter: string; number: number } | null {
-  const isPsalm118 = bookKey === PSALMS_BOOK_KEY
-    && (psalmNumbering === 'septuagint' ? chapterNumber === 118 : chapterNumber === 119);
-  if (!isPsalm118) return null;
-
-  const numericVerse = typeof verseNumber === 'number' ? verseNumber : Number(verseNumber);
-  if (!Number.isInteger(numericVerse) || numericVerse < 1 || (numericVerse - 1) % 8 !== 0) return null;
-
-  const stanzaIndex = (numericVerse - 1) / 8;
-  const letter = PSALM_118_STANZA_LETTERS[stanzaIndex];
-  return letter ? { letter, number: stanzaIndex + 1 } : null;
-}
-
-function getBibleLanguageLabel(language: BibleLanguageKey, appLanguage: AppLanguage): string {
-  const option = LANGUAGE_OPTIONS.find((item) => item.key === language);
-  return appText(option?.label, appLanguage) || language;
-}
-
-function getVersePreviewLanguage(
-  verse: BibleDisplayVerse,
-  appLanguage: AppLanguage,
-  availableLanguages: BibleLanguageKey[],
-  enabledLanguages: EnabledBibleLanguages,
-): BibleLanguageKey {
-  const primaryLanguages: BibleLanguageKey[] = appLanguage === 'ar'
-    ? ['arabic', 'arabicFromCoptic', 'english', 'englishNkjv', 'englishFromCoptic', 'coptic', 'greek']
-    : appLanguage === 'fr'
-      ? ['french', 'english', 'englishNkjv', 'englishFromCoptic', 'arabic', 'arabicFromCoptic', 'coptic', 'greek']
-      : ['english', 'englishNkjv', 'englishFromCoptic', 'arabic', 'arabicFromCoptic', 'coptic', 'greek'];
-  const orderedLanguages = [
-    ...primaryLanguages,
-    ...availableLanguages.filter((language) => !primaryLanguages.includes(language)),
-  ];
-  const enabledWithText = orderedLanguages.find((language) =>
-    availableLanguages.includes(language) && enabledLanguages[language] && String(verse[language] || '').trim()
-  );
-  if (enabledWithText) return enabledWithText;
-
-  const enabledFallback = orderedLanguages.find((language) => availableLanguages.includes(language) && enabledLanguages[language]);
-  if (enabledFallback) return enabledFallback;
-
-  return availableLanguages.find((language) => String(verse[language] || '').trim()) || availableLanguages[0] || 'english';
-}
-
 export default function BibleChapterDocument() {
-  const modalOrientations = useModalOrientations();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const { nowPlayingInset } = useBottomChrome();
   // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
   // get the same headerless, gesture-nav UI as the native app, same as
   // ServiceDocument.tsx/lectionary/index.tsx.
-  const isMobileDocument = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
-  const selectorPanelWidth = isMobileDocument ? Math.round(screenWidth * 0.7) : Math.round(screenWidth * 0.5);
   const { bookKey, chapter, numbering: numberingParam, verse: verseParam } = useLocalSearchParams<{
     bookKey: string;
     chapter: string;
@@ -227,6 +134,8 @@ export default function BibleChapterDocument() {
   // Bumped by Retry on a failed load: a new value re-runs both loads below.
   const [reloadToken, setReloadToken] = useState(0);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  // The verse the reader was at when the Verses panel opened: outlined in it, and scrolled to.
+  const [selectorVerse, setSelectorVerse] = useState<string | null>(null);
   // Book Settings open as a sheet over the chapter, never as a page. The
   // chapter stays focused and re-anchors to the reader's verse after each
   // change (the settings-signature layout effect below); its own scroll
@@ -266,6 +175,7 @@ export default function BibleChapterDocument() {
   const openVerseSelector = useCallback(() => {
     selectorAnchorRef.current = currentVerseRef.current;
     selectorOpenRef.current = true;
+    setSelectorVerse(currentVerseRef.current);
     setIsSelectorOpen(true);
   }, []);
   const closeVerseSelector = useCallback(() => {
@@ -314,17 +224,7 @@ export default function BibleChapterDocument() {
     restoreGuardRef.current = currentVerseRef.current;
     setRestoreVerse(currentVerseRef.current);
   }, [settingsSignature, bookKey, chapter, psalmNumbering, verseParam]);
-  const [selectorSlide] = useState(() => new Animated.Value(1));
   const enabledLanguages = preferences.bibleVisibleLanguages;
-
-  useEffect(() => {
-    Animated.timing(selectorSlide, {
-      toValue: isSelectorOpen ? 0 : 1,
-      duration: 220,
-      easing: isSelectorOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [isSelectorOpen, selectorSlide]);
 
   useEffect(() => {
     if (!bookKey) return;
@@ -490,11 +390,11 @@ export default function BibleChapterDocument() {
         if (edge === 'left' && travelled > 60) {
           goBackALevel();
         } else if (!isSelectorOpen && edge === 'right' && travelled < -36) {
-          setIsSelectorOpen(true);
+          openVerseSelector();
         }
       },
     });
-  }, [goBackALevel, screenWidth, isSelectorOpen, pencilGestureActive, bookSettingsOpen]);
+  }, [goBackALevel, openVerseSelector, screenWidth, isSelectorOpen, pencilGestureActive, bookSettingsOpen]);
 
   return (
     <BleedPage
@@ -584,153 +484,36 @@ export default function BibleChapterDocument() {
             }}
           />
 
-          <Modal
-            animationType="none"
-            transparent
+          <BibleVersePanel
             visible={isSelectorOpen}
-            onRequestClose={closeVerseSelector}
-            supportedOrientations={modalOrientations}
-            // Edge to edge on Android too, as on iOS: it pads itself clear of the bars and the notch.
-            statusBarTranslucent
-            navigationBarTranslucent
-          >
-            {/* The drawer runs up under the status bar, so on a light page
-                the clock and battery over it turn dark to stay readable. */}
-            <StatusBar style={theme.dark ? 'light' : 'dark'} />
-            <View style={styles.selectorOverlay}>
-              <Pressable accessibilityLabel={selectorText.closeSelector} style={styles.selectorBackdrop} onPress={closeVerseSelector} />
-              {/* The panel runs to the screen's edge; its rows stop short of a
-                  phone's notch on its side, and its strips bleed out past them. */}
-              <Animated.View style={[styles.selectorPanel, { width: selectorPanelWidth, paddingTop: insets.top, paddingRight: SPACING.md + insets.right, transform: [{ translateX: selectorSlide.interpolate({ inputRange: [0, 1], outputRange: [0, selectorPanelWidth] }) }] }]}>
-                <View style={[styles.selectorHeader, { marginRight: -(SPACING.md + insets.right), paddingRight: SPACING.md + insets.right }]}>
-                  {preferences.appLanguage === 'ar' ? (
-                    <Text style={[styles.selectorHeaderTitle, styles.selectorHeaderArabic]}>{selectorText.verses}</Text>
-                  ) : (
-                    <Text style={styles.selectorHeaderTitle}>{selectorText.verses}</Text>
-                  )}
-                </View>
-
-                <View style={styles.chapterNavRow}>
-                  <ChapterNavButton
-                    accessibilityLabel={selectorText.previousChapter}
-                    appLanguage={preferences.appLanguage}
-                    disabled={previousChapter === null}
-                    icon="chevron-back"
-                    label={selectorText.previous}
-                    onPress={() => goToChapter(previousChapter)}
-                    styles={styles}
-                    theme={theme}
-                  />
-                  <ChapterNavButton
-                    accessibilityLabel={selectorText.nextChapter}
-                    appLanguage={preferences.appLanguage}
-                    disabled={nextChapter === null}
-                    icon="chevron-forward"
-                    label={selectorText.next}
-                    onPress={() => goToChapter(nextChapter)}
-                    styles={styles}
-                    theme={theme}
-                  />
-                </View>
-
-                <View style={styles.selectorLanguageBar}>
-                  {LANGUAGE_OPTIONS.filter((option) => availableLanguages.includes(option.key)).map((option) => {
-                    const languageLabel = getBibleLanguageLabel(option.key, preferences.appLanguage);
-                    return (
-                      <Pressable
-                        accessibilityLabel={languageLabel}
-                        key={option.key}
-                        style={[
-                          styles.languageButton,
-                          { backgroundColor: enabledLanguages[option.key] ? theme.colors.accent : theme.colors.surface, borderColor: enabledLanguages[option.key] ? theme.colors.accent : theme.colors.border },
-                        ]}
-                        onPress={() => toggleLanguage(option.key)}
-                      >
-                        <Text style={[styles.languageText, preferences.appLanguage === 'ar' && styles.languageTextArabic, { color: enabledLanguages[option.key] ? theme.colors.onAccent : theme.colors.text }]}>
-                          {languageLabel}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <ScrollView style={styles.selectorList}>
-                  {(verses || []).map((verse) => {
-                    const previewLanguage = getVersePreviewLanguage(verse, preferences.appLanguage, availableLanguages, enabledLanguages);
-                    const isPsalmIntroduction = Boolean(verse.isPsalmIntroduction);
-                    const stanza = getPsalmStanza(bookKey, currentChapterNumber, psalmNumbering, verse.verseNumber);
-                    return (
-                      <Fragment key={`selector-${verse.verseNumber}`}>
-                        {stanza ? (
-                          <View accessibilityRole="header" style={styles.psalmStanzaDivider}>
-                            <View style={styles.psalmStanzaLine} />
-                            <View style={styles.psalmStanzaLabel}>
-                              <Text style={styles.psalmStanzaLetter}>{stanza.letter}</Text>
-                              <Text style={[styles.psalmStanzaNumber, preferences.appLanguage === 'ar' && styles.psalmStanzaNumberArabic]}>
-                                ({getBibleVerseDisplayLabel(stanza.number, preferences.appLanguage)})
-                              </Text>
-                            </View>
-                            <View style={styles.psalmStanzaLine} />
-                          </View>
-                        ) : null}
-                        <Pressable accessibilityRole="button" style={styles.selectorItem} onPress={() => selectVerse(verse.verseNumber)}>
-                          <Text
-                            style={[
-                              styles.selectorVerseNumber,
-                              verse.isLxxAddition && styles.selectorVerseNumberLxx,
-                              isPsalmIntroduction && styles.selectorVerseNumberIntro,
-                            ]}
-                          >
-                            {isPsalmIntroduction ? '' : getBibleVerseDisplayLabel(verse.verseNumber, preferences.appLanguage)}
-                          </Text>
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.selectorVersePreview,
-                              isArabicBibleLanguage(previewLanguage) && styles.selectorVersePreviewArabic,
-                              previewLanguage === 'coptic' && styles.selectorVersePreviewCoptic,
-                              isPsalmIntroduction && styles.selectorVersePreviewIntro,
-                              // Arabic in italic, slanted as Chrome slants it (utils/arabicItalic.ts).
-                              isPsalmIntroduction && isArabicBibleLanguage(previewLanguage) && arabicItalicStyle(),
-                              // Coptic in italic is its own face, drawn upright.
-                              isPsalmIntroduction && previewLanguage === 'coptic' && styles.selectorVersePreviewCopticItalic,
-                            ]}
-                          >
-                            {verse[previewLanguage]}
-                          </Text>
-                        </Pressable>
-                      </Fragment>
-                    );
-                  })}
-                </ScrollView>
-
-                {/* Its strip runs down under the home indicator; its buttons sit above it. */}
-                <View
-                  style={[styles.selectorActionRow, {
-                    marginRight: -(SPACING.md + insets.right),
-                    paddingRight: SPACING.xl + insets.right,
-                    paddingBottom: SPACING.sm + insets.bottom,
-                  }]}
-                >
-                  <Pressable accessibilityLabel={selectorText.bookmarkChapter} style={styles.selectorIconButton} onPress={() => toggleBookmark(bookmarkId)}>
-                    <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={25} color={theme.colors.accent} />
-                  </Pressable>
-                  <Pressable
-                    accessibilityLabel={selectorText.openBibleSettings}
-                    style={styles.selectorIconButton}
-                    onPress={() => {
-                      const anchor = selectorAnchorRef.current || currentVerseRef.current;
-                      closeVerseSelector();
-                      if (anchor) currentVerseRef.current = anchor;
-                      showBookSettings(true);
-                    }}
-                  >
-                    <Icon name="settings-outline" size={25} color={theme.colors.accent} />
-                  </Pressable>
-                </View>
-              </Animated.View>
-            </View>
-          </Modal>
+            onClose={closeVerseSelector}
+            theme={theme}
+            appLanguage={preferences.appLanguage}
+            text={selectorText}
+            title={{ english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench }}
+            bookKey={bookKey}
+            chapterNumber={currentChapterNumber}
+            chapterCount={chapterCount}
+            previousChapter={previousChapter}
+            nextChapter={nextChapter}
+            onGoToChapter={goToChapter}
+            psalmNumbering={psalmNumbering}
+            verses={verses || []}
+            availableLanguages={availableLanguages}
+            enabledLanguages={enabledLanguages}
+            onToggleLanguage={toggleLanguage}
+            currentVerse={selectorVerse}
+            highlights={bibleHighlights.highlights}
+            onSelectVerse={selectVerse}
+            bookmarked={bookmarked}
+            onToggleBookmark={() => toggleBookmark(bookmarkId)}
+            onOpenSettings={() => {
+              const anchor = selectorAnchorRef.current || currentVerseRef.current;
+              closeVerseSelector();
+              if (anchor) currentVerseRef.current = anchor;
+              showBookSettings(true);
+            }}
+          />
         </View>
       )}
       <BookSettingsSheet inDocument visible={bookSettingsOpen} onClose={() => showBookSettings(false)} />
@@ -738,144 +521,12 @@ export default function BibleChapterDocument() {
   );
 }
 
-function ChapterNavButton({
-  accessibilityLabel,
-  appLanguage,
-  disabled,
-  icon,
-  label,
-  onPress,
-  styles,
-  theme,
-}: {
-  accessibilityLabel: string;
-  appLanguage: AppLanguage;
-  disabled: boolean;
-  icon: 'chevron-back' | 'chevron-forward';
-  label: string;
-  onPress: () => void;
-  styles: ChapterStyles;
-  theme: DocumentTheme;
-}) {
-  const disabledColor = documentSelectorColors(theme).disabled;
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      disabled={disabled}
-      style={[styles.chapterNavButton, disabled && styles.chapterNavButtonDisabled]}
-      onPress={onPress}
-    >
-      <Icon name={icon} size={20} color={disabled ? disabledColor : theme.colors.accent} />
-      <Text style={[styles.chapterNavText, appLanguage === 'ar' && styles.chapterNavTextArabic, { color: disabled ? disabledColor : theme.colors.text }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-type ChapterStyles = ReturnType<typeof createStyles>;
-
 function createStyles(theme: DocumentTheme) {
-  const { colors } = theme;
-  const drawer = documentSelectorColors(theme);
   return StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: COLORS.black },
+    safeArea: { flex: 1, backgroundColor: theme.colors.page },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     loading: { fontFamily: TYPOGRAPHY.body, color: COLORS.muted, fontSize: 17 },
     error: { fontFamily: TYPOGRAPHY.body, color: COLORS.priest, fontSize: 17 },
     verseScreen: { flex: 1 },
-    selectorOverlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: drawer.scrim },
-    selectorBackdrop: { flex: 1 },
-    // Visual language matched to ContentSelectorDrawer (the normal document
-    // reader's content selector) — same panel background/border, header
-    // pattern (back button left, centered bilingual title), and card-style
-    // list items, per the request to make the two selectors feel consistent.
-    // Its colours are the page's in the same way (constants/documentSelectorColors.ts).
-    selectorPanel: {
-      backgroundColor: drawer.panel,
-      borderColor: withAlpha(colors.accent, 0.35),
-      borderLeftWidth: 1,
-      paddingHorizontal: SPACING.md,
-    },
-    selectorHeader: {
-      alignItems: 'center',
-      backgroundColor: colors.strip,
-      borderBottomWidth: 1,
-      borderBottomColor: withAlpha(colors.accent, 0.28),
-      flexDirection: 'row',
-      justifyContent: 'center',
-      marginHorizontal: -SPACING.md,
-      minHeight: 62,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-    },
-    selectorHeaderTitle: { color: colors.accent, fontFamily: TYPOGRAPHY.title, fontSize: 21, fontWeight: '800' },
-    selectorHeaderArabic: { fontFamily: 'Arial', textAlign: 'left', writingDirection: 'rtl' },
-    chapterNavRow: { borderBottomColor: withAlpha(colors.accent, 0.18), borderBottomWidth: 1, flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.sm },
-    chapterNavButton: {
-      alignItems: 'center',
-      borderColor: withAlpha(colors.accent, 0.42),
-      borderRadius: 8,
-      borderWidth: 1,
-      flex: 1,
-      flexDirection: 'row',
-      gap: SPACING.xs,
-      justifyContent: 'center',
-      minHeight: 42,
-    },
-    chapterNavButtonDisabled: { borderColor: withAlpha(drawer.disabled, 0.4), opacity: 0.72 },
-    chapterNavText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '800' },
-    chapterNavTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
-    selectorLanguageBar: { borderBottomColor: withAlpha(colors.accent, 0.18), borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingVertical: SPACING.sm },
-    languageButton: { borderRadius: 8, borderWidth: 1, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
-    languageText: { fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700' },
-    languageTextArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
-    selectorList: { flex: 1, paddingTop: SPACING.md },
-    psalmStanzaDivider: { alignItems: 'center', flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
-    psalmStanzaLine: { backgroundColor: withAlpha(colors.accent, 0.38), flex: 1, height: 1 },
-    psalmStanzaLabel: { alignItems: 'center', flexDirection: 'row', gap: SPACING.xs },
-    psalmStanzaLetter: { color: colors.accent, fontFamily: 'Arial', fontSize: 21, fontWeight: '700', lineHeight: 28, textAlign: 'center' },
-    psalmStanzaNumber: { color: colors.accent, fontFamily: TYPOGRAPHY.title, fontSize: 13, fontWeight: '700', textAlign: 'left', writingDirection: 'ltr' },
-    psalmStanzaNumberArabic: { fontFamily: TYPOGRAPHY.arabic },
-    selectorItem: {
-      alignItems: 'center',
-      backgroundColor: colors.strip,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-      flexDirection: 'row',
-      gap: SPACING.sm,
-      minHeight: 56,
-      marginBottom: SPACING.sm,
-      paddingHorizontal: SPACING.md,
-    },
-    selectorVerseNumber: { color: colors.accent, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontWeight: '800', minWidth: 28 },
-    // The same colours the chapter itself marks these verses in.
-    selectorVerseNumberLxx: { color: colors.priest },
-    selectorVerseNumberIntro: { color: colors.refrain },
-    selectorVersePreview: { flex: 1, fontFamily: 'Georgia', fontSize: 13, lineHeight: 18, color: colors.text },
-    selectorVersePreviewArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'right', writingDirection: 'rtl' },
-    selectorVersePreviewCoptic: { fontFamily: TYPOGRAPHY.coptic },
-    selectorVersePreviewCopticItalic: { fontFamily: TYPOGRAPHY.copticItalic, fontStyle: 'normal' },
-    selectorVersePreviewIntro: { color: colors.refrain, fontStyle: 'italic' },
-    selectorActionRow: {
-      alignItems: 'center',
-      backgroundColor: colors.strip,
-      borderColor: withAlpha(colors.accent, 0.32),
-      borderTopWidth: 1,
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      marginHorizontal: -SPACING.md,
-      paddingHorizontal: SPACING.xl,
-      paddingVertical: SPACING.sm,
-    },
-    selectorIconButton: {
-      alignItems: 'center',
-      backgroundColor: withAlpha(colors.accent, 0.06),
-      borderColor: withAlpha(colors.accent, 0.24),
-      borderRadius: 20,
-      borderWidth: 1,
-      height: 40,
-      justifyContent: 'center',
-      width: 40,
-    },
   });
 }
