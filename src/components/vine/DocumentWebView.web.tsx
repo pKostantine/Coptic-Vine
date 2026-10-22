@@ -44,6 +44,10 @@ interface DocumentWebViewProps {
   restoreRequest?: DocumentRestoreRequest | null;
   /** Extra scrollable space at the bottom for floating app chrome such as the global mini player. */
   bottomContentInset?: number;
+  /** Where the text starts under floating reader controls (documentHtml.ts's topContentInset). */
+  topContentInset?: number;
+  /** Whether the headpiece the document opens with still shows below the floating controls: the title pill's cue. */
+  onHeadpieceInViewChange?: (inView: boolean) => void;
   sermonPlannerMode?: boolean;
   sermonHighlights?: SermonHighlight[];
   /** The page the document is read on — see constants/documentThemes.ts. */
@@ -81,6 +85,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       initialVerseIndex,
       restoreRequest,
       bottomContentInset = 0,
+      topContentInset = 0,
+      onHeadpieceInViewChange,
       collapsedSectionIds,
       sermonPlannerMode = false,
       sermonHighlights = [],
@@ -171,6 +177,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     }, [sermonHighlights, sermonPlannerMode]);
 
     const handleAction = (action: DocumentAction) => {
+      if (action?.type === 'headpieceInView') {
+        onHeadpieceInViewChange?.(Boolean(action.inView));
+        return;
+      }
       if (action?.type === 'currentSection' && action.sectionId) {
         if (loadingRef.current) {
           reportDuringLoadRef.current = action;
@@ -306,6 +316,10 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               suppressAllSpeakerLabels,
               // Applied after load instead — see applyBottomInset.
               bottomContentInset: 0,
+              // Built in, unlike the bottom's: it changes only with the layout
+              // (a rotation, a browser crossing the phone width), and the page's
+              // own first jump has to land below the controls.
+              topContentInset,
               sermonPlannerMode,
               theme,
               ornamentColor,
@@ -325,6 +339,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         copticRecitedPrayers,
         copticGospelRite,
         suppressAllSpeakerLabels,
+        topContentInset,
         sermonPlannerMode,
         theme,
         ornamentColor,

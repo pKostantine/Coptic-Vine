@@ -39,7 +39,7 @@ test('no page wraps its glow, green header or tab bar in a side-padded safe area
   const offenders = [...sourceFiles('src/app'), ...sourceFiles('src/components')].filter((file) => {
     const source = read(file);
     const sidePadded = /<SafeAreaView edges=\{\['left', 'right'/.test(source);
-    const chrome = /<PageGlow|<HeroGlow|<AppHeader|<BottomTabBar|<PersonHero|<DocumentTopBar/.test(source);
+    const chrome = /<PageGlow|<HeroGlow|<AppHeader|<BottomTabBar|<PersonHero|<FloatingReaderControls/.test(source);
     return sidePadded && chrome && !/BleedPage/.test(source);
   });
   assert.deepEqual(offenders, []);
@@ -53,10 +53,15 @@ test('the chrome that spans the screen keeps its own contents clear of the notch
   assert.match(overlay, /right: 18 \+ insets\.right,/);
   // The artist's and cantor's glow reaches back out past the page's notch padding.
   assert.match(read('src/components/vine/ui/PersonHero.tsx'), /\{ left: -insets\.left, right: -insets\.right \}/);
-  // The documents' green bar, and the Bible chapter's above the text, run to both edges.
-  assert.match(read('src/components/vine/ui/DocumentTopBar.tsx'), /paddingTop: insets\.top, paddingLeft: insets\.left, paddingRight: insets\.right/);
+  // The controls floating over a document keep clear of the notch: in by the
+  // safe area on every side, beside the notch on a phone on its side.
+  const floating = read('src/components/vine/ui/floatingControls.ts');
+  assert.match(floating, /left: 14 \+ insets\.left, right: 14 \+ insets\.right/);
+  assert.match(floating, /left: Math\.max\(insets\.left, 14\), right: Math\.max\(insets\.right, 14\)/);
+  assert.match(floating, /left: 24 \+ insets\.left, right: 24 \+ insets\.right/);
+  // The Bible chapter's float over its page from the top of the screen, outside the notch padding.
   const chapter = read('src/app/bible/[bookKey]/[chapter].tsx');
-  assert.match(chapter, /<BleedPage\n\s+edges=\{\['bottom'\]\}[\s\S]*header=\{\([\s\S]*<DocumentTopBar/);
+  assert.match(chapter, /<BleedPage\n\s+edges=\{\['bottom'\]\}[\s\S]*header=\{\([\s\S]*<FloatingReaderControls/);
   assert.doesNotMatch(chapter, /<SafeAreaView/);
 });
 
@@ -143,14 +148,16 @@ test('headers and buttons keep below the status bar; tiles share the width insid
   const notice = read('src/components/vine/ui/NoticeScreen.tsx');
   assert.match(notice, /<ScrollView/);
   assert.match(notice, /paddingLeft: 24 \+ insets\.left,\n\s+paddingRight: 24 \+ insets\.right,/);
-  // The Bible chapter's loading splash stays under its bar, so Back can still be reached.
+  // The Bible chapter's loading splash starts at the top of its page, its
+  // floating controls over it, so Back can still be reached.
   assert.match(read('src/app/bible/[bookKey]/[chapter].tsx'), /<LoadingScreen belowHeader \/>/);
   // A light page runs up under the status bar, whose clock and battery turn
-  // dark over it -- a status bar of the document's own, mounted only while it shows.
+  // dark over it -- a status bar of the document's own, mounted only while it
+  // shows. A phone on its side hides it, the Bible's controls beside the notch.
   const statusBar = read('src/components/vine/ui/DocumentStatusBar.tsx');
-  assert.match(statusBar, /return focused && !theme\.dark \? <StatusBar style="dark" \/> : null;/);
+  assert.match(statusBar, /if \(!focused\) return null;\n\s+if \(hidden\) return <StatusBar hidden \/>;\n\s+return !theme\.dark \? <StatusBar style="dark" \/> : null;/);
   assert.match(read('src/components/vine/screens/ServiceDocument.tsx'), /<DocumentStatusBar theme=\{documentTheme\} \/>/);
-  assert.match(read('src/app/bible/[bookKey]/[chapter].tsx'), /<DocumentStatusBar theme=\{theme\} \/>/);
+  assert.match(read('src/app/bible/[bookKey]/[chapter].tsx'), /<DocumentStatusBar theme=\{theme\} hidden=\{floatingLayout\.hideStatusBar\} \/>/);
   // The seasons' year bar, across a phone, keeps clear of its notch.
   assert.match(read('src/components/vine/screens/SeasonSelectorScreen.tsx'), /wide \? styles\.yearBarWide : \{ left: 16 \+ insets\.left, right: 16 \+ insets\.right \}/);
 });

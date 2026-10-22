@@ -2,10 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Href, Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { PanResponder, type PanResponderGestureState, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import DocumentPillBar from '../ui/DocumentPillBar';
-import DocumentTopBar from '../ui/DocumentTopBar';
+import FloatingReaderControls from '../ui/FloatingReaderControls';
+import { floatingControlsLayout } from '../ui/floatingControls';
 import CalendarSheet from '../ui/CalendarSheet';
 import DocumentDateBar from '../ui/DocumentDateBar';
 import DocumentStatusBar from '../ui/DocumentStatusBar';
@@ -35,6 +36,7 @@ import { useReportDocumentTheme } from '../../../context/BottomChromeContext';
 import { useSermonPlanner } from '../../../hooks/useSermonPlanner';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { useReadingKeepAwake } from '../../../utils/useReadingKeepAwake';
+import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import { findReadingSectionId, parseReadingParam } from '../../../utils/documentReadings';
 import { hydrateSupabaseServiceHymn } from '../../../utils/hymnLibrary';
 import { getEpistleConditionFlags } from '../../../utils/readingsService';
@@ -179,6 +181,21 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isMobileDocument = Platform.OS !== 'web';
+  const insets = useSafeAreaInsets();
+  // A browser has no edge swipes: its controls float over the top of the
+  // page (FloatingReaderControls), in place of a bar above it. The app has
+  // none, and reads full width.
+  const floatingLayout = floatingControlsLayout({
+    width: screenWidth,
+    height: screenHeight,
+    insets,
+    wideWeb: screenWidth >= MOBILE_WEB_BREAKPOINT,
+    native: false,
+  });
+  // Whether the headpiece the service opens with still shows its title
+  // below the controls (documentHtml.ts reports it): the title pill fades
+  // in once it has scrolled away.
+  const [headpieceInView, setHeadpieceInView] = useState(true);
   // The page the document is read on (constants/documentThemes.ts); the
   // screen around the reader is painted with it too, so the page runs edge
   // to edge.
@@ -1044,6 +1061,10 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     [screenWidth, isCoveredByModal, leaveDocument],
   );
 
+  // The controls float over the text itself only where the document scrolls
+  // straight up under them.
+  const controlsOverText = !isMobileDocument && !preferences.slideshowMode && !showDateBar && !isAntiphonary;
+
   return (
     <SafeAreaView
       edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
@@ -1070,19 +1091,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       <Head>
         <title>{`Coptic Vine ${title}`}</title>
       </Head>
-      {!isMobileDocument ? (
-        <DocumentTopBar
-          title={{ english: title, arabic, french }}
-          onBack={() => leaveDocument()}
-          backAccessibilityLabel="Leave document"
-          leadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-          onLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-          leadingAccessibilityLabel={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
-          trailingIcon={isSermonPlanner ? 'document-text-outline' : 'list-outline'}
-          trailingAccessibilityLabel={isSermonPlanner ? 'Open sermon notes' : 'Open content list'}
-          onTrailingPress={() => setSelectorOpen(true)}
-        />
-      ) : null}
+      {/* The floating controls' room, where the page doesn't run up under them:
+          a date bar, the Antiphonary's pills or a slideshow start below them. */}
+      {!isMobileDocument && !controlsOverText ? <View style={{ height: floatingLayout.contentTop }} /> : null}
       {showDateBar && !error ? (
         <DocumentDateBar
           arabic={preferences.appLanguage === 'ar'}
@@ -1151,6 +1162,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             sermonPlannerMode={isSermonPlanner}
             sermonHighlights={sermonPlanner.plan.highlights}
             ornamentColor={documentOrnamentColor(documentTheme, ornamentSeason)}
+            topContentInset={controlsOverText ? floatingLayout.contentTop : 0}
+            onHeadpieceInViewChange={setHeadpieceInView}
           />
           </View>
           {isSermonPlanner ? (
@@ -1221,6 +1234,33 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           their own prefetched sections and never needed the parent's, so they
           now ride out the reload (still showing content, not a spinner) and
           are refreshed in place by the hydration effect above. */}
+      {!isMobileDocument ? (
+        <FloatingReaderControls
+          theme={documentTheme}
+          reader="service"
+          layout={floatingLayout}
+          onBack={() => leaveDocument()}
+          backAccessibilityLabel="Leave document"
+          // At the top of a service its headpiece carries the title; the pill
+          // fades in once that has scrolled away.
+          title={{ english: title, arabic, french }}
+          titleVisible={!controlsOverText || !headpieceInView}
+          actions={[
+            ...(shouldShowFullscreen && screenWidth >= MOBILE_WEB_BREAKPOINT
+              ? [{
+                icon: isFullscreen ? 'close-fullscreen' as const : 'open-in-full' as const,
+                accessibilityLabel: isFullscreen ? 'Exit full screen' : 'Enter full screen',
+                onPress: toggleFullscreen,
+              }]
+              : []),
+            {
+              icon: isSermonPlanner ? 'document-text-outline' as const : 'list-outline' as const,
+              accessibilityLabel: isSermonPlanner ? 'Open sermon notes' : 'Open content list',
+              onPress: () => setSelectorOpen(true),
+            },
+          ]}
+        />
+      ) : null}
       <SubdocumentModal
         visible={Boolean(subdocumentModal)}
         title={subdocumentModal?.title ?? null}

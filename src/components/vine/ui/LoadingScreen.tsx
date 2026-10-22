@@ -9,9 +9,9 @@ import { getCurrentAppLanguage } from '../../../utils/preferencesStorage';
 /** Continues the native splash screen's look (the same deep green, the same seal) instead of cutting to a bare "Loading…" text while a document's content loads from Supabase. */
 export default function LoadingScreen({ belowHeader = false }: {
   /**
-   * Under a header the page keeps (the Bible chapter's bar): the splash
-   * starts at the header's foot instead of running up over its buttons. It
-   * still runs to the sides and the foot of the screen.
+   * On a page whose body starts at the top of the screen (the Bible chapter,
+   * its controls floating over it): the splash starts there instead of
+   * reaching up past the status bar. It still runs to the sides and the foot.
    */
   belowHeader?: boolean;
 } = {}) {

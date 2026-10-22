@@ -213,6 +213,9 @@ test('the stored choice is a page, and Night when it is not', () => {
   assert.match(fs.readFileSync('src/context/ReadingPreferencesContext.tsx', 'utf8'), /setDocumentTheme: \(theme: DocumentThemeId\) => void;/);
 });
 
+/** The floating controls' fade, which both builders draw. */
+const readerChromeFade = () => loadFile('src/components/vine/readerChromeFade.ts', (name) => (name === '../../constants/documentThemes' ? themes : require(name)));
+
 /** The document builder, with its leaf imports stubbed as tests/selectionMenus.test.cjs stubs the Bible's. */
 function loadDocumentBuilder() {
   const local = {
@@ -221,6 +224,7 @@ function loadDocumentBuilder() {
     '../../constants/documentOrnaments': loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name))),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),
+    './readerChromeFade': readerChromeFade(),
     '../../utils/versePresentation': loadFile('src/utils/versePresentation.js'),
     '../../utils/verseRubric': loadFile('src/utils/verseRubric.js'),
   };
@@ -232,6 +236,7 @@ function loadBibleBuilder() {
     '../../constants/documentThemes': themes,
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
+    './readerChromeFade': readerChromeFade(),
     '../../utils/bibleNumerals': loadFile('src/utils/bibleNumerals.ts'),
     '../../utils/displayText': { formatEnglishDisplayText: (value) => String(value || '') },
   };

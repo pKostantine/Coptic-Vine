@@ -288,7 +288,7 @@ test('the document scrolls in its own scroller, never as the page', () => {
   assert.match(rootRule, /height: 100%;/);
   assert.match(rootRule, /overflow: hidden;/);
   assert.match(html, /\.page-scroller \{[^}]*overflow-y: auto;/);
-  assert.match(html, /<div class="page-scroller"><main class="document">/);
+  assert.match(html, /<div class="page-scroller"><main class="document"[ >]/);
   assert.match(html, /pageScroller\.addEventListener\('scroll', scheduleReport/);
   assert.doesNotMatch(html, /window\.addEventListener\('scroll'/);
   assert.doesNotMatch(html, /window\.scrollTo\(/);

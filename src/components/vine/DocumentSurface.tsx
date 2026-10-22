@@ -52,6 +52,10 @@ interface DocumentSurfaceProps {
   sermonHighlights?: SermonHighlight[];
   /** The colour the document's ornaments are drawn in; by default the page's own (documentOrnamentColor, Night and Paper in the Annual green). */
   ornamentColor?: string;
+  /** Scroll mode: where the text starts under floating reader controls (documentHtml.ts's topContentInset). */
+  topContentInset?: number;
+  /** Scroll mode: whether the headpiece the document opens with still shows below the floating controls. */
+  onHeadpieceInViewChange?: (inView: boolean) => void;
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -151,6 +155,8 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       sermonPlannerMode = false,
       sermonHighlights = [],
       ornamentColor: ornamentColorProp,
+      topContentInset = 0,
+      onHeadpieceInViewChange,
     },
     ref,
   ) => {
@@ -385,6 +391,8 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         initialVerseIndex={initialScrollVerseIndex}
         restoreRequest={restoreRequest}
         bottomContentInset={nowPlayingInset}
+        topContentInset={topContentInset}
+        onHeadpieceInViewChange={onHeadpieceInViewChange}
         sermonPlannerMode={sermonPlannerMode}
         sermonHighlights={sermonHighlights}
         theme={theme}

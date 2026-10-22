@@ -9,6 +9,7 @@ import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesSto
 import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGap } from './documentPresentationMetrics';
+import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
 export interface DocumentVerse {
@@ -146,6 +147,8 @@ export interface DocumentAction {
   active?: boolean;
   /** "contentHeight" only: how tall the laid-out document is, for anything embedding it at its natural size. */
   height?: number;
+  /** "headpieceInView" only: whether the headpiece the document opens with still shows below the floating controls. */
+  inView?: boolean;
 }
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, french: false, coptic: true, arabic: true };
@@ -207,6 +210,7 @@ export function buildDocumentHtml(
     copticGospelRite = false,
     suppressAllSpeakerLabels = false,
     bottomContentInset = 0,
+    topContentInset = 0,
     sermonPlannerMode = false,
     nativeSwipeNavigation = false,
     theme = NIGHT_DOCUMENT_THEME,
@@ -229,6 +233,14 @@ export function buildDocumentHtml(
     suppressAllSpeakerLabels?: boolean;
     /** Extra bottom clearance for app-level floating chrome, in CSS pixels. */
     bottomContentInset?: number;
+    /**
+     * Where the text starts when FloatingReaderControls float over the top of
+     * the page (floatingControls.ts's contentTop): the document opens below
+     * them, fades out under them as it scrolls, lands every jump below them,
+     * and reports whether the headpiece it opens with is still in view (the
+     * title pill shows once it isn't). 0, the page has nothing over it.
+     */
+    topContentInset?: number;
     /** Adds persistent range highlighting and Pencil-aware annotation controls. */
     sermonPlannerMode?: boolean;
     /** Native touch edge navigation only; no swipe-to-exit on any website. */
@@ -359,9 +371,19 @@ export function buildDocumentHtml(
       }
       .document {
         box-sizing: border-box;
-        padding: ${SPACING.md}px 0 ${Math.max(0, Math.round(bottomContentInset))}px;
+        padding: ${Math.max(SPACING.md, Math.round(topContentInset))}px 10px ${Math.max(0, Math.round(bottomContentInset))}px;
         max-width: 100vw;
       }
+      /* The page's margins: a phone's 14px (with each cell's 4px), a tablet's
+         28px, a desktop's 36px. */
+      @media (min-width: 700px) {
+        .document { padding-left: 24px; padding-right: 24px; }
+      }
+      @media (min-width: 1000px) {
+        .document { padding-left: 32px; padding-right: 32px; }
+      }
+      .page-scroller { scroll-padding-top: ${Math.max(0, Math.round(topContentInset))}px; }
+      ${readerChromeFadeCss(colors.page, topContentInset)}
       .section {
         box-sizing: border-box;
         margin-bottom: ${SPACING.xl}px;
@@ -671,7 +693,7 @@ export function buildDocumentHtml(
     </style>
   </head>
   <body>
-    ${ornamentDefs}<div class="page-scroller"><main class="document">${htmlSections}</main></div>
+    ${ornamentDefs}${readerChromeFadeHtml(topContentInset)}<div class="page-scroller"><main class="document" data-chrome-top="${Math.max(0, Math.round(topContentInset))}">${htmlSections}</main></div>
     <script>
       function postAction(type, payload) {
         var message = JSON.stringify(Object.assign({ type: type }, payload || {}));
@@ -700,6 +722,11 @@ export function buildDocumentHtml(
       // scroller to scroll-to-top, and with the page no taller than the web
       // view, its own scroll view has nothing left to move.
       var pageScroller = document.querySelector('.page-scroller');
+      // The height of the controls floating over the page (topContentInset,
+      // carried on the document): a jump lands below them, and the reading
+      // line sits as far below them as it sat below a bar.
+      var chromeHost = document.querySelector('.document');
+      var chromeTop = chromeHost ? Number(chromeHost.getAttribute('data-chrome-top')) || 0 : 0;
       // How tall the document actually is. Anything embedding this at its
       // natural size rather than in a full screen — the saint picker's hymn
       // preview — has no other way to know: the content is laid out in here.
@@ -775,7 +802,7 @@ export function buildDocumentHtml(
         // For a surviving hymn every settings change uses its START.
         var target = targetEdge === 'end'
           ? documentTop(element.getBoundingClientRect().bottom) - pageScroller.clientHeight + 16
-          : documentTop(element.getBoundingClientRect().top) - 1;
+          : documentTop(element.getBoundingClientRect().top) - 1 - chromeTop;
         return clampScrollTop(target);
       }
       window.scrollToSection = function (sectionId, edge) {
@@ -791,7 +818,7 @@ export function buildDocumentHtml(
           var verse = verseId && document.querySelector('[data-verse-id="' + verseId + '"]');
           if (verse && verse.closest('.section') && verse.closest('.section').id === id) {
             jumpAndHold(function () {
-              return verse.isConnected ? clampScrollTop(documentTop(verse.getBoundingClientRect().top) - 1) : null;
+              return verse.isConnected ? clampScrollTop(documentTop(verse.getBoundingClientRect().top) - 1 - chromeTop) : null;
             });
             return true;
           }
@@ -807,7 +834,7 @@ export function buildDocumentHtml(
         var element = document.querySelector('[data-verse-id="' + verseId + '"]');
         if (!element) return false;
         var verseTop = function () {
-          return element.isConnected ? clampScrollTop(documentTop(element.getBoundingClientRect().top) - 1) : null;
+          return element.isConnected ? clampScrollTop(documentTop(element.getBoundingClientRect().top) - 1 - chromeTop) : null;
         };
         jumpAndHold(verseTop);
         return true;
@@ -1043,7 +1070,7 @@ export function buildDocumentHtml(
         }
         function reportCurrentSection() {
           pending = false;
-          var threshold = 96;
+          var threshold = 96 + chromeTop;
           var currentSection = findCurrent(sections, threshold);
           var currentVerse = findCurrent(verseRows, threshold);
           var sectionId = currentSection && currentSection.getAttribute('data-section-id');
@@ -1061,6 +1088,34 @@ export function buildDocumentHtml(
         }
         pageScroller.addEventListener('scroll', scheduleReport, { passive: true });
         scheduleReport();
+      })();
+      // Under floating controls: whether the headpiece the document opens
+      // with still shows its title below them. It carries the service's
+      // title, so the controls' title pill shows only once it has scrolled
+      // away (or if the document opens without one).
+      (function () {
+        if (!chromeTop) return;
+        var headpiece = document.querySelector('.document .headpiece');
+        if (headpiece && documentTop(headpiece.getBoundingClientRect().top) > chromeTop + 160) headpiece = null;
+        var title = headpiece && (headpiece.querySelector('.headpiece-title') || headpiece);
+        var lastInView = null;
+        var pending = false;
+        function reportHeadpiece() {
+          pending = false;
+          var inView = Boolean(title && title.isConnected && title.getClientRects().length
+            && title.getBoundingClientRect().bottom > chromeTop - 12);
+          if (inView === lastInView) return;
+          lastInView = inView;
+          postAction('headpieceInView', { inView: inView });
+        }
+        function scheduleHeadpieceReport() {
+          if (pending) return;
+          pending = true;
+          requestAnimationFrame(reportHeadpiece);
+        }
+        pageScroller.addEventListener('scroll', scheduleHeadpieceReport, { passive: true });
+        window.addEventListener('resize', scheduleHeadpieceReport);
+        reportHeadpiece();
       })();
       (function () {
         if (!${JSON.stringify(nativeSwipeNavigation)}) return;

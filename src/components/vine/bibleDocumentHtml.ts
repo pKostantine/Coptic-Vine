@@ -2,6 +2,7 @@ import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/docume
 import { formatCopticNumber, formatGreekNumber } from '../../utils/bibleNumerals';
 import { formatEnglishDisplayText } from '../../utils/displayText';
 import { getLanguageColumnGap } from './documentPresentationMetrics';
+import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
 export interface BibleDisplayVerse {
@@ -57,6 +58,7 @@ export function buildBibleChapterHtml({
   restoreVerse = null,
   readerId = '',
   bottomContentInset = 0,
+  topContentInset = 0,
   highlighting = false,
   highlightLabels = { copy: 'Copy', remove: 'Remove' },
   copyReference = null,
@@ -75,6 +77,13 @@ export function buildBibleChapterHtml({
   preface?: BiblePreface | null;
   /** Extra bottom clearance for app-level floating chrome, in CSS pixels. */
   bottomContentInset?: number;
+  /**
+   * Where the chapter starts under FloatingReaderControls (floatingControls.ts's
+   * contentTop), in the reading view: it opens below them, fades out under
+   * them as it scrolls, and lands a verse below them. A slideshow is laid out
+   * below them instead, and passes none.
+   */
+  topContentInset?: number;
   /** Verse to land on when the chapter opens (a search hit or a deep link), instead of the top. */
   initialVerse?: string | number | null;
   /** Current verse to retain across language/display changes; never highlighted as a deep link. */
@@ -91,6 +100,7 @@ export function buildBibleChapterHtml({
   theme?: DocumentTheme;
 }) {
   const colors = theme.colors;
+  const chromeTop = isSlideshow ? 0 : Math.max(0, Math.round(topContentInset));
   const safeFontSize = Math.max(12, Number(fontSize) || 18);
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
   const effectiveLanguages: BibleLanguageKey[] = languageKeys.length ? languageKeys : ['english'];
@@ -213,15 +223,24 @@ export function buildBibleChapterHtml({
       .chapter {
         box-sizing: border-box;
         min-height: 100vh;
-        padding: 14px 14px calc(28px + env(safe-area-inset-bottom) + ${Math.max(0, Math.round(bottomContentInset))}px);
+        padding: ${Math.max(14, chromeTop)}px 20px calc(28px + env(safe-area-inset-bottom) + ${Math.max(0, Math.round(bottomContentInset))}px);
       }
+      /* The page's margins: a phone's 20px, a tablet's 28px, a desktop's 36px. */
+      @media (min-width: 700px) {
+        .chapter { padding-left: 28px; padding-right: 28px; }
+      }
+      @media (min-width: 1000px) {
+        .chapter { padding-left: 36px; padding-right: 36px; }
+      }
+      html { scroll-padding-top: ${chromeTop}px; }
+      ${readerChromeFadeCss(colors.page, chromeTop)}
       .verse-row {
         box-sizing: border-box;
         display: grid;
         grid-template-columns: ${columnTemplate};
         gap: ${getLanguageColumnGap(safeFontSize)}px;
         border-bottom: 1px solid var(--border-color);
-        padding: 15px 0;
+        padding: 12px 0 13px;
       }
       .verse-row.verse-target {
         background: ${colors.accentSoft};
@@ -372,10 +391,12 @@ export function buildBibleChapterHtml({
         width: 1px;
       }
       ${effectiveHighlighting ? textHighlightStyles() : ''}
+      /* A washed highlight sits a little off its words, as a marker's would. */
+      mark.sermon-highlight:not([data-style="underline"]) { padding: 1px 3px; }
     </style>
   </head>
   <body class="${isSlideshow ? 'slideshow' : 'scroll'}">
-    ${bodyContent}
+    ${readerChromeFadeHtml(chromeTop)}${bodyContent}
     <script>
       (function () {
         var sourceDocument = document.getElementById('source-document');
@@ -1043,7 +1064,8 @@ export function buildBibleChapterHtml({
             if (!rows.length) return;
             var current = rows[0];
             for (var i = 0; i < rows.length; i += 1) {
-              if (rows[i].getBoundingClientRect().top <= 96) current = rows[i];
+              // The reading line, as far below the floating controls as it sat below a bar.
+              if (rows[i].getBoundingClientRect().top <= 96 + ${JSON.stringify(chromeTop)}) current = rows[i];
               else break;
             }
             reportVerse(current.getAttribute('data-verse'));

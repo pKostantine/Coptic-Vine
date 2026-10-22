@@ -23,12 +23,14 @@ const localeFormat = loadFile('src/utils/localeFormat.ts', (name) => (name === '
 /** The document builder, its leaf imports stubbed as tests/documentThemes.test.cjs stubs them. */
 function loadDocumentBuilder() {
   const theme = loadFile('src/constants/theme.ts');
+  const documentThemes = loadFile('src/constants/documentThemes.ts', (name) => (name === './theme' ? theme : require(name)));
   const local = {
     '../../constants/theme': theme,
-    '../../constants/documentThemes': loadFile('src/constants/documentThemes.ts', (name) => (name === './theme' ? theme : require(name))),
+    '../../constants/documentThemes': documentThemes,
     '../../constants/documentOrnaments': loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name))),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),
+    './readerChromeFade': loadFile('src/components/vine/readerChromeFade.ts', (name) => (name === '../../constants/documentThemes' ? documentThemes : require(name))),
     '../../utils/versePresentation': loadFile('src/utils/versePresentation.js'),
     '../../utils/verseRubric': loadFile('src/utils/verseRubric.js'),
   };
