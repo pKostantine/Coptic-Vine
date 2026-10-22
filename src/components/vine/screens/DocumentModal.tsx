@@ -19,7 +19,9 @@ import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../Docum
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import DocumentPillBar from '../ui/DocumentPillBar';
 import { getDocumentTheme } from '../../../constants/documentThemes';
-import DocumentTopBar from '../ui/DocumentTopBar';
+import FloatingReaderControls from '../ui/FloatingReaderControls';
+import { floatingControlsLayout } from '../ui/floatingControls';
+import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import LoadingScreen from '../ui/LoadingScreen';
@@ -163,10 +165,22 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
   const [slideJumpRequest, setSlideJumpRequest] = useState<SlideJumpRequest | null>(null);
   const documentRef = useRef<DocumentWebViewHandle>(null);
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   // The app closes and navigates a subdocument entirely by edge swipe and so
-  // shows no top bar; a browser has no such gesture and keeps the bar instead.
+  // shows no controls; a browser has no such gesture, and its controls float
+  // over the top of the page (FloatingReaderControls).
   const isMobileDocument = Platform.OS !== 'web';
+  const floatingInsets = useSafeAreaInsets();
+  const floatingLayout = floatingControlsLayout({
+    width: screenWidth,
+    height: screenHeight,
+    insets: floatingInsets,
+    wideWeb: screenWidth >= MOBILE_WEB_BREAKPOINT,
+    native: false,
+  });
+  // As in ServiceDocument: the title pill fades in once the headpiece the
+  // subdocument opens with (if it has one) has scrolled away.
+  const [headpieceInView, setHeadpieceInView] = useState(true);
 
   // Anything stacked over this document: a deeper subdocument, the content
   // selector, or one of the overlay screens above. While any of them is up,
@@ -421,6 +435,10 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     });
   }, [overlayStartsInInset, screenWidth]);
 
+  // The controls float over the text itself only where the subdocument
+  // scrolls straight up under them, with no pills or slideshow starting it.
+  const controlsOverText = !isMobileDocument && !preferences.slideshowMode && !isAntiphonary && sectionPills.length <= 1;
+
   return (
     <Modal
       animationType="slide"
@@ -450,22 +468,14 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         } as object)}
       >
         {/* A subdocument opens on top of a document the reader is already in,
-            so on the app it gets no bar at all -- same as the document
-            underneath it (see ServiceDocument.tsx). Both of the bar's actions
+            so on the app it gets no controls at all -- same as the document
+            underneath it (see ServiceDocument.tsx). Both of their actions
             already have native gestures in swipeGesturePanResponder below:
             swipe in from the left edge to close, in from the right to open
-            ContentSelectorDrawer. A browser has neither gesture, so the web
-            build keeps the bar. */}
-        {!isMobileDocument ? (
-          <DocumentTopBar
-            title={title || ''}
-            onBack={onClose}
-            backAccessibilityLabel="Close subdocument"
-            trailingIcon="list-outline"
-            trailingAccessibilityLabel="Open content list"
-            onTrailingPress={() => setSelectorOpen(true)}
-          />
-        ) : null}
+            ContentSelectorDrawer. A browser has neither gesture, so its
+            controls float over the page (rendered below); where pills or a
+            slideshow start the page, this is their room above them. */}
+        {!isMobileDocument && !controlsOverText ? <View style={{ height: floatingLayout.contentTop }} /> : null}
         {isAntiphonary ? (
           <DocumentPillBar
             pills={ANTIPHONARY_GROUPS}
@@ -510,6 +520,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 initialScrollVerseIndex={currentVerseIndex}
                 onCollapseToggle={setSelectedSlideSectionId}
                 keyboardNavigationEnabled={visible && !isCovered}
+                topContentInset={controlsOverText ? floatingLayout.contentTop : 0}
+                onHeadpieceInViewChange={setHeadpieceInView}
               />
             </View>
             <ContentSelectorDrawer
@@ -531,6 +543,18 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             />
           </>
         )}
+        {!isMobileDocument ? (
+          <FloatingReaderControls
+            theme={documentTheme}
+            reader="service"
+            layout={floatingLayout}
+            onBack={onClose}
+            backAccessibilityLabel="Close subdocument"
+            title={title || ''}
+            titleVisible={!controlsOverText || !headpieceInView}
+            actions={[{ icon: 'list-outline', accessibilityLabel: 'Open content list', onPress: () => setSelectorOpen(true) }]}
+          />
+        ) : null}
         {/* Its hidden button is a dead zone for the edge swipes, as the pill
             bar is: dragging it along the foot moves it to the other corner. */}
         <GlobalNowPlayingOverlay

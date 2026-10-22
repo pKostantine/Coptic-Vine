@@ -3,13 +3,15 @@ import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BibleWebView, { BibleWebViewHandle } from '@/components/vine/BibleWebView';
 import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/vine/bibleDocumentHtml';
 import BibleVersePanel from '@/components/vine/ui/BibleVersePanel';
 import BleedPage from '@/components/vine/ui/BleedPage';
 import DocumentStatusBar from '@/components/vine/ui/DocumentStatusBar';
-import DocumentTopBar from '@/components/vine/ui/DocumentTopBar';
+import FloatingReaderControls from '@/components/vine/ui/FloatingReaderControls';
+import { floatingControlsLayout } from '@/components/vine/ui/floatingControls';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
 import LoadingScreen from '@/components/vine/ui/LoadingScreen';
 import { getDocumentTheme, type DocumentTheme } from '@/constants/documentThemes';
@@ -35,6 +37,7 @@ import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useReadingKeepAwake } from '@/utils/useReadingKeepAwake';
 import { useCopticFontDataUri, useCopticItalicFontDataUri } from '@/utils/useCopticFontDataUri';
+import { MOBILE_WEB_BREAKPOINT } from '@/utils/useIsMobileWeb';
 import { isStylusGestureEvent } from '@/utils/isStylusGestureEvent';
 import { isBibleHighlightAnchor, isBibleHighlightColor } from '@/utils/bibleHighlights';
 import { BookSettingsSheet } from '@/components/vine/screens/SettingsScreen';
@@ -105,7 +108,17 @@ function getAvailableLanguages(verses: BibleDisplayVerse[], bookKey: string | nu
 
 export default function BibleChapterDocument() {
   const router = useRouter();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // The chapter's controls float over its page on every platform: it is the
+  // only place that names the book and chapter open.
+  const floatingLayout = floatingControlsLayout({
+    width: screenWidth,
+    height: screenHeight,
+    insets,
+    wideWeb: Platform.OS === 'web' && screenWidth >= MOBILE_WEB_BREAKPOINT,
+    native: Platform.OS !== 'web',
+  });
   const { nowPlayingInset } = useBottomChrome();
   // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
   // get the same headerless, gesture-nav UI as the native app, same as
@@ -299,12 +312,14 @@ export default function BibleChapterDocument() {
       // Now Playing is an overlay in slideshow mode. It must never shorten
       // the page or change where Bible verses split.
       bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
+      // The reading view runs up under the controls; a slideshow is laid out below them (verseScreen's padding).
+      topContentInset: preferences.slideshowMode ? 0 : floatingLayout.contentTop,
       highlighting: effectiveSelectText,
       highlightLabels: { copy: selectorText.copy, remove: selectorText.removeHighlight },
       copyReference,
       theme,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, copticItalicFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText, copyReference, theme]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, copticItalicFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText, copyReference, theme, floatingLayout.contentTop]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -401,25 +416,34 @@ export default function BibleChapterDocument() {
       edges={['bottom']}
       style={[styles.safeArea, { backgroundColor: theme.colors.page }]}
       header={(
-        // The same bar as every other document. Unlike them it stays in the
-        // app too, not only on the web: it is the only place that says which
-        // book and chapter is open. It runs to both edges; the chapter keeps
-        // clear of the notch.
-        <DocumentTopBar
-          title={{ english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench }}
+        // Floating over the page, in the app as on the web: the chapter's
+        // controls are the only place that says which book and chapter is
+        // open. Its title opens the verse list, as the list button does; the
+        // capsules keep clear of the notch.
+        <FloatingReaderControls
+          theme={theme}
+          reader="bible"
+          layout={floatingLayout}
           onBack={goBackALevel}
-          leadingIcon={shouldShowFullscreen ? (isFullscreen ? 'close-fullscreen' : 'open-in-full') : undefined}
-          onLeadingPress={shouldShowFullscreen ? toggleFullscreen : undefined}
-          leadingAccessibilityLabel={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
-          trailingIcon="list-outline"
-          trailingAccessibilityLabel={selectorText.openSelector}
-          onTrailingPress={openVerseSelector}
+          title={{ english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench }}
+          onTitlePress={openVerseSelector}
+          titleAccessibilityLabel={selectorText.openSelector}
+          actions={[
+            ...(shouldShowFullscreen && Platform.OS === 'web' && screenWidth >= MOBILE_WEB_BREAKPOINT
+              ? [{
+                icon: isFullscreen ? 'close-fullscreen' as const : 'open-in-full' as const,
+                accessibilityLabel: isFullscreen ? 'Exit full screen' : 'Enter full screen',
+                onPress: toggleFullscreen,
+              }]
+              : []),
+            { icon: 'list-outline' as const, accessibilityLabel: selectorText.openSelector, onPress: openVerseSelector },
+          ]}
         />
       )}
       {...(Platform.OS !== 'web' ? gesturePanResponder.panHandlers : {})}
     >
       {/* The page runs up under the status bar; on a light one its clock and battery turn dark. */}
-      <DocumentStatusBar theme={theme} />
+      <DocumentStatusBar theme={theme} hidden={floatingLayout.hideStatusBar} />
       <Head>
         <title>{`Coptic Vine ${headerTitleEnglish || 'Bible'}`}</title>
       </Head>
@@ -434,7 +458,7 @@ export default function BibleChapterDocument() {
       ) : !chapterHtml ? (
         <LoadingScreen belowHeader />
       ) : (
-        <View style={styles.verseScreen}>
+        <View style={[styles.verseScreen, preferences.slideshowMode && { paddingTop: floatingLayout.contentTop }]}>
           <BibleWebView
             ref={bibleWebViewRef}
             html={chapterHtml}
