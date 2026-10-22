@@ -25,10 +25,10 @@ const fade = loadFile('src/components/vine/readerChromeFade.ts', withThemes);
 
 const NO_INSETS = { top: 0, left: 0, right: 0 };
 
-test('a desktop browser: 42px capsules 14px down and 24px in, the text from 68px', () => {
+test('a desktop browser: 42px capsules 14px down and 24px in, the text from 72px', () => {
   assert.deepEqual(
     floatingControlsLayout({ width: 1440, height: 900, insets: NO_INSETS, wideWeb: true, native: false }),
-    { top: 14, left: 24, right: 24, size: 42, contentTop: 68, hideStatusBar: false },
+    { top: 14, left: 24, right: 24, size: 42, contentTop: 72, hideStatusBar: false },
   );
 });
 
@@ -47,7 +47,7 @@ test('a phone held upright sits the capsules just under its status bar, 14px in'
 test('a phone on its side hides its status bar and sits the capsules in the safe area beside the notch', () => {
   assert.deepEqual(
     floatingControlsLayout({ width: 844, height: 390, insets: { top: 0, left: 47, right: 47 }, wideWeb: false, native: true }),
-    { top: 12, left: 47, right: 47, size: 42, contentTop: 64, hideStatusBar: true },
+    { top: 12, left: 47, right: 47, size: 42, contentTop: 66, hideStatusBar: true },
   );
   // With nothing to clear on a side, still 14px in from its edge.
   const flat = floatingControlsLayout({ width: 844, height: 390, insets: { top: 0, left: 0, right: 47 }, wideWeb: false, native: true });
@@ -86,12 +86,13 @@ test('the capsules wear the page, a hairline of its ink, and its second voice', 
 });
 
 test('the text fades out under the controls, clear by just above where it starts', () => {
-  assert.deepEqual(fade.readerChromeFade(68), { start: 6, end: 56 });
-  assert.deepEqual(fade.readerChromeFade(105), { start: 43, end: 93 });
-  assert.deepEqual(fade.readerChromeFade(30), { start: 0, end: 18 });
-  const css = fade.readerChromeFadeCss('#EBD3A7', 68);
-  assert.match(css, /linear-gradient\(to bottom, #EBD3A7 6px, rgba\(235, 211, 167, 0\) 56px\)/);
-  assert.match(css, /height: 56px;/);
+  // The desktop's, as the design has it: solid to 20px, clear by 64px, the text from 72px.
+  assert.deepEqual(fade.readerChromeFade(72), { start: 20, end: 64 });
+  assert.deepEqual(fade.readerChromeFade(105), { start: 53, end: 97 });
+  assert.deepEqual(fade.readerChromeFade(30), { start: 0, end: 22 });
+  const css = fade.readerChromeFadeCss('#EBD3A7', 72);
+  assert.match(css, /linear-gradient\(to bottom, #EBD3A7 20px, rgba\(235, 211, 167, 0\) 64px\)/);
+  assert.match(css, /height: 64px;/);
   assert.match(css, /pointer-events: none;/);
   assert.match(css, /position: fixed;/);
   assert.equal(fade.readerChromeFadeHtml(68), '<div class="reader-fade" aria-hidden="true"></div>');

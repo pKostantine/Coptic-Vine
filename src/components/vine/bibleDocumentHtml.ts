@@ -240,7 +240,7 @@ export function buildBibleChapterHtml({
         grid-template-columns: ${columnTemplate};
         gap: ${getLanguageColumnGap(safeFontSize)}px;
         border-bottom: 1px solid var(--border-color);
-        padding: 15px 0;
+        padding: 12px 0 13px;
       }
       .verse-row.verse-target {
         background: ${colors.accentSoft};

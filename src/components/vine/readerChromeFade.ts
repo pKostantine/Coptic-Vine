@@ -9,8 +9,8 @@ import { withAlpha } from '../../constants/documentThemes';
  * page (documentHtml.ts) and the Bible's (bibleDocumentHtml.ts).
  */
 export function readerChromeFade(topInset: number): { start: number; end: number } {
-  const end = Math.max(0, Math.round(topInset) - 12);
-  return { start: Math.max(0, end - 50), end };
+  const end = Math.max(0, Math.round(topInset) - 8);
+  return { start: Math.max(0, end - 44), end };
 }
 
 /** The fade's own rule, for a `<div class="reader-fade">` fixed over the page; nothing without an inset. */

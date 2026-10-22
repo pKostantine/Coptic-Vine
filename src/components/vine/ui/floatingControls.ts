@@ -70,7 +70,7 @@ interface LayoutInput {
 export const TABLET_MIN_SIDE = 600;
 
 /**
- * Desktop: 14px down and 24px in, the text from 68px. A phone held upright:
+ * Desktop: 14px down and 24px in, the text from 72px. A phone held upright:
  * just under the status bar, 14px in. A phone on its side: the status bar
  * hides, and the capsules sit in the safe area beside the notch. A tablet:
  * 44px capsules, 10px under the status bar, 24px in.
@@ -79,7 +79,7 @@ export function floatingControlsLayout({ width, height, insets, wideWeb, native 
   if (!native && wideWeb) {
     const top = 14;
     const size = 42;
-    return { top, left: 24 + insets.left, right: 24 + insets.right, size, contentTop: top + size + 12, hideStatusBar: false };
+    return { top, left: 24 + insets.left, right: 24 + insets.right, size, contentTop: top + size + 16, hideStatusBar: false };
   }
   if (native && Math.min(width, height) >= TABLET_MIN_SIDE) {
     const top = insets.top + 10;
@@ -89,7 +89,7 @@ export function floatingControlsLayout({ width, height, insets, wideWeb, native 
   const size = 42;
   if (native && width > height) {
     const top = 12;
-    return { top, left: Math.max(insets.left, 14), right: Math.max(insets.right, 14), size, contentTop: top + size + 10, hideStatusBar: true };
+    return { top, left: Math.max(insets.left, 14), right: Math.max(insets.right, 14), size, contentTop: top + size + 12, hideStatusBar: true };
   }
   const top = insets.top > 0 ? insets.top + 6 : 10;
   return { top, left: 14 + insets.left, right: 14 + insets.right, size, contentTop: top + size + 10, hideStatusBar: false };
