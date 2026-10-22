@@ -14,7 +14,7 @@ import { bibleHighlightVerseId, type BibleDisplayVerse, type BibleLanguageKey } 
 import { highlightWash } from '../textHighlights';
 import Icon from './Icon';
 import ReaderPanel from './ReaderPanel';
-import { readerPanelColors, readerPanelText } from './readerPanelParts';
+import { chapterPosition, highlightColorsByVerse, readerPanelColors, readerPanelText } from './readerPanelParts';
 
 export const BIBLE_LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: AppText }[] = [
   { key: 'english', label: { english: 'English', arabic: 'الإنجليزية', french: 'Anglais' } },
@@ -84,24 +84,6 @@ function getVersePreviewLanguage(
   if (enabledFallback) return enabledFallback;
 
   return availableLanguages.find((language) => String(verse[language] || '').trim()) || availableLanguages[0] || 'english';
-}
-
-/** "Chapter 1 of 50", "Psalm 23 of 151", in the App Language: the chapter, and the count in a lighter voice. */
-export function chapterPosition(chapterNumber: number, chapterCount: number, isPsalms: boolean, language: AppLanguage): { name: string; count: string } {
-  const number = getBibleVerseDisplayLabel(chapterNumber, language);
-  const total = chapterCount > 0 ? getBibleVerseDisplayLabel(chapterCount, language) : '';
-  if (language === 'ar') return { name: `${isPsalms ? 'المزمور' : 'الإصحاح'} ${number}`, count: total ? `من ${total}` : '' };
-  if (language === 'fr') return { name: `${isPsalms ? 'Psaume' : 'Chapitre'} ${number}`, count: total ? `sur ${total}` : '' };
-  return { name: `${isPsalms ? 'Psalm' : 'Chapter'} ${number}`, count: total ? `of ${total}` : '' };
-}
-
-/** Each highlighted verse's colour, by the id a highlight anchors to: the first highlight on it gives its number its colour. */
-export function highlightColorsByVerse(highlights: Pick<BibleHighlight, 'verseId' | 'color'>[]): Map<string, string> {
-  const colors = new Map<string, string>();
-  for (const highlight of highlights) {
-    if (!colors.has(highlight.verseId)) colors.set(highlight.verseId, highlight.color);
-  }
-  return colors;
 }
 
 interface BibleVersePanelProps {
@@ -185,7 +167,8 @@ export default function BibleVersePanel({
     if (!visible || !currentVerse) return;
     const y = rowLayouts[currentVerse];
     if (y === undefined) return;
-    scrollRef.current?.scrollTo({ y: Math.max(y - 12, 0), animated: false });
+    // A couple of verses stay in view above the one being read.
+    scrollRef.current?.scrollTo({ y: Math.max(y - 120, 0), animated: false });
   }, [visible, currentVerse, rowLayouts]);
 
   return (

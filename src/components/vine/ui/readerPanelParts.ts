@@ -1,4 +1,6 @@
 import { withAlpha, type DocumentTheme } from '../../../constants/documentThemes';
+import type { BibleHighlight } from '../../../types/bibleHighlights';
+import { getBibleVerseDisplayLabel } from '../../../utils/bibleService';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
 import type { DocumentSection } from '../documentHtml';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
@@ -6,7 +8,7 @@ import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 /**
  * What the reader's two side panels share — the service's Contents and the
  * Bible's Verses (ReaderPanel.tsx): their colours on the page they open over,
- * their size on each screen, and the logic of the Contents list. Kept apart
+ * their size on each screen, and the logic of their lists. Kept apart
  * from the components so it can be tested on its own.
  */
 
@@ -210,4 +212,22 @@ export function trailingHyperlinkIds(sections: Pick<DocumentSection, 'id' | 'isH
   const trailing = new Set<string>();
   for (let index = sections.length - 1; index >= 0 && sections[index].isHyperlinkButton; index -= 1) trailing.add(sections[index].id);
   return trailing;
+}
+
+/** "Chapter 1 of 50", "Psalm 23 of 151", in the App Language: the chapter, and the count in a lighter voice. */
+export function chapterPosition(chapterNumber: number, chapterCount: number, isPsalms: boolean, language: AppLanguage): { name: string; count: string } {
+  const number = getBibleVerseDisplayLabel(chapterNumber, language);
+  const total = chapterCount > 0 ? getBibleVerseDisplayLabel(chapterCount, language) : '';
+  if (language === 'ar') return { name: `${isPsalms ? 'المزمور' : 'الإصحاح'} ${number}`, count: total ? `من ${total}` : '' };
+  if (language === 'fr') return { name: `${isPsalms ? 'Psaume' : 'Chapitre'} ${number}`, count: total ? `sur ${total}` : '' };
+  return { name: `${isPsalms ? 'Psalm' : 'Chapter'} ${number}`, count: total ? `of ${total}` : '' };
+}
+
+/** Each highlighted verse's colour, by the id a highlight anchors to: the first highlight on it gives its number its colour. */
+export function highlightColorsByVerse(highlights: Pick<BibleHighlight, 'verseId' | 'color'>[]): Map<string, string> {
+  const colors = new Map<string, string>();
+  for (const highlight of highlights) {
+    if (!colors.has(highlight.verseId)) colors.set(highlight.verseId, highlight.color);
+  }
+  return colors;
 }
