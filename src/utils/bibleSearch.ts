@@ -1,6 +1,7 @@
 import { BibleBook, getBibleBooks } from './bibleService';
 import { contentDataClient as supabase } from '../services/contentDataClient';
 import type { AppLanguage } from './preferencesStorage';
+import { englishVersionLabel } from './bibleVersionLabels';
 
 /**
  * Search over the Bible.
@@ -34,15 +35,22 @@ export const BIBLE_SEARCH_LANGUAGES: BibleSearchLanguage[] = [
 ];
 
 export const BIBLE_SEARCH_LANGUAGE_LABELS: Record<BibleSearchLanguage, { english: string; arabic: string; french?: string }> = {
-  english: { english: 'English', arabic: 'الإنجليزية', french: 'Anglais' },
+  // Across both testaments: SAAS in the Old, NKJV in the New (bibleSearchLanguageLabel names one testament's).
+  english: { english: 'English (SAAS, NKJV)', arabic: 'الإنجليزية (SAAS، NKJV)', french: 'Anglais (SAAS, NKJV)' },
   english_nkjv: { english: 'English (NKJV)', arabic: 'الإنجليزية (NKJV)', french: 'Anglais (NKJV)' },
   english_from_coptic: { english: 'English from Coptic', arabic: 'الإنجليزية عن القبطية', french: 'Anglais du copte' },
   coptic: { english: 'Coptic', arabic: 'القبطية', french: 'Copte' },
   greek: { english: 'Greek', arabic: 'اليونانية', french: 'Grec' },
-  arabic: { english: 'Arabic', arabic: 'العربية', french: 'Arabe' },
+  arabic: { english: 'Arabic (SVD)', arabic: 'العربية (SVD)', french: 'Arabe (SVD)' },
   arabic_from_coptic: { english: 'Arabic from Coptic', arabic: 'العربية عن القبطية', french: 'Arabe du copte' },
   french: { english: 'French', arabic: 'الفرنسية', french: 'Français' },
 };
+
+/** A search language's name within one testament (a result's, or the search's scope): the English is the SAAS in the Old Testament and the NKJV in the New. */
+export function bibleSearchLanguageLabel(language: BibleSearchLanguage, testament: BibleTestament | null | undefined): { english: string; arabic: string; french?: string } {
+  if (language === 'english' && testament) return englishVersionLabel(testament);
+  return BIBLE_SEARCH_LANGUAGE_LABELS[language];
+}
 
 /**
  * How the words someone typed are joined.

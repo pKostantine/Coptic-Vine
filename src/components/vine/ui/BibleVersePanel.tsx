@@ -9,6 +9,7 @@ import type { BibleHighlight } from '../../../types/bibleHighlights';
 import { appText, appTextIsArabic, type AppText } from '../../../utils/appText';
 import { arabicItalicStyle } from '../../../utils/arabicItalic';
 import { getBibleVerseDisplayLabel, type PsalmNumbering } from '../../../utils/bibleService';
+import { ARABIC_VERSION_LABEL, englishVersionLabel, type BibleVersionTestament } from '../../../utils/bibleVersionLabels';
 import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { bibleHighlightVerseId, type BibleDisplayVerse, type BibleLanguageKey } from '../bibleDocumentHtml';
 import { highlightWash } from '../textHighlights';
@@ -17,12 +18,13 @@ import ReaderPanel from './ReaderPanel';
 import { chapterPosition, highlightColorsByVerse, readerPanelColors, readerPanelText } from './readerPanelParts';
 
 export const BIBLE_LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: AppText }[] = [
-  { key: 'english', label: { english: 'English', arabic: 'الإنجليزية', french: 'Anglais' } },
+  // The English and the Arabic are named by their version (getBibleLanguageLabel).
+  { key: 'english', label: englishVersionLabel(null) },
   { key: 'englishNkjv', label: { english: 'English (NKJV)', arabic: 'الإنجليزية (NKJV)', french: 'Anglais (NKJV)' } },
   { key: 'englishFromCoptic', label: { english: 'English (from Coptic)', arabic: 'الإنجليزية (من القبطية)', french: 'Anglais (du copte)' } },
   { key: 'coptic', label: { english: 'Coptic', arabic: 'القبطية', french: 'Copte' } },
   { key: 'greek', label: { english: 'Greek', arabic: 'اليونانية', french: 'Grec' } },
-  { key: 'arabic', label: { english: 'Arabic', arabic: 'العربية', french: 'Arabe' } },
+  { key: 'arabic', label: ARABIC_VERSION_LABEL },
   { key: 'arabicFromCoptic', label: { english: 'Arabic (from Coptic)', arabic: 'العربية (من القبطية)', french: 'Arabe (du copte)' } },
   { key: 'french', label: { english: 'French', arabic: 'الفرنسية', french: 'Français' } },
 ];
@@ -55,7 +57,10 @@ function getPsalmStanza(
   return letter ? { letter, number: stanzaIndex + 1 } : null;
 }
 
-function getBibleLanguageLabel(language: BibleLanguageKey, appLanguage: AppLanguage): string {
+/** A text's name: the English and the Arabic by their version (bibleVersionLabels.ts), the English by the book's testament. */
+function getBibleLanguageLabel(language: BibleLanguageKey, appLanguage: AppLanguage, testament: BibleVersionTestament | null): string {
+  if (language === 'english') return appText(englishVersionLabel(testament), appLanguage);
+  if (language === 'arabic') return appText(ARABIC_VERSION_LABEL, appLanguage);
   const option = BIBLE_LANGUAGE_OPTIONS.find((item) => item.key === language);
   return appText(option?.label, appLanguage) || language;
 }
@@ -102,6 +107,8 @@ interface BibleVersePanelProps {
   /** "Genesis 1", heading the panel under "Verses". */
   title: AppText;
   bookKey: string | null | undefined;
+  /** The book's testament, which names its English: the SAAS in the Old, the NKJV in the New. */
+  testament: BibleVersionTestament | null;
   chapterNumber: number;
   chapterCount: number;
   previousChapter: number | null;
@@ -136,6 +143,7 @@ export default function BibleVersePanel({
   text,
   title,
   bookKey,
+  testament,
   chapterNumber,
   chapterCount,
   previousChapter,
@@ -218,7 +226,7 @@ export default function BibleVersePanel({
           >
             {BIBLE_LANGUAGE_OPTIONS.filter((option) => availableLanguages.includes(option.key)).map((option) => {
               const on = Boolean(enabledLanguages[option.key]);
-              const languageLabel = getBibleLanguageLabel(option.key, appLanguage);
+              const languageLabel = getBibleLanguageLabel(option.key, appLanguage, testament);
               return (
                 <Pressable
                   key={option.key}

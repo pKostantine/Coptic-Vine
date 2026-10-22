@@ -12,7 +12,7 @@ import BleedPage from '@/components/vine/ui/BleedPage';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import {
-    BIBLE_SEARCH_LANGUAGE_LABELS,
+    bibleSearchLanguageLabel,
     BIBLE_SEARCH_LANGUAGES,
     formatBibleReference,
     parseBibleReference,
@@ -334,7 +334,7 @@ export default function BibleSearchScreen() {
             {BIBLE_SEARCH_LANGUAGES.map((language) => (
               <Chip
                 key={language}
-                label={label(BIBLE_SEARCH_LANGUAGE_LABELS[language])}
+                label={label(bibleSearchLanguageLabel(language, testament))}
                 active={languages.includes(language)}
                 isArabic={isArabic}
                 onPress={() => toggleLanguage(language)}
@@ -456,7 +456,7 @@ function ResultRow({
         return (
           <View key={language} style={styles.snippetBlock}>
             <Text style={styles.snippetLanguage}>
-              {BIBLE_SEARCH_LANGUAGE_LABELS[language][isArabic ? 'arabic' : 'english']}
+              {bibleSearchLanguageLabel(language, result.testament)[isArabic ? 'arabic' : 'english']}
             </Text>
             <Text
               style={[

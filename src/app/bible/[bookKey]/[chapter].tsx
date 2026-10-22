@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BibleWebView, { BibleWebViewHandle } from '@/components/vine/BibleWebView';
 import { BibleDisplayVerse, BibleLanguageKey, buildBibleChapterHtml } from '@/components/vine/bibleDocumentHtml';
+import BibleChapterPicker from '@/components/vine/ui/BibleChapterPicker';
 import BibleVersePanel from '@/components/vine/ui/BibleVersePanel';
 import BleedPage from '@/components/vine/ui/BleedPage';
 import DocumentStatusBar from '@/components/vine/ui/DocumentStatusBar';
@@ -50,6 +51,7 @@ const SELECTOR_TEXT: Record<AppLanguage, {
   previousChapter: string;
   nextChapter: string;
   openSelector: string;
+  chooseChapter: string;
   closeSelector: string;
   bookmarkChapter: string;
   openBibleSettings: string;
@@ -60,6 +62,7 @@ const SELECTOR_TEXT: Record<AppLanguage, {
     previousChapter: 'Previous chapter',
     nextChapter: 'Next chapter',
     openSelector: 'Open verse selector',
+    chooseChapter: 'Choose a chapter',
     closeSelector: 'Close verse selector',
     bookmarkChapter: 'Bookmark chapter',
     openBibleSettings: 'Open Bible settings',
@@ -70,6 +73,7 @@ const SELECTOR_TEXT: Record<AppLanguage, {
     previousChapter: 'الإصحاح السابق',
     nextChapter: 'الإصحاح التالي',
     openSelector: 'فتح محدد الآيات',
+    chooseChapter: 'اختيار إصحاح',
     closeSelector: 'إغلاق محدد الآيات',
     bookmarkChapter: 'حفظ الإصحاح',
     openBibleSettings: 'فتح إعدادات الكتاب المقدس',
@@ -80,6 +84,7 @@ const SELECTOR_TEXT: Record<AppLanguage, {
     previousChapter: 'Chapitre précédent',
     nextChapter: 'Chapitre suivant',
     openSelector: 'Ouvrir la liste des versets',
+    chooseChapter: 'Choisir un chapitre',
     closeSelector: 'Fermer la liste des versets',
     bookmarkChapter: 'Ajouter le chapitre aux favoris',
     openBibleSettings: 'Ouvrir les réglages de la Bible',
@@ -196,6 +201,8 @@ export default function BibleChapterDocument() {
     selectorAnchorRef.current = null;
     setIsSelectorOpen(false);
   }, []);
+  // The title pill's chapter list: the book's chapters, to read another.
+  const [chapterPickerOpen, setChapterPickerOpen] = useState(false);
 
   // This chapter can stay mounted underneath another page. Never let a
   // background iframe/WebView scroll report replace the frozen verse.
@@ -418,16 +425,16 @@ export default function BibleChapterDocument() {
       header={(
         // Floating over the page, in the app as on the web: the chapter's
         // controls are the only place that says which book and chapter is
-        // open. Its title opens the verse list, as the list button does; the
-        // capsules keep clear of the notch.
+        // open. Its title opens the book's chapters, to read another; the
+        // list button opens the verses. The capsules keep clear of the notch.
         <FloatingReaderControls
           theme={theme}
           reader="bible"
           layout={floatingLayout}
           onBack={goBackALevel}
           title={{ english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench }}
-          onTitlePress={openVerseSelector}
-          titleAccessibilityLabel={selectorText.openSelector}
+          onTitlePress={chapterCount > 1 ? () => setChapterPickerOpen(true) : undefined}
+          titleAccessibilityLabel={chapterCount > 1 ? selectorText.chooseChapter : undefined}
           actions={[
             ...(shouldShowFullscreen && Platform.OS === 'web' && screenWidth >= MOBILE_WEB_BREAKPOINT
               ? [{
@@ -508,6 +515,25 @@ export default function BibleChapterDocument() {
             }}
           />
 
+          <BibleChapterPicker
+            visible={chapterPickerOpen}
+            theme={theme}
+            language={preferences.appLanguage}
+            bookKey={bookKey}
+            bookTitle={preferences.appLanguage === 'ar'
+              ? book?.titleArabic || ''
+              : preferences.appLanguage === 'fr' ? book?.titleFrench || book?.titleEnglish || '' : book?.titleEnglish || ''}
+            isPsalms={bookKey === PSALMS_BOOK_KEY}
+            chapters={chapterKeys ?? []}
+            current={currentChapterNumber}
+            top={floatingLayout.top + floatingLayout.size + 8}
+            onSelect={(target) => {
+              setChapterPickerOpen(false);
+              if (target !== currentChapterNumber) goToChapter(target);
+            }}
+            onClose={() => setChapterPickerOpen(false)}
+          />
+
           <BibleVersePanel
             visible={isSelectorOpen}
             onClose={closeVerseSelector}
@@ -516,6 +542,7 @@ export default function BibleChapterDocument() {
             text={selectorText}
             title={{ english: headerTitleEnglish, arabic: headerTitleArabic, french: headerTitleFrench }}
             bookKey={bookKey}
+            testament={book?.testament ?? null}
             chapterNumber={currentChapterNumber}
             chapterCount={chapterCount}
             previousChapter={previousChapter}

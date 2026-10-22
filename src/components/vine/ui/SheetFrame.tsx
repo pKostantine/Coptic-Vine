@@ -6,7 +6,7 @@ import { COLORS } from '../../../constants/theme';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
-import { useSheetDragToClose } from './useSheetDragToClose';
+import { SheetDragHoldContext, useSheetDragToClose } from './useSheetDragToClose';
 import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 interface SheetFrameProps {
@@ -92,12 +92,14 @@ export default function SheetFrame({
     ? <View style={styles.inlineLayer}>{content}</View>
     : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>{content}</Modal>);
 
+  // Controls inside that drag themselves (the text size slider) hold the sheet's own drag off.
+  const held = <SheetDragHoldContext.Provider value={sheetDrag.hold}>{children}</SheetDragHoldContext.Provider>;
   const body = scroll ? (
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
-      {children}
+      {held}
     </ScrollView>
   ) : (
-    <View style={styles.fill}>{children}</View>
+    <View style={styles.fill}>{held}</View>
   );
 
   const backdrop = (
