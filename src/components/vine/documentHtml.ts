@@ -1,3 +1,4 @@
+import { COPTIC_INITIAL_VIEWBOX, COPTIC_INITIAL_VINE_PIECES, COPTIC_INITIALS } from '../../constants/copticInitialArt';
 import { HEADPIECES, isHeadpiece, MEDALLION, type DocumentOrnament, type HeadpieceOrnament } from '../../constants/documentOrnaments';
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 import { SPACING } from '../../constants/theme';
@@ -284,9 +285,11 @@ export function buildDocumentHtml(
     verses: getDisplayedVerseEntries(section, displayFilterOpts).map(({ verse }) => verse),
   }));
   const suppressMap = computeGlobalSuppressSpeakerLabelFlags(displayedSectionsForSuppress, bishopPresent, suppressAllSpeakerLabels);
+  const initialsUsed = new Set<string>();
   const htmlSections = visibleSections
     .map((section) =>
       renderSection(section, {
+        initialsUsed,
         fontSize,
         visibleColumns,
         appLanguage,
@@ -311,6 +314,22 @@ export function buildDocumentHtml(
       return `<symbol id="cv-ornament-${kind}" viewBox="0 0 ${art.width} ${art.height}">${art.body}</symbol>`;
     }).join('')}</defs></svg>`
     : '';
+  // Likewise each decorated initial a hymn opens with: its letter, and its
+  // vine from the pieces the vines share.
+  const vinePieces = [...new Set([...initialsUsed].flatMap((letter) => COPTIC_INITIALS[letter].vine))];
+  const initialDefs = initialsUsed.size
+    ? `<svg class="ornament-defs" aria-hidden="true"><defs>${
+      vinePieces.map((piece) => `<path id="cv-vine-piece-${piece}" d="${COPTIC_INITIAL_VINE_PIECES[piece]}"></path>`).join('')
+    }${[...initialsUsed].map((letter) => {
+      const key = copticInitialKey(letter);
+      return `<path id="cv-initial-${key}" d="${COPTIC_INITIALS[letter].letter}"></path><g id="cv-initial-vine-${key}">${
+        COPTIC_INITIALS[letter].vine.map((piece) => `<use href="#cv-vine-piece-${piece}"></use>`).join('')
+      }</g>`;
+    }).join('')}</defs></svg>`
+    : '';
+  // The initial is set in the design's own em, two-thirds of its line: here,
+  // the same share of this page's Coptic line.
+  const initialSize = (designEm: number) => `${Math.round((designEm * verseLineHeight / 1.5) * 100) / 100}px`;
 
   return `<!doctype html>
 <html>
@@ -488,6 +507,44 @@ export function buildDocumentHtml(
         width: 0.25em;
       }
       .metropolitan { color: ${colors.metropolitan}; }
+      /* The decorated initial opening a hymn's Coptic, as the old books set
+         it: two lines tall, its letter in the ornaments' colour and its vine
+         in the titles' gold. Line 3 runs the full width again. */
+      .coptic-initial {
+        float: left;
+        height: ${initialSize(2.86)};
+        margin: ${initialSize(0.07)} ${initialSize(0.32)} 0 ${initialSize(-0.04)};
+        position: relative;
+        width: ${initialSize(3.18)};
+      }
+      /* A paragraph too short to wrap around it keeps it a line tall, inline. */
+      .coptic-initial.one-line {
+        display: inline-block;
+        float: none;
+        height: ${verseLineHeight}px;
+        margin: 0 ${initialSize(0.14)} 0 ${initialSize(-0.02)};
+        vertical-align: top;
+        width: ${initialSize(1.67)};
+      }
+      .coptic-initial-art {
+        height: 100%;
+        left: 0;
+        position: absolute;
+        top: 0;
+        width: 100%;
+      }
+      .coptic-initial-vine { fill: ${colors.accent}; }
+      .coptic-initial-art .coptic-initial-letter { fill: ${ornamentColor}; }
+      /* The letter itself stays in the text, unseen, for copying and for screen readers. */
+      .coptic-initial-text {
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        height: 1px;
+        overflow: hidden;
+        position: absolute;
+        white-space: nowrap;
+        width: 1px;
+      }
       ${sermonPlannerMode ? sermonPlannerStyles() : ''}
       .section-title {
         color: ${colors.accent};
@@ -693,7 +750,7 @@ export function buildDocumentHtml(
     </style>
   </head>
   <body>
-    ${ornamentDefs}${readerChromeFadeHtml(topContentInset)}<div class="page-scroller"><main class="document" data-chrome-top="${Math.max(0, Math.round(topContentInset))}">${htmlSections}</main></div>
+    ${ornamentDefs}${initialDefs}${readerChromeFadeHtml(topContentInset)}<div class="page-scroller"><main class="document" data-chrome-top="${Math.max(0, Math.round(topContentInset))}">${htmlSections}</main></div>
     <script>
       function postAction(type, payload) {
         var message = JSON.stringify(Object.assign({ type: type }, payload || {}));
@@ -701,6 +758,54 @@ export function buildDocumentHtml(
           window.ReactNativeWebView.postMessage(message);
         } else if (window.parent) {
           window.parent.postMessage(message, '*');
+        }
+      }
+      // A hymn's decorated initial stands two lines tall, but never beside a
+      // paragraph too short to wrap around it: one that fits on a single line
+      // with the initial a line tall keeps it so, inline. (Measured without
+      // the initial at all, a line that only just fits wraps once it's back,
+      // leaving the short initial over two lines the tall one would fill.)
+      // Decided once the page is laid out, and again when the Coptic face
+      // arrives, when the width changes (a turn of the device), and when a
+      // collapsed hymn opens. Runs ahead of everything else that answers a
+      // resize, so they measure the outcome.
+      function fitCopticInitials() {
+        var initials = document.querySelectorAll('.coptic-initial[data-fit]');
+        for (var i = 0; i < initials.length; i += 1) {
+          var initial = initials[i];
+          var paragraph = initial.closest('.verse-text');
+          if (!paragraph || !paragraph.getClientRects().length) continue;
+          initial.classList.add('one-line');
+          var range = document.createRange();
+          range.setStartBefore(initial);
+          range.setEndAfter(paragraph.lastChild);
+          var rects = range.getClientRects();
+          var lineHeight = parseFloat(getComputedStyle(paragraph).lineHeight) || 1;
+          var lines = 0;
+          var lineTop = null;
+          for (var r = 0; r < rects.length && lines < 2; r += 1) {
+            if (!rects[r].width || (lineTop !== null && Math.abs(rects[r].top - lineTop) < lineHeight / 2)) continue;
+            lines += 1;
+            lineTop = rects[r].top;
+          }
+          initial.classList.toggle('one-line', lines < 2);
+        }
+      }
+      fitCopticInitials();
+      if (document.querySelector('.coptic-initial[data-fit]')) {
+        var initialsWidth = document.documentElement.clientWidth;
+        window.addEventListener('resize', function () {
+          if (document.documentElement.clientWidth === initialsWidth) return;
+          initialsWidth = document.documentElement.clientWidth;
+          fitCopticInitials();
+        });
+        // Laid out before the face has loaded, the Coptic was measured in a
+        // stand-in. (fonts.ready can settle before this face has even begun.)
+        if (document.fonts && document.fonts.load) {
+          document.fonts.load('${copticFontSize}px CopticVine').then(function () {
+            fitCopticInitials();
+            reportContentHeight();
+          });
         }
       }
       // Takes either one section id or, for a settings-change restore, an
@@ -857,6 +962,7 @@ export function buildDocumentHtml(
         var section = button.closest('.section');
         if (!section) return;
         var collapsed = section.classList.toggle('collapsed');
+        if (!collapsed) fitCopticInitials();
         button.classList.toggle('is-collapsed', collapsed);
         button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
         postAction('toggleCollapse', { sectionId: section.getAttribute('data-section-id'), collapsed: collapsed });
@@ -1222,6 +1328,8 @@ function getDisplayedVerseEntries(
 function renderSection(
   section: DocumentSection,
   opts: {
+    /** Collects the decorated initials the document opens hymns with, to draw each once. */
+    initialsUsed: Set<string>;
     fontSize: number;
     visibleColumns: VisibleColumns;
     appLanguage: AppTitleLanguage;
@@ -1266,8 +1374,10 @@ function renderSection(
     ? renderHeadpieceTitle(section, section.ornament, appLanguage, isCollapsed, theme)
     : renderSectionTitle(section, appLanguage, isCollapsed, theme);
 
+  // The hymn's first Coptic paragraph under its title opens with its decorated initial.
+  const opening = { initialPending: Boolean(titleHtml.trim()) };
   const versesHtml = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent, copticGospelRite })
-    .map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts))
+    .map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts, opening))
     .join('');
 
   return `
@@ -1470,6 +1580,7 @@ function renderVerse(
   section: DocumentSection,
   suppressSpeakerLabel: boolean,
   {
+    initialsUsed,
     visibleColumns,
     bishopPresent,
     copticRecitedPrayers,
@@ -1477,6 +1588,7 @@ function renderVerse(
     sermonPlannerMode,
     theme,
   }: {
+    initialsUsed: Set<string>;
     fontSize: number;
     visibleColumns: VisibleColumns;
     bishopPresent: boolean;
@@ -1485,6 +1597,8 @@ function renderVerse(
     sermonPlannerMode: boolean;
     theme: DocumentTheme;
   },
+  /** Whether the hymn's opening initial is still to be set: by the first verse that shows Coptic. */
+  opening: { initialPending: boolean },
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent, suppressAllSpeakerLabels, theme);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
@@ -1569,6 +1683,10 @@ function renderVerse(
   // is where this line already sat, just narrower.
   const copticStandsAlone =
     isInvincibleCoptic && !hasTranslationText && languages.some((language) => language.key === 'coptic');
+  // The first Coptic paragraph under the hymn's title, whether or not it
+  // opens with a letter there is a decorated initial for.
+  const opensHymn = opening.initialPending && languages.some((language) => language.key === 'coptic');
+  if (opensHymn) opening.initialPending = false;
   const columnLanguages = copticStandsAlone ? languages.filter((language) => language.key !== 'coptic') : languages;
   const gridTemplateColumns = `repeat(${Math.max(columnLanguages.length, 1)}, minmax(0, 1fr))`;
   const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
@@ -1588,7 +1706,11 @@ function renderVerse(
     // only open a blank gap above it.
     const speakerLabel = spansRow ? '' : language.speakerLabel;
     const verseId = `${section.id}::v${index}`;
-    const bodyText = highlightMetropolitanBrackets(language.text);
+    const initial = language.key === 'coptic' && opensHymn && !verseNumberText ? splitCopticInitial(language.text) : null;
+    if (initial) initialsUsed.add(initial.letter);
+    const bodyText = initial
+      ? renderCopticInitial(initial, centered) + highlightMetropolitanBrackets(initial.rest)
+      : highlightMetropolitanBrackets(language.text);
     const renderedBody = sermonPlannerMode
       ? `<span class="sermon-annotatable-text" data-sermon-section-id="${escapeAttribute(section.id)}" data-sermon-verse-id="${escapeAttribute(verseId)}" data-sermon-language="${escapeAttribute(language.key)}">${bodyText}</span>`
       : bodyText;
@@ -1611,6 +1733,35 @@ function renderVerse(
   const verseId = `${section.id}::v${index}`;
 
   return `<div class="verse-row" data-verse-id="${escapeAttribute(verseId)}"${tuneAttribute} style="grid-template-columns: ${gridTemplateColumns};">${cells}</div>`;
+}
+
+// The marks a letter can carry (the jinkim, an overline) ride with it into the initial.
+const COPTIC_INITIAL_PATTERN = /^\s*(\S)([\u0300-\u036F\uFE20-\uFE2F]*)/u;
+
+/** A Coptic paragraph's opening letter, when there's a decorated initial for it, and the text after it. */
+function splitCopticInitial(text: string): { letter: string; marks: string; rest: string } | null {
+  const match = COPTIC_INITIAL_PATTERN.exec(text);
+  if (!match || !COPTIC_INITIALS[match[1]]) return null;
+  return { letter: match[1], marks: match[2], rest: text.slice(match[0].length) };
+}
+
+function copticInitialKey(letter: string) {
+  return letter.codePointAt(0)!.toString(16);
+}
+
+/**
+ * The decorated initial, drawn from the shapes the document defines once
+ * (initialDefs), with the letter itself kept in the text unseen. It hangs two
+ * lines tall unless the page finds the paragraph fits on one line
+ * (fitCopticInitials); a centred line has no side to hang it from, so it
+ * keeps it a line tall from the start.
+ */
+function renderCopticInitial(initial: { letter: string; marks: string }, centered: boolean) {
+  const key = copticInitialKey(initial.letter);
+  return `<span class="coptic-initial${centered ? ' one-line' : ''}"${centered ? '' : ' data-fit'}>`
+    + `<svg class="coptic-initial-art" viewBox="${COPTIC_INITIAL_VIEWBOX}" aria-hidden="true">`
+    + `<use class="coptic-initial-vine" href="#cv-initial-vine-${key}"></use><use class="coptic-initial-letter" href="#cv-initial-${key}"></use>`
+    + `</svg><span class="coptic-initial-text">${escapeHtml(initial.letter + initial.marks)}</span></span>`;
 }
 
 function sermonPlannerStyles() {
