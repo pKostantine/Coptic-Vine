@@ -9,8 +9,11 @@ const DRAG_TO_CLOSE = 80;
 /**
  * For a control inside a sheet that takes drags of its own (the text size
  * slider): hold() as a finger lands on it, release() as it lifts, and the
- * sheet doesn't take that finger's pull for its own drag-to-close. Without it
- * a slide with a little downward wobble moved the whole sheet down the page.
+ * sheet neither takes that finger's pull for its own drag-to-close nor
+ * scrolls under it. Without it a slide with a little downward wobble moved
+ * the page: the whole sheet at the top of its content, and the content
+ * itself anywhere further down -- React Native's scroll view on iOS takes a
+ * touch from a native slider once it moves, which a plain iOS one never does.
  */
 export interface SheetDragHold {
   hold: () => void;
@@ -49,14 +52,19 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
   // Decided when the finger lands and kept for the whole drag, so a pull that
   // starts down the content never turns into closing the sheet partway through.
   const startedAtTopRef = useRef(true);
-  // A control under the finger has its own drag (SheetDragHoldContext).
+  // A control under the finger has its own drag (SheetDragHoldContext): the
+  // ref for the gesture callbacks, the state for the scroll view, which
+  // stops scrolling while it lasts.
   const heldRef = useRef(false);
+  const [held, setHeld] = useState(false);
   const [hold] = useState<SheetDragHold>(() => ({
     hold: () => {
       heldRef.current = true;
+      setHeld(true);
     },
     release: () => {
       heldRef.current = false;
+      setHeld(false);
     },
   }));
 
@@ -64,9 +72,11 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
   const [responders] = useState(() => {
     const dragging: PanResponderCallbacks = {
       onPanResponderTerminationRequest: () => false,
-      onPanResponderMove: (_, gesture) => drag.setValue(Math.max(0, gesture.dy)),
+      // A hold that lands once a pull has begun (the slider saying its slide
+      // has started) keeps the sheet where it is from then on.
+      onPanResponderMove: (_, gesture) => drag.setValue(heldRef.current ? 0 : Math.max(0, gesture.dy)),
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > DRAG_TO_CLOSE || gesture.vy > 1.2) onCloseRef.current();
+        if (!heldRef.current && (gesture.dy > DRAG_TO_CLOSE || gesture.vy > 1.2)) onCloseRef.current();
         else Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
       },
       onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
@@ -79,7 +89,7 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
           startedAtTopRef.current = scrollTopRef.current <= 0;
           // A new finger: a hold left by one whose end went unseen can't keep the sheet from closing.
           // (React Native settles the responder before a control's own onTouchStart, which holds again.)
-          heldRef.current = false;
+          if (heldRef.current) hold.release();
           return false;
         },
         // Taken ahead of the ScrollView, which would otherwise swallow the pull.
@@ -92,5 +102,5 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
     scrollTopRef.current = event.nativeEvent.contentOffset.y;
   };
 
-  return { grabHandlers: responders.grab.panHandlers, sheetHandlers: responders.sheet.panHandlers, onScroll, hold };
+  return { grabHandlers: responders.grab.panHandlers, sheetHandlers: responders.sheet.panHandlers, onScroll, hold, held };
 }

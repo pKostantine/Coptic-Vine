@@ -92,10 +92,11 @@ export default function SheetFrame({
     ? <View style={styles.inlineLayer}>{content}</View>
     : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>{content}</Modal>);
 
-  // Controls inside that drag themselves (the text size slider) hold the sheet's own drag off.
+  // Controls inside that drag themselves (the text size slider) hold the
+  // sheet's own drag off, and its scrolling while the finger is on them.
   const held = <SheetDragHoldContext.Provider value={sheetDrag.hold}>{children}</SheetDragHoldContext.Provider>;
   const body = scroll ? (
-    <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
+    <ScrollView scrollEnabled={!sheetDrag.held} bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
       {held}
     </ScrollView>
   ) : (
