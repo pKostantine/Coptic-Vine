@@ -113,8 +113,8 @@ test('forced lines render line for line on every platform', () => {
   assert.match(verseBlock, /textAlign: alignmentFor\("coptic"\)/);
   assert.match(verseBlock, /annotateNativeLines\(event\.nativeEvent\.lines \|\| \[\], renderedText\)/);
   // A centered column measures its lines on web too, and a page's share of it renders line by line.
-  assert.match(verseBlock, /measureJustifiedLinesWeb\(renderedText, language\.fontSize, language\.fontFamily, columnWidth, fontWeight, fontStyle\)/);
-  assert.match(verseBlock, /language\.forceLines\.map\(\(line, index\) => \(\s*<Text key=\{index\} allowFontScaling=\{false\}/);
+  assert.match(verseBlock, /measureJustifiedLinesWeb\(renderedText, language\.fontSize, language\.fontFamily, textWidth, fontWeight, fontStyle\)/);
+  assert.match(verseBlock, /language\.forceLines\.map\(\(line, index\) => \{\s*const text = \(\s*<Text key=\{index\} allowFontScaling=\{false\}/);
   assert.match(justified, /const isLastLine = forceLines \? Boolean\(line\.isParagraphEnd\) : index === lastIndex \|\| line\.isParagraphEnd;/);
   assert.match(justified, /import \{ annotateNativeLines, countInitialLines, splitParagraphs, splitWords, textAfterLines \} from "\.\/textLines";/);
   // Text with no words never waits on a layout event that cannot come.
