@@ -276,6 +276,7 @@ test('the screens float the controls over the page in place of a bar', () => {
   }
   const chapter = read('src/app/bible/[bookKey]/[chapter].tsx');
   assert.match(chapter, /topContentInset: preferences\.slideshowMode \? 0 : floatingLayout\.contentTop/);
-  assert.match(chapter, /onTitlePress=\{openVerseSelector\}/);
+  // The title opens the book's chapters (BibleChapterPicker); the verses stay with the list button.
+  assert.match(chapter, /onTitlePress=\{chapterCount > 1 \? \(\) => setChapterPickerOpen\(true\) : undefined\}/);
   assert.ok(!fs.existsSync('src/components/vine/ui/DocumentTopBar.tsx'), 'the green bar is gone');
 });

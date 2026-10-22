@@ -1,9 +1,12 @@
 import { Host, Slider } from '@expo/ui';
+import { useContext } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { toEasternArabicDigits } from '@/utils/localeFormat';
 import { FONT_SCALE_STEP, fontScaleToLevel, MAX_FONT_SCALE, MIN_FONT_SCALE } from '@/utils/preferencesStorage';
+
+import { SheetDragHoldContext } from './useSheetDragToClose';
 
 export interface FontScaleControlProps {
   fontScale: number;
@@ -17,8 +20,8 @@ export interface FontScaleControlProps {
   /** The phone sheet's tighter row: 2pt less above and below. */
   compact?: boolean;
   /**
-   * The desktop's row: the value between − and + buttons instead of a track.
-   * Only a desktop browser asks for it, so only the web control draws it.
+   * Kept for the callers; every browser now gets − and + buttons
+   * (FontScaleControl.web.tsx), and the apps always the slider.
    */
   stepper?: boolean;
 }
@@ -43,9 +46,10 @@ export interface FontScaleControlProps {
  * static node — worse than leaving it alone. The control names itself through
  * the visible label sitting directly above it instead.
  *
- * The web build gets FontScaleControl.web.tsx (a tappable track) instead,
- * which also keeps @expo/ui out of the web bundle entirely — Metro resolves
- * the .web.tsx variant and never follows this file's imports there.
+ * The web build gets FontScaleControl.web.tsx (− and + buttons, on a phone's
+ * and a tablet's browser too) instead, which also keeps @expo/ui out of the
+ * web bundle entirely — Metro resolves the .web.tsx variant and never follows
+ * this file's imports there.
  */
 export default function FontScaleControl({
   fontScale,
@@ -55,6 +59,9 @@ export default function FontScaleControl({
   compact = false,
 }: FontScaleControlProps) {
   const level = fontScaleToLevel(fontScale);
+  // In a sheet, the slider's finger is the slider's: the sheet's pull-down
+  // to close would otherwise take a slide that dips, and move the sheet down.
+  const sheet = useContext(SheetDragHoldContext);
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
       <View style={styles.header}>
@@ -63,7 +70,12 @@ export default function FontScaleControl({
           {isArabic ? toEasternArabicDigits(level) : level}
         </Text>
       </View>
-      <View style={styles.track}>
+      <View
+        style={styles.track}
+        onTouchStart={sheet?.hold}
+        onTouchEnd={sheet?.release}
+        onTouchCancel={sheet?.release}
+      >
         {/* Anchors the two ends of the track as smallest/largest, so the control
             reads without having to drag it first. */}
         <Text style={[styles.endMarker, styles.endMarkerSmall]}>A</Text>

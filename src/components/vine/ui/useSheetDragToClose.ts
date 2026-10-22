@@ -1,10 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useEffect, useRef, useState } from 'react';
 import {
   Animated, PanResponder, type NativeScrollEvent, type NativeSyntheticEvent, type PanResponderCallbacks,
   type PanResponderGestureState,
 } from 'react-native';
 
 const DRAG_TO_CLOSE = 80;
+
+/**
+ * For a control inside a sheet that takes drags of its own (the text size
+ * slider): hold() as a finger lands on it, release() as it lifts, and the
+ * sheet doesn't take that finger's pull for its own drag-to-close. Without it
+ * a slide with a little downward wobble moved the whole sheet down the page.
+ */
+export interface SheetDragHold {
+  hold: () => void;
+  release: () => void;
+}
+
+export const SheetDragHoldContext = createContext<SheetDragHold | null>(null);
 
 function isPullDown(gesture: PanResponderGestureState) {
   return gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2;
@@ -36,6 +49,16 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
   // Decided when the finger lands and kept for the whole drag, so a pull that
   // starts down the content never turns into closing the sheet partway through.
   const startedAtTopRef = useRef(true);
+  // A control under the finger has its own drag (SheetDragHoldContext).
+  const heldRef = useRef(false);
+  const [hold] = useState<SheetDragHold>(() => ({
+    hold: () => {
+      heldRef.current = true;
+    },
+    release: () => {
+      heldRef.current = false;
+    },
+  }));
 
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
   const [responders] = useState(() => {
@@ -54,10 +77,13 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
         ...dragging,
         onStartShouldSetPanResponderCapture: () => {
           startedAtTopRef.current = scrollTopRef.current <= 0;
+          // A new finger: a hold left by one whose end went unseen can't keep the sheet from closing.
+          // (React Native settles the responder before a control's own onTouchStart, which holds again.)
+          heldRef.current = false;
           return false;
         },
         // Taken ahead of the ScrollView, which would otherwise swallow the pull.
-        onMoveShouldSetPanResponderCapture: (_, gesture) => startedAtTopRef.current && isPullDown(gesture),
+        onMoveShouldSetPanResponderCapture: (_, gesture) => !heldRef.current && startedAtTopRef.current && isPullDown(gesture),
       }),
     };
   });
@@ -66,5 +92,5 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
     scrollTopRef.current = event.nativeEvent.contentOffset.y;
   };
 
-  return { grabHandlers: responders.grab.panHandlers, sheetHandlers: responders.sheet.panHandlers, onScroll };
+  return { grabHandlers: responders.grab.panHandlers, sheetHandlers: responders.sheet.panHandlers, onScroll, hold };
 }
