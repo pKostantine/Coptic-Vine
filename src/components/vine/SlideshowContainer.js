@@ -33,7 +33,6 @@ import {
   hashSlideshowText,
   isSlideSettled,
   isSlideshowItemMeasured,
-  isSlideshowLanguageJustified,
   normalizeLanguageMetric,
   paginateItems,
 } from "./slideshowLayout";
@@ -1647,7 +1646,8 @@ function isCopticGatedVerse(verse) {
  * it (documentHtml.ts): the hymn's capital, on the first of its verses whose
  * Coptic, as shown, opens on a capital there is an initial for -- never after
  * a Bible verse number. Which verse that is depends on the languages shown.
- * One centred on a line of its own keeps the face's own capital.
+ * One centred on a line of its own (Agios opening St Basil's Anaphora) takes
+ * it a line tall, as the scrolling reader does.
  */
 function findOpeningInitial(section, visibleLanguages = {}) {
   if (!(section.title?.english || section.title?.french || section.title?.arabic)) return null;
@@ -1657,7 +1657,7 @@ function findOpeningInitial(section, visibleLanguages = {}) {
     const showsCoptic = getVisibleVerseLanguages({ verse, isRecitedPrayer: isCopticGatedVerse(verse) }, visibleLanguages).includes("coptic");
     const split = showsCoptic && !verse.bibleVerseNumber ? splitCopticInitial(String(verse.coptic || "")) : null;
     if (!split) continue;
-    return isSlideshowLanguageJustified(verse, "coptic") ? { index, initial: { letter: split.letter, marks: split.marks } } : null;
+    return { index, initial: { letter: split.letter, marks: split.marks } };
   }
   return null;
 }

@@ -90,8 +90,9 @@ test("the hymn's capital takes the initial, on the verse the scrolling reader gi
   // The first verse shown whose Coptic opens on a capital, past any kept in lower case; never after a verse number.
   assert.match(finder, /const showsCoptic = getVisibleVerseLanguages\(\{ verse, isRecitedPrayer: isCopticGatedVerse\(verse\) \}, visibleLanguages\)\.includes\("coptic"\);/);
   assert.match(finder, /const split = showsCoptic && !verse\.bibleVerseNumber \? splitCopticInitial\(String\(verse\.coptic \|\| ""\)\) : null;\s+if \(!split\) continue;/);
-  // Centred on a line of its own, it keeps the face's own capital.
-  assert.match(finder, /return isSlideshowLanguageJustified\(verse, "coptic"\) \? \{ index, initial: \{ letter: split\.letter, marks: split\.marks \} \} : null;/);
+  // Centred on a line of its own too (Agios opening St Basil's Anaphora): it takes it a line tall.
+  assert.match(finder, /if \(!split\) continue;\s+return \{ index, initial: \{ letter: split\.letter, marks: split\.marks \} \};/);
+  assert.doesNotMatch(finder.slice(0, finder.indexOf("\n}\n")), /isSlideshowLanguageJustified/);
   assert.match(container, /copticInitial=\{item\.copticInitial\}/);
   // The scrolling reader's rule, for the two to agree.
   assert.match(source("components/vine/documentHtml.ts"), /const initial = opening\.initialPending && copticCell && !verse\.bibleVerseNumber \? splitCopticInitial\(copticCell\.text\) : null;\s+if \(initial\) opening\.initialPending = false;/);
@@ -111,4 +112,23 @@ test("the Coptic column measures and sets its text around the initial, in the or
   assert.match(justified, /\{initial\.render\(lines\[0\]\.initial\)\}\s+<View style=\{BESIDE_INITIAL_STYLE\}>\{lines\.slice\(0, besideCount\)\.map/);
   // The flag survives every hand-off: reported, and handed back by pagination.
   assert.equal((justified.match(/\.\.\.\(line\.initial \? \{ initial: line\.initial \} : null\),/g) || []).length, 2);
+});
+
+test("a centred line opening its hymn takes the initial a line tall, before its first word, in the same colours", () => {
+  const verse = source("components/vine/VerseBlock.js");
+  // Every column that opens the hymn has it, justified or centred.
+  assert.match(verse, /const initial = copticInitial \|\| null;/);
+  assert.match(verse, /<PlainVerseBody[\s\S]*?initial=\{initial\}[\s\S]*?\/>/);
+  const body = verse.slice(verse.indexOf("function PlainVerseBody"), verse.indexOf("function JustifiedVerseBody"));
+  // Measured in the room left beside it, its first line marked as beside it for pagination.
+  assert.match(body, /const textWidth = initial \? columnWidth - initial\.one\.room : columnWidth;/);
+  assert.match(body, /onMetric\?\.\(\{ lines: besideInitial\(webLines, hasInitial\) \}\)/);
+  assert.match(body, /onMetric\?\.\(\{ lines: besideInitial\(toReportedLines\(annotateNativeLines\(event\.nativeEvent\.lines \|\| \[\], renderedText\)\), hasInitial\) \}\)/);
+  // Drawn a line tall, centred together with the text; a page handed its lines draws it before the first.
+  assert.match(body, /\{initial\.render\("one"\)\}/);
+  assert.match(body, /return line\.initial && initial \? withInitial\(text, index\) : text;/);
+  assert.match(body, /return initial \? withInitial\(text\) : text;/);
+  assert.match(verse, /const CENTERED_INITIAL_ROW_STYLE = \{ alignItems: "flex-start", flexDirection: "row", justifyContent: "center" \};/);
+  // One initial for either body: the letter in the ornaments' colour, the vine in the titles' gold.
+  assert.equal((verse.match(/<CopticInitial/g) || []).length, 1);
 });

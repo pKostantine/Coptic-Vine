@@ -26,6 +26,8 @@ const DISABLED_SELECTION_STYLE = Platform.OS === "web"
       userSelect: "none",
     }
   : null;
+// A centred line opening its hymn, and the decorated initial a line tall before it (PlainVerseBody).
+const CENTERED_INITIAL_ROW_STYLE = { alignItems: "flex-start", flexDirection: "row", justifyContent: "center" };
 
 export default function VerseBlock({
   verse,
@@ -107,8 +109,9 @@ export default function VerseBlock({
   const alignmentFor = (language) => (isSlideshowLanguageJustified(verse, language) ? "justify" : "center");
   // The initial stands in for the Coptic's first letter, so the column's text
   // starts after it -- unless the lines were handed in from pagination,
-  // which measured the text that way already.
-  const initial = copticInitial && isSlideshowLanguageJustified(verse, "coptic") ? copticInitial : null;
+  // which measured the text that way already. A centred line takes it too,
+  // a line tall (PlainVerseBody).
+  const initial = copticInitial || null;
   const copticText = formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd();
   const bibleNumberFor = (language) =>
     !Array.isArray(verse.slideshowBibleNumberLanguages) ||
@@ -249,6 +252,19 @@ export default function VerseBlock({
     // Coptic in italic is already its italic face: asking for italic again
     // would have the system slant that a second time.
     const languageFontStyle = slantsArabic ? arabicFontStyle(true) : language.key === "coptic" ? "normal" : bodyFontStyle;
+    // The decorated initial: its room in a line one or two lines tall, and drawn in either.
+    const initial = language.initial ? {
+      ...copticInitialMetrics(language.lineHeight),
+      render: (mode) => (
+        <CopticInitial
+          letter={language.initial.letter}
+          mode={mode}
+          lineHeight={language.lineHeight}
+          vineColor={theme.colors.gold}
+          letterColor={theme.colors.ornament || theme.colors.gold}
+        />
+      ),
+    } : null;
     const textStyle = [
       styles.text,
       ...language.styles,
@@ -310,18 +326,7 @@ export default function VerseBlock({
               fontStyle={languageFontStyle}
               fontWeight={bodyFontWeight}
               glyphRoomFontSize={language.key === "coptic" ? language.fontSize : 0}
-              initial={language.initial ? {
-                ...copticInitialMetrics(language.lineHeight),
-                render: (mode) => (
-                  <CopticInitial
-                    letter={language.initial.letter}
-                    mode={mode}
-                    lineHeight={language.lineHeight}
-                    vineColor={theme.colors.gold}
-                    letterColor={theme.colors.ornament || theme.colors.gold}
-                  />
-                ),
-              } : null}
+              initial={initial}
               measureOnly={isMeasuring}
               onMetric={(metric) => reportLanguageMetric(language.key, metric)}
             />
@@ -335,6 +340,7 @@ export default function VerseBlock({
             columnWidth={cellWidth - SPACING.xs * 2}
             fontStyle={languageFontStyle}
             fontWeight={bodyFontWeight}
+            initial={initial}
             onMetric={(metric) => reportLanguageMetric(language.key, metric)}
           />
         )}
@@ -469,54 +475,84 @@ function renderPrefixNode(language, parts, prefixStyle, selectableText, theme) {
 }
 
 /**
+ * A centred line's lines, the first marked as set beside a decorated initial a
+ * line tall when there is one: pagination then keeps it with the initial
+ * (normalizeLanguageMetric), and hands it back so (forceLines).
+ */
+function besideInitial(lines, initial) {
+  return initial && lines.length ? [{ ...lines[0], initial: "one" }, ...lines.slice(1)] : lines;
+}
+
+/**
  * A centered column (a refrain label, a reading reference, a Coptic line
  * standing alone). Its lines are measured like a justified column's -- on
  * web by the same canvas measurement, on the phone from the text engine's
  * own layout -- so pagination can turn it over the page too; and a page's
  * share of it is then rendered line by line, each line centered.
  */
-function PlainVerseBody({ language, textStyle, selectableText, columnWidth, fontStyle, fontWeight, onMetric, theme }) {
+function PlainVerseBody({ language, textStyle, selectableText, columnWidth, fontStyle, fontWeight, initial = null, onMetric, theme }) {
   const renderedText = getPlainRenderedText(language);
   // Room for the Coptic font's capitals and descenders past their lines
   // (glyphRoomStyle): a Text on iOS and Android draws only inside its frame.
   const glyphRoom = language.key === "coptic" ? glyphRoomStyle(language.fontSize) : null;
   const roomHeight = glyphRoom ? glyphRoom.paddingTop + glyphRoom.paddingBottom : 0;
+  // A centred line opening its hymn has no side to hang a tall initial from,
+  // so it takes one a line tall, before its first word (as documentHtml.ts
+  // sets it), and the text has that much less room.
+  const textWidth = initial ? columnWidth - initial.one.room : columnWidth;
   const webLines = useMemo(
     () => (Platform.OS === "web"
-      ? measureJustifiedLinesWeb(renderedText, language.fontSize, language.fontFamily, columnWidth, fontWeight, fontStyle)
+      ? measureJustifiedLinesWeb(renderedText, language.fontSize, language.fontFamily, textWidth, fontWeight, fontStyle)
       : null),
-    [columnWidth, fontStyle, fontWeight, language.fontFamily, language.fontSize, renderedText],
+    [textWidth, fontStyle, fontWeight, language.fontFamily, language.fontSize, renderedText],
   );
+  const hasInitial = Boolean(initial);
+  // Beside the initial the text is as wide as its words, not the column
+  // (styles.text), so the two centre together. Flattened, as the web drops a
+  // width of "auto" and keeps the column's.
+  const besideStyle = initial ? { ...StyleSheet.flatten([textStyle, glyphRoom]), flexShrink: 1, width: undefined } : null;
   useEffect(() => {
-    if (webLines) onMetric?.({ lines: webLines });
-  }, [onMetric, webLines]);
+    if (webLines) onMetric?.({ lines: besideInitial(webLines, hasInitial) });
+  }, [hasInitial, onMetric, webLines]);
+
+  // The first line and the initial before it, centred together.
+  const withInitial = (text, key) => (
+    <View key={key} style={CENTERED_INITIAL_ROW_STYLE}>
+      {initial.render("one")}
+      {text}
+    </View>
+  );
 
   if (language.forceLines) {
     return (
       <View onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height })}>
-        {language.forceLines.map((line, index) => (
-          <Text key={index} allowFontScaling={false} selectable={selectableText} style={[textStyle, glyphRoom]}>
-            {String(line.text || "").trim() || "\u00a0"}
-          </Text>
-        ))}
+        {language.forceLines.map((line, index) => {
+          const text = (
+            <Text key={index} allowFontScaling={false} selectable={selectableText} style={line.initial && initial ? besideStyle : [textStyle, glyphRoom]}>
+              {String(line.text || "").trim() || "\u00a0"}
+            </Text>
+          );
+          return line.initial && initial ? withInitial(text, index) : text;
+        })}
       </View>
     );
   }
 
-  return (
+  const text = (
     <Text
       allowFontScaling={false}
       selectable={selectableText}
-      style={[textStyle, glyphRoom]}
+      style={besideStyle ?? [textStyle, glyphRoom]}
       // The room is padding, which a Text's own layout counts: the text is as tall as before.
       onLayout={(event) => onMetric?.({ height: event.nativeEvent.layout.height - roomHeight })}
       onTextLayout={(event) =>
-        onMetric?.({ lines: toReportedLines(annotateNativeLines(event.nativeEvent.lines || [], renderedText)) })
+        onMetric?.({ lines: besideInitial(toReportedLines(annotateNativeLines(event.nativeEvent.lines || [], renderedText)), hasInitial) })
       }
     >
       {renderLanguageText(language, theme)}
     </Text>
   );
+  return initial ? withInitial(text) : text;
 }
 
 function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, forceLines, minWordsToJustify, fontStyle, fontWeight, glyphRoomFontSize = 0, initial = null, measureOnly, onMetric, theme }) {
