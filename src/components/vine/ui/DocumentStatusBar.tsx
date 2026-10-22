@@ -10,8 +10,13 @@ import type { DocumentTheme } from '../../../constants/documentThemes';
  * the app's light one comes back the moment another screen is. A component
  * rather than StatusBar.setStyle, because the drawers mount status bars of
  * their own and closing one re-applies whatever is mounted beneath it.
+ *
+ * `hidden`: a phone on its side gives the status bar's room to the text, its
+ * floating controls beside the notch (floatingControls.ts).
  */
-export default function DocumentStatusBar({ theme }: { theme: DocumentTheme }) {
+export default function DocumentStatusBar({ theme, hidden = false }: { theme: DocumentTheme; hidden?: boolean }) {
   const focused = useIsFocused();
-  return focused && !theme.dark ? <StatusBar style="dark" /> : null;
+  if (!focused) return null;
+  if (hidden) return <StatusBar hidden />;
+  return !theme.dark ? <StatusBar style="dark" /> : null;
 }
