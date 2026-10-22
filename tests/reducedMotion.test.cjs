@@ -75,7 +75,7 @@ test('every sheet, drawer and overlay transition asks before animating', () => {
     'src/components/playback/PlayerSheet.tsx',
     'src/components/playback/GlobalNowPlayingOverlay.tsx',
     'src/components/vine/ui/CalendarSheet.tsx',
-    'src/components/vine/ui/ContentSelectorDrawer.tsx',
+    'src/components/vine/ui/ReaderPanel.tsx',
     'src/components/vine/ui/SermonPlannerDrawer.tsx',
     'src/components/vine/ui/TodayCard.tsx',
   ]) {

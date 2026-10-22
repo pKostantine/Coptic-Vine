@@ -1222,6 +1222,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             copticGospelRite={copticGospelRite}
             appLanguage={preferences.appLanguage}
             theme={documentTheme}
+            title={{ english: title, arabic, french }}
           />
           )}
         </>
