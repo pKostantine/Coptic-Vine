@@ -56,6 +56,19 @@ test('each Hoos is set in a Lintel, on its titled first part only', () => {
   }
 });
 
+test('the three anaphoras set their Anaphora, Sanctus and Confession in a Lintel', () => {
+  const keys = ['StBasil', 'StGregory', 'StCyril'].flatMap((saint) => [`anaphora${saint}`, `sanctus${saint}`, `confession${saint}`]);
+  const dressed = withDocumentOrnaments([
+    ...keys.map((key, index) => section(`${key}-${index}`, key, key)),
+    section('confessionStBasil-161-cont1', 'confessionStBasil'),
+    section('alternateConfessionResponse-162', 'alternateConfessionResponse', 'Alternate Confession Response'),
+  ], TITLE);
+  const byId = Object.fromEntries(dressed.map((entry) => [entry.id, entry.ornament]));
+  for (const [index, key] of keys.entries()) assert.equal(byId[`${key}-${index}`], 'lintel', key);
+  assert.equal(byId['confessionStBasil-161-cont1'], undefined);
+  assert.equal(byId['alternateConfessionResponse-162'], undefined);
+});
+
 test('the Psalm and Gospel are set in the Three Roundels, in every service that reads them', () => {
   const titleOnly = (id, english) => ({ id, title: { english, arabic: '' }, verses: [] });
   const dressed = withDocumentOrnaments([

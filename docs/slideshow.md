@@ -160,7 +160,7 @@ Items are placed in order; a slide holds whole items:
   piece again.
 - **A few titles keep their first two verses** (`TITLE_PAIRED_VERSE_COUNTS`:
   the Kiahk, Nativity, Theophany, Lenten, Palm Sunday and Resurrection
-  Hooses, and the three Agios Agios Agios; `flattenSections` sets the title
+  Hooses, and the three anaphoras' Sanctus; `flattenSections` sets the title
   item's `pairedVerseCount` from the section's hymn key). Their first verse
   is a short opening line, so while the title is still on the slide the
   second verse does as the first does beneath it: whole if it fits, else as

@@ -229,9 +229,9 @@ export const TITLE_PAIRED_VERSE_COUNTS = Object.freeze({
   theLentenHoos: 2,
   thePalmSundayHoos: 2,
   theResurrectionHoos: 2,
-  agiosAgiosAgiosStBasil: 2,
-  agiosAgiosAgiosStGregory: 2,
-  agiosAgiosAgiosStCyril: 2,
+  sanctusStBasil: 2,
+  sanctusStGregory: 2,
+  sanctusStCyril: 2,
 });
 const MAX_TITLE_PAIRED_VERSES = 2;
 
