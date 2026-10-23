@@ -1034,7 +1034,7 @@ test("a break at a verse its title keeps waits on the title to settle", () => {
 
 test("the titles that keep two verses are named by hymn key, and the slideshow sets the count from the section", () => {
   assert.deepEqual(Object.keys(TITLE_PAIRED_VERSE_COUNTS).sort(), [
-    "agiosAgiosAgiosStBasil", "agiosAgiosAgiosStCyril", "agiosAgiosAgiosStGregory",
+    "sanctusStBasil", "sanctusStCyril", "sanctusStGregory",
     "theKiahkHoos", "theLentenHoos", "theNativityHoos", "thePalmSundayHoos", "theResurrectionHoos", "theTheophanyHoos",
   ]);
   assert.equal(getTitlePairedVerseCount("theKiahkHoos"), 2);

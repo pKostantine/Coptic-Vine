@@ -19,6 +19,19 @@ const HOOS_KEYS = new Set([
   'theResurrectionHoos',
 ]);
 
+/** The three anaphoras' Anaphora, Sanctus and Confession, each set in a Lintel too. */
+const ANAPHORA_KEYS = new Set([
+  'anaphoraStBasil',
+  'sanctusStBasil',
+  'confessionStBasil',
+  'anaphoraStGregory',
+  'sanctusStGregory',
+  'confessionStGregory',
+  'anaphoraStCyril',
+  'sanctusStCyril',
+  'confessionStCyril',
+]);
+
 /**
  * The Psalm and Gospel, wherever a service reads them: the Gospel rites
  * spliced in whole, whose title ("Psalm and Gospel") heads a section of its
@@ -65,7 +78,8 @@ function followingTheotokiaDay(sections: DocumentSection[], from: number): Weekd
 
 /**
  * Dresses a hydrated service with its ornaments: its own name in the Stepped
- * headpiece at the start, each Hoos's title in a Lintel, the Theotokia of
+ * headpiece at the start, each Hoos's title in a Lintel, and the
+ * anaphoras' Anaphora, Sanctus and Confession, the Theotokia of
  * the day announced in the Interlace just before the Psali's conclusion that
  * leads into it, the Psalm and Gospel in the Three Roundels, and the
  * Medallion closing the service -- before the buttons that leave for the
@@ -102,7 +116,7 @@ export function withDocumentOrnaments(sections: DocumentSection[], title: Docume
     }
     const key = sectionKey(section);
     dressed.push(!hasTitle(section) ? section
-      : HOOS_KEYS.has(key) ? { ...section, ornament: 'lintel' }
+      : HOOS_KEYS.has(key) || ANAPHORA_KEYS.has(key) ? { ...section, ornament: 'lintel' }
         : GOSPEL_RITE_KEYS.has(key) ? { ...section, ornament: 'roundels' }
           : section);
   });
