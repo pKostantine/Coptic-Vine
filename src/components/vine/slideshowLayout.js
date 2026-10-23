@@ -553,7 +553,8 @@ function appendTallVerseSegments({
   firstSegmentIndex = 0,
   labelSegment,
   // The first piece stays on the slide it is on, however little of it fits
-  // (a title's first verse): at least a line, over the foot if need be.
+  // (a title's first verse), so long as a line of it does: never past the
+  // foot. When none does, the verse starts the next slide.
   keepWithSlide = false,
 }) {
   let segmentIndex = firstSegmentIndex;
@@ -564,18 +565,15 @@ function appendTallVerseSegments({
       ? createContinuationCapacityItem(item, state)
       : item;
     const remainingHeight = availableHeight - currentHeight;
-    let lineCapacities = independentLineTakes(state, getIndependentLineCapacities(
+    let lineCapacities = keepInitialLinesTogether(state, independentLineTakes(state, getIndependentLineCapacities(
       state,
       remainingHeight,
       fontSize,
       capacityItem,
       visibleLanguages,
-    ));
+    )));
 
     const keepHere = keepWithSlide && segmentIndex === firstSegmentIndex && currentSlide.length > 0;
-    if (keepHere && !hasPositiveLineCapacity(lineCapacities)) {
-      lineCapacities = getMinimumLineCapacities(state);
-    }
 
     if (!keepHere && currentSlide.length && shouldAvoidTinyFragment(
       state,
@@ -660,6 +658,20 @@ export function independentLineTakes(state, capacities) {
       takes[entry.language] = take;
     });
   return takes;
+}
+
+/**
+ * The lines beside a decorated initial turn the page only together (see
+ * createVerseLineSegment). Where only one of them fits, the verse takes
+ * nothing here rather than set the other past the foot of the slide.
+ */
+function keepInitialLinesTogether(state, capacities) {
+  const splitsInitial = state.languages.some((entry) => {
+    const beside = countInitialLines(entry.lines);
+    const take = capacities[entry.language] || 0;
+    return entry.offset < beside && take > 0 && entry.offset + take < beside;
+  });
+  return splitsInitial ? {} : capacities;
 }
 
 // What a continuation segment still carries: no speaker label, and the
@@ -934,6 +946,25 @@ export function getVerseLineSegmentHeight(segment, fontSize, visibleLanguages) {
   return getVerseCommonHeight(segment.item, fontSize, visibleLanguages) +
     prefixHeight +
     (languageHeights.length ? Math.max(...languageHeights) : 0);
+}
+
+/**
+ * The height an item is paginated by. A verse whose lines are all measured
+ * is never taken for shorter than those lines set, by the arithmetic its
+ * pieces are placed by: its row's own report can come from before its lines
+ * were final. On the phone a decorated initial's Coptic is laid out in passes
+ * (JustifiedText's useNativeInitialLines), and the report of the last pass
+ * could arrive after the row had left the measurement layer, leaving the
+ * height of an earlier one -- the English column alone -- and a slide that
+ * ran off the foot of the screen. Whatever else the row reported beyond its
+ * lines still counts.
+ */
+export function getPaginationItemHeight(item, measuredHeight, languageMetric, fontSize, visibleLanguages) {
+  if (item?.type !== "verse" || typeof measuredHeight !== "number" || !hasEveryMeasuredColumn(item, languageMetric, visibleLanguages)) {
+    return measuredHeight;
+  }
+  const whole = createWholeVerseItem(item, languageMetric, fontSize);
+  return Math.max(measuredHeight, getVerseLineSegmentHeight({ item: whole }, fontSize, visibleLanguages));
 }
 
 /**

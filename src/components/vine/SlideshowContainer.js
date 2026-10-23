@@ -23,6 +23,7 @@ import {
   getPageTurnForSwipe,
   getPageTurnForTap,
   getPageTurnForViewportTap,
+  getPaginationItemHeight,
   getSlideContentBudget,
   getSlideKey,
   getSlidePadding,
@@ -376,7 +377,7 @@ export default function SlideshowContainer({
     const effectiveHeights = {};
     items.forEach((item) => {
       effectiveHeights[item.id] =
-        measuredHeights[item.id] ??
+        getPaginationItemHeight(item, measuredHeights[item.id], measuredLanguageHeights[item.id], fontSize, visibleLanguages) ??
         estimateItemHeight(item, fontSize, visibleLanguages, slideTableWidth);
     });
 

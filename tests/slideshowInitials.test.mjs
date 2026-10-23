@@ -5,7 +5,9 @@ import test from "node:test";
 import {
   createVerseLineSegment,
   getItemSignature,
+  getSlideshowLanguageLineHeight,
   normalizeLanguageMetric,
+  paginateItems,
 } from "../src/components/vine/slideshowLayout.js";
 import { annotateNativeLines, countInitialLines, textAfterLines } from "../src/components/vine/textLines.js";
 
@@ -131,4 +133,24 @@ test("a centred line opening its hymn takes the initial a line tall, before its 
   assert.match(verse, /const CENTERED_INITIAL_ROW_STYLE = \{ alignItems: "flex-start", flexDirection: "row", justifyContent: "center" \};/);
   // One initial for either body: the letter in the ornaments' colour, the vine in the titles' gold.
   assert.equal((verse.match(/<CopticInitial/g) || []).length, 1);
+});
+
+test("where only one of the initial's lines fits beneath its title, the verse starts the next slide", () => {
+  const languages = { english: true, coptic: true };
+  const fontSize = 18;
+  const item = copticItem();
+  const lineHeight = getSlideshowLanguageLineHeight("coptic", item, fontSize);
+  const title = { id: "hymn-title", sectionId: "hymn", type: "title", title: { english: "Thanksgiving" } };
+  const metric = { english: { lines: lines(4) }, coptic: { lines: lines(5, "two") } };
+  const ids = (slides) => slides.map((slide) => slide.map((entry) => entry.slideId || entry.id));
+  // Room beneath the title for one line and its padding, not two.
+  const budget = 40 + 2 + 16 + lineHeight + 4;
+  const slides = paginateItems([title, item], { "hymn-title": 40, "hymn-0": 200 }, { "hymn-0": metric }, budget, fontSize, languages, 1024);
+  assert.deepEqual(ids(slides)[0], ["hymn-title"]);
+  assert.equal(slides[1][0].slideshowLineRanges.coptic.start, 0);
+  assert.ok(slides[1][0].slideshowLineCounts.coptic >= 2);
+  // With room for both, they go beneath the title.
+  const roomy = paginateItems([title, item], { "hymn-title": 40, "hymn-0": 200 }, { "hymn-0": metric }, budget + lineHeight, fontSize, languages, 1024);
+  assert.deepEqual(ids(roomy)[0], ["hymn-title", "hymn-0-segment-0"]);
+  assert.equal(roomy[0][1].slideshowLineCounts.coptic, 2);
 });

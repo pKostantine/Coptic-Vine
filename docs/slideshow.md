@@ -1,7 +1,7 @@
 # Slideshow mode
 
 How a document is turned into slides, measured, paged and kept still.
-Last brought up to date: October 16, 2026.
+Last brought up to date: October 22, 2026.
 
 Files:
 
@@ -77,6 +77,16 @@ height *and* the lines of every column that has text
 layer until then. Measured by height alone, a verse used to leave before
 its lines arrived and could then only be split by guessing.
 
+**A measured verse is paginated by no less than its lines**
+(`getPaginationItemHeight`): the height its lines set, by the arithmetic its
+pieces are placed by (`getVerseLineSegmentHeight`), or its row's report if
+that is taller. The row's report can predate its lines. On the phone a
+decorated initial's Coptic is laid out in passes (`useNativeInitialLines`),
+and the last pass's report could arrive after the row had left the
+measurement layer, leaving the English column's height alone: the verse was
+placed whole beneath its title and ran off the foot of the screen. The
+passes stand out of the row's flow, so an early report is never too tall.
+
 Measurement items are keyed by a hash of the measurement key plus the item
 id, so a wipe (new width, font, languages) remounts anything still being
 measured: neither Fabric nor a `ResizeObserver` reports an unchanged size
@@ -140,7 +150,10 @@ Items are placed in order; a slide holds whole items:
   always share a slide.** If the first verse does not fit beneath its title
   (and the toggle, if set between them), it is split there and gives as
   much of itself as fits — at least a line — rather than leave the title on
-  a slide of its own; the rest turns the page. Only the first verse: every
+  a slide of its own; the rest turns the page. Never past the foot: when not
+  a line fits beneath the title (a service's title page, say), or only one
+  of the two lines beside a decorated initial, which turn the page only
+  together (`keepInitialLinesTogether`), the verse starts the next slide. Only the first verse: every
   later verse keeps the whole-verse rule (`pairedWithTitleHere`,
   `keepWithSlide`). A break at such a verse, from its top, is a break at
   its title, and a page turned back into it is the title with the first
