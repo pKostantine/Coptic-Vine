@@ -108,6 +108,12 @@ test('the app\'s slider holds the sheet from the finger landing until both it li
   assert.match(frame, /<ScrollView scrollEnabled=\{!sheetDrag\.held\}/);
 });
 
+test('the app\'s slider sits where it belongs from the first frame, out of the safe area\'s reach', () => {
+  // Its sheet is laid out below the screen before sliding up: SwiftUI kept the
+  // slider clear of the safe area there, too high, until a slide laid it out again.
+  assert.match(source('components/vine/ui/FontScaleControl.tsx'), /<Host\s+matchContents=\{\{ vertical: true \}\}[^>]*\s+ignoreSafeArea="all"/);
+});
+
 test('every browser sizes text with − and + buttons; only the apps get a slider', () => {
   const web = source('components/vine/ui/FontScaleControl.web.tsx');
   assert.doesNotMatch(web, /accessibilityRole="adjustable"/, 'no track on the web');

@@ -97,12 +97,17 @@ export default function FontScaleControl({
             always runs small-to-large left-to-right, matching the fixed A/A
             markers beside it; the rest of this app's layout isn't mirrored for
             Arabic either, so letting the locale flip just this one control
-            would leave it disagreeing with its own labels. */}
+            would leave it disagreeing with its own labels. ignoreSafeArea:
+            SwiftUI keeps its content clear of the screen's safe area, and the
+            sheet is laid out below the foot of the screen before it slides up,
+            where all of it is unsafe. The slider was set too high, and only
+            dropped into place when moving it laid SwiftUI out again. */}
         <Host
           matchContents={{ vertical: true }}
           colorScheme="dark"
           seedColor={COLORS.gold}
           layoutDirection="leftToRight"
+          ignoreSafeArea="all"
           style={styles.sliderHost}
         >
           <FontScaleSlider

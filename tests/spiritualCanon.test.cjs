@@ -439,7 +439,7 @@ test('the metania rule reads the day’s own flags, by the same engine the books
 
 test('the time of day is set on wheels: the system’s own on iOS, scrolling columns elsewhere', () => {
   const ios = read('src/components/canon/TimeWheel.ios.tsx');
-  assert.match(ios, /<Host colorScheme="dark" style=\{styles\.host\}>/);
+  assert.match(ios, /<Host colorScheme="dark" ignoreSafeArea="all" style=\{styles\.host\}>/);
   assert.match(ios, /displayedComponents=\{\['hourAndMinute'\]\}/);
   assert.match(ios, /modifiers=\{\[datePickerStyle\('wheel'\), labelsHidden\(\)/);
   const wheel = read('src/components/canon/TimeWheel.tsx');
