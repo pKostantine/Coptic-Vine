@@ -108,8 +108,8 @@ test('no guessed line breaks reach the page, and the deck shows only settled sli
 test('forced lines render line for line on every platform', () => {
   const verseBlock = fs.readFileSync('src/components/vine/VerseBlock.js', 'utf8');
   const justified = fs.readFileSync('src/components/vine/JustifiedText.js', 'utf8');
-  // A column opened by a decorated initial is set line by line on the web too, around it.
-  assert.match(verseBlock, /Platform\.OS === "web" && !language\.forceLines && !language\.initial \? \(\s*<CssJustifiedVerseBody/);
+  // A column opened by an initial, or by an opening word, is set line by line on the web too, around it.
+  assert.match(verseBlock, /Platform\.OS === "web" && !language\.forceLines && !initial && !language\.openingWord \? \(\s*<CssJustifiedVerseBody/);
   assert.match(verseBlock, /textAlign: alignmentFor\("coptic"\)/);
   assert.match(verseBlock, /annotateNativeLines\(event\.nativeEvent\.lines \|\| \[\], renderedText\)/);
   // A centered column measures its lines on web too, and a page's share of it renders line by line.
@@ -131,7 +131,8 @@ test('every drawn Coptic line has room for the ornamented capitals and descender
   assert.equal((justified.match(/\{ textAlign: fallbackAlign \}, glyphRoom\]/g) || []).length, 2);
   assert.match(justified, /wordStyles\?\.\[lineWordOffsets\[index\] \+ wordIndex\],\n\s+glyphRoom,/);
   const verse = fs.readFileSync('src/components/vine/VerseBlock.js', 'utf8');
-  assert.match(verse, /glyphRoomFontSize=\{language\.key === "coptic" \? language\.fontSize : 0\}/);
+  // The Arabic's larger opening word has its room too.
+  assert.match(verse, /glyphRoomFontSize=\{language\.key === "coptic" \? language\.fontSize : language\.key === "arabic" && language\.openingWord \? language\.openingWord\.style\.fontSize : 0\}/);
   assert.match(verse, /const glyphRoom = language\.key === "coptic" \? glyphRoomStyle\(language\.fontSize\) : null;/);
   // The plain body reports its text's height, not the room around it.
   assert.match(verse, /height: event\.nativeEvent\.layout\.height - roomHeight/);

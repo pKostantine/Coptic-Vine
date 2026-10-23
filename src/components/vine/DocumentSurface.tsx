@@ -4,7 +4,7 @@ import { ActivityIndicator, Platform, useWindowDimensions, View } from 'react-na
 import SlideshowContainer from './SlideshowContainer';
 import DocumentWebView, { DocumentAction, DocumentSection, DocumentWebViewHandle } from './DocumentWebView';
 import { pickDocumentTitle, withRememberedCollapse, type DocumentTitle } from './documentHtml';
-import { documentOrnamentColor } from '../../constants/documentOrnaments';
+import { documentInitialColors, documentOrnamentColor, type InitialColors } from '../../constants/documentOrnaments';
 import { getDocumentTheme, slideshowThemeFor } from '../../constants/documentThemes';
 import { useBottomChrome } from '../../context/BottomChromeContext';
 import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
@@ -52,6 +52,8 @@ interface DocumentSurfaceProps {
   sermonHighlights?: SermonHighlight[];
   /** The colour the document's ornaments are drawn in; by default the page's own (documentOrnamentColor, Night and Paper in the Annual green). */
   ornamentColor?: string;
+  /** The decorated initials' vine and letter; by default the page's own (documentInitialColors, Night in the Annual pair). */
+  initialColors?: InitialColors;
   /** Scroll mode: where the text starts under floating reader controls (documentHtml.ts's topContentInset). */
   topContentInset?: number;
   /** Scroll mode: whether the headpiece the document opens with still shows below the floating controls. */
@@ -155,6 +157,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       sermonPlannerMode = false,
       sermonHighlights = [],
       ornamentColor: ornamentColorProp,
+      initialColors: initialColorsProp,
       topContentInset = 0,
       onHeadpieceInViewChange,
     },
@@ -166,10 +169,11 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     // The page both renderers draw on (constants/documentThemes.ts).
     const theme = getDocumentTheme(preferences.documentTheme);
     const ornamentColor = ornamentColorProp ?? documentOrnamentColor(theme);
+    const initialColors = initialColorsProp ?? documentInitialColors(theme);
     const slideshowTheme = useMemo(() => {
       const base = slideshowThemeFor(theme);
-      return { ...base, colors: { ...base.colors, ornament: ornamentColor } };
-    }, [theme, ornamentColor]);
+      return { ...base, colors: { ...base.colors, ornament: ornamentColor, initialVine: initialColors.vine, initialLetter: initialColors.letter } };
+    }, [theme, ornamentColor, initialColors.vine, initialColors.letter]);
     const effectiveSlideshowMode = preferences.slideshowMode && !sermonPlannerMode;
     const effectiveSelectText = sermonPlannerMode || (preferences.selectText && !effectiveSlideshowMode);
     // section.id already includes hymn_key + item_order. Combining it with
@@ -397,6 +401,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         sermonHighlights={sermonHighlights}
         theme={theme}
         ornamentColor={ornamentColor}
+        initialColors={initialColors}
       />
     );
   },

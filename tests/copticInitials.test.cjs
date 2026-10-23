@@ -21,6 +21,7 @@ function loadDocumentBuilder() {
     '../../constants/documentThemes': themes,
     '../../constants/copticInitialArt': art,
     './copticInitial': loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? loadFile('src/constants/copticInitialArt.ts') : require(name))),
+    './openingInitials': loadFile('src/components/vine/openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? loadFile('src/constants/englishInitialArt.ts') : require(name))),
     '../../constants/documentOrnaments': loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name))),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),
@@ -56,20 +57,23 @@ test('a titled hymn opens its first Coptic paragraph with the decorated initial,
   const html = build([hymn([verse('Ⲙⲁⲣⲉⲛϣⲉⲡϩ̀ⲙⲟⲧ'), verse('Ϫⲉ ⲁϥⲉⲣⲥ̀ⲕⲉⲡⲁⲍⲓⲛ')])], OPTIONS);
   assert.deepEqual(initials(html), ['<span class="coptic-initial" data-fit>']);
   assert.ok(body(html).includes('<use class="coptic-initial-vine" href="#cv-initial-vine-2c98"></use><use class="coptic-initial-letter" href="#cv-initial-2c98"></use>'));
-  assert.ok(body(html).includes('<span class="coptic-initial-text">Ⲙ</span></span>ⲁⲣⲉⲛϣⲉⲡϩ̀ⲙⲟⲧ'));
+  // The rest of its first word follows in the letter's colour.
+  assert.ok(body(html).includes('<span class="coptic-initial-text">Ⲙ</span></span><span class="opening-word">ⲁⲣⲉⲛϣⲉⲡϩ̀ⲙⲟⲧ</span>'));
   // Drawn once, for the letter used, from the vine's own pieces.
   assert.match(html, /<path id="cv-initial-2c98" d="M/);
   assert.equal((html.match(/id="cv-initial-[0-9a-f]+"/g) || []).length, 1);
   const vine = art.COPTIC_INITIALS['Ⲙ'].vine;
   assert.ok(html.includes(`<g id="cv-initial-vine-2c98">${vine.map((piece) => `<use href="#cv-vine-piece-${piece}"></use>`).join('')}</g>`));
   for (const piece of new Set(vine)) assert.ok(html.includes(`<path id="cv-vine-piece-${piece}" d="${art.COPTIC_INITIAL_VINE_PIECES[piece]}"></path>`));
-  // Only the Coptic column: the English and Arabic beside it stay as they are.
+  // One decorated initial, in the Coptic column; the English and Arabic beside it open in their own way.
   assert.equal((body(html).match(/coptic-initial-text/g) || []).length, 1);
+  assert.equal((body(html).match(/class="english-initial"/g) || []).length, 1);
+  assert.equal((body(html).match(/class="opening-word arabic-opening"/g) || []).length, 1);
 });
 
 test('the letter carries its jinkim into the copied text', () => {
   const html = build([hymn([verse('  Ⲁ̀ⲙⲏⲛ ⲁⲗⲗⲏⲗⲟⲩⲓⲁ')])], OPTIONS);
-  assert.ok(body(html).includes('<span class="coptic-initial-text">Ⲁ̀</span></span>ⲙⲏⲛ ⲁⲗⲗⲏⲗⲟⲩⲓⲁ'));
+  assert.ok(body(html).includes('<span class="coptic-initial-text">Ⲁ̀</span></span><span class="opening-word">ⲙⲏⲛ</span> ⲁⲗⲗⲏⲗⲟⲩⲓⲁ'));
 });
 
 test('the hymn\'s capital takes the initial: the first Coptic paragraph under a title to open on one, and only that one', () => {
@@ -78,7 +82,7 @@ test('the hymn\'s capital takes the initial: the first Coptic paragraph under a 
   // The people's Kyrie kept in lower case before the Verses of the Cymbals: the capital after it takes the initial.
   const cymbals = build([hymn([verse('ⲕⲩⲣⲓⲉ ⲉ̀ⲗⲉⲏ̀ⲥⲟⲛ'), verse('Ⲧⲉⲛⲟⲩⲱϣⲧ ⲙ̀Ⲫⲓⲱⲧ'), verse('Ⲭⲉⲣⲉ ⲧⲉⲕⲕⲗⲏⲥⲓⲁ')])], OPTIONS);
   assert.deepEqual(initials(cymbals), ['<span class="coptic-initial" data-fit>']);
-  assert.ok(body(cymbals).includes('<span class="coptic-initial-text">Ⲧ</span></span>ⲉⲛⲟⲩⲱϣⲧ'));
+  assert.ok(body(cymbals).includes('<span class="coptic-initial-text">Ⲧ</span></span><span class="opening-word">ⲉⲛⲟⲩⲱϣⲧ</span>'));
   assert.ok(body(cymbals).includes('>Ⲭⲉⲣⲉ ⲧⲉⲕⲕⲗⲏⲥⲓⲁ<'), 'one initial a hymn');
   // A capital that doesn't open its paragraph stays in its line.
   assert.deepEqual(initials(build([hymn([verse('(Ⲙⲁⲣⲉⲛ)'), verse('ⲙⲁⲣⲉⲛ')])], OPTIONS)), []);
@@ -136,4 +140,87 @@ test('the page decides after layout whether the paragraph wraps, and decides aga
   assert.match(script, /var collapsed = section\.classList\.toggle\('collapsed'\);\s+if \(!collapsed\) fitCopticInitials\(\);/);
   // A page without an initial carries the script but no listeners for it.
   assert.equal(initials(build([hymn([verse('ⲙⲁⲣⲉⲛ')])], OPTIONS)).length, 0);
+});
+
+// ---- The opening in all three columns (Coptic Vine Design, "Drop caps and decorated initials", option 3) ----
+
+const openings = loadFile('src/components/vine/openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? loadFile('src/constants/englishInitialArt.ts') : require(name)));
+const ornaments = loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name)));
+const coptic = loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? art : require(name)));
+
+test('the Arabic first word is stretched once with kashida, only between letters that join', () => {
+  assert.equal(openings.stretchArabicWord('مبارك'), 'مبـــارك');
+  assert.equal(openings.stretchArabicWord('قوموا'), 'قومـــوا');
+  // Never after a letter that doesn't join the next, nor into lam-alef; a word with no join stays as it is.
+  assert.equal(openings.stretchArabicWord('ودار'), 'ودار');
+  assert.equal(openings.stretchArabicWord('لا'), 'لا');
+  // Its vowel marks stay on their letter, ahead of the stretch.
+  assert.equal(openings.stretchArabicWord('بَارَك'), 'بَـــارَك');
+  assert.deepEqual(openings.splitArabicOpening('مبارك أنت'), { word: 'مبـــارك', rest: ' أنت' });
+});
+
+test('the English initial is the first capital, two lines tall, its gap stepped past its swash', () => {
+  assert.deepEqual(openings.splitEnglishOpening('Blessed are You'), { letter: 'B', rest: 'lessed are You' });
+  assert.equal(openings.splitEnglishOpening('“Blessed'), null);
+  assert.equal(openings.splitEnglishOpening('the light'), null);
+  const fontSize = 20;
+  const lineHeight = 26;
+  // Beside lines 1.5 apart it is the design's 3.84 times the text.
+  const designEm = openings.englishInitialMetrics('A', fontSize, fontSize * 1.5).unit * 1000;
+  assert.ok(Math.abs(designEm / fontSize - 3.84) < 0.01, `${designEm / fontSize}`);
+  // Line 2 starts past the swash and .03 of the initial's em more (the design's per-letter margins), line 1 .02 nearer.
+  for (const [letter, margin] of [['A', 0.15], ['F', 0.282], ['T', 0.436], ['M', 0.03]]) {
+    const metrics = openings.englishInitialMetrics(letter, fontSize, lineHeight);
+    const em = metrics.unit * 1000;
+    const glyph = metrics.glyph;
+    assert.ok(Math.abs(metrics.room - em * (-0.02 + glyph.advance / 1000 + margin)) < 0.02, letter);
+    assert.ok(Math.abs(metrics.room - metrics.firstRoom - em * 0.02) < 0.001, letter);
+    assert.equal(metrics.height, lineHeight * 2);
+  }
+});
+
+test('beside the Coptic initial line 2 starts at its edge and line 1 a quarter em inside it', () => {
+  const box = coptic.copticInitialMetrics(30).two;
+  const em = 30 / 1.5;
+  assert.ok(Math.abs(box.room - em * 3.14) < 0.02);
+  assert.ok(Math.abs(box.firstRoom - em * 2.89) < 0.02);
+  // Set in a row, it leaves line 1 its room.
+  assert.ok(Math.abs(box.left + box.width + box.right - box.firstRoom) < 0.02);
+  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], OPTIONS);
+  const twoLine = /\.coptic-initial \{([^}]+)\}/.exec(html)[1];
+  assert.match(twoLine, /margin: [\d.]+px 0 0 -?[\d.]+px;/);
+  assert.match(twoLine, /shape-outside: polygon\(0 0, calc\(100% - [\d.]+px\) 0, calc\(100% - [\d.]+px\) 55%, 100% 55%, 100% 100%, 0 100%\);/);
+});
+
+test('on Night the initials take the season\'s own vine and letter; elsewhere the titles\' gold and the ornaments\' colour', () => {
+  const night = themes.DOCUMENT_THEMES.night ?? Object.values(themes.DOCUMENT_THEMES).find((page) => page.id === 'night');
+  assert.deepEqual(ornaments.documentInitialColors(night, 'annual'), { vine: '#E3B53B', letter: '#5FAE68' });
+  assert.deepEqual(ornaments.documentInitialColors(night, 'gold'), { vine: '#5FAE68', letter: '#EDBE45' });
+  assert.deepEqual(ornaments.documentInitialColors(night, 'holyweek'), { vine: '#3E3333', letter: '#D63A40' });
+  for (const page of Object.values(themes.DOCUMENT_THEMES).filter((entry) => entry.id !== 'night')) {
+    assert.deepEqual(ornaments.documentInitialColors(page, 'lent'), { vine: page.colors.accent, letter: ornaments.documentOrnamentColor(page, 'lent') });
+  }
+  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], { ...OPTIONS, initialColors: { vine: '#5FAE68', letter: '#EDBE45' } });
+  assert.ok(html.includes('.coptic-initial-vine { fill: #5FAE68; }'));
+  assert.ok(html.includes('.coptic-initial-art .coptic-initial-letter { fill: #EDBE45; }'));
+  assert.ok(html.includes('.opening-word { color: #EDBE45; }'));
+});
+
+test('the row the hymn opens on opens in English and Arabic too, its first words in the letter\'s colour', () => {
+  const html = build([hymn([verse('Ⲕⲥ̀ⲙⲁⲣⲱⲟⲩⲧ ⲡϭⲟⲓⲥ', { english: 'Blessed are You, O Lord', arabic: 'مبارك أنت أيها الرب' }), verse('Ⲡⲉⲛⲛⲟⲩϯ', { english: 'Our God', arabic: 'إلهنا' })])], OPTIONS);
+  const page = body(html);
+  // English: its capital drawn two lines tall, the letter kept unseen, the rest of the word in small capitals.
+  assert.match(page, /<span class="english-initial" style="width: [\d.]+px; height: 52px; shape-outside: polygon\(/);
+  assert.ok(page.includes('<span class="english-initial-text">B</span></span><span class="opening-word english-small-caps">lessed</span> are You, O Lord'));
+  // Arabic: its first word stretched, larger and bold.
+  assert.ok(page.includes('<span class="opening-word arabic-opening">مبـــارك</span> أنت أيها الرب'));
+  // Coptic: the rest of the word after its initial.
+  assert.ok(page.includes('<span class="opening-word">ⲥ̀ⲙⲁⲣⲱⲟⲩⲧ</span> ⲡϭⲟⲓⲥ'));
+  // Once a hymn.
+  assert.equal((page.match(/class="english-initial"/g) || []).length, 1);
+  assert.ok(page.includes('>Our God<'));
+  // With the Coptic hidden, the English and Arabic still open on that row.
+  const noCoptic = body(build([hymn([verse('Ⲕⲥ̀ⲙⲁⲣⲱⲟⲩⲧ', { english: 'Blessed', arabic: 'مبارك' })])], { ...OPTIONS, visibleColumns: { english: true, french: false, coptic: false, arabic: true } }));
+  assert.equal((noCoptic.match(/class="english-initial"/g) || []).length, 1);
+  assert.equal((noCoptic.match(/coptic-initial-text/g) || []).length, 0);
 });

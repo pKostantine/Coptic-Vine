@@ -1,5 +1,5 @@
 import { COPTIC_INITIAL_VIEWBOX, COPTIC_INITIAL_VINE_PIECES, COPTIC_INITIALS } from '../../constants/copticInitialArt';
-import { HEADPIECES, isHeadpiece, MEDALLION, type DocumentOrnament, type HeadpieceOrnament } from '../../constants/documentOrnaments';
+import { HEADPIECES, isHeadpiece, MEDALLION, type DocumentOrnament, type HeadpieceOrnament, type InitialColors } from '../../constants/documentOrnaments';
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 import { SPACING } from '../../constants/theme';
 import type {
@@ -11,6 +11,7 @@ import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGap } from './documentPresentationMetrics';
 import { copticInitialMetrics, splitCopticInitial } from './copticInitial';
+import { englishInitialMetrics, splitArabicOpening, splitEnglishOpening, splitRestOfFirstWord } from './openingInitials';
 import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
@@ -217,6 +218,7 @@ export function buildDocumentHtml(
     nativeSwipeNavigation = false,
     theme = NIGHT_DOCUMENT_THEME,
     ornamentColor = theme.colors.accent,
+    initialColors = { vine: theme.colors.accent, letter: ornamentColor },
   }: {
     copticFontDataUri: string;
     /** The Coptic face's italic, for Coptic set in italic; without it the browser fakes one. */
@@ -251,6 +253,8 @@ export function buildDocumentHtml(
     theme?: DocumentTheme;
     /** The colour the document's ornaments are drawn in (documentOrnamentColor): the season's on Night and Paper, the page's own ink on the others. */
     ornamentColor?: string;
+    /** The decorated initials' vine and letter (documentInitialColors); the letter's colour is the opening words' too. */
+    initialColors?: InitialColors;
   },
 ) {
   const colors = theme.colors;
@@ -508,13 +512,17 @@ export function buildDocumentHtml(
       }
       .metropolitan { color: ${colors.metropolitan}; }
       /* The decorated initial opening a hymn's Coptic, as the old books set
-         it: two lines tall, its letter in the ornaments' colour and its vine
-         in the titles' gold. Line 3 runs the full width again. */
+         it: two lines tall, its letter and its vine in the initials' colours.
+         The gap beside it steps: line 2 starts right at its edge, line 1 a
+         little inside it, where the vine is open at that height (the step
+         falls just below line 1). Line 3 runs the full width again. */
       .coptic-initial {
         float: left;
         height: ${initialBox.two.height}px;
-        margin: ${initialBox.two.top}px ${initialBox.two.right}px 0 ${initialBox.two.left}px;
+        margin: ${initialBox.two.top}px 0 0 ${initialBox.two.left}px;
         position: relative;
+        shape-margin: 0;
+        shape-outside: polygon(0 0, calc(100% - ${initialBox.two.tuck}px) 0, calc(100% - ${initialBox.two.tuck}px) 55%, 100% 55%, 100% 100%, 0 100%);
         width: ${initialBox.two.width}px;
       }
       /* A paragraph too short to wrap around it keeps it a line tall, inline. */
@@ -523,6 +531,7 @@ export function buildDocumentHtml(
         float: none;
         height: ${verseLineHeight}px;
         margin: 0 ${initialBox.one.right}px 0 ${initialBox.one.left}px;
+        shape-outside: none;
         vertical-align: top;
         width: ${initialBox.one.width}px;
       }
@@ -533,10 +542,41 @@ export function buildDocumentHtml(
         top: 0;
         width: 100%;
       }
-      .coptic-initial-vine { fill: ${colors.accent}; }
-      .coptic-initial-art .coptic-initial-letter { fill: ${ornamentColor}; }
+      .coptic-initial-vine { fill: ${initialColors.vine}; }
+      .coptic-initial-art .coptic-initial-letter { fill: ${initialColors.letter}; }
+      /* The English opening: its first letter two lines tall in Corinthia,
+         drawn (its box sized and its gap stepped where it is set), the rest
+         of its first word in small capitals. Text never tucks under it. */
+      .english-initial {
+        float: left;
+        position: relative;
+        shape-margin: 0;
+      }
+      .english-initial-art {
+        overflow: visible;
+        position: absolute;
+      }
+      .english-initial-letter {
+        fill: ${initialColors.letter};
+        stroke: ${initialColors.letter};
+        stroke-linejoin: round;
+      }
+      .english-initial-shadow { fill: rgba(0, 0, 0, 0.6); }
+      /* The first word of every column, after its initial, in the letter's colour. */
+      .opening-word { color: ${initialColors.letter}; }
+      .english-small-caps {
+        font-variant: small-caps;
+        letter-spacing: 0.06em;
+      }
+      /* Arabic has no capitals: its first word is stretched with kashida and
+         set larger, in bold, without growing its line. */
+      .arabic-opening {
+        font-size: 1.4em;
+        font-weight: 700;
+        line-height: 1;
+      }
       /* The letter itself stays in the text, unseen, for copying and for screen readers. */
-      .coptic-initial-text {
+      .coptic-initial-text, .english-initial-text {
         clip: rect(0 0 0 0);
         clip-path: inset(50%);
         height: 1px;
@@ -1583,6 +1623,7 @@ function renderVerse(
   suppressSpeakerLabel: boolean,
   {
     initialsUsed,
+    fontSize,
     visibleColumns,
     bishopPresent,
     copticRecitedPrayers,
@@ -1685,13 +1726,20 @@ function renderVerse(
   // is where this line already sat, just narrower.
   const copticStandsAlone =
     isInvincibleCoptic && !hasTranslationText && languages.some((language) => language.key === 'coptic');
-  // The first Coptic paragraph under the hymn's title to open on a capital
-  // there is a decorated initial for: the hymn's own capital, which a line
-  // before it kept in lower case (the people's Kyrie before the Verses of the
-  // Cymbals) leaves to it. Never after a Bible verse number.
+  // The hymn opens on the first paragraph under its title whose Coptic opens
+  // on a capital there is a decorated initial for: the hymn's own capital,
+  // which a line before it kept in lower case (the people's Kyrie before the
+  // Verses of the Cymbals) leaves to it. Never after a Bible verse number.
+  // Decided whether or not the Coptic is shown, so the English and Arabic
+  // open on that same row (openingInitials.ts).
+  const opensHymn = opening.initialPending && !verse.bibleVerseNumber && Boolean(splitCopticInitial(copticText));
+  if (opensHymn) opening.initialPending = false;
   const copticCell = languages.find((language) => language.key === 'coptic');
-  const initial = opening.initialPending && copticCell && !verse.bibleVerseNumber ? splitCopticInitial(copticCell.text) : null;
-  if (initial) opening.initialPending = false;
+  const initial = opensHymn && copticCell ? splitCopticInitial(copticCell.text) : null;
+  const englishOpening = opensHymn && !isCentered ? splitEnglishOpening(verse.english || '') : null;
+  const arabicOpening = opensHymn && !isCentered ? splitArabicOpening(formatArabicDigits(verse.arabic || '')) : null;
+  // The English line's height, as the page sets it, for the initial beside it.
+  const englishLineHeight = Math.round(fontSize * 1.3);
   const columnLanguages = copticStandsAlone ? languages.filter((language) => language.key !== 'coptic') : languages;
   const gridTemplateColumns = `repeat(${Math.max(columnLanguages.length, 1)}, minmax(0, 1fr))`;
   const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
@@ -1713,9 +1761,15 @@ function renderVerse(
     const verseId = `${section.id}::v${index}`;
     const cellInitial = language.key === 'coptic' ? initial : null;
     if (cellInitial) initialsUsed.add(cellInitial.letter);
+    const englishInitial = language.key === 'english' ? englishOpening : null;
+    const arabicWord = language.key === 'arabic' ? arabicOpening : null;
     const bodyText = cellInitial
-      ? renderCopticInitial(cellInitial, centered) + highlightMetropolitanBrackets(cellInitial.rest)
-      : highlightMetropolitanBrackets(language.text);
+      ? renderCopticInitial(cellInitial, centered) + renderOpeningRest(cellInitial.rest)
+      : englishInitial
+        ? renderEnglishInitial(englishInitial.letter, fontSize, englishLineHeight) + renderOpeningRest(englishInitial.rest, 'english-small-caps')
+        : arabicWord
+          ? `<span class="opening-word arabic-opening">${escapeHtml(arabicWord.word)}</span>${highlightMetropolitanBrackets(arabicWord.rest)}`
+          : highlightMetropolitanBrackets(language.text);
     const renderedBody = sermonPlannerMode
       ? `<span class="sermon-annotatable-text" data-sermon-section-id="${escapeAttribute(section.id)}" data-sermon-verse-id="${escapeAttribute(verseId)}" data-sermon-language="${escapeAttribute(language.key)}">${bodyText}</span>`
       : bodyText;
@@ -1738,6 +1792,32 @@ function renderVerse(
   const verseId = `${section.id}::v${index}`;
 
   return `<div class="verse-row" data-verse-id="${escapeAttribute(verseId)}"${tuneAttribute} style="grid-template-columns: ${gridTemplateColumns};">${cells}</div>`;
+}
+
+/** The rest of a paragraph's first word after its initial, in the letter's colour (and in English, small capitals), then the paragraph. */
+function renderOpeningRest(rest: string, className = '') {
+  const first = splitRestOfFirstWord(rest);
+  if (!first) return highlightMetropolitanBrackets(rest);
+  return `<span class="opening-word${className ? ` ${className}` : ''}">${escapeHtml(first.word)}</span>${highlightMetropolitanBrackets(first.after)}`;
+}
+
+const cssPx = (value: number) => `${Math.round(value * 100) / 100}px`;
+
+/**
+ * The English opening initial (openingInitials.ts): a box as wide as line 2's
+ * room and two lines tall, floated, its gap stepped a little nearer beside
+ * line 1, with the letter drawn in it -- stroked in its own colour, over its
+ * shadow -- and the letter itself kept in the text, unseen.
+ */
+function renderEnglishInitial(letter: string, fontSize: number, lineHeight: number) {
+  const metrics = englishInitialMetrics(letter, fontSize, lineHeight);
+  const tuck = cssPx(metrics.room - metrics.firstRoom);
+  const { drawing } = metrics;
+  return `<span class="english-initial" style="width: ${cssPx(metrics.room)}; height: ${cssPx(metrics.height)}; shape-outside: polygon(0 0, calc(100% - ${tuck}) 0, calc(100% - ${tuck}) 55%, 100% 55%, 100% 100%, 0 100%);">`
+    + `<svg class="english-initial-art" viewBox="${drawing.viewBox}" style="left: ${cssPx(drawing.left)}; top: ${cssPx(drawing.top)}; width: ${cssPx(drawing.width)}; height: ${cssPx(drawing.height)};" aria-hidden="true">`
+    + `<path class="english-initial-shadow" d="${metrics.glyph.path}" transform="translate(${metrics.shadowOffset} ${metrics.shadowOffset})"></path>`
+    + `<path class="english-initial-letter" d="${metrics.glyph.path}" stroke-width="${metrics.strokeWidth}"></path>`
+    + `</svg><span class="english-initial-text">${escapeHtml(letter)}</span></span>`;
 }
 
 function copticInitialKey(letter: string) {

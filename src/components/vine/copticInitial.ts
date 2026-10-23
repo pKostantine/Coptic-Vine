@@ -26,14 +26,20 @@ export function splitCopticInitial(text: string): CopticInitialSplit | null {
 /**
  * The initial's measures for a Coptic line this tall. The design sets them in
  * its own em, two-thirds of its line, so each is that share of this line: two
- * lines tall (nudged down a little, with a gap before the text) beside a
- * paragraph that wraps, one line tall beside one that doesn't. `room` is how
- * much of a line's width it takes.
+ * lines tall (nudged down a little) beside a paragraph that wraps, one line
+ * tall beside one that doesn't. `room` is how much of a line's width it takes:
+ * beside the tall one, line 2 starts right at its edge and line 1 a quarter em
+ * inside it (`firstRoom`), where the vine is open at that height -- a stepped
+ * gap. `right` is the margin that leaves line 1 its room.
  */
 export function copticInitialMetrics(lineHeight: number) {
   const em = (designEm: number) => Math.round((designEm * lineHeight / 1.5) * 100) / 100;
+  const two = { width: em(3.18), height: em(2.86), top: em(0.07), left: em(-0.04), tuck: em(0.25) };
+  const room = Math.round((two.width + two.left) * 100) / 100;
+  const firstRoom = Math.round((room - two.tuck) * 100) / 100;
+  const oneRoom = em(1.67 + 0.14 - 0.02);
   return {
-    two: { width: em(3.18), height: em(2.86), top: em(0.07), right: em(0.32), left: em(-0.04), room: em(3.18 + 0.32 - 0.04) },
-    one: { width: em(1.67), height: lineHeight, right: em(0.14), left: em(-0.02), room: em(1.67 + 0.14 - 0.02) },
+    two: { ...two, right: Math.round((firstRoom - two.width - two.left) * 100) / 100, room, firstRoom },
+    one: { width: em(1.67), height: lineHeight, right: em(0.14), left: em(-0.02), room: oneRoom, firstRoom: oneRoom },
   };
 }

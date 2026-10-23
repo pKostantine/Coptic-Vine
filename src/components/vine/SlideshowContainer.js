@@ -10,6 +10,7 @@ import { DOCUMENT_CONTROL_METRICS, getLanguageColumnGap } from "./documentPresen
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
 import { splitCopticInitial } from "./copticInitial";
+import { splitEnglishOpening, splitRestOfFirstWord } from "./openingInitials";
 import {
   createSlideAnchor,
   estimateItemHeight,
@@ -32,6 +33,7 @@ import {
   getTitlePairedVerseCount,
   getVisibleVerseLanguages,
   hashSlideshowText,
+  hasSeasonalPrefixLine,
   isSlideSettled,
   isSlideshowItemMeasured,
   normalizeLanguageMetric,
@@ -1459,6 +1461,9 @@ const SlideItem = memo(function SlideItem({
         selectableText={false}
         bishopPresent={item.bishopPresent}
         copticInitial={item.copticInitial}
+        englishInitial={item.englishInitial}
+        arabicOpening={Boolean(item.arabicOpening)}
+        lineRanges={item.slideshowLineRanges}
         onLanguageLayout={(language, metric) =>
           onLanguageMeasured?.(language, metric, measurementSignature)
         }
@@ -1572,6 +1577,11 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visi
 
     const verses = section.verses || [];
     const opening = findOpeningInitial(section, visibleLanguages);
+    // The row the hymn opens on whether or not its Coptic is shown: its
+    // English and Arabic open there too (openingInitials.ts) -- unless it is a
+    // Hoos verse, which opens on its seasonal line.
+    const openingRow = findOpeningInitial(section, { ...visibleLanguages, coptic: true });
+    const opensOtherColumns = (verse, verseIndex) => openingRow?.index === verseIndex && !hasSeasonalPrefixLine(verse);
 
     return [
       {
@@ -1616,6 +1626,8 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visi
         isRecitedPrayer: isCopticGatedVerse(verse),
         isReading: Boolean(section.isReading),
         copticInitial: opening?.index === verseIndex ? opening.initial : null,
+        englishInitial: opensOtherColumns(verse, verseIndex) ? findEnglishInitial(verse) : null,
+        arabicOpening: opensOtherColumns(verse, verseIndex) && Boolean(String(verse.arabic || "").trim()),
         forceWhiteVerses: Boolean(section.forceWhiteVerses),
         verseIndex: sectionIndex + verseIndex,
       })),
@@ -1657,9 +1669,21 @@ function findOpeningInitial(section, visibleLanguages = {}) {
     const showsCoptic = getVisibleVerseLanguages({ verse, isRecitedPrayer: isCopticGatedVerse(verse) }, visibleLanguages).includes("coptic");
     const split = showsCoptic && !verse.bibleVerseNumber ? splitCopticInitial(String(verse.coptic || "")) : null;
     if (!split) continue;
-    return { index, initial: { letter: split.letter, marks: split.marks } };
+    // Whether its first word goes on after the letter, to set the rest of it in the letter's colour.
+    return { index, initial: { letter: split.letter, marks: split.marks, opensWord: /^\S/.test(split.rest) } };
   }
   return null;
+}
+
+/**
+ * The English initial a verse the hymn opens on takes (openingInitials.ts):
+ * its first capital, and whether its first word goes on after it. Decided from
+ * the whole verse, since a piece of it turned over the page carries only the
+ * lines measured after the initial.
+ */
+function findEnglishInitial(verse) {
+  const split = splitEnglishOpening(String(verse.english || ""));
+  return split ? { letter: split.letter, opensWord: Boolean(splitRestOfFirstWord(split.rest)) } : null;
 }
 
 function findSlideSectionId(slide = []) {

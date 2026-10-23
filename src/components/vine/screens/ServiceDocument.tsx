@@ -24,7 +24,7 @@ import {
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { BookSettingsSheet } from './SettingsScreen';
-import { documentOrnamentColor } from '../../../constants/documentOrnaments';
+import { documentInitialColors, documentOrnamentColor } from '../../../constants/documentOrnaments';
 import { getDocumentTheme } from '../../../constants/documentThemes';
 import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
 import { getDayThemeKey, type SeasonThemeKey } from '../../../constants/seasonAppearance';
@@ -1164,6 +1164,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             sermonPlannerMode={isSermonPlanner}
             sermonHighlights={sermonPlanner.plan.highlights}
             ornamentColor={documentOrnamentColor(documentTheme, ornamentSeason)}
+            initialColors={documentInitialColors(documentTheme, ornamentSeason)}
             topContentInset={controlsOverText ? floatingLayout.contentTop : 0}
             onHeadpieceInViewChange={setHeadpieceInView}
           />
