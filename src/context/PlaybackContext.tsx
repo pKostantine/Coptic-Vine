@@ -1,5 +1,5 @@
 import { useEvent, useEventListener } from 'expo';
-import { setAudioModeAsync, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayerStatus, type AudioMode } from 'expo-audio';
 import * as Network from 'expo-network';
 import type { VideoPlayer, VideoSource } from 'expo-video';
 import { AppState, Platform } from 'react-native';
@@ -206,6 +206,17 @@ function whenWebVideoReady(callback: () => void): void {
   element.addEventListener('canplay', callback, { once: true });
 }
 
+/**
+ * The audio session songs play in. It must not mix with other apps: iOS
+ * gives the lock screen, Control Center and CarPlay's Now Playing only to an
+ * app whose sound does not mix, so expo-audio's lock screen needs doNotMix.
+ */
+const PLAYBACK_AUDIO_MODE: Partial<AudioMode> = {
+  playsInSilentMode: true,
+  shouldPlayInBackground: true,
+  interruptionMode: 'doNotMix',
+};
+
 /** The video player's settings, made once (utils/livePlayback). */
 function setupVideoPlayer(instance: VideoPlayer): void {
   instance.loop = false;
@@ -396,7 +407,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     const video = videoPlayerRef.current;
     try {
       video.pause();
-      video.showNowPlayingNotification = false;
+      // Only while it is on. Each write makes expo-video set the shared audio
+      // session again, and with no lesson playing it lets the sound mix with
+      // other apps, so the song that follows never reaches Now Playing.
+      if (video.showNowPlayingNotification) video.showNowPlayingNotification = false;
       video.replace(null);
     } catch {
       // A player already torn down has nothing to stop.
@@ -685,11 +699,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   }, [currentIndex, originalQueue, queue, shuffleEnabled]);
 
   useEffect(() => {
-    void setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: true,
-      interruptionMode: 'doNotMix',
-    });
+    void setAudioModeAsync(PLAYBACK_AUDIO_MODE);
   }, []);
 
   useEffect(() => {
@@ -729,6 +739,11 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       // screen's track buttons (iOS, trackControls.ts) they replace expo-audio's
       // 10-second skips, as on the web below.
       const activate = () => {
+        // A lesson that stops, and the video player starting up, make
+        // expo-video set the audio session to mix with other apps, and iOS
+        // then shows nothing in Now Playing. The songs' own session comes
+        // back each time they take the lock screen, here and once more below.
+        if (Platform.OS === 'ios') void setAudioModeAsync(PLAYBACK_AUDIO_MODE);
         player.setActiveForLockScreen(true, metadata, {
           showSeekBackward: !hasTrackControls,
           showSeekForward: !hasTrackControls,
