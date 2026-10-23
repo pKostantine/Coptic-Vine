@@ -175,9 +175,13 @@ export async function getActiveFlagsForDate(context: ContentContext, date: strin
   const ascension = h50Start === null ? null : h50Start + 39;
   const pentecost = h50End;
   const lastFriLent = lentEnd;
-  const jonahFeast = jonahEnd;
-  const apostlesFeast = apostlesEnd;
-  const stmaryFeast = stmaryEnd;
+  // Jonah's, the Apostles' and St. Mary's season ranges end on the fast's last
+  // day; its feast is the next (Jonah's Passover, the Apostles' Feast, the
+  // Assumption), as calendar_event_instances has it. The Postgres function
+  // took the last day for the feast, so the fast lost its last day.
+  const jonahFeast = jonahEnd === null ? null : jonahEnd + 1;
+  const apostlesFeast = apostlesEnd === null ? null : apostlesEnd + 1;
+  const stmaryFeast = stmaryEnd === null ? null : stmaryEnd + 1;
 
   const nativityDate = nearestFeast(slice, 'TheHolyNativityFeast', gregYear, p);
   const theophanyDate = nearestFeast(slice, 'TheHolyEpiphany', gregYear, p);
@@ -187,8 +191,8 @@ export async function getActiveFlagsForDate(context: ContentContext, date: strin
   const paramounTheo = paramounToday('ParamounTheophany');
 
   const inNatfast = natfastStart !== null && p >= natfastStart && natfastEnd !== null && p < natfastEnd;
-  const inStmary = stmaryStart !== null && stmaryEnd !== null && p >= stmaryStart && p < stmaryEnd;
-  const inApostles = apostlesStart !== null && apostlesEnd !== null && p >= apostlesStart && p < apostlesEnd;
+  const inStmary = stmaryStart !== null && stmaryEnd !== null && p >= stmaryStart && p <= stmaryEnd;
+  const inApostles = apostlesStart !== null && apostlesEnd !== null && p >= apostlesStart && p <= apostlesEnd;
 
   const firstOnOrAfter = (month: number, dayOfMonth: number, from: number | null) => {
     if (from === null) return null;
@@ -332,7 +336,7 @@ export async function getActiveFlagsForDate(context: ContentContext, date: strin
   }
 
   // ══ G. JONAH
-  if (jonahStart !== null && jonahEnd !== null && p >= jonahStart && p < jonahEnd) emit(feast('JonahFast', "Jonah's Fast"), feast('JonahsFast', "Jonah's Fast"), feast('Fasts', 'Fasts'));
+  if (jonahStart !== null && jonahEnd !== null && p >= jonahStart && p <= jonahEnd) emit(feast('JonahFast', "Jonah's Fast"), feast('JonahsFast', "Jonah's Fast"), feast('Fasts', 'Fasts'));
   if (jonahFeast !== null && p === jonahFeast) emit(feast('JonahPassover', "Jonah's Passover"), feast('JonahsPassover', "Jonah's Passover"), feast('JonahTheProphet', 'Jonah the Prophet'), feast('Feasts', 'Feasts'));
 
   // ══ H. APOSTLES
@@ -375,7 +379,7 @@ export async function getActiveFlagsForDate(context: ContentContext, date: strin
   if ((c.weekday === 'Wednesday' || c.weekday === 'Friday' || inNatfast || inStmary || inApostles)
     && !paramounNat && !paramounTheo && !feastDay && !inH50Period && !inNativityPeriod && !inTheophanyPeriod && !inNayrouzPeriod
     && !inLentOrHolyWeek
-    && (jonahStart === null || p < jonahStart || (jonahEnd !== null && p >= jonahEnd))) {
+    && (jonahStart === null || p < jonahStart || (jonahEnd !== null && p > jonahEnd))) {
     emit(feast('NormalFastingDays', 'Normal Fasting Days'));
     if (!(inNatfast || inStmary || inApostles)) emit(feast('Fasts', 'Fasts'));
   }
