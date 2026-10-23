@@ -29,7 +29,9 @@ export default function TimeWheel({ time, onChange }: TimeWheelProps) {
     return date;
   }, [hour, minute]);
   return (
-    <Host colorScheme="dark" style={styles.host}>
+    // Out of the safe area's reach, as the text size slider is (FontScaleControl.tsx):
+    // its sheet is laid out below the screen before it slides up.
+    <Host colorScheme="dark" ignoreSafeArea="all" style={styles.host}>
       <DatePicker
         selection={selection}
         displayedComponents={['hourAndMinute']}
