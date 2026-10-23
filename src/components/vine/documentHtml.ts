@@ -1226,8 +1226,9 @@ export function buildDocumentHtml(
       (function () {
         if (!${JSON.stringify(nativeSwipeNavigation)}) return;
         var startX = null, startY = null, fired = false, lastPostAt = 0;
+        // A swipe to the left from anywhere in the right half opens the contents (utils/edgeSwipe.ts).
         function getSelectorEdge() {
-          return Math.min(240, Math.max(128, window.innerWidth * 0.18));
+          return window.innerWidth / 2;
         }
         function preventEvent(event) {
           if (event && event.cancelable && event.preventDefault) event.preventDefault();
@@ -1244,7 +1245,7 @@ export function buildDocumentHtml(
           if (startX === null || fired) return;
           var dx = x - startX, dy = y - startY;
           var absDx = Math.abs(dx), absDy = Math.abs(dy);
-          var selectorEdge = Math.min(240, Math.max(128, window.innerWidth * 0.18));
+          var selectorEdge = getSelectorEdge();
           var startedInLeftEdge = startX < 56;
           var startedInRightEdge = startX > window.innerWidth - selectorEdge;
           if (absDx > 12 && absDx > absDy * 1.2) preventEvent(event);

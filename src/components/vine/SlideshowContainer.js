@@ -1054,10 +1054,9 @@ export function NavigationSurface({
         onPanResponderRelease: (event, gestureState) => {
           if (isStylusGestureEvent(event)) return;
           const pageTurn = getPageTurnForSwipe(gestureState.dx);
-          const selectorEdgeWidth = Math.min(
-            240,
-            Math.max(96, surfaceBounds.width * 0.18),
-          );
+          // A swipe to the left from the right half opens the contents
+          // (utils/edgeSwipe.ts); from the left half it turns the page.
+          const selectorEdgeWidth = surfaceBounds.width / 2;
           const localStartX = gestureState.x0 - surfaceBounds.left;
           if (
             Boolean(onOpenSelector) &&

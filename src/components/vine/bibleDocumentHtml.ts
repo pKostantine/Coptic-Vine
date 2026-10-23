@@ -1002,7 +1002,8 @@ export function buildBibleChapterHtml({
             post({ type: 'previousLevel' });
             return;
           }
-          if (startX > window.innerWidth - Math.min(96, Math.max(56, window.innerWidth * 0.16)) && dx < 0) {
+          // From anywhere in the right half, as the documents' contents open (utils/edgeSwipe.ts).
+          if (startX > window.innerWidth / 2 && dx < 0) {
             post({ type: 'openSelector' });
             return;
           }
