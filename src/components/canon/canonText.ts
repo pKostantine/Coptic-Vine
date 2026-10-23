@@ -2,9 +2,11 @@ import { tr } from '@/utils/appText';
 import { getCurrentAppLanguage } from '@/utils/preferencesStorage';
 import { toEasternArabicDigits, WEEKDAYS_AR, WEEKDAYS_EN, WEEKDAYS_FR } from '@/utils/localeFormat';
 import {
+  ABSTINENCE_FASTS,
   AGPEYA_PSALM_COUNTS,
   canonAgpeyaPrayer,
   parseCanonTime,
+  type AbstinenceFast,
   type CanonFrequency,
   type CanonGoal,
   type CanonItem,
@@ -49,7 +51,48 @@ export function canonKindLabel(kind: CanonKind): string {
   if (kind === 'agpeya') return tr('Agpeya', 'Agpia', 'الأجبية');
   if (kind === 'bible') return tr('Bible', 'Bible', 'الكتاب المقدس');
   if (kind === 'metania') return tr('Metanias', 'Métanies', 'المطانيات');
+  if (kind === 'abstinence') return abstinenceTitle();
   return tr('Custom', 'Personnalisé', 'خاص');
+}
+
+function abstinenceTitle(): string {
+  return tr('Abstinence', 'Abstinence', 'الانقطاع');
+}
+
+/** A fast abstinence is kept in, by its name: "Wednesdays and Fridays", "Jonah’s Fast". */
+export function abstinenceFastName(fast: AbstinenceFast): string {
+  switch (fast) {
+    case 'wedFri': return tr('Wednesdays and Fridays', 'Mercredis et vendredis', 'الأربعاء والجمعة');
+    case 'nativity': return tr('Nativity Fast (Advent)', 'Jeûne de la Nativité (Avent)', 'صوم الميلاد');
+    case 'paramoun': return tr('Paramoun Days', 'Jours du Paramoun', 'أيام البرامون');
+    case 'jonah': return tr('Jonah’s Fast', 'Jeûne de Jonas', 'صوم يونان');
+    case 'lent': return tr('Lent', 'Grand Carême', 'الصوم الكبير');
+    case 'holyWeek': return tr('Holy Week', 'Semaine sainte', 'أسبوع الآلام');
+    case 'apostles': return tr('Apostles’ Fast', 'Jeûne des Apôtres', 'صوم الرسل');
+    default: return tr('St. Mary’s Fast', 'Jeûne de la Vierge', 'صوم السيدة العذراء');
+  }
+}
+
+/** The fasts chosen, in a few words: "All fasts", "Lent, Holy Week", "5 fasts". */
+export function abstinenceFastsLabel(fasts: readonly AbstinenceFast[]): string {
+  if (!fasts.length) return tr('No fasts chosen', 'Aucun jeûne choisi', 'لم تُختر أصوام');
+  if (fasts.length === ABSTINENCE_FASTS.length) return tr('All fasts', 'Tous les jeûnes', 'كل الأصوام');
+  if (fasts.length <= 2) return fasts.map(abstinenceFastName).join(arabic() ? '، ' : ', ');
+  return plural(fasts.length, ['fast', 'fasts'], ['jeûne', 'jeûnes'], { one: 'صوم واحد', two: 'صومان', few: 'أصوام', many: 'صومًا' });
+}
+
+/** Which days of the fasts abstinence is kept on, where they are chosen. */
+export function abstinenceDaysExplanation(): string {
+  return tr(
+    'Only on their weekdays, Monday to Friday — never on a Saturday, a Sunday or a feast.',
+    'Seulement en semaine, du lundi au vendredi — jamais le samedi, le dimanche ni un jour de fête.',
+    'في أيامها من الاثنين إلى الجمعة فقط — لا في السبت ولا في الأحد ولا في عيد.',
+  );
+}
+
+/** "Until 2:00 PM": when abstinence ends. */
+export function untilLabel(time: string): string {
+  return `${tr('Until', 'Jusqu’à', 'حتى')} ${canonTimeLabel(time)}`;
 }
 
 /** A prayer of the Agpeya's name: on a task ("The First Hour", "Midnight · Second Watch"), or short, in a list ("Prime", "Second Watch"). */
@@ -65,6 +108,7 @@ export function canonTaskTitle(task: Pick<CanonTask, 'kind' | 'hourId' | 'title'
   if (task.kind === 'agpeya' && task.hourId) return agpeyaHourName(task.hourId);
   if (task.kind === 'bible') return tr('Bible reading', 'Lecture de la Bible', 'قراءة الكتاب المقدس');
   if (task.kind === 'metania') return tr('Metanias', 'Métanies', 'المطانيات');
+  if (task.kind === 'abstinence') return abstinenceTitle();
   return task.title ?? '';
 }
 
@@ -73,6 +117,7 @@ export function canonItemTitle(item: CanonItem): string {
   if (item.kind === 'custom') return item.title;
   if (item.kind === 'bible') return tr('Bible reading', 'Lecture de la Bible', 'قراءة الكتاب المقدس');
   if (item.kind === 'metania') return tr('Metanias', 'Métanies', 'المطانيات');
+  if (item.kind === 'abstinence') return abstinenceTitle();
   return tr('Agpeya', 'Agpia', 'الأجبية');
 }
 
@@ -156,6 +201,7 @@ export function canonFrequencyLabel(frequency: CanonFrequency | { kind: 'byDay' 
   if (frequency.kind === 'applicable') return tr('All applicable days', 'Tous les jours prévus', 'كل الأيام المسموح بها');
   if (frequency.kind === 'fastingDays') return tr('Fasting days', 'Jours de jeûne', 'أيام الصوم');
   if (frequency.kind === 'byDay') return tr('Varies by day', 'Selon le jour', 'حسب اليوم');
+  if (frequency.kind === 'fasts') return abstinenceFastsLabel(frequency.fasts);
   if (frequency.kind === 'perWeek') {
     const times = frequency.times;
     if (arabic()) {
@@ -221,8 +267,9 @@ export function dayProgressLabel(done: number, total: number): string {
   return `${done} of ${total} done`;
 }
 
-/** The line under a task's name: how much, how often this week, and when. */
+/** The line under a task's name: how much, how often this week, and when — for abstinence, until when, wherever the time is also shown. */
 export function canonTaskDetail(task: CanonTask, { withTime = true }: { withTime?: boolean } = {}): string {
+  if (task.kind === 'abstinence') return task.time ? untilLabel(task.time) : '';
   const parts = [
     canonGoalLabel(task.goal, task.hourId),
     task.weekly ? weeklyProgressLabel(task.weekly.done, task.weekly.target) : null,
@@ -234,6 +281,9 @@ export function canonTaskDetail(task: CanonTask, { withTime = true }: { withTime
 
 /** What a reminder says: the task, and how much it asks. */
 export function canonReminderText(task: CanonTask): { title: string; body: string } {
+  if (task.kind === 'abstinence') {
+    return { title: abstinenceTitle(), body: tr('Your abstinence ends now.', 'Votre abstinence prend fin.', 'انتهى وقت انقطاعك.') };
+  }
   const goal = canonGoalLabel(task.goal, task.hourId);
   const title = canonTaskTitle(task);
   const lead = tr('Your spiritual canon', 'Votre canon spirituel', 'قانونك الروحي');

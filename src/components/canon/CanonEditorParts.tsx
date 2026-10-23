@@ -92,6 +92,90 @@ export function ChoiceList<T extends string>({ options, selected, onSelect, arab
   );
 }
 
+/**
+ * A drop-down list of checkboxes: closed, its label and what is chosen in a
+ * few words; open, every choice with its box, and one to choose them all or
+ * none. Choices are kept in the list's own order.
+ */
+export function CheckboxDropdown<T extends string>({ label, summary, options, selected, onChange, arabic }: {
+  label: string;
+  /** What is chosen, shown under the label: "All fasts", "Lent, Holy Week". */
+  summary: string;
+  options: { key: T; label: string }[];
+  selected: readonly T[];
+  onChange: (selected: T[]) => void;
+  arabic: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const all = options.every((option) => selected.includes(option.key));
+  const toggle = (key: T) => onChange(options.map((option) => option.key).filter((other) => (other === key ? !selected.includes(other) : selected.includes(other))));
+  return (
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${summary}`}
+        accessibilityState={{ expanded: open }}
+        aria-expanded={open}
+        onPress={() => setOpen(!open)}
+        style={({ pressed }) => [styles.dropdownHead, open && styles.dropdownHeadOpen, pressed && styles.pressed]}
+      >
+        <View style={styles.flex}>
+          <Text style={[styles.inlineLabel, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{label}</Text>
+          <Text style={[styles.dropdownSummary, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>{summary}</Text>
+        </View>
+        <Icon name="chevron-down" size={18} color={COLORS.gold} style={open ? styles.chevronOpen : undefined} />
+      </Pressable>
+      {open ? (
+        <View style={styles.dropdownList}>
+          <CheckboxRow
+            label={all ? tr('Clear all', 'Tout décocher', 'ألغِ الكل') : tr('Select all', 'Tout cocher', 'اختر الكل')}
+            checked={all}
+            mixed={!all && selected.length > 0}
+            quiet
+            arabic={arabic}
+            onPress={() => onChange(all ? [] : options.map((option) => option.key))}
+          />
+          {options.map((option) => (
+            <CheckboxRow key={option.key} label={option.label} checked={selected.includes(option.key)} arabic={arabic} onPress={() => toggle(option.key)} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function CheckboxRow({ label, checked, mixed = false, quiet = false, arabic, onPress }: {
+  label: string;
+  checked: boolean;
+  /** Some chosen, not all: the "all" row's dash. */
+  mixed?: boolean;
+  /** The "all" row, in gold small capitals over the choices. */
+  quiet?: boolean;
+  arabic: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: mixed ? 'mixed' : checked }}
+      aria-checked={mixed ? 'mixed' : checked}
+      onPress={onPress}
+      style={({ pressed }) => [styles.checkRow, pressed && styles.pressed]}
+    >
+      <View style={[styles.checkBox, (checked || mixed) && styles.checkBoxOn]}>
+        {checked ? <Icon name="checkmark" size={14} color={COLORS.greenDeep} /> : mixed ? <Icon name="remove" size={14} color={COLORS.greenDeep} /> : null}
+      </View>
+      <Text
+        style={[quiet ? styles.checkAll : styles.choiceLabel, !quiet && checked && styles.choiceLabelOn, arabic && (quiet ? styles.arabicTight : styles.arabic)]}
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+      >
+        {quiet && !arabic ? label.toUpperCase() : label}
+      </Text>
+    </Pressable>
+  );
+}
+
 /** A number with round − and + either side of it. */
 export function Stepper({ value, min, max, step, label, format, onChange }: {
   value: number;
@@ -232,9 +316,10 @@ export function InlineSwitch({ icon, label, detail, on, disabled = false, onPres
 
 /**
  * When a task is kept, and whether to be reminded then: a time of day (or
- * none, "any time"), chosen in a sheet; with a time, the reminder's switch.
+ * none, "any time", unless one is `required`), chosen in a sheet; with a
+ * time, the reminder's switch.
  */
-export function TimeAndReminder({ time, remind, suggestedTime, arabic, remindersNote, onChange }: {
+export function TimeAndReminder({ time, remind, suggestedTime, arabic, remindersNote, label, remindLabel, required = false, onChange }: {
   time: string | null;
   remind: boolean;
   /** The time the sheet opens on when there is none yet: an hour's own, or the morning. */
@@ -242,17 +327,24 @@ export function TimeAndReminder({ time, remind, suggestedTime, arabic, reminders
   arabic: boolean;
   /** Under the switch: why reminders may not come (turned off on this device, not allowed, the web). */
   remindersNote?: string | null;
+  /** What the time is: "Time of day", or abstinence's "Until". */
+  label?: string;
+  /** The switch's own words: "Remind me", or "Remind me when it ends". */
+  remindLabel?: string;
+  /** A time it must have: there is no clearing it. */
+  required?: boolean;
   onChange: (next: { time: string | null; remind: boolean }) => void;
 }) {
   const [picking, setPicking] = useState(false);
+  const timeLabel = label ?? tr('Time of day', 'Heure', 'الوقت');
   return (
     <View style={styles.timeBlock}>
       <View style={styles.inlineRow}>
         <Icon name="time-outline" size={19} color={time ? COLORS.gold : COLORS.muted} />
-        <Text style={[styles.inlineLabel, styles.flex, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Time of day', 'Heure', 'الوقت')}</Text>
+        <Text style={[styles.inlineLabel, styles.flex, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{timeLabel}</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${tr('Time of day', 'Heure', 'الوقت')}: ${time ? canonTimeLabel(time) : tr('Any time', 'N’importe quand', 'أي وقت')}`}
+          accessibilityLabel={`${timeLabel}: ${time ? canonTimeLabel(time) : tr('Any time', 'N’importe quand', 'أي وقت')}`}
           onPress={() => setPicking(true)}
           style={({ pressed }) => [styles.timePill, time && styles.timePillSet, pressed && styles.pressed]}
         >
@@ -260,7 +352,7 @@ export function TimeAndReminder({ time, remind, suggestedTime, arabic, reminders
             {time ? canonTimeLabel(time) : tr('Any time', 'N’importe quand', 'أي وقت')}
           </Text>
         </Pressable>
-        {time ? (
+        {time && !required ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr('Clear the time', 'Effacer l’heure', 'امسح الوقت')}
@@ -274,7 +366,7 @@ export function TimeAndReminder({ time, remind, suggestedTime, arabic, reminders
       </View>
       <InlineSwitch
         icon="notifications-outline"
-        label={tr('Remind me', 'Me le rappeler', 'ذكّرني')}
+        label={remindLabel ?? tr('Remind me', 'Me le rappeler', 'ذكّرني')}
         detail={time
           ? remind
             ? remindersNote ?? `${tr('A notification at', 'Une notification à', 'إشعار في')} ${canonTimeLabel(time)}`
@@ -293,6 +385,7 @@ export function TimeAndReminder({ time, remind, suggestedTime, arabic, reminders
       <TimeSheet
         visible={picking}
         initial={time ?? suggestedTime}
+        title={timeLabel}
         arabic={arabic}
         onClose={() => setPicking(false)}
         onDone={(next) => {
@@ -310,9 +403,10 @@ export function TimeAndReminder({ time, remind, suggestedTime, arabic, reminders
  * own on the iPhone and iPad), then Set. The sheet is dragged closed by its
  * handle alone, so turning a wheel never closes it.
  */
-function TimeSheet({ visible, initial, arabic, onClose, onDone }: {
+function TimeSheet({ visible, initial, title, arabic, onClose, onDone }: {
   visible: boolean;
   initial: string;
+  title: string;
   arabic: boolean;
   onClose: () => void;
   onDone: (time: string) => void;
@@ -333,7 +427,7 @@ function TimeSheet({ visible, initial, arabic, onClose, onDone }: {
           <Pressable accessibilityRole="button" hitSlop={8} onPress={onClose} style={({ pressed }) => [styles.sheetSide, pressed && styles.pressed]}>
             <Text style={[styles.sheetCancel, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Cancel', 'Annuler', 'إلغاء')}</Text>
           </Pressable>
-          <Text style={[styles.sheetKicker, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Time of day', 'Heure', 'الوقت')}</Text>
+          <Text style={[styles.sheetKicker, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
           <View style={styles.sheetSide} />
         </View>
         {/* Mounted afresh on each opening, on the task's own time. */}
@@ -382,6 +476,16 @@ const styles = StyleSheet.create({
   radioDot: { backgroundColor: COLORS.gold, borderRadius: 5, height: 10, width: 10 },
   choiceLabel: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '600' },
   choiceLabelOn: { color: COLORS.white },
+
+  dropdownHead: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.3)', borderColor: COLORS.goldLine, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 10, minHeight: 56, paddingHorizontal: 14, paddingVertical: 10 },
+  dropdownHeadOpen: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  dropdownSummary: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '600', marginTop: 2 },
+  chevronOpen: { transform: [{ rotate: '180deg' }] },
+  dropdownList: { backgroundColor: 'rgba(0, 0, 0, 0.22)', borderBottomLeftRadius: 14, borderBottomRightRadius: 14, borderColor: COLORS.goldLine, borderTopWidth: 0, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 4 },
+  checkRow: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 44, paddingVertical: 6 },
+  checkBox: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 6, borderWidth: 1.5, height: 22, justifyContent: 'center', width: 22 },
+  checkBoxOn: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
+  checkAll: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.2 },
 
   stepper: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: 14, flexDirection: 'row', gap: 10, justifyContent: 'space-between', padding: 6 },
   stepButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 18, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },

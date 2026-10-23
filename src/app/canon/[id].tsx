@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
+  CheckboxDropdown,
   ChoiceList,
   ChoiceSegment,
   EditorCard,
@@ -15,7 +16,18 @@ import {
   TimeAndReminder,
   WeekdayChips,
 } from '@/components/canon/CanonEditorParts';
-import { agpeyaHourName, calendarDaysExplanation, canonFrequencyLabel, canonGoalLabel, canonItemTitle, psalmsLabel, weekdayName } from '@/components/canon/canonText';
+import {
+  abstinenceDaysExplanation,
+  abstinenceFastName,
+  abstinenceFastsLabel,
+  agpeyaHourName,
+  calendarDaysExplanation,
+  canonFrequencyLabel,
+  canonGoalLabel,
+  canonItemTitle,
+  psalmsLabel,
+  weekdayName,
+} from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow, SectionHeading } from '@/components/vine/screens/BookPage';
 import BleedPage from '@/components/vine/ui/BleedPage';
@@ -28,6 +40,8 @@ import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
 import { tr } from '@/utils/appText';
 import { goBack } from '@/utils/navigation';
 import {
+  ABSTINENCE_DEFAULT_UNTIL,
+  ABSTINENCE_FASTS,
   AGPEYA_PSALM_COUNTS,
   agpeyaHourDefaultTime,
   CANON_AGPEYA_PRAYERS,
@@ -46,6 +60,7 @@ import {
   normalizeCanonItem,
   sortHourPlans,
   WEEKDAYS,
+  type AbstinenceCanonItem,
   type AgpeyaCanonItem,
   type CanonFrequency,
   type CanonGoal,
@@ -90,7 +105,8 @@ function confirmRemoval(title: string, onConfirm: () => void) {
  * One item of the spiritual canon, made or changed: for the Agpeya its hours
  * (the same each day, or by day of the week), each with its measure and
  * time; for the Bible and anything else, its measure; how often it is kept;
- * and when, with a reminder then. Nothing is kept until it is saved.
+ * and when, with a reminder then. Abstinence has the fasts it is kept in and
+ * the time it lasts until instead. Nothing is kept until it is saved.
  */
 export default function CanonItemScreen() {
   const router = useRouter();
@@ -99,7 +115,7 @@ export default function CanonItemScreen() {
   const arabic = preferences.appLanguage === 'ar';
   const canon = useSpiritualCanon();
   const isNew = params.id === 'new';
-  const kind: CanonKind = params.kind === 'bible' || params.kind === 'metania' || params.kind === 'custom' ? params.kind : 'agpeya';
+  const kind: CanonKind = params.kind === 'bible' || params.kind === 'metania' || params.kind === 'abstinence' || params.kind === 'custom' ? params.kind : 'agpeya';
   const existing = isNew ? null : canon.items.find((item) => item.id === params.id) ?? null;
   const [draft, setDraft] = useState<CanonItem | null>(() => (isNew ? newCanonItem(kind) : existing));
   const [problem, setProblem] = useState<string | null>(null);
@@ -128,7 +144,9 @@ export default function CanonItemScreen() {
         ? tr('Give it a name.', 'Donnez-lui un nom.', 'أعطه اسمًا.')
         : issue === 'hours'
           ? tr('Choose at least one hour of the Agpeya.', 'Choisissez au moins une heure de l’Agpia.', 'اختر ساعة واحدة على الأقل من الأجبية.')
-          : tr('Choose at least one day of the week.', 'Choisissez au moins un jour de la semaine.', 'اختر يومًا واحدًا على الأقل من الأسبوع.'));
+          : issue === 'fasts'
+            ? tr('Choose at least one fast.', 'Choisissez au moins un jeûne.', 'اختر صومًا واحدًا على الأقل.')
+            : tr('Choose at least one day of the week.', 'Choisissez au moins un jour de la semaine.', 'اختر يومًا واحدًا على الأقل من الأسبوع.'));
       return;
     }
     const clean = normalizeCanonItem(draft) ?? draft;
@@ -198,6 +216,8 @@ export default function CanonItemScreen() {
 
               {draft.kind === 'agpeya' ? (
                 <AgpeyaEditor item={draft} today={canon.today} arabic={arabic} remindersNote={remindersNote} onChange={update} />
+              ) : draft.kind === 'abstinence' ? (
+                <AbstinenceEditor item={draft} arabic={arabic} remindersNote={remindersNote} onChange={update} />
               ) : (
                 <>
                   <View style={draft.kind === 'bible' || draft.kind === 'metania' ? styles.firstSection : null}>
@@ -209,7 +229,7 @@ export default function CanonItemScreen() {
                 </>
               )}
 
-              {draft.kind !== 'agpeya' || draft.pattern === 'same' ? (
+              {draft.kind !== 'abstinence' && (draft.kind !== 'agpeya' || draft.pattern === 'same') ? (
                 <>
                   <SectionHeading size="page" title={tr('How often', 'À quelle fréquence', 'كم مرة')} arabic={arabic} />
                   <EditorCard>
@@ -218,7 +238,7 @@ export default function CanonItemScreen() {
                 </>
               ) : null}
 
-              {draft.kind !== 'agpeya' ? (
+              {draft.kind !== 'agpeya' && draft.kind !== 'abstinence' ? (
                 <>
                   <SectionHeading size="page" title={tr('When', 'Quand', 'متى')} arabic={arabic} />
                   <EditorCard>
@@ -390,6 +410,52 @@ function FrequencyEditor({ kind, frequency, today, arabic, onChange }: {
         </>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * Abstinence: the fasts it is kept in, chosen from a drop-down list of
+ * checkboxes (their weekdays alone), and the time it lasts until, with a
+ * reminder when it ends.
+ */
+function AbstinenceEditor({ item, arabic, remindersNote, onChange }: {
+  item: AbstinenceCanonItem;
+  arabic: boolean;
+  remindersNote: string | null;
+  onChange: (item: AbstinenceCanonItem) => void;
+}) {
+  return (
+    <>
+      <View style={styles.firstSection}>
+        <SectionHeading size="page" title={tr('Which fasts', 'Quels jeûnes', 'أي الأصوام')} arabic={arabic} />
+      </View>
+      <EditorCard>
+        <CheckboxDropdown
+          arabic={arabic}
+          label={tr('Fasts', 'Jeûnes', 'الأصوام')}
+          summary={abstinenceFastsLabel(item.frequency.fasts)}
+          options={ABSTINENCE_FASTS.map((fast) => ({ key: fast.id, label: abstinenceFastName(fast.id) }))}
+          selected={item.frequency.fasts}
+          onChange={(fasts) => onChange({ ...item, frequency: { kind: 'fasts', fasts } })}
+        />
+        <Text style={[styles.hint, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{abstinenceDaysExplanation()}</Text>
+      </EditorCard>
+
+      <SectionHeading size="page" title={tr('Until when', 'Jusqu’à quand', 'حتى متى')} arabic={arabic} />
+      <EditorCard>
+        <TimeAndReminder
+          time={item.time}
+          remind={item.remind}
+          suggestedTime={ABSTINENCE_DEFAULT_UNTIL}
+          label={tr('Abstain until', 'Abstinence jusqu’à', 'الانقطاع حتى')}
+          remindLabel={tr('Remind me when it ends', 'Me prévenir à la fin', 'ذكّرني عند انتهائه')}
+          required
+          arabic={arabic}
+          remindersNote={remindersNote}
+          onChange={({ time, remind }) => onChange({ ...item, time: time ?? item.time, remind })}
+        />
+      </EditorCard>
+    </>
   );
 }
 
