@@ -28,14 +28,18 @@ function isPullDown(gesture: PanResponderGestureState) {
 
 /**
  * Drags a sheet down to close it, the way an iOS sheet pulls down: by its grab
- * handle at any time, and by anywhere else on the sheet when the pull starts
- * with its content scrolled to the top. A pull that starts further down the
- * content just scrolls it back up.
+ * handle at any time, and by a pull down anywhere else on the sheet. With its
+ * content at the top the sheet follows the finger at once; with the content
+ * scrolled down, the pull scrolls it back up first and, once it reaches the
+ * top, carries on drawing the sheet down, all in one movement. While the
+ * sheet is drawn down its content stays still, so a finger going back up
+ * brings the sheet back rather than scrolling under it.
  *
- * Spread `grabHandlers` on the grab handle, `sheetHandlers` on the sheet, and
- * `onScroll` on its ScrollView. A sheet whose content scrolls itself (a web
- * view) takes the grab handle alone, since there is no telling where that
- * content has scrolled to.
+ * Spread `grabHandlers` on the grab handle, `sheetHandlers` on the sheet,
+ * `onScroll` on its ScrollView, and turn the ScrollView's scrolling off while
+ * `scrollLocked`. A sheet whose content scrolls itself (a web view) takes the
+ * grab handle alone, since there is no telling where that content has
+ * scrolled to.
  */
 export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onClose: () => void) {
   // The handlers outlive renders; they read the latest onClose from here.
@@ -49,51 +53,84 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
   useEffect(() => {
     if (visible) scrollTopRef.current = 0;
   }, [visible]);
-  // Decided when the finger lands and kept for the whole drag, so a pull that
-  // starts down the content never turns into closing the sheet partway through.
-  const startedAtTopRef = useRef(true);
-  // A control under the finger has its own drag (SheetDragHoldContext): the
-  // ref for the gesture callbacks, the state for the scroll view, which
-  // stops scrolling while it lasts.
+  // How far the finger had come when the sheet began to follow it: none for
+  // the grab handle or for content at its top as the finger lands, and null
+  // until a pull on scrolled content has brought it back to its top.
+  const followFromRef = useRef<number | null>(0);
+  // A control under the finger has its own drag (SheetDragHoldContext), or
+  // the sheet is drawn down: either way its content keeps still. The refs
+  // for the gesture callbacks, the state for the scroll view.
   const heldRef = useRef(false);
-  const [held, setHeld] = useState(false);
+  const pullingRef = useRef(false);
+  const [scrollLocked, setScrollLocked] = useState(false);
   const [hold] = useState<SheetDragHold>(() => ({
     hold: () => {
       heldRef.current = true;
-      setHeld(true);
+      setScrollLocked(true);
     },
     release: () => {
       heldRef.current = false;
-      setHeld(false);
+      setScrollLocked(pullingRef.current);
     },
   }));
 
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
   const [responders] = useState(() => {
+    // How far the sheet is drawn down: what the finger has come since the
+    // content reached its top, and nothing while a control holds the finger.
+    const distance = (gesture: PanResponderGestureState) => {
+      if (heldRef.current) return 0;
+      if (followFromRef.current === null && scrollTopRef.current <= 0) followFromRef.current = gesture.dy;
+      return followFromRef.current === null ? 0 : Math.max(0, gesture.dy - followFromRef.current);
+    };
+    const settle = () => {
+      pullingRef.current = false;
+      setScrollLocked(heldRef.current);
+    };
+    const springBack = () => Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
     const dragging: PanResponderCallbacks = {
       onPanResponderTerminationRequest: () => false,
-      // A hold that lands once a pull has begun (the slider saying its slide
-      // has started) keeps the sheet where it is from then on.
-      onPanResponderMove: (_, gesture) => drag.setValue(heldRef.current ? 0 : Math.max(0, gesture.dy)),
-      onPanResponderRelease: (_, gesture) => {
-        if (!heldRef.current && (gesture.dy > DRAG_TO_CLOSE || gesture.vy > 1.2)) onCloseRef.current();
-        else Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+      onPanResponderMove: (_, gesture) => {
+        const pulled = distance(gesture);
+        if (pulled > 0 && !pullingRef.current) {
+          pullingRef.current = true;
+          setScrollLocked(true);
+        }
+        drag.setValue(pulled);
       },
-      onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
+      onPanResponderRelease: (_, gesture) => {
+        const pulled = distance(gesture);
+        settle();
+        if (pulled > DRAG_TO_CLOSE || (pulled > 0 && gesture.vy > 1.2)) onCloseRef.current();
+        else springBack();
+      },
+      onPanResponderTerminate: () => {
+        settle();
+        springBack();
+      },
     };
     return {
-      grab: PanResponder.create({ ...dragging, onMoveShouldSetPanResponder: (_, gesture) => isPullDown(gesture) }),
+      grab: PanResponder.create({
+        ...dragging,
+        // Claimed as the finger lands, so the handle drags at once wherever the
+        // content has scrolled to, and the sheet's own pull never takes it.
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          followFromRef.current = 0;
+        },
+      }),
       sheet: PanResponder.create({
         ...dragging,
         onStartShouldSetPanResponderCapture: () => {
-          startedAtTopRef.current = scrollTopRef.current <= 0;
+          followFromRef.current = scrollTopRef.current <= 0 ? 0 : null;
           // A new finger: a hold left by one whose end went unseen can't keep the sheet from closing.
           // (React Native settles the responder before a control's own onTouchStart, which holds again.)
           if (heldRef.current) hold.release();
           return false;
         },
         // Taken ahead of the ScrollView, which would otherwise swallow the pull.
-        onMoveShouldSetPanResponderCapture: (_, gesture) => !heldRef.current && startedAtTopRef.current && isPullDown(gesture),
+        // On iOS the scroll view still scrolls the content up under it natively.
+        onMoveShouldSetPanResponderCapture: (_, gesture) => !heldRef.current && isPullDown(gesture),
       }),
     };
   });
@@ -102,5 +139,5 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
     scrollTopRef.current = event.nativeEvent.contentOffset.y;
   };
 
-  return { grabHandlers: responders.grab.panHandlers, sheetHandlers: responders.sheet.panHandlers, onScroll, hold, held };
+  return { grabHandlers: responders.grab.panHandlers, sheetHandlers: responders.sheet.panHandlers, onScroll, hold, scrollLocked };
 }

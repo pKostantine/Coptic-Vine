@@ -105,7 +105,7 @@ test('the app\'s slider holds the sheet from the finger landing until both it li
   assert.match(source('components/vine/ui/FontScaleSlider.ios.tsx'), /from '@expo\/ui\/swift-ui'[\s\S]+onEditingChanged=\{onSlidingChange\}/);
   const frame = source('components/vine/ui/SheetFrame.tsx');
   assert.match(frame, /<SheetDragHoldContext\.Provider value=\{sheetDrag\.hold\}>/);
-  assert.match(frame, /<ScrollView scrollEnabled=\{!sheetDrag\.held\}/);
+  assert.match(frame, /<ScrollView scrollEnabled=\{!sheetDrag\.scrollLocked\}/);
 });
 
 test('the app\'s slider sits where it belongs from the first frame, out of the safe area\'s reach', () => {

@@ -72,8 +72,8 @@ export default function SheetFrame({
     }
   }, [visible, mounted, progress, drag, reduced]);
 
-  // Pulled down from anywhere on the sheet while its content is scrolled to
-  // the top. Content that scrolls itself is dragged by the grab handle alone.
+  // Pulled down from anywhere on the sheet, its content scrolling back up to
+  // the top first. Content that scrolls itself is dragged by the grab handle alone.
   const sheetDrag = useSheetDragToClose(visible, drag, onClose);
 
   // Inline there is no modal to catch Android's back button, so the sheet does.
@@ -96,7 +96,7 @@ export default function SheetFrame({
   // sheet's own drag off, and its scrolling while the finger is on them.
   const held = <SheetDragHoldContext.Provider value={sheetDrag.hold}>{children}</SheetDragHoldContext.Provider>;
   const body = scroll ? (
-    <ScrollView scrollEnabled={!sheetDrag.held} bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
+    <ScrollView scrollEnabled={!sheetDrag.scrollLocked} bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
       {held}
     </ScrollView>
   ) : (

@@ -31,7 +31,7 @@ interface CalendarSheetProps {
  * up from the foot; the day block stays in view above it, so choosing a day
  * recolours the block behind the sheet. On a desktop it opens as a centred
  * dialog instead. Closes on the dimmed area, the back button, or (as a sheet)
- * a drag down on the handle.
+ * a pull down anywhere on it.
  */
 export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline = false }: CalendarSheetProps) {
   const modalOrientations = useModalOrientations();
@@ -65,7 +65,7 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
     }
   }, [visible, mounted, progress, drag, reduced]);
 
-  // Pulled down from anywhere on the sheet while the calendar is scrolled to its top.
+  // Pulled down from anywhere on the sheet, the calendar scrolling back up to its top first.
   const sheetDrag = useSheetDragToClose(visible, drag, onClose);
 
   // Inline there is no modal to catch Android's back button, so the sheet does.
@@ -86,7 +86,7 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
     : <Modal supportedOrientations={modalOrientations} visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>{children}</Modal>);
 
   const panel = (
-    <ScrollView bounces={false} showsVerticalScrollIndicator={false} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
+    <ScrollView scrollEnabled={!sheetDrag.scrollLocked} bounces={false} showsVerticalScrollIndicator={false} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
       <CalendarPanel
         onOpenSeasons={() => {
           onClose();
