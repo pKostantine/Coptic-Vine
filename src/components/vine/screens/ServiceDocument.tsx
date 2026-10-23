@@ -1019,7 +1019,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // DocumentModal.tsx's own closeSwipePanResponder already correctly scopes
   // itself to close only the topmost modal; this ensures the document
   // BEHIND it never competes for the same gesture while anything covers it.
-  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen || settingsOpen || interpretationsOpen;
+  // Settings and the calendar are drawn in this screen, over the page: while
+  // either is open, a swipe on it neither opens the contents nor leaves.
+  const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen || settingsOpen || calendarOpen || interpretationsOpen;
 
   // Where the swipe this screen took began: decided while it is being taken,
   // kept for its release (see swipeStartX).

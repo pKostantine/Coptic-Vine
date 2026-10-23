@@ -282,8 +282,9 @@ slides before one does not remount it.
 
 - Tap: left half previous, right half next, in the surface's own bounds.
 - Swipe: 36 px horizontally (`SLIDESHOW_SWIPE_ACTIVATION_DISTANCE`); a
-  swipe left that starts in the right 18 % of the surface opens the content
-  selector instead.
+  swipe left that starts in the right half of the surface opens the content
+  selector instead (`utils/edgeSwipe.ts`; on the phone the document's own
+  edge swipes decide it, by the same rule).
 - Keys: →, ↓, PageDown, Space, Enter next; ←, ↑, PageUp, Backspace
   previous; Home, End. A focused button keeps only Space and Enter
   (`isKeyKeptByFocusedControl`); typed-into fields and arrow-key widgets

@@ -313,11 +313,11 @@ test('a subdocument (and its Settings/Calendar) can be swiped out from a landsca
   assert.match(modal, /useInsetEdgeSwipe\(!isCovered, onClose, \(\) => setSelectorOpen\(true\), \(\) => touchOnPillBarRef\.current\)/);
 });
 
-test('a swipe goes back or opens the contents only from the very edge, measured from where it began', () => {
+test('a swipe goes back only from the very edge and opens the contents from the right half, measured from where it began', () => {
   // gestureState.x0 is 0 until a responder is granted, and granting resets
   // dx; reading either made every swipe look like it began at the left edge.
-  // And a swipe across a page -- one to the left starts on the right of the
-  // screen -- must turn it, not open the contents or close the document.
+  // A swipe to the right across a page must turn it back, never close the
+  // document; one to the left from the left half turns it on.
   const ts = require('typescript');
   const source = fs.readFileSync('src/utils/edgeSwipe.ts', 'utf8');
   assert.match(source, /return gestureState\.moveX - gestureState\.dx;/);
@@ -328,14 +328,13 @@ test('a swipe goes back or opens the contents only from the very edge, measured 
   assert.equal(EDGE_SWIPE_ZONE, 28);
   assert.equal(swipeEdge(10, 430), 'left');
   assert.equal(swipeEdge(420, 430), 'right');
-  // The contents open from a wider strip, wider on a tablet: 48pt on a phone, up to 88pt.
-  assert.equal(rightEdgeSwipeZone(430), 48);
-  assert.equal(rightEdgeSwipeZone(1024), 72);
-  assert.equal(rightEdgeSwipeZone(1366), 88);
-  assert.equal(swipeEdge(390, 430), 'right');
-  assert.equal(swipeEdge(960, 1024), 'right');
-  for (const start of [40, 56, 120, 215, 310, 380]) assert.equal(swipeEdge(start, 430), null, `a swipe from ${start} is on the page`);
-  assert.equal(swipeEdge(900, 1024), null);
+  // The contents open from anywhere in the right half of the screen.
+  assert.equal(rightEdgeSwipeZone(430), 215);
+  assert.equal(rightEdgeSwipeZone(844), 422);
+  for (const start of [216, 310, 380, 429]) assert.equal(swipeEdge(start, 430), 'right', `a swipe from ${start} opens the contents`);
+  assert.equal(swipeEdge(600, 1024), 'right');
+  for (const start of [40, 56, 120, 215]) assert.equal(swipeEdge(start, 430), null, `a swipe from ${start} is on the page`);
+  assert.equal(swipeEdge(500, 1024), null);
 
   for (const file of ['src/components/vine/screens/DocumentModal.tsx', 'src/components/vine/screens/ServiceDocument.tsx', 'src/app/bible/[bookKey]/[chapter].tsx']) {
     const screen = fs.readFileSync(file, 'utf8');

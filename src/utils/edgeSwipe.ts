@@ -8,13 +8,12 @@ import type { PanResponderGestureState } from 'react-native';
 export const EDGE_SWIPE_ZONE = 28;
 
 /**
- * How near the right edge a swipe must start to open the contents: wider,
- * and wider still on a larger screen, since a thumb or finger reaching for
- * the edge of a tablet rarely lands on its last few points. A left swipe
- * that turns a slide still starts well inside it.
+ * How far in from the right edge a swipe to the left may start to open the
+ * contents: anywhere in the right half of the screen. On a slide, a swipe to
+ * the left from the left half still turns the page.
  */
 export function rightEdgeSwipeZone(screenWidth: number): number {
-  return Math.round(Math.min(88, Math.max(48, screenWidth * 0.07)));
+  return Math.round(screenWidth / 2);
 }
 
 /**
