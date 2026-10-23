@@ -165,7 +165,7 @@ test('the engine plays an entry with a picture on the video player, for either r
   // Loading a video entry stops the audio player; loading an audio entry stops the video player.
   assert.match(context, /if \(entryHasVideo\(entry\)\) \{[\s\S]*stopAudioEngine\(\);[\s\S]*video\.showNowPlayingNotification = true;[\s\S]*video\.replace\(videoSourceFor\(entry, uri, rendition\)\);/);
   assert.match(context, /stopVideoEngine\(\);\n\s+setCurrentIndex\(boundedIndex\);\n\s+player\.replace\(\{/);
-  assert.match(context, /video\.showNowPlayingNotification = false;\n\s+video\.replace\(null\);/);
+  assert.match(context, /if \(video\.showNowPlayingNotification\) video\.showNowPlayingNotification = false;\n\s+video\.replace\(null\);/);
   // Only the audio player claims expo-audio's lock screen; the video player carries its own metadata.
   assert.match(context, /if \(activeEngine === 'audio'\) \{[\s\S]*player\.setActiveForLockScreen\(true, metadata, \{\n\s+showSeekBackward: !hasTrackControls,\n\s+showSeekForward: !hasTrackControls,/);
   assert.match(context, /\} else \{\n\s+\/\/ The video player carries its own metadata \(VideoSource\.metadata\)\.\n\s+player\.setActiveForLockScreen\(false\);/);
@@ -182,6 +182,20 @@ test('the engine plays an entry with a picture on the video player, for either r
   // The lesson's place is remembered and picked up again.
   assert.match(context, /resumePositionFor\(peekLearningResume\(\)\[entry\.playable\.id\], entry\.playable\.durationMs\)/);
   assert.match(context, /void saveLearningResume\(currentItem\.playable\.id, persistenceBucket \* 5000, resumeDurationMs\);/);
+});
+
+test('songs reach Now Playing: their audio session never mixes, and expo-video is not left to change it', () => {
+  const context = read('src/context/PlaybackContext.tsx');
+  // iOS gives Now Playing (lock screen, Control Center, CarPlay) only to an app whose sound does not mix.
+  assert.match(context, /const PLAYBACK_AUDIO_MODE: Partial<AudioMode> = \{\n\s+playsInSilentMode: true,\n\s+shouldPlayInBackground: true,\n\s+interruptionMode: 'doNotMix',\n\};/);
+  assert.match(context, /useEffect\(\(\) => \{\n\s+void setAudioModeAsync\(PLAYBACK_AUDIO_MODE\);\n\s+\}, \[\]\);/);
+  // Each write of showNowPlayingNotification makes expo-video set the session again, mixing while no lesson
+  // plays, so a song never writes it unless a lesson had it on.
+  assert.equal((context.match(/video\.showNowPlayingNotification = false;/g) || []).length, 1);
+  assert.match(context, /if \(video\.showNowPlayingNotification\) video\.showNowPlayingNotification = false;/);
+  // The session comes back whenever the audio player takes the lock screen, and with the second try 600 ms on.
+  assert.match(context, /const activate = \(\) => \{[\s\S]*?if \(Platform\.OS === 'ios'\) void setAudioModeAsync\(PLAYBACK_AUDIO_MODE\);\n\s+player\.setActiveForLockScreen\(true, metadata, \{/);
+  assert.match(context, /activate\(\);\n[\s\S]*?timer = setTimeout\(activate, 600\);/);
 });
 
 test('one surface for the whole app: over the lesson page, in a floating window, or a hidden anchor', () => {
