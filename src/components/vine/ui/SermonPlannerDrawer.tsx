@@ -226,7 +226,12 @@ export default function SermonPlannerDrawer({
   const insets = useSafeAreaInsets();
   const compact = Platform.OS !== 'web' || screenWidth < MOBILE_WEB_BREAKPOINT;
   const panelWidth = compact ? Math.min(screenWidth, Math.round(screenWidth * 0.9)) : Math.min(620, Math.round(screenWidth * 0.52));
-  const [slide] = useState(() => new Animated.Value(0));
+  // The drawer stays up until it has slid away, so every opening starts off
+  // the right edge (as ReaderPanel does: taken down the moment it was closed,
+  // its slide stopped short and the next opening began nearly open).
+  const [mounted, setMounted] = useState(visible);
+  if (visible && !mounted) setMounted(true);
+  const [slide] = useState(() => new Animated.Value(1));
   const scrollRef = useRef<ScrollView>(null);
   const noteRefs = useRef<Record<string, TextInput | null>>({});
   // A highlight made across several verses is one card.
@@ -236,13 +241,16 @@ export default function SermonPlannerDrawer({
 
   const reduced = useReducedMotion();
   useEffect(() => {
+    if (!mounted) return;
     Animated.timing(slide, {
       toValue: visible ? 0 : 1,
       duration: motionDuration(220, reduced),
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
-    }).start();
-  }, [reduced, slide, visible]);
+    }).start(({ finished }) => {
+      if (finished && !visible) setMounted(false);
+    });
+  }, [mounted, reduced, slide, visible]);
 
   useEffect(() => {
     if (!visible || !activeHighlightId) return;
@@ -263,7 +271,7 @@ export default function SermonPlannerDrawer({
     <Modal
       transparent
       animationType="none"
-      visible={visible}
+      visible={mounted}
       onRequestClose={onClose}
       supportedOrientations={modalOrientations}
       // Edge to edge on Android too, as on iOS: it pads itself clear of the bars and the notch.
@@ -273,9 +281,11 @@ export default function SermonPlannerDrawer({
       {/* The drawer runs up under the status bar, so on a light page the
           clock and battery over it turn dark to stay readable. */}
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
+      {/* Never narrower than the window: iOS can lay out a Modal's first frame
+          portrait-wide with the page on its side (see ReaderPanel). */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
+        style={[styles.overlay, { minWidth: screenWidth }]}
       >
         <Pressable accessibilityLabel="Close sermon notes" style={styles.backdrop} onPress={onClose} />
         <Animated.View

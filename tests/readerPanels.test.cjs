@@ -215,3 +215,21 @@ test('the two lists open on the shared sheet, and keep their search, Up next and
   assert.match(chapter, /highlights=\{bibleHighlights\.highlights\}/);
   assert.doesNotMatch(chapter, /<Modal\b/, 'the chapter screen keeps no panel of its own');
 });
+
+test('the sheet opens from off the right edge every time, whatever size its first frame is laid out at', () => {
+  const sheet = fs.readFileSync('src/components/vine/ui/ReaderPanel.tsx', 'utf8');
+  // It stays up until it has slid away, so the next opening starts from closed.
+  assert.match(sheet, /visible=\{mounted\}/);
+  assert.match(sheet, /if \(finished && !visible\) setMounted\(false\);/);
+  // Its row is never narrower than the window, so the panel is never drawn
+  // against the right edge of a first frame laid out portrait-wide.
+  assert.match(sheet, /<View style=\{\[styles\.overlay, \{ minWidth: width \}\]\}>/);
+});
+
+test('the sermon notes drawer opens from off the right edge every time, as the sheet does', () => {
+  const drawer = fs.readFileSync('src/components/vine/ui/SermonPlannerDrawer.tsx', 'utf8');
+  assert.match(drawer, /useState\(\(\) => new Animated\.Value\(1\)\)/);
+  assert.match(drawer, /visible=\{mounted\}/);
+  assert.match(drawer, /if \(finished && !visible\) setMounted\(false\);/);
+  assert.match(drawer, /style=\{\[styles\.overlay, \{ minWidth: screenWidth \}\]\}/);
+});

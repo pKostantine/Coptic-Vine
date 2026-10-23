@@ -73,16 +73,25 @@ export default function ReaderPanel({
   const styles = useMemo(() => createStyles(theme, layout.compact), [theme, layout.compact]);
   const colors = useMemo(() => readerPanelColors(theme), [theme]);
 
+  // The sheet stays up until it has slid away. Taken down the moment it was
+  // closed, it stopped its slide a frame or two in, so the next opening began
+  // where that slide stopped, nearly open, rather than off the right edge.
+  const [mounted, setMounted] = useState(visible);
+  if (visible && !mounted) setMounted(true);
+
   const [slide] = useState(() => new Animated.Value(1));
   const reduced = useReducedMotion();
   useEffect(() => {
+    if (!mounted) return;
     Animated.timing(slide, {
       toValue: visible ? 0 : 1,
       duration: motionDuration(220, reduced),
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
-    }).start();
-  }, [visible, slide, reduced]);
+    }).start(({ finished }) => {
+      if (finished && !visible) setMounted(false);
+    });
+  }, [visible, mounted, slide, reduced]);
 
   // Clear of the screen's edge on the right: a phone's notch or rounded corner, or none.
   const edge = layout.compact ? Math.max(insets.right, 24) : insets.right;
@@ -91,7 +100,7 @@ export default function ReaderPanel({
     <Modal
       transparent
       animationType="none"
-      visible={visible}
+      visible={mounted}
       onRequestClose={onClose}
       supportedOrientations={modalOrientations}
       // Edge to edge on Android too, as on iOS: it pads itself clear of the bars and the notch.
@@ -100,7 +109,12 @@ export default function ReaderPanel({
     >
       {/* The panel runs up under the status bar on a phone, so on a light page the clock and battery turn dark. */}
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
-      <View style={styles.overlay}>
+      {/* Never narrower than the window. iOS lays out a Modal's first frame at
+          the screen's size for the way the phone is held, so with the page on
+          its side and the phone lying flat, or upright under a rotation lock,
+          that frame was portrait-wide, and the panel, set against its right
+          edge, showed at the left of the screen until the next frame. */}
+      <View style={[styles.overlay, { minWidth: width }]}>
         <Animated.View
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim, opacity: slide.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
