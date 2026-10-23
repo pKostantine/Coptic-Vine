@@ -61,6 +61,8 @@ export default function VerseBlock({
   // The decorated initial this verse's Coptic opens its hymn with ({ letter,
   // marks }, see flattenSections in SlideshowContainer.js), or none.
   copticInitial = null,
+  // A standalone refrain before the hymn (ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ), set in lower case.
+  copticRefrain = false,
   // The hymn opens on this verse in English and Arabic too: the English
   // initial ({ letter, opensWord }), and whether the Arabic's first word is
   // stretched (openingInitials.ts).
@@ -130,7 +132,8 @@ export default function VerseBlock({
   // which measured the text that way already. A centred line takes it too,
   // a line tall (PlainVerseBody).
   const initial = copticInitial || null;
-  const copticText = formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd();
+  const formattedCoptic = formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd();
+  const copticText = copticRefrain ? formattedCoptic.toLowerCase() : formattedCoptic;
   // The initials' colours (documentInitialColors): the letter's is the opening words' too.
   const initialVineColor = theme.colors.initialVine || theme.colors.gold;
   const initialLetterColor = theme.colors.initialLetter || theme.colors.ornament || theme.colors.gold;

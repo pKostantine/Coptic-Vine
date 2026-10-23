@@ -170,6 +170,7 @@ export function getItemSignature(item, displayedTitle = "") {
       item.copticInitial?.letter,
       item.englishInitial?.letter,
       item.arabicOpening,
+      item.copticRefrain,
     ].join("\u241f")),
   ].join(":");
 }

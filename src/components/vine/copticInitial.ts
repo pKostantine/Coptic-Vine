@@ -16,11 +16,17 @@ export interface CopticInitialSplit {
   rest: string;
 }
 
-/** A Coptic paragraph's opening letter, when there's a decorated initial for it, and the text after it. */
-export function splitCopticInitial(text: string): CopticInitialSplit | null {
+/**
+ * A Coptic paragraph's opening letter, when there's a decorated initial for
+ * it, and the text after it. A paragraph opening on a small letter has none,
+ * unless `capitalise` (the paragraph a hymn opens on after its standalone
+ * refrain, kept in lower case in the books): then it takes its capital's.
+ */
+export function splitCopticInitial(text: string, capitalise = false): CopticInitialSplit | null {
   const match = COPTIC_INITIAL_PATTERN.exec(text);
-  if (!match || !COPTIC_INITIALS[match[1]]) return null;
-  return { letter: match[1], marks: match[2], rest: text.slice(match[0].length) };
+  const letter = match && capitalise ? match[1].toUpperCase() : match?.[1];
+  if (!match || !letter || !COPTIC_INITIALS[letter]) return null;
+  return { letter, marks: match[2], rest: text.slice(match[0].length) };
 }
 
 /**

@@ -1417,7 +1417,7 @@ function renderSection(
 
   // The hymn's capital -- the one letter of it hymnLibrary.js capitalizes --
   // is set as a decorated initial where it opens a Coptic paragraph.
-  const opening = { initialPending: Boolean(titleHtml.trim()) };
+  const opening = { initialPending: Boolean(titleHtml.trim()), afterRefrain: false };
   const versesHtml = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent, copticGospelRite })
     .map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts, opening))
     .join('');
@@ -1640,8 +1640,12 @@ function renderVerse(
     sermonPlannerMode: boolean;
     theme: DocumentTheme;
   },
-  /** Whether the hymn's opening initial is still to be set: by the first Coptic paragraph that opens on a capital. */
-  opening: { initialPending: boolean },
+  /**
+   * Whether the hymn's opening initial is still to be set (by the first Coptic
+   * paragraph that opens on a capital), and whether a standalone refrain has
+   * come before it.
+   */
+  opening: { initialPending: boolean; afterRefrain: boolean },
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent, suppressAllSpeakerLabels, theme);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
@@ -1676,6 +1680,11 @@ function renderVerse(
   const copticText = copticHiddenByToggle
     ? ''
     : formatCopticNumbers(verse.coptic || '', verse.preserveCopticDigits);
+  // A standalone refrain before the hymn -- its Coptic alone on its row, like
+  // ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ or ⲇⲟⲝⲁⲥⲓ ⲟ ⲑⲉⲟⲥ ⲏⲙⲱⲛ -- is set in lower case, plain,
+  // and the hymn opens on the paragraph after it.
+  const openingRefrain = opening.initialPending && isInvincibleCoptic && !hasTranslationText && Boolean(copticText.trim());
+  if (openingRefrain) opening.afterRefrain = true;
 
   const languages: { className: string; key: keyof VisibleColumns; text: string; speakerLabel?: string; speakerClass?: string }[] = [
     { className: 'english', key: 'english' as const, text: verse.english || '', speakerLabel: rubric?.english, speakerClass: rubric?.class },
@@ -1683,7 +1692,7 @@ function renderVerse(
     {
       className: 'coptic',
       key: 'coptic' as const,
-      text: copticText,
+      text: openingRefrain ? copticText.toLowerCase() : copticText,
       speakerLabel: rubric?.coptic,
       speakerClass: rubric?.class,
     },
@@ -1732,10 +1741,12 @@ function renderVerse(
   // Verses of the Cymbals) leaves to it. Never after a Bible verse number.
   // Decided whether or not the Coptic is shown, so the English and Arabic
   // open on that same row (openingInitials.ts).
-  const opensHymn = opening.initialPending && !verse.bibleVerseNumber && Boolean(splitCopticInitial(copticText));
+  // Kept in lower case in the books, the paragraph after a refrain takes its capital's initial.
+  const opensHymn = !openingRefrain && opening.initialPending && !verse.bibleVerseNumber && Boolean(splitCopticInitial(copticText, opening.afterRefrain));
+  const capitalise = opening.afterRefrain;
   if (opensHymn) opening.initialPending = false;
   const copticCell = languages.find((language) => language.key === 'coptic');
-  const initial = opensHymn && copticCell ? splitCopticInitial(copticCell.text) : null;
+  const initial = opensHymn && copticCell ? splitCopticInitial(copticCell.text, capitalise) : null;
   const englishOpening = opensHymn && !isCentered ? splitEnglishOpening(verse.english || '') : null;
   const arabicOpening = opensHymn && !isCentered ? splitArabicOpening(formatArabicDigits(verse.arabic || '')) : null;
   // The English line's height, as the page sets it, for the initial beside it.

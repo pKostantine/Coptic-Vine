@@ -94,12 +94,31 @@ test('the hymn\'s capital takes the initial: the first Coptic paragraph under a 
   assert.ok(body(html).includes('<span class="coptic-initial-text">Ⲙ</span>'));
 });
 
-test('no Coptic column, no initial; an Invincible Coptic line still takes it', () => {
+test('no Coptic column, no initial; an Invincible Coptic line alone on its row is a refrain and takes none either', () => {
   const english = { english: true, french: false, coptic: false, arabic: true };
   assert.deepEqual(initials(build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], { ...OPTIONS, visibleColumns: english })), []);
   const invincible = build([hymn([verse('Ⲁⲅⲓⲟⲥ', { english: '', arabic: '', invincibleCoptic: true })])], { ...OPTIONS, visibleColumns: english });
-  // Alone on its row it is centred: a line tall from the start, with nothing to measure.
-  assert.deepEqual(initials(invincible), ['<span class="coptic-initial one-line">']);
+  assert.deepEqual(initials(invincible), []);
+  assert.ok(body(invincible).includes('>ⲁⲅⲓⲟⲥ<'));
+});
+
+test('a standalone refrain before the hymn is set in lower case without an initial; the paragraph after it opens the hymn', () => {
+  // The Sanctus: a rubric, ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ alone on its row, then the hymn, kept in lower case in the books.
+  const sanctus = build([hymn([
+    verse('', { english: 'The priest takes the veil', type: 'comment' }),
+    verse('Ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ.', { english: '', arabic: '', prayerType: 'Invincible Coptic' }),
+    verse('ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ', { english: 'Holy, holy, holy', arabic: 'قدوسٌ' }),
+  ])], OPTIONS);
+  assert.deepEqual(initials(sanctus), ['<span class="coptic-initial" data-fit>']);
+  assert.ok(body(sanctus).includes('>ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ.<'));
+  assert.ok(body(sanctus).includes('<span class="coptic-initial-text">Ⲭ</span></span><span class="opening-word">ⲟⲩⲁⲃ</span> ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ'));
+  // Its English and Arabic open on that paragraph too.
+  assert.ok(body(sanctus).includes('<span class="english-initial-text">H</span></span><span class="opening-word english-small-caps">oly,</span> holy, holy'));
+  // A seasonal Hoos's ⲇⲟⲝⲁⲥⲓ ⲟ ⲑⲉⲟⲥ ⲏⲙⲱⲛ, already in lower case.
+  const hoos = build([hymn([verse('ⲇⲟⲝⲁⲥⲓ ⲟ ⲑⲉⲟⲥ ⲏⲙⲱⲛ.', { english: '', arabic: '', invincibleCoptic: true }), verse('Ⲁⲣⲓⲯⲁⲗⲓⲛ')])], OPTIONS);
+  assert.ok(body(hoos).includes('<span class="coptic-initial-text">Ⲁ</span>'));
+  // Without a refrain before it, a paragraph in lower case still leaves the initial to the capital after it.
+  assert.ok(body(build([hymn([verse('ⲕⲩⲣⲓⲉ ⲉⲗⲉⲏⲥⲟⲛ'), verse('Ⲧⲉⲛⲟⲩⲱϣⲧ')])], OPTIONS)).includes('<span class="coptic-initial-text">Ⲧ</span>'));
 });
 
 test('the initial is exactly two lines tall, or one, and follows the text size', () => {

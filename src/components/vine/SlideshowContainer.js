@@ -12,6 +12,7 @@ import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
 import { splitCopticInitial } from "./copticInitial";
 import { splitEnglishOpening, splitRestOfFirstWord } from "./openingInitials";
 import {
+  copticStandsAlone,
   createSlideAnchor,
   estimateItemHeight,
   findSlideIndexForAnchor,
@@ -1461,6 +1462,7 @@ const SlideItem = memo(function SlideItem({
         selectableText={false}
         bishopPresent={item.bishopPresent}
         copticInitial={item.copticInitial}
+        copticRefrain={Boolean(item.copticRefrain)}
         englishInitial={item.englishInitial}
         arabicOpening={Boolean(item.arabicOpening)}
         lineRanges={item.slideshowLineRanges}
@@ -1626,6 +1628,7 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visi
         isRecitedPrayer: isCopticGatedVerse(verse),
         isReading: Boolean(section.isReading),
         copticInitial: opening?.index === verseIndex ? opening.initial : null,
+        copticRefrain: Boolean(openingRow?.refrains.includes(verseIndex)),
         englishInitial: opensOtherColumns(verse, verseIndex) ? findEnglishInitial(verse) : null,
         arabicOpening: opensOtherColumns(verse, verseIndex) && Boolean(String(verse.arabic || "").trim()),
         forceWhiteVerses: Boolean(section.forceWhiteVerses),
@@ -1658,21 +1661,28 @@ function isCopticGatedVerse(verse) {
  * it (documentHtml.ts): the hymn's capital, on the first of its verses whose
  * Coptic, as shown, opens on a capital there is an initial for -- never after
  * a Bible verse number. Which verse that is depends on the languages shown.
- * One centred on a line of its own (Agios opening St Basil's Anaphora) takes
- * it a line tall, as the scrolling reader does.
+ * A standalone refrain before it -- its Coptic alone on its row, like ⲁⲅⲓⲟⲥ
+ * ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ or ⲇⲟⲝⲁⲥⲓ ⲟ ⲑⲉⲟⲥ ⲏⲙⲱⲛ -- takes none and is set in lower case
+ * (`refrains`); the paragraph after it, kept in lower case in the books,
+ * takes its capital's.
  */
 function findOpeningInitial(section, visibleLanguages = {}) {
   if (!(section.title?.english || section.title?.french || section.title?.arabic)) return null;
   const verses = section.verses || [];
+  const refrains = [];
   for (let index = 0; index < verses.length; index += 1) {
     const verse = verses[index];
+    if (copticStandsAlone(verse) && String(verse.coptic || "").trim()) {
+      refrains.push(index);
+      continue;
+    }
     const showsCoptic = getVisibleVerseLanguages({ verse, isRecitedPrayer: isCopticGatedVerse(verse) }, visibleLanguages).includes("coptic");
-    const split = showsCoptic && !verse.bibleVerseNumber ? splitCopticInitial(String(verse.coptic || "")) : null;
+    const split = showsCoptic && !verse.bibleVerseNumber ? splitCopticInitial(String(verse.coptic || ""), refrains.length > 0) : null;
     if (!split) continue;
     // Whether its first word goes on after the letter, to set the rest of it in the letter's colour.
-    return { index, initial: { letter: split.letter, marks: split.marks, opensWord: /^\S/.test(split.rest) } };
+    return { index, initial: { letter: split.letter, marks: split.marks, opensWord: /^\S/.test(split.rest) }, refrains };
   }
-  return null;
+  return refrains.length ? { index: -1, initial: null, refrains } : null;
 }
 
 /**
