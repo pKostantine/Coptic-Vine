@@ -43,6 +43,7 @@ const DISABLED_SELECTION_STYLE = IS_WEB
 const WORD_INTRINSIC_STYLE = { width: "auto", flexBasis: "auto", flexShrink: 0, alignSelf: "flex-start" };
 const INITIAL_ROW_STYLE = { alignItems: "flex-start", flexDirection: "row" };
 const BESIDE_INITIAL_STYLE = { flex: 1, minWidth: 0 };
+const INITIAL_PROBES_STYLE = { left: 0, position: "absolute", top: 0 };
 
 function getLineWordOffsets(lines) {
   let offset = 0;
@@ -513,8 +514,16 @@ export default function JustifiedText({
     // Its layouts still under way: nothing is reported until the lines are
     // known. Then it is drawn as it will be, in the measuring layer too,
     // since no single layout of the text is as tall as the paragraph set
-    // around its initial.
-    return <View style={{ width }}>{nativeInitial.probes}</View>;
+    // around its initial. Until then its layouts stand out of the row's
+    // flow: stacked in it, they made the row report a height a line or more
+    // too tall, and that report could be the last pagination heard. Out of
+    // it, an early report is short, and pagination makes that good from the
+    // lines (getPaginationItemHeight).
+    return (
+      <View style={{ width }}>
+        <View style={INITIAL_PROBES_STYLE}>{nativeInitial.probes}</View>
+      </View>
+    );
   }
   if (!forceLines && !IS_WEB && !nativeInitial && (native.isMeasuring || measureOnly)) {
     // The invisible measuring Text stays in flow so its parent reports the

@@ -14,6 +14,7 @@ import {
   getPageTurnForSwipe,
   getPageTurnForTap,
   getPageTurnForViewportTap,
+  getPaginationItemHeight,
   getSlideContentBudget,
   getSlidePadding,
   getSlideRenderLayers,
@@ -1183,4 +1184,44 @@ test("turned back into a title's first verse, the pages are the same ones, title
   // A forward break at the first verse itself begins at the title.
   const atVerse = paginateItems([title, first, second], heights, languageHeights, budget, fontSize, ALL_LANGUAGES, 1024, { itemId: "psalm-0", offsets: {} });
   assert.deepEqual(ids(atVerse), ids(forward));
+});
+
+test("a title's first verse never runs past the foot: with no line's room beneath the title, it starts the next slide", () => {
+  const title = { id: "psalm-title", sectionId: "psalm", type: "title", title: { english: "Psalm 85" } };
+  const first = verseItem({ id: "psalm-0", sectionId: "psalm" });
+  const metric = { english: { lines: metricLines("English", 8) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 8) }, arabic: { lines: metricLines("عربي", 8) } };
+  const fontSize = 18;
+  const lineHeight = getSlideshowLanguageLineHeight("arabic", first, fontSize);
+  const budget = lineHeight * 10 + 40;
+  // The title leaves less than a line's room beneath it.
+  const heights = { "psalm-title": budget - 20, "psalm-0": lineHeight * 8 + 16 };
+  const slides = paginateItems([title, first], heights, { "psalm-0": metric }, budget, fontSize, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides[0].map((entry) => entry.id), ["psalm-title"]);
+  assert.equal(slides[1][0].sourceItemId, "psalm-0");
+  assert.deepEqual(slides[1][0].slideshowLineRanges.english, { start: 0, end: 8 });
+});
+
+test("a measured verse is paginated by no less than its lines, whatever its row last reported", () => {
+  const fontSize = 18;
+  const item = verseItem({ id: "v" });
+  const metric = { english: { lines: metricLines("English", 5) }, coptic: { lines: metricLines("ⲕⲟⲡⲧ", 7) }, arabic: { lines: metricLines("عربي", 3) } };
+  const linesTall = getSlideshowLanguageLineHeight("coptic", item, fontSize) * 7 + 16;
+  // A row that reported the English column alone (the Coptic still being laid out around its initial).
+  assert.equal(getPaginationItemHeight(item, 120, metric, fontSize, ALL_LANGUAGES), linesTall);
+  // Whatever else a row reported beyond its lines still counts.
+  assert.equal(getPaginationItemHeight(item, linesTall + 30, metric, fontSize, ALL_LANGUAGES), linesTall + 30);
+  // Its lines not all in, or not a verse, or not reported at all: the row's report as it is.
+  assert.equal(getPaginationItemHeight(item, 120, { english: metric.english }, fontSize, ALL_LANGUAGES), 120);
+  assert.equal(getPaginationItemHeight({ id: "t", type: "title" }, 40, undefined, fontSize, ALL_LANGUAGES), 40);
+  assert.equal(getPaginationItemHeight(item, undefined, metric, fontSize, ALL_LANGUAGES), undefined);
+  // Beneath its title, the verse that only seemed to fit is set as much of it as fits, the rest over the page.
+  const title = { id: "t", sectionId: "section", type: "title", title: { english: "Doxology" } };
+  const budget = 40 + 2 + 140;
+  const heights = { t: 40, v: getPaginationItemHeight(item, 120, metric, fontSize, ALL_LANGUAGES) };
+  const slides = paginateItems([title, item], heights, { v: metric }, budget, fontSize, ALL_LANGUAGES, 1024);
+  assert.deepEqual(slides[0].map((entry) => entry.slideId || entry.id), ["t", "v-segment-0"]);
+  assert.ok(slides[0][1].slideshowLineCounts.coptic < 7);
+  // The slideshow paginates by it.
+  const container = fs.readFileSync(new URL("../src/components/vine/SlideshowContainer.js", import.meta.url), "utf8");
+  assert.match(container, /getPaginationItemHeight\(item, measuredHeights\[item\.id\], measuredLanguageHeights\[item\.id\], fontSize, visibleLanguages\) \?\?\s+estimateItemHeight\(/);
 });
