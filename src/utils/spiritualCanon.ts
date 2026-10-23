@@ -7,12 +7,14 @@ import { AGPEYA_HOURS } from './agpeyaHours';
  * keeps the document on the device and the account, and schedules the
  * reminders from it.
  *
- * - An item is the Agpeya (some of its hours), the Bible, metanias, or
- *   anything else the believer names (a custom item).
+ * - An item is the Agpeya (some of its hours), the Bible, metanias,
+ *   abstinence, or anything else the believer names (a custom item).
  * - Each is kept every day, on chosen days of the week, or a number of times
  *   a week. The Agpeya can instead keep different hours on each day, and
  *   metanias can be kept on all applicable days (METANIA_CONDITION) or on
  *   fasting days only (METANIA_FASTING_CONDITION), from the real calendar.
+ *   Abstinence is kept on the weekdays of the fasts chosen (ABSTINENCE_FASTS),
+ *   from the calendar too, until a time of day.
  * - Each can ask for a measure: a number of psalms (the Agpeya), of chapters
  *   or verses (the Bible), of minutes, or of the believer's own unit ("50
  *   metanias").
@@ -22,7 +24,7 @@ import { AGPEYA_HOURS } from './agpeyaHours';
  * hour. Ticking one off is a mark on that day.
  */
 
-export type CanonKind = 'agpeya' | 'bible' | 'metania' | 'custom';
+export type CanonKind = 'agpeya' | 'bible' | 'metania' | 'abstinence' | 'custom';
 /** 0 is Sunday, as `Date.getUTCDay` counts. The week starts on Sunday. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export const WEEKDAYS: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
@@ -44,7 +46,9 @@ export type CanonFrequency =
   /** Metanias only: every day they are made, as the calendar says (METANIA_CONDITION). */
   | { kind: 'applicable' }
   /** Metanias only: those days that are fasting days (METANIA_FASTING_CONDITION). */
-  | { kind: 'fastingDays' };
+  | { kind: 'fastingDays' }
+  /** Abstinence only: the weekdays of these fasts (ABSTINENCE_FASTS), as the calendar has them. */
+  | { kind: 'fasts'; fasts: AbstinenceFast[] };
 export type CanonFrequencyKind = CanonFrequency['kind'];
 
 /**
@@ -57,6 +61,43 @@ export type CanonFrequencyKind = CanonFrequency['kind'];
 export const METANIA_CONDITION = '!((Feasts && !HolyWeek) || Weekends)';
 /** The same days, the fasting days among them only: Holy Week's are, though the calendar doesn't mark them Fasts. */
 export const METANIA_FASTING_CONDITION = '!((Feasts && !HolyWeek) || Weekends) && (Fasts || HolyWeek)';
+
+/** A fast abstinence can be kept in: the Church's fasts, and Wednesdays and Fridays. */
+export type AbstinenceFast = 'wedFri' | 'nativity' | 'paramoun' | 'jonah' | 'lent' | 'holyWeek' | 'apostles' | 'stMary';
+
+/**
+ * The days abstinence is kept on at all: Monday to Friday (Weekdays), never
+ * on a feast — Holy Week aside, as for metanias (METANIA_CONDITION).
+ */
+export const ABSTINENCE_DAY_CONDITION = 'Weekdays && !(Feasts && !HolyWeek)';
+
+/**
+ * The fasts abstinence can be kept in, in the order of the list to choose
+ * from, each by the flags calendar.get_context_flags gives a day. Wednesdays
+ * and Fridays are those that are fasting days: the ordinary ones
+ * (NormalFastingDays, not in the Holy Fifty Days or the festive periods) and
+ * those of the fasts the calendar takes that flag from (getContextFlags drops
+ * it through Lent and Pascha). Lent stops at its last Friday; Holy Week is
+ * its own.
+ */
+export const ABSTINENCE_FASTS: readonly { id: AbstinenceFast; condition: string }[] = [
+  { id: 'wedFri', condition: '(Wednesday || Friday) && (NormalFastingDays || Lent || HolyWeek || JonahsFast || ParamounNativity || ParamounTheophany)' },
+  { id: 'nativity', condition: 'NativityFast' },
+  { id: 'paramoun', condition: 'ParamounNativity || ParamounTheophany' },
+  { id: 'jonah', condition: 'JonahsFast' },
+  { id: 'lent', condition: 'Lent && !HolyWeek' },
+  { id: 'holyWeek', condition: 'HolyWeek' },
+  { id: 'apostles', condition: 'ApostlesFast' },
+  { id: 'stMary', condition: 'StMarysFast || StMaryFast' },
+];
+const ABSTINENCE_FAST_IDS: readonly AbstinenceFast[] = ABSTINENCE_FASTS.map((fast) => fast.id);
+
+export function isAbstinenceFast(value: unknown): value is AbstinenceFast {
+  return ABSTINENCE_FAST_IDS.includes(value as AbstinenceFast);
+}
+
+/** Abstinence's time, until the believer sets their own. */
+export const ABSTINENCE_DEFAULT_UNTIL = '14:00';
 
 /** One hour of the Agpeya in an Agpeya item: how much of it, and when. */
 export interface CanonHourPlan {
@@ -99,6 +140,18 @@ export interface MetaniaCanonItem extends CanonItemBase {
   remind: boolean;
 }
 
+/** Not eating until a time of day, on the weekdays of the fasts chosen (its frequency). */
+export interface AbstinenceCanonItem extends CanonItemBase {
+  kind: 'abstinence';
+  frequency: { kind: 'fasts'; fasts: AbstinenceFast[] };
+  /** No measure: abstinence asks for a time. */
+  goal: CanonGoal;
+  /** Until when, "HH:MM": always set. */
+  time: string;
+  /** A notification when it ends. */
+  remind: boolean;
+}
+
 export interface CustomCanonItem extends CanonItemBase {
   kind: 'custom';
   title: string;
@@ -108,7 +161,7 @@ export interface CustomCanonItem extends CanonItemBase {
   remind: boolean;
 }
 
-export type CanonItem = AgpeyaCanonItem | BibleCanonItem | MetaniaCanonItem | CustomCanonItem;
+export type CanonItem = AgpeyaCanonItem | BibleCanonItem | MetaniaCanonItem | AbstinenceCanonItem | CustomCanonItem;
 
 /**
  * A task ticked off (or unticked, which is kept so the account's older tick
@@ -256,14 +309,16 @@ export const GOAL_KINDS: Record<CanonKind, readonly CanonGoalKind[]> = {
   agpeya: ['none', 'psalms', 'minutes'],
   bible: ['none', 'chapters', 'verses', 'minutes'],
   metania: ['none', 'metanias', 'minutes'],
+  abstinence: ['none'],
   custom: ['none', 'minutes', 'times'],
 };
 
-/** How often each kind may be kept: metanias also on every day they are made. */
+/** How often each kind may be kept: metanias also on every day they are made, abstinence in the fasts alone. */
 export const FREQUENCY_KINDS: Record<CanonKind, readonly CanonFrequencyKind[]> = {
   agpeya: ['daily', 'weekdays', 'perWeek'],
   bible: ['daily', 'weekdays', 'perWeek'],
   metania: ['applicable', 'fastingDays', 'daily', 'weekdays', 'perWeek'],
+  abstinence: ['fasts'],
   custom: ['daily', 'weekdays', 'perWeek'],
 };
 
@@ -356,12 +411,17 @@ export function newCanonItem(kind: CanonKind, now = new Date()): CanonItem {
   if (kind === 'metania') {
     return { ...base, kind, frequency: { kind: 'applicable' }, goal: { kind: 'metanias', count: GOAL_LIMITS.metanias.initial }, time: null, remind: false };
   }
+  if (kind === 'abstinence') {
+    // Every fast to start with; the believer leaves out the ones they don't keep.
+    return { ...base, kind, frequency: { kind: 'fasts', fasts: [...ABSTINENCE_FAST_IDS] }, goal: { kind: 'none' }, time: ABSTINENCE_DEFAULT_UNTIL, remind: false };
+  }
   return { ...base, kind, title: '', note: '', goal: { kind: 'none' }, time: null, remind: false };
 }
 
 /** Why an item can't be kept as it stands, or null when it can. */
-export function canonItemProblem(item: CanonItem): 'title' | 'hours' | 'days' | null {
+export function canonItemProblem(item: CanonItem): 'title' | 'hours' | 'days' | 'fasts' | null {
   if (item.kind === 'custom' && !item.title.trim()) return 'title';
+  if (item.kind === 'abstinence' && !item.frequency.fasts.length) return 'fasts';
   if (item.kind === 'agpeya') {
     if (item.pattern === 'same' && !item.hours.length) return 'hours';
     if (item.pattern === 'byDay' && !item.days.some((plans) => plans.length)) return 'hours';
@@ -411,7 +471,18 @@ export function normalizeCanonGoal(value: unknown, kind: CanonKind, hourId?: str
   return { kind: goalKind, count } as CanonGoal;
 }
 
+/** The fasts chosen, each once, in the list's order. */
+function normalizeAbstinenceFasts(value: unknown): AbstinenceFast[] {
+  const chosen = Array.isArray(value) ? value : [];
+  return ABSTINENCE_FAST_IDS.filter((fast) => chosen.includes(fast));
+}
+
 export function normalizeCanonFrequency(value: unknown, kind: CanonKind = 'custom'): CanonFrequency {
+  // Abstinence is kept in the fasts, and nothing else.
+  if (kind === 'abstinence') {
+    const fasts = value && typeof value === 'object' && (value as { kind?: unknown }).kind === 'fasts' ? (value as { fasts?: unknown }).fasts : ABSTINENCE_FAST_IDS;
+    return { kind: 'fasts', fasts: normalizeAbstinenceFasts(fasts) };
+  }
   if (!value || typeof value !== 'object') return { kind: kind === 'metania' ? 'applicable' : 'daily' };
   const frequency = value as { kind?: unknown; days?: unknown; times?: unknown };
   if (frequency.kind === 'applicable' || frequency.kind === 'fastingDays') return kind === 'metania' ? { kind: frequency.kind } : { kind: 'daily' };
@@ -457,7 +528,7 @@ export function normalizeCanonItem(value: unknown): CanonItem | null {
   if (!value || typeof value !== 'object') return null;
   const item = value as Partial<CanonItem> & Record<string, unknown>;
   if (typeof item.id !== 'string' || !item.id || item.id.length > 120) return null;
-  if (item.kind !== 'agpeya' && item.kind !== 'bible' && item.kind !== 'metania' && item.kind !== 'custom') return null;
+  if (item.kind !== 'agpeya' && item.kind !== 'bible' && item.kind !== 'metania' && item.kind !== 'abstinence' && item.kind !== 'custom') return null;
   const now = new Date().toISOString();
   const base = {
     id: item.id,
@@ -474,6 +545,11 @@ export function normalizeCanonItem(value: unknown): CanonItem | null {
       hours: normalizeHourPlans(item.hours),
       days: WEEKDAYS.map((day) => normalizeHourPlans(days[day])),
     };
+  }
+  if (item.kind === 'abstinence') {
+    const until = isCanonTime(item.time) ? item.time : ABSTINENCE_DEFAULT_UNTIL;
+    const frequency = base.frequency as AbstinenceCanonItem['frequency'];
+    return { ...base, kind: 'abstinence', frequency, goal: { kind: 'none' }, time: until, remind: Boolean(item.remind) };
   }
   const time = isCanonTime(item.time) ? item.time : null;
   const remind = Boolean(item.remind) && time != null;
@@ -649,11 +725,13 @@ export const AGPEYA_NONE_CONDITION = 'HolyWeek';
 export const AGPEYA_MORNING_ONLY_CONDITION = 'PalmSunday';
 export type CanonAgpeyaDay = 'all' | 'beforeEve' | 'none';
 
-/** A day as the calendar has it for the canon: metanias' two conditions against its flags, and the Agpeya through Pascha. */
+/** A day as the calendar has it for the canon: metanias' two conditions against its flags, the Agpeya through Pascha, and the fasts it keeps abstinence in. */
 export interface CanonCalendarDay {
   applicable: boolean;
   fasting: boolean;
   agpeya: CanonAgpeyaDay;
+  /** The fasts this day is a day of abstinence in (ABSTINENCE_FASTS); none on a weekend or a feast. */
+  fasts: AbstinenceFast[];
 }
 
 /** What the canon knows of the Church's calendar: each day, or null while its flags have still to be read. */
@@ -663,10 +741,10 @@ export interface CanonCalendar {
 
 /** Whether an item is kept on days the calendar decides, and so needs it read. */
 export function keptByCalendar(frequency: CanonFrequency): boolean {
-  return frequency.kind === 'applicable' || frequency.kind === 'fastingDays';
+  return frequency.kind === 'applicable' || frequency.kind === 'fastingDays' || frequency.kind === 'fasts';
 }
 
-/** Whether a canon needs the calendar read: metanias kept by it, and any Agpeya (Pascha leaves it out). */
+/** Whether a canon needs the calendar read: metanias and abstinence kept by it, and any Agpeya (Pascha leaves it out). */
 export function canonNeedsCalendar(items: readonly CanonItem[]): boolean {
   return items.some((item) => item.kind === 'agpeya' || keptByCalendar(item.frequency));
 }
@@ -693,6 +771,11 @@ function keptOn(frequency: CanonFrequency, day: string, calendar?: CanonCalendar
   if (frequency.kind === 'applicable') return calendar?.calendarDay(day)?.applicable ?? provisionalMetaniaDay(day);
   // A fasting day is the calendar's to say: none is assumed before it is read.
   if (frequency.kind === 'fastingDays') return calendar?.calendarDay(day)?.fasting ?? false;
+  // So are the fasts: no day is one of abstinence before then.
+  if (frequency.kind === 'fasts') {
+    const fasts = calendar?.calendarDay(day)?.fasts ?? [];
+    return frequency.fasts.some((fast) => fasts.includes(fast));
+  }
   return true;
 }
 

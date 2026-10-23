@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { InlineSwitch } from '@/components/canon/CanonEditorParts';
-import { agpeyaHourName, canonFrequencyLabel, canonGoalLabel, canonItemTitle, canonTimeLabel } from '@/components/canon/canonText';
+import { agpeyaHourName, canonFrequencyLabel, canonGoalLabel, canonItemTitle, canonTimeLabel, untilLabel } from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow, SectionHeading } from '@/components/vine/screens/BookPage';
 import BleedPage from '@/components/vine/ui/BleedPage';
@@ -25,6 +25,7 @@ const CANON_KIND_ICONS: Record<CanonKind, IconName> = {
   agpeya: 'sunrise',
   bible: 'book-outline',
   metania: 'arrow-down-circle-outline',
+  abstinence: 'time-outline',
   custom: 'checkmark-done',
 };
 
@@ -39,6 +40,7 @@ function itemSummary(item: CanonItem): string {
     const names = item.hours.map((plan) => agpeyaHourName(plan.hourId, 'traditional')).join(', ');
     return [names, canonFrequencyLabel(item.frequency)].filter(Boolean).join(' · ');
   }
+  if (item.kind === 'abstinence') return [canonFrequencyLabel(item.frequency), untilLabel(item.time)].join(' · ');
   return [canonGoalLabel(item.goal), canonFrequencyLabel(item.frequency), item.time ? canonTimeLabel(item.time) : null]
     .filter((part): part is string => Boolean(part))
     .join(' · ');
@@ -46,7 +48,7 @@ function itemSummary(item: CanonItem): string {
 
 /**
  * Editing the spiritual canon: what it holds, each opening its own editor;
- * the three kinds of thing to add; and whether this device sends the
+ * the kinds of thing to add; and whether this device sends the
  * reminders.
  */
 export default function CanonEditScreen() {
@@ -83,6 +85,15 @@ export default function CanonEditScreen() {
         'A number of metanias, or a time',
         'Un nombre de métanies, ou un temps',
         'عدد من المطانيات، أو وقت',
+      ),
+    },
+    {
+      kind: 'abstinence',
+      title: tr('Abstinence', 'Abstinence', 'الانقطاع'),
+      detail: tr(
+        'No food until a time you choose, on the weekdays of the fasts you keep',
+        'Rien à manger jusqu’à l’heure choisie, en semaine, dans les jeûnes que vous gardez',
+        'الانقطاع عن الطعام حتى وقت تختاره، في أيام الأسبوع من الأصوام التي تحفظها',
       ),
     },
     {

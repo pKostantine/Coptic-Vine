@@ -556,3 +556,149 @@ test('a task skipped is off that day’s list, out of its count and its reminder
   const merged = canon.mergeCanonDayMarks({ a: { done: false, at: '2026-10-19T08:00:00Z' } }, { a: { done: false, skipped: true, at: '2026-10-19T09:00:00Z' } });
   assert.equal(merged.a.skipped, true);
 });
+
+function abstinence(extra = {}) {
+  return { ...canon.newCanonItem('abstinence', new Date(STAMP)), id: 'abstinence-1', ...extra };
+}
+
+test('abstinence is kept in the fasts chosen, until a time, with no measure', () => {
+  const item = abstinence();
+  assert.deepEqual(item.frequency, { kind: 'fasts', fasts: ['wedFri', 'nativity', 'paramoun', 'jonah', 'lent', 'holyWeek', 'apostles', 'stMary'] });
+  assert.equal(item.time, '14:00');
+  assert.deepEqual(item.goal, { kind: 'none' });
+  assert.equal(item.remind, false);
+  assert.deepEqual([...canon.FREQUENCY_KINDS.abstinence], ['fasts']);
+  assert.deepEqual([...canon.GOAL_KINDS.abstinence], ['none']);
+  assert.equal(canon.canonItemProblem(item), null);
+  assert.equal(canon.canonItemProblem({ ...item, frequency: { kind: 'fasts', fasts: [] } }), 'fasts');
+  assert.equal(canon.canonNeedsCalendar([item]), true);
+
+  // Read back: fasts known, once each, in the list's order; always a time; never a measure.
+  const clean = canon.normalizeCanonItem({ ...item, frequency: { kind: 'fasts', fasts: ['lent', 'christmas', 'wedFri', 'lent'] }, time: 'noon', goal: { kind: 'minutes', count: 30 }, remind: true });
+  assert.deepEqual(clean.frequency, { kind: 'fasts', fasts: ['wedFri', 'lent'] });
+  assert.equal(clean.time, '14:00');
+  assert.deepEqual(clean.goal, { kind: 'none' });
+  assert.equal(clean.remind, true);
+  assert.deepEqual(canon.normalizeCanonItem({ ...item, frequency: { kind: 'daily' } }).frequency.fasts.length, 8);
+  // The fasts are abstinence's alone.
+  assert.deepEqual(canon.normalizeCanonFrequency({ kind: 'fasts', fasts: ['lent'] }, 'metania'), { kind: 'daily' });
+  assert.deepEqual(canon.normalizeCanonFrequency({ kind: 'fasts', fasts: ['lent'] }, 'custom'), { kind: 'daily' });
+});
+
+test('abstinence is asked on a day in one of its fasts, as the calendar has the day, and reminds when it ends', () => {
+  const item = abstinence({ frequency: { kind: 'fasts', fasts: ['lent', 'holyWeek'] }, time: '15:00', remind: true });
+  const days = {
+    '2027-03-10': { applicable: true, fasting: true, agpeya: 'all', fasts: ['wedFri', 'lent'] }, // a Wednesday of Lent
+    '2027-03-11': { applicable: true, fasting: true, agpeya: 'all', fasts: ['lent'] },
+    '2027-03-13': { applicable: false, fasting: false, agpeya: 'all', fasts: [] }, // its Saturday
+    '2027-06-30': { applicable: true, fasting: true, agpeya: 'all', fasts: ['wedFri', 'apostles'] },
+  };
+  const calendar = { calendarDay: (day) => days[day] ?? null };
+  const tasks = (day) => canon.canonTasksForDay(doc([item]), day, calendar);
+  assert.equal(tasks('2027-03-10').length, 1);
+  assert.equal(tasks('2027-03-11')[0].key, 'abstinence-1');
+  assert.equal(tasks('2027-03-11')[0].time, '15:00');
+  assert.equal(tasks('2027-03-13').length, 0);
+  assert.equal(tasks('2027-06-30').length, 0, 'not a fast it keeps');
+  assert.equal(tasks('2027-03-12').length, 0, 'no day is one of abstinence before the calendar has read it');
+
+  const reminders = canon.upcomingCanonReminders(doc([item]), new Date(2027, 2, 10, 9, 0), { calendar, horizonDays: 7 });
+  assert.deepEqual(reminders.map((reminder) => reminder.day), ['2027-03-10', '2027-03-11']);
+  assert.equal(reminders[0].at.getHours(), 15);
+});
+
+test('the days of abstinence are a fast’s weekdays, never a weekend or a feast, by the calendar’s own flags', async () => {
+  assert.equal(canon.ABSTINENCE_DAY_CONDITION, 'Weekdays && !(Feasts && !HolyWeek)');
+  const engine = load('src/utils/conditionEngine.js', {
+    './dateUtils': { toIsoDate: (value) => String(value).slice(0, 10) },
+    '../services/contentDataClient': { contentDataClient: {} },
+  });
+  const flagsByDay = {
+    ordinaryWednesday: { Weekdays: true, Wednesday: true, Wednesdays: true, NormalFastingDays: true, Fasts: true },
+    ordinaryTuesday: { Weekdays: true, Tuesday: true, Annual: true },
+    holyFiftyFriday: { Weekdays: true, Friday: true, PentecostPeriod: true, Feasts: true },
+    lentFriday: { Weekdays: true, Friday: true, Lent: true, GreatLent: true, GreatFast: true, Fasts: true, LentWeekdays: true },
+    lentSaturday: { Weekends: true, Saturday: true, Lent: true, Fasts: true, LentWeekends: true },
+    annunciationInLent: { Weekdays: true, Thursday: true, Lent: true, Fasts: true, Feasts: true },
+    holyTuesday: { Weekdays: true, Tuesday: true, Pascha: true, HolyWeek: true, Feasts: true },
+    goodFriday: { Weekdays: true, Friday: true, Pascha: true, HolyWeek: true, GoodFriday: true },
+    brightSaturday: { Weekends: true, Saturday: true, Pascha: true, HolyWeek: true, BrightSaturday: true },
+    nativityMonday: { Weekdays: true, Monday: true, NativityFast: true, NormalFastingDays: true, Fasts: true },
+    nativityParamoun: { Weekdays: true, Tuesday: true, NativityFast: true, Fasts: true, ParamounNativity: true, NativityParamoun: true },
+    theophanyParamounFriday: { Weekdays: true, Friday: true, ParamounTheophany: true, TheophanyParamoun: true },
+    jonahWednesday: { Weekdays: true, Wednesday: true, JonahFast: true, JonahsFast: true, Fasts: true },
+    apostlesThursday: { Weekdays: true, Thursday: true, ApostlesFast: true, Apostles: true, NormalFastingDays: true, Fasts: true },
+    stMaryMonday: { Weekdays: true, Monday: true, StMarysFast: true, StMaryFast: true, NormalFastingDays: true, Fasts: true },
+    transfiguration: { Weekdays: true, Wednesday: true, StMarysFast: true, StMaryFast: true, Fasts: true, Feasts: true },
+  };
+  const calendar = load('src/services/canonCalendar.ts', {
+    '@/utils/conditionEngine': { evaluateCondition: engine.evaluateCondition, getContextFlags: async (day) => flagsByDay[day] },
+    '@/utils/spiritualCanon': canon,
+  });
+  const fasts = async (day) => (await calendar.readCanonCalendarDay(day)).fasts;
+  assert.deepEqual(await fasts('ordinaryWednesday'), ['wedFri']);
+  assert.deepEqual(await fasts('ordinaryTuesday'), []);
+  assert.deepEqual(await fasts('holyFiftyFriday'), [], 'the Holy Fifty Days are not a fast');
+  assert.deepEqual(await fasts('lentFriday'), ['wedFri', 'lent']);
+  assert.deepEqual(await fasts('lentSaturday'), [], 'never on a weekend');
+  assert.deepEqual(await fasts('annunciationInLent'), [], 'nor on a feast');
+  assert.deepEqual(await fasts('holyTuesday'), ['holyWeek'], 'Holy Week is not a feast here, nor Lent');
+  assert.deepEqual(await fasts('goodFriday'), ['wedFri', 'holyWeek']);
+  assert.deepEqual(await fasts('brightSaturday'), []);
+  assert.deepEqual(await fasts('nativityMonday'), ['nativity']);
+  assert.deepEqual(await fasts('nativityParamoun'), ['nativity', 'paramoun']);
+  assert.deepEqual(await fasts('theophanyParamounFriday'), ['wedFri', 'paramoun']);
+  assert.deepEqual(await fasts('jonahWednesday'), ['wedFri', 'jonah']);
+  assert.deepEqual(await fasts('apostlesThursday'), ['apostles']);
+  assert.deepEqual(await fasts('stMaryMonday'), ['stMary']);
+  assert.deepEqual(await fasts('transfiguration'), []);
+
+  // The device keeps each day's fasts; days read before them are read again.
+  const service = read('src/services/spiritualCanonService.ts');
+  assert.match(service, /const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v6';/);
+  assert.match(service, /&& Array\.isArray\(entry\?\.fasts\)/);
+  assert.match(service, /fasts: \(entry\.fasts as unknown\[\]\)\.filter\(isAbstinenceFast\),/);
+});
+
+test('abstinence speaks each App Language: its fasts, and until when', () => {
+  let language = 'en';
+  const appText = { tr: (english, french, arabic) => (language === 'ar' ? arabic : language === 'fr' ? french : english) };
+  const text = load('src/components/canon/canonText.ts', {
+    '@/utils/appText': appText,
+    '@/utils/preferencesStorage': { getCurrentAppLanguage: () => language },
+    '@/utils/localeFormat': localeStub,
+    '@/utils/spiritualCanon': canon,
+  });
+  const task = canon.canonTasksForDay(doc([abstinence()]), '2027-03-11', { calendarDay: () => ({ applicable: true, fasting: true, agpeya: 'all', fasts: ['lent'] }) })[0];
+  assert.equal(text.canonKindLabel('abstinence'), 'Abstinence');
+  assert.equal(text.canonTaskTitle(task), 'Abstinence');
+  assert.equal(text.canonTaskDetail(task), 'Until 2:00 PM');
+  assert.equal(text.canonTaskDetail(task, { withTime: false }), 'Until 2:00 PM');
+  assert.deepEqual(text.canonReminderText(task), { title: 'Abstinence', body: 'Your abstinence ends now.' });
+  assert.equal(text.canonFrequencyLabel(abstinence().frequency), 'All fasts');
+  assert.equal(text.canonFrequencyLabel({ kind: 'fasts', fasts: ['lent', 'holyWeek'] }), 'Lent, Holy Week');
+  assert.equal(text.canonFrequencyLabel({ kind: 'fasts', fasts: ['wedFri', 'lent', 'holyWeek'] }), '3 fasts');
+  assert.equal(text.abstinenceFastsLabel([]), 'No fasts chosen');
+  assert.equal(text.abstinenceFastName('nativity'), 'Nativity Fast (Advent)');
+  language = 'fr';
+  assert.equal(text.untilLabel('14:00'), 'Jusqu’à 14 h');
+  assert.equal(text.canonFrequencyLabel({ kind: 'fasts', fasts: ['wedFri', 'lent', 'holyWeek'] }), '3 jeûnes');
+  language = 'ar';
+  assert.equal(text.canonTaskTitle(task), 'الانقطاع');
+  assert.equal(text.untilLabel('14:00'), 'حتى ٢:٠٠ م');
+  assert.equal(text.abstinenceFastsLabel(['wedFri', 'lent', 'holyWeek']), '٣ أصوام');
+});
+
+test('abstinence is added from the canon’s list, its fasts chosen from a drop-down of checkboxes, its time required', () => {
+  const list = read('src/app/canon/edit.tsx');
+  assert.match(list, /kind: 'abstinence',\n\s+title: tr\('Abstinence'/);
+  assert.match(list, /abstinence: 'time-outline',/);
+  const editor = read('src/app/canon/[id].tsx');
+  assert.match(editor, /params\.kind === 'abstinence'/);
+  assert.match(editor, /<CheckboxDropdown[\s\S]+?options=\{ABSTINENCE_FASTS\.map\(\(fast\) => \(\{ key: fast\.id, label: abstinenceFastName\(fast\.id\) \}\)\)\}/);
+  assert.match(editor, /<TimeAndReminder[\s\S]+?label=\{tr\('Abstain until'[\s\S]+?required\n/);
+  const parts = read('src/components/canon/CanonEditorParts.tsx');
+  assert.match(parts, /export function CheckboxDropdown/);
+  assert.match(parts, /accessibilityState=\{\{ expanded: open \}\}/);
+  assert.match(parts, /\{time && !required \? \(/, 'a required time has no clearing it');
+});

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import {
   emptyCanonDocument,
   type CanonCalendarDay,
+  isAbstinenceFast,
   normalizeCanonDayMarks,
   normalizeCanonDocument,
   normalizeCanonItem,
@@ -27,8 +28,8 @@ function storageKey(identity: string) {
 /** The device's preference for canon reminders here (not the account's: each device decides). */
 const REMINDERS_KEY = 'cv-spiritual-canon-reminders-v1';
 /** The days metanias are made, as last read from the calendar: the canon shows them at once, offline too. */
-// v5: Holy Week's weekdays are fasting days for metanias; days read before are read again.
-const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v5';
+// v6: each day's fasts, for abstinence; days read before are read again.
+const CALENDAR_KEY = 'cv-spiritual-canon-calendar-v6';
 
 /** A day as the calendar had it, and when it was read. */
 export type CachedCanonCalendarDay = CanonCalendarDay & { readAt: string };
@@ -111,8 +112,15 @@ export async function loadCanonCalendarCache(): Promise<Record<string, CachedCan
         && typeof entry?.applicable === 'boolean'
         && typeof entry?.fasting === 'boolean'
         && (entry?.agpeya === 'all' || entry?.agpeya === 'beforeEve' || entry?.agpeya === 'none')
+        && Array.isArray(entry?.fasts)
         && typeof entry?.readAt === 'string' && !Number.isNaN(Date.parse(entry.readAt)))
-      .map(([day, entry]) => [day, { applicable: Boolean(entry.applicable), fasting: Boolean(entry.fasting), agpeya: entry.agpeya as CanonCalendarDay['agpeya'], readAt: String(entry.readAt) }]));
+      .map(([day, entry]) => [day, {
+        applicable: Boolean(entry.applicable),
+        fasting: Boolean(entry.fasting),
+        agpeya: entry.agpeya as CanonCalendarDay['agpeya'],
+        fasts: (entry.fasts as unknown[]).filter(isAbstinenceFast),
+        readAt: String(entry.readAt),
+      }]));
   } catch {
     return {};
   }
