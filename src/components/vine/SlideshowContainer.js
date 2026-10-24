@@ -10,7 +10,7 @@ import { DOCUMENT_CONTROL_METRICS, getLanguageColumnGap } from "./documentPresen
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
 import { splitCopticInitial } from "./copticInitial";
-import { splitEnglishOpening, splitRestOfFirstWord } from "./openingInitials";
+import { opensInTranslation, splitEnglishOpening, splitRestOfFirstWord } from "./openingInitials";
 import {
   copticStandsAlone,
   createSlideAnchor,
@@ -1664,7 +1664,8 @@ function isCopticGatedVerse(verse) {
  * A standalone refrain before it -- its Coptic alone on its row, like ⲁⲅⲓⲟⲥ
  * ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ or ⲇⲟⲝⲁⲥⲓ ⲟ ⲑⲉⲟⲥ ⲏⲙⲱⲛ -- takes none and is set in lower case
  * (`refrains`); the paragraph after it, kept in lower case in the books,
- * takes its capital's.
+ * takes its capital's. A hymn with no such verse opens, without one, on its
+ * first English and Arabic paragraph (opensInTranslation).
  */
 function findOpeningInitial(section, visibleLanguages = {}) {
   if (!(section.title?.english || section.title?.french || section.title?.arabic)) return null;
@@ -1682,7 +1683,9 @@ function findOpeningInitial(section, visibleLanguages = {}) {
     // Whether its first word goes on after the letter, to set the rest of it in the letter's colour.
     return { index, initial: { letter: split.letter, marks: split.marks, opensWord: /^\S/.test(split.rest) }, refrains };
   }
-  return refrains.length ? { index: -1, initial: null, refrains } : null;
+  // No Coptic paragraph opens it, so it opens in its English and Arabic.
+  const index = verses.findIndex((verse) => opensInTranslation(verse));
+  return index !== -1 || refrains.length ? { index, initial: null, refrains } : null;
 }
 
 /**

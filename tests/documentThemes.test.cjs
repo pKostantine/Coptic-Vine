@@ -288,8 +288,10 @@ test('the scrolling reader is set on its page, and no other', () => {
     assert.match(html, new RegExp(`\\.metropolitan \\{ color: ${colors.metropolitan}; \\}`), `${id}'s metropolitan`);
     assert.match(html, new RegExp(`stroke="${colors.accent}"`), `${id}'s collapse button`);
     assert.match(html, new RegExp(`\\.gospel-rite-toggle\\.is-on \\{\\s+background: ${colors.accent};\\s+color: ${colors.onAccent};`), `${id}'s lit toggle`);
-    // Each kind of line is inked in the page's colour for it.
-    for (const [text, key] of [['A comment', 'comment'], ['A silent prayer', 'silent'], ['Refrain', 'refrain'], ['Matthew 1:1', 'comment'], ['Priest line', 'text'], ['Deacon line', 'alternate']]) {
+    // Each kind of line is inked in the page's colour for it. The priest's
+    // opens the hymn, which has no Coptic (opensInTranslation): its P an
+    // initial, the rest of its first word in small capitals.
+    for (const [text, key] of [['A comment', 'comment'], ['A silent prayer', 'silent'], ['Refrain', 'refrain'], ['Matthew 1:1', 'comment'], ['riest</span> line', 'text'], ['Deacon line', 'alternate']]) {
       const at = html.indexOf(`>${text}<`);
       assert.ok(at > 0, `${id} shows "${text}"`);
       const paragraph = html.slice(html.lastIndexOf('<p ', at), at);

@@ -254,3 +254,39 @@ test('the row the hymn opens on opens in English and Arabic too, its first words
   assert.equal((noCoptic.match(/class="english-initial"/g) || []).length, 1);
   assert.equal((noCoptic.match(/coptic-initial-text/g) || []).length, 0);
 });
+
+test('a hymn with no Coptic to open on opens in English and Arabic, on its first paragraph past any comment', () => {
+  const absolution = (verses) => build([hymn(verses, { english: 'Absolution of the Third Hour', arabic: '' })], OPTIONS);
+  const page = body(absolution([
+    verse('', { english: 'The priest says', arabic: '', type: 'comment' }),
+    verse('', { english: 'O God of all compassion', arabic: 'يا إله كل رأفة', type: 'recitedPrayer' }),
+    verse('', { english: 'We ask and entreat You', arabic: 'نسأل ونطلب', type: 'recitedPrayer' }),
+  ]));
+  assert.ok(page.includes('>The priest says<'));
+  assert.ok(page.includes('<span class="english-initial-text">O</span></span>'));
+  assert.ok(page.includes('<span class="opening-word arabic-opening">يـــا</span> إله كل رأفة'));
+  assert.equal((page.match(/class="english-initial"/g) || []).length, 1);
+  assert.equal((page.match(/class="opening-word arabic-opening"/g) || []).length, 1);
+  assert.ok(page.includes('>We ask and entreat You<'));
+  assert.deepEqual(initials(page), []);
+  // A recited prayer's Coptic switched off leaves it nothing in Coptic to open on, too.
+  const recited = body(build([hymn([verse('Ⲡⲉⲛⲓⲱⲧ', { english: 'Our Father', arabic: 'أبانا', type: 'recitedPrayer' })])], { ...OPTIONS, copticRecitedPrayers: false }));
+  assert.ok(recited.includes('<span class="english-initial-text">O</span></span><span class="opening-word english-small-caps">ur</span> Father'));
+  assert.deepEqual(initials(recited), []);
+  // Still never a reading's numbered verse, nor a hymn's untitled continuation.
+  assert.ok(!body(absolution([verse('', { english: 'In the beginning', bibleVerseNumber: '1' })])).includes('english-initial'));
+  assert.ok(!body(build([hymn([verse('', { english: 'And again' })], { english: '', arabic: '' })], OPTIONS)).includes('english-initial'));
+  // The Arabic alone opens it when the English has no capital to open on.
+  const arabicOnly = body(absolution([verse('', { english: '', arabic: 'مبارك أنت' })]));
+  assert.ok(arabicOnly.includes('<span class="opening-word arabic-opening">مبـــارك</span> أنت'));
+});
+
+test('which verse opens a hymn in English and Arabic when nothing in Coptic does', () => {
+  assert.equal(openings.opensInTranslation({ type: 'text', english: 'O God', arabic: '' }), true);
+  assert.equal(openings.opensInTranslation({ type: 'text', english: '', arabic: 'يا إله' }), true);
+  assert.equal(openings.opensInTranslation({ type: 'text', english: '(Bow down)', arabic: '' }), false);
+  for (const type of ['comment', 'silentComment', 'refrainLabel', 'readingReference']) {
+    assert.equal(openings.opensInTranslation({ type, english: 'Rubric', arabic: 'عربي' }), false, type);
+  }
+  assert.equal(openings.opensInTranslation({ type: 'text', english: 'In the beginning', bibleVerseNumber: '1' }), false);
+});

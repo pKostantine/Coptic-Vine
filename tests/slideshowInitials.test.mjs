@@ -106,7 +106,10 @@ test("the hymn's capital takes the initial, on the verse the scrolling reader gi
   // The scrolling reader's rule, for the two to agree: the row is decided whether or not the Coptic is shown.
   const page = source("components/vine/documentHtml.ts");
   assert.match(page, /const openingRefrain = opening\.initialPending && isInvincibleCoptic && !hasTranslationText && Boolean\(copticText\.trim\(\)\);/);
-  assert.match(page, /const opensHymn = !openingRefrain && opening\.initialPending && !verse\.bibleVerseNumber && Boolean\(splitCopticInitial\(copticText, opening\.afterRefrain\)\);[\s\S]*?if \(opensHymn\) opening\.initialPending = false;/);
+  assert.match(page, /const opensHymn = !openingRefrain && opening\.initialPending && \(opening\.inTranslation\s+\? opensInTranslation\(verse\)\s+: !verse\.bibleVerseNumber && Boolean\(splitCopticInitial\(copticText, opening\.afterRefrain\)\)\);[\s\S]*?if \(opensHymn\) opening\.initialPending = false;/);
+  // A hymn nothing in Coptic opens opens on its first English and Arabic paragraph, in both readers.
+  assert.match(page, /if \(opening\.initialPending\) versesHtml = renderVerses\(\{ initialPending: true, afterRefrain: false, inTranslation: true \}\);/);
+  assert.match(finder, /const index = verses\.findIndex\(\(verse\) => opensInTranslation\(verse\)\);\s+return index !== -1 \|\| refrains\.length \? \{ index, initial: null, refrains \} : null;/);
   assert.match(page, /const initial = opensHymn && copticCell \? splitCopticInitial\(copticCell\.text, capitalise\) : null;/);
   // The English and Arabic open on that same row, the Coptic shown or not.
   assert.match(container, /const openingRow = findOpeningInitial\(section, \{ \.\.\.visibleLanguages, coptic: true \}\);/);

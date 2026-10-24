@@ -12,7 +12,7 @@ import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldU
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGap } from './documentPresentationMetrics';
 import { copticInitialMetrics, splitCopticInitial } from './copticInitial';
 import { ENGLISH_INITIALS } from '../../constants/englishInitialArt';
-import { ENGLISH_FIRST_WORD_NEARER, englishInitialMetrics, splitArabicOpening, splitEnglishOpening, splitRestOfFirstWord } from './openingInitials';
+import { ENGLISH_FIRST_WORD_NEARER, englishInitialMetrics, opensInTranslation, splitArabicOpening, splitEnglishOpening, splitRestOfFirstWord } from './openingInitials';
 import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
@@ -1419,10 +1419,13 @@ function renderSection(
 
   // The hymn's capital -- the one letter of it hymnLibrary.js capitalizes --
   // is set as a decorated initial where it opens a Coptic paragraph.
-  const opening = { initialPending: Boolean(titleHtml.trim()), afterRefrain: false };
-  const versesHtml = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent, copticGospelRite })
-    .map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts, opening))
-    .join('');
+  const verseEntries = getDisplayedVerseEntries(section, { displayComments, displaySilentPrayers, bishopPresent, copticGospelRite });
+  const renderVerses = (opening: VerseOpening) =>
+    verseEntries.map(({ verse, index }) => renderVerse(verse, index, section, suppressMap.get(verse) ?? false, opts, opening)).join('');
+  const opening = { initialPending: Boolean(titleHtml.trim()), afterRefrain: false, inTranslation: false };
+  let versesHtml = renderVerses(opening);
+  // Nothing opened on its Coptic, so it opens in its English and Arabic (opensInTranslation).
+  if (opening.initialPending) versesHtml = renderVerses({ initialPending: true, afterRefrain: false, inTranslation: true });
 
   return `
     ${toggleHtml}
@@ -1618,6 +1621,18 @@ function renderSectionTitle(section: DocumentSection, appLanguage: AppTitleLangu
   `;
 }
 
+/**
+ * Whether the hymn's opening initial is still to be set (by the first Coptic
+ * paragraph that opens on a capital), and whether a standalone refrain has
+ * come before it; or, when no Coptic paragraph opens it, whether it opens on
+ * its first English and Arabic paragraph instead.
+ */
+interface VerseOpening {
+  initialPending: boolean;
+  afterRefrain: boolean;
+  inTranslation: boolean;
+}
+
 function renderVerse(
   verse: DocumentVerse,
   index: number,
@@ -1644,12 +1659,7 @@ function renderVerse(
     sermonPlannerMode: boolean;
     theme: DocumentTheme;
   },
-  /**
-   * Whether the hymn's opening initial is still to be set (by the first Coptic
-   * paragraph that opens on a capital), and whether a standalone refrain has
-   * come before it.
-   */
-  opening: { initialPending: boolean; afterRefrain: boolean },
+  opening: VerseOpening,
 ) {
   const { color, italic } = resolveVerseColor(verse, index, section, bishopPresent, suppressAllSpeakerLabels, theme);
   const rubric = suppressSpeakerLabel ? undefined : RUBRIC[resolveVerseRubricType(verse, bishopPresent)];
@@ -1744,9 +1754,12 @@ function renderVerse(
   // which a line before it kept in lower case (the people's Kyrie before the
   // Verses of the Cymbals) leaves to it. Never after a Bible verse number.
   // Decided whether or not the Coptic is shown, so the English and Arabic
-  // open on that same row (openingInitials.ts).
+  // open on that same row (openingInitials.ts). A hymn with no such
+  // paragraph opens on its first English and Arabic one (opensInTranslation).
   // Kept in lower case in the books, the paragraph after a refrain takes its capital's initial.
-  const opensHymn = !openingRefrain && opening.initialPending && !verse.bibleVerseNumber && Boolean(splitCopticInitial(copticText, opening.afterRefrain));
+  const opensHymn = !openingRefrain && opening.initialPending && (opening.inTranslation
+    ? opensInTranslation(verse)
+    : !verse.bibleVerseNumber && Boolean(splitCopticInitial(copticText, opening.afterRefrain)));
   const capitalise = opening.afterRefrain;
   if (opensHymn) opening.initialPending = false;
   const copticCell = languages.find((language) => language.key === 'coptic');

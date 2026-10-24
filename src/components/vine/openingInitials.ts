@@ -11,7 +11,8 @@ import {
  * decorated initial (Coptic Vine Design, "Drop caps and decorated initials",
  * English and Arabic openings), shared by both readers: the scrolling page
  * (documentHtml.ts) and the slideshow (VerseBlock.js). The first word of each
- * column takes the season's letter colour.
+ * column takes the season's letter colour. A hymn with no Coptic to open on
+ * opens so in its English and Arabic alone (opensInTranslation).
  *
  * English: its first letter an Old English capital, in the initials' letter
  * colour as the Coptic's letter is, the rest of its first word in small
@@ -33,6 +34,21 @@ export function splitEnglishOpening(text: string): { letter: string; rest: strin
   const match = /^\s*([A-Z])/.exec(text);
   if (!match || !ENGLISH_INITIALS[match[1]]) return null;
   return { letter: match[1], rest: text.slice(match[0].length) };
+}
+
+/** Verse types that never open a hymn: comments, and the centred refrain labels and reading references. */
+const NEVER_OPENS = new Set(['comment', 'silentComment', 'refrainLabel', 'readingReference']);
+
+/**
+ * Whether a hymn with no Coptic paragraph to open on -- none in its rows, or
+ * none shown, as a recited prayer's with its Coptic switched off -- opens on
+ * this verse in its English and Arabic: the first of its verses whose English
+ * opens on a capital there is an initial for, or that has Arabic. Never a
+ * comment, and never after a Bible verse number.
+ */
+export function opensInTranslation(verse: { type?: string; english?: string | null; arabic?: string | null; bibleVerseNumber?: string | null }) {
+  if (verse.bibleVerseNumber || NEVER_OPENS.has(verse.type ?? '')) return false;
+  return Boolean(splitEnglishOpening(verse.english || '')) || Boolean((verse.arabic || '').trim());
 }
 
 export interface EnglishInitialMetrics {
