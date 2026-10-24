@@ -312,6 +312,24 @@ invisible overlays.
 - Columns share the table width less `getLanguageColumnGap` between them.
   A Coptic line with no translation spans the row, centered.
 - Chrome (titles, buttons) follows `getDocumentChromeMetrics`.
+- A titled hymn opens in all three columns on one verse (Coptic Vine
+  Design, "Drop caps and decorated initials"): the Coptic with the decorated
+  initial (`copticInitial.ts`), the English with its first letter an Old
+  English capital with a rising vine (`openingInitials.ts`, drawn from
+  `englishInitialArt.ts`, built from `assets/initials/english`), and the
+  Arabic with its first word stretched once with kashida, in bold. Both
+  initials draw their vine and letter in the initials' colours
+  (`documentInitialColors`: by season on Night), and the rest of each first
+  word takes the letter's, the English in small capitals. Beside the Coptic
+  two-line initial the gap steps, line 1 a little nearer than line 2
+  (`firstRoom`, `room`); the English square runs from line 1's capitals to
+  line 2's baseline, the rest of its first word a little nearer, and an
+  English paragraph of one line keeps a blank second line beside it. A
+  standalone refrain before the hymn (Coptic alone on its row, like ⲁⲅⲓⲟⲥ
+  ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ) is set in lower case without an initial, and the hymn opens
+  on the paragraph after it. The verse and the English initial are decided
+  from the whole verse in `flattenSections`, so a piece turned over the page
+  keeps them.
 
 ## 8. Checking it
 

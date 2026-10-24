@@ -7,6 +7,7 @@ import type { AppLanguage } from '../../utils/preferencesStorage';
 import type { SermonHighlight } from '../../types/sermonPlanner';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
+import type { InitialColors } from '../../constants/documentOrnaments';
 
 export type { DocumentAction, DocumentSection, DocumentVerse } from './documentHtml';
 
@@ -54,6 +55,8 @@ interface DocumentWebViewProps {
   theme?: DocumentTheme;
   /** The colour its ornaments are drawn in (documentOrnamentColor). */
   ornamentColor?: string;
+  /** The decorated initials' vine and letter (documentInitialColors). */
+  initialColors?: InitialColors;
 }
 
 /**
@@ -92,6 +95,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       sermonHighlights = [],
       theme = NIGHT_DOCUMENT_THEME,
       ornamentColor,
+      initialColors,
     },
     ref,
   ) => {
@@ -323,6 +327,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               sermonPlannerMode,
               theme,
               ornamentColor,
+              initialColors,
             })
           : null,
       [
@@ -343,6 +348,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         sermonPlannerMode,
         theme,
         ornamentColor,
+        initialColors,
       ],
     );
 

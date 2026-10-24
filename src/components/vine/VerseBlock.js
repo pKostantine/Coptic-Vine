@@ -6,6 +6,15 @@ import { resolveRubricKey } from "../../utils/verseRubric";
 import { copticInitialMetrics } from "./copticInitial";
 import JustifiedText, { glyphRoomStyle, measureJustifiedLinesWeb } from "./JustifiedText";
 import { CopticInitial } from "./ui/CopticInitial";
+import { EnglishInitial } from "./ui/EnglishInitial";
+import {
+  arabicOpeningWord,
+  englishInitialMetrics,
+  englishOpeningWord,
+  splitArabicOpening,
+  splitEnglishOpening,
+  splitRestOfFirstWord,
+} from "./openingInitials";
 import { getLanguageColumnGap } from "./documentPresentationMetrics";
 import {
   copticStandsAlone as isCopticStandingAlone,
@@ -52,6 +61,17 @@ export default function VerseBlock({
   // The decorated initial this verse's Coptic opens its hymn with ({ letter,
   // marks }, see flattenSections in SlideshowContainer.js), or none.
   copticInitial = null,
+  // A standalone refrain before the hymn (ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ), set in lower case.
+  copticRefrain = false,
+  // The hymn opens on this verse in English and Arabic too: the English
+  // initial ({ letter, opensWord }), and whether the Arabic's first word is
+  // stretched (openingInitials.ts).
+  englishInitial = null,
+  arabicOpening = false,
+  // Where in each column's lines this piece of the verse starts (a piece
+  // turned over the page from a tall verse starts part way), so only the
+  // piece holding a paragraph's first word sets it as an opening word.
+  lineRanges = null,
 }) {
   const isRefrainLabel = verse.type === "refrainLabel";
   const isReadingReference = verse.type === "readingReference";
@@ -112,7 +132,32 @@ export default function VerseBlock({
   // which measured the text that way already. A centred line takes it too,
   // a line tall (PlainVerseBody).
   const initial = copticInitial || null;
-  const copticText = formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd();
+  const formattedCoptic = formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd();
+  const copticText = copticRefrain ? formattedCoptic.toLowerCase() : formattedCoptic;
+  // The initials' colours (documentInitialColors): the letter's is the opening words' too.
+  const initialVineColor = theme.colors.initialVine || theme.colors.gold;
+  const initialLetterColor = theme.colors.initialLetter || theme.colors.ornament || theme.colors.gold;
+  const startsParagraph = (language) => (lineRanges?.[language]?.start ?? 0) === 0;
+  // The opening: the rest of each column's first word in the letter's colour,
+  // the English set after its initial in small capitals (passed here in
+  // capitals) and the Arabic's stretched and set larger, in bold. Only a
+  // justified column opens so.
+  const copticRest = initial ? copticText.trimStart().slice(initial.letter.length + initial.marks.length) : "";
+  const englishText = String(verse.english || "").trimEnd();
+  // A piece turned over the page carries the lines measured after the
+  // initial already, so only the whole verse is split here.
+  const englishOpening = (() => {
+    if (!englishInitial || alignmentFor("english") !== "justify") return null;
+    if (verse.slideshowForcedLines?.english) return { letter: englishInitial.letter, text: englishText, hasWord: englishInitial.opensWord };
+    const split = splitEnglishOpening(englishText);
+    if (!split || split.letter !== englishInitial.letter) return null;
+    const first = splitRestOfFirstWord(split.rest);
+    return { letter: split.letter, text: first ? first.word.toUpperCase() + first.after : split.rest, hasWord: Boolean(first) };
+  })();
+  const arabicText = formatArabicNumbers(verse.arabic).trimEnd();
+  const arabicSplit = arabicOpening && alignmentFor("arabic") === "justify" ? splitArabicOpening(arabicText) : null;
+  const englishFontSize = getSlideshowLanguageFontSize("english", { verse }, fontSize);
+  const arabicFontSize = getSlideshowLanguageFontSize("arabic", { verse }, fontSize);
   const bibleNumberFor = (language) =>
     !Array.isArray(verse.slideshowBibleNumberLanguages) ||
     verse.slideshowBibleNumberLanguages.includes(language)
@@ -122,10 +167,13 @@ export default function VerseBlock({
     {
       key: "english",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "english", bishopPresent),
-      text: String(verse.english || "").trimEnd(),
+      text: englishOpening && !verse.slideshowForcedLines?.english ? englishOpening.text : englishText,
+      englishInitial: englishOpening?.letter ?? null,
+      englishOpensWord: Boolean(englishOpening?.hasWord),
+      openingWord: englishOpening?.hasWord && startsParagraph("english") ? englishOpeningWord(englishFontSize, initialLetterColor) : null,
       bibleVerseNumber: bibleNumberFor("english"),
       seasonalHoosVersePrefix: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
-      fontSize: getSlideshowLanguageFontSize("english", { verse }, fontSize),
+      fontSize: englishFontSize,
       fontFamily: "Georgia",
       lineHeight: getSlideshowLanguageLineHeight("english", { verse }, fontSize),
       styles: [styles.english],
@@ -151,10 +199,9 @@ export default function VerseBlock({
     },
     {
       key: "coptic",
-      text: initial && !verse.slideshowForcedLines?.coptic
-        ? copticText.trimStart().slice(initial.letter.length + initial.marks.length)
-        : copticText,
+      text: initial && !verse.slideshowForcedLines?.coptic ? copticRest : copticText,
       initial,
+      openingWord: initial?.opensWord && startsParagraph("coptic") ? { style: { color: initialLetterColor }, baselineShift: 0 } : null,
       bibleVerseNumber: bibleNumberFor("coptic"),
       seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine
         ? verse.seasonalHoosVersePrefix
@@ -171,12 +218,13 @@ export default function VerseBlock({
     {
       key: "arabic",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "arabic", bishopPresent),
-      text: formatArabicNumbers(verse.arabic).trimEnd(),
+      text: arabicSplit && !verse.slideshowForcedLines?.arabic ? arabicSplit.word + arabicSplit.rest : arabicText,
+      openingWord: arabicSplit && startsParagraph("arabic") ? arabicOpeningWord(arabicFontSize, initialLetterColor) : null,
       bibleVerseNumber: bibleNumberFor("arabic"),
       seasonalHoosVersePrefix: hasSeasonalPrefixLine
         ? formatArabicNumbers(verse.seasonalHoosVersePrefix)
         : "",
-      fontSize: getSlideshowLanguageFontSize("arabic", { verse }, fontSize),
+      fontSize: arabicFontSize,
       fontFamily: "Arial",
       lineHeight: getSlideshowLanguageLineHeight("arabic", { verse }, fontSize),
       styles: [styles.arabic],
@@ -252,7 +300,9 @@ export default function VerseBlock({
     // Coptic in italic is already its italic face: asking for italic again
     // would have the system slant that a second time.
     const languageFontStyle = slantsArabic ? arabicFontStyle(true) : language.key === "coptic" ? "normal" : bodyFontStyle;
-    // The decorated initial: its room in a line one or two lines tall, and drawn in either.
+    // The initial: the Coptic's decorated one, its room in a line one or two
+    // lines tall and drawn in either; or the English one, two lines tall.
+    const englishMetrics = language.englishInitial ? englishInitialMetrics(language.englishInitial, language.fontSize, language.lineHeight, language.englishOpensWord) : null;
     const initial = language.initial ? {
       ...copticInitialMetrics(language.lineHeight),
       render: (mode) => (
@@ -260,10 +310,13 @@ export default function VerseBlock({
           letter={language.initial.letter}
           mode={mode}
           lineHeight={language.lineHeight}
-          vineColor={theme.colors.gold}
-          letterColor={theme.colors.ornament || theme.colors.gold}
+          vineColor={initialVineColor}
+          letterColor={initialLetterColor}
         />
       ),
+    } : englishMetrics ? {
+      two: { room: englishMetrics.room, firstRoom: englishMetrics.firstRoom },
+      render: () => <EnglishInitial letter={language.englishInitial} metrics={englishMetrics} color={initialLetterColor} />,
     } : null;
     const textStyle = [
       styles.text,
@@ -303,7 +356,7 @@ export default function VerseBlock({
           // pagination measured, on web as on the phone: given the joined
           // text back, the browser could wrap it a line longer or shorter
           // than the page was budgeted for.
-          Platform.OS === "web" && !language.forceLines && !language.initial ? (
+          Platform.OS === "web" && !language.forceLines && !initial && !language.openingWord ? (
             <CssJustifiedVerseBody
               theme={theme}
               language={language}
@@ -576,7 +629,8 @@ function JustifiedVerseBody({ language, textStyle, selectableText, columnWidth, 
         fontWeight={fontWeight}
         width={columnWidth}
         rtl={language.key === "arabic"}
-        firstWordStyle={bibleVerseNumber ? { color: theme.colors.gold, fontWeight: "700" } : null}
+        firstWordStyle={bibleVerseNumber ? { color: theme.colors.gold, fontWeight: "700" } : language.openingWord?.style ?? null}
+        firstWordBaselineShift={bibleVerseNumber ? 0 : language.openingWord?.baselineShift ?? 0}
         wordStyles={wordStyles}
         forceLines={forceLines}
         minWordsToJustify={SLIDESHOW_JUSTIFIED ? minWordsToJustify : Number.POSITIVE_INFINITY}

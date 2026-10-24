@@ -174,15 +174,36 @@ function splitOverwidthWord(word, maxWidth, fontSize, fontFamily, fontWeight, fo
   return chunks;
 }
 
-function computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWordWeight = fontWeight) {
+/**
+ * How a paragraph's first word is set when it isn't set as the rest: a weight
+ * alone (a Bible verse number, bold), or { fontSize, fontWeight, letterSpacing }
+ * (an opening word: larger, or in small capitals). Null when it is set as the rest.
+ */
+function firstWordMetrics(firstWord, fontSize, fontWeight) {
+  const spec = typeof firstWord === "string" ? { fontWeight: firstWord } : firstWord || {};
+  const metrics = {
+    fontSize: spec.fontSize ?? fontSize,
+    fontWeight: spec.fontWeight ?? fontWeight,
+    letterSpacing: spec.letterSpacing ?? 0,
+  };
+  return metrics.fontSize === fontSize && metrics.fontWeight === fontWeight && !metrics.letterSpacing ? null : metrics;
+}
+
+function measureFirstWordWeb(word, metrics, fontFamily, fontStyle) {
+  return measureWidthWeb(word, metrics.fontSize, fontFamily, metrics.fontWeight, fontStyle) + metrics.letterSpacing * getGraphemes(word).length;
+}
+
+function computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWord = fontWeight) {
   const widths = new Map();
   for (const word of words) {
     if (!widths.has(word)) widths.set(word, measureWidthWeb(word, fontSize, fontFamily, fontWeight, fontStyle));
   }
-  // The first word is set in its own weight (a Bible verse number, bold and
-  // gold), and bold is wider: measured regular, a row could overflow its column.
-  if (words.length && firstWordWeight !== fontWeight) {
-    widths.set(words[0], measureWidthWeb(words[0], fontSize, fontFamily, firstWordWeight, fontStyle));
+  // The first word set in its own weight (a Bible verse number, bold and
+  // gold) or size (an opening word) is wider: measured as the rest, a row
+  // could overflow its column.
+  const first = firstWordMetrics(firstWord, fontSize, fontWeight);
+  if (words.length && first) {
+    widths.set(words[0], measureFirstWordWeb(words[0], first, fontFamily, fontStyle));
   }
 
   const expandedWords = words.flatMap((word) => {
@@ -200,13 +221,13 @@ function computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontS
   return wrapWordsIntoLines(expandedWords, widths, spaceWidth, maxWidth);
 }
 
-function computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWordWeight = fontWeight) {
+function computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWord = fontWeight) {
   return splitParagraphs(text).flatMap((paragraph, paragraphIndex) => {
     const words = splitWords(paragraph);
     if (!words.length) {
       return [{ words: [], isBlank: true, isParagraphEnd: true }];
     }
-    const lines = computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, paragraphIndex === 0 ? firstWordWeight : fontWeight);
+    const lines = computeParagraphLinesWeb(words, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, paragraphIndex === 0 ? firstWord : fontWeight);
     return lines.map((lineWords, index) => ({
       words: lineWords,
       isParagraphEnd: index === lines.length - 1,
@@ -219,9 +240,16 @@ function computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxW
  * decorated initial narrower than the rest -- with a word wider than its own
  * line broken there, as the browser breaks it.
  */
-function computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, widthOf) {
-  const measure = (token) => measureWidthWeb(token, fontSize, fontFamily, fontWeight, fontStyle);
-  const spaceWidth = measure(" ");
+function computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, widthOf, firstWord = fontWeight) {
+  const plain = (token) => measureWidthWeb(token, fontSize, fontFamily, fontWeight, fontStyle);
+  const first = firstWordMetrics(firstWord, fontSize, fontWeight);
+  let firstPending = Boolean(first);
+  const measure = (token) => {
+    if (!firstPending) return plain(token);
+    firstPending = false;
+    return measureFirstWordWeb(token, first, fontFamily, fontStyle);
+  };
+  const spaceWidth = plain(" ");
   const lines = [];
   splitParagraphs(text).forEach((paragraph) => {
     const queue = splitWords(paragraph);
@@ -264,18 +292,32 @@ function computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle
 }
 
 /**
- * A paragraph opened by a decorated initial (ui/CopticInitial.tsx): one line
- * tall beside it if the whole of it fits there, else its first two lines
- * narrowed beside the initial two lines tall and the rest at full width.
- * Each line beside it says which ("one" or "two"), which is how pagination
- * keeps those lines together and the render knows to set it beside them.
+ * A paragraph opened by an initial (ui/CopticInitial.tsx, ui/EnglishInitial.tsx):
+ * one line tall beside it if the whole of it fits there and the initial has a
+ * one-line form, else its first two lines narrowed beside the initial two
+ * lines tall -- line 1 by `firstRoom`, line 2 by `room`, the gap stepping
+ * between them -- and the rest at full width. An initial with no one-line
+ * form (the English) keeps two lines beside it, the second blank if its
+ * paragraph fits on one. Each line beside it says which ("one" or "two"),
+ * which is how pagination keeps those lines together and the render knows to
+ * set it beside them.
  */
-function computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, initial) {
-  const short = computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, () => width - initial.one.room);
-  if (short.length <= 1) return short.map((line) => ({ ...line, initial: "one" }));
-  const narrow = width - initial.two.room;
-  return computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, (index) => (index < 2 ? narrow : width))
+function computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, initial, firstWord = fontWeight) {
+  if (initial.one) {
+    const short = computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, () => width - initial.one.room, firstWord);
+    if (short.length <= 1) return short.map((line) => ({ ...line, initial: "one" }));
+  }
+  const firstRoom = initial.two.firstRoom ?? initial.two.room;
+  const lines = computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, (index) => width - (index === 0 ? firstRoom : index === 1 ? initial.two.room : 0), firstWord)
     .map((line, index) => (index < 2 ? { ...line, initial: "two" } : line));
+  return withBlankLineBesideInitial(lines);
+}
+
+/** Two lines beside a two-line initial, whatever its paragraph: one that fits on a line leaves the second blank. */
+function withBlankLineBesideInitial(lines) {
+  return lines.length === 1 && lines[0].initial === "two"
+    ? [...lines, { words: [], isBlank: true, isParagraphEnd: true, initial: "two" }]
+    : lines;
 }
 
 // Web-only line measurement for text that is NOT rendered through this
@@ -289,10 +331,10 @@ function computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyl
 // always falls back to rough character-count estimation for every tall-verse
 // split -- this reuses the same canvas measurement this component's own web
 // path already relies on, just exposed standalone.
-export function measureJustifiedLinesWeb(text, fontSize, fontFamily, maxWidth, fontWeight = "400", fontStyle = "normal", firstWordWeight = fontWeight) {
+export function measureJustifiedLinesWeb(text, fontSize, fontFamily, maxWidth, fontWeight = "400", fontStyle = "normal", firstWord = fontWeight) {
   if (!IS_WEB) return null;
   if (!String(text || "").length) return [];
-  return computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWordWeight).map((line) => ({
+  return computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, maxWidth, firstWord).map((line) => ({
     text: line.words.join(" "),
     isBlank: Boolean(line.isBlank),
     isParagraphEnd: Boolean(line.isParagraphEnd),
@@ -323,9 +365,15 @@ function nativeLineCacheKey(text, fontSize, fontFamily, fontWeight, fontStyle, w
 // a probe for it would be waited on for ever.
 const NO_LINES = Object.freeze([]);
 
+/** What of a first word's own style changes where lines break: its weight, size and spacing. */
+function firstWordLayoutKey(firstWordStyle, fontWeight) {
+  return firstWordStyle
+    ? `${firstWordStyle.fontWeight || fontWeight}/${firstWordStyle.fontSize ?? ""}/${firstWordStyle.letterSpacing ?? ""}`
+    : fontWeight;
+}
+
 function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordStyle, measureOnly) {
-  const firstWordWeight = firstWordStyle?.fontWeight || fontWeight;
-  const cacheKey = nativeLineCacheKey(text, fontSize, fontFamily, `${fontWeight}/${firstWordWeight}`, fontStyle, width);
+  const cacheKey = nativeLineCacheKey(text, fontSize, fontFamily, `${fontWeight}/${firstWordLayoutKey(firstWordStyle, fontWeight)}`, fontStyle, width);
   const [state, setState] = useState(null); // { forKey, lines }
   const cached = splitWords(text).length ? nativeLineCache.get(cacheKey) : NO_LINES;
   const lines = cached ?? (state && state.forKey === cacheKey ? state.lines : null);
@@ -372,30 +420,39 @@ function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle
 }
 
 /**
- * The lines of a paragraph opened by a decorated initial, from the platform's
- * own text engine as computeInitialLinesWeb works them out on the web. The
- * engine lays a Text out at one width, so the paragraph is laid out at the
- * two narrowed widths at once -- beside the initial one line tall, and two --
- * and, when it wraps beside the short one, what follows its first two lines
- * beside the tall one is laid out again at the column's full width. Each
- * layout is cached like any other (useNativeLines), so the slide shown after
- * the measuring pass has them at once. Null when there is no initial.
+ * The lines of a paragraph opened by an initial, from the platform's own text
+ * engine as computeInitialLinesWeb works them out on the web. The engine lays
+ * a Text out at one width, so the paragraph is laid out beside the initial
+ * one line tall (when it has that form) and beside line 1 of the two-line
+ * one at once; where the gap steps, what follows line 1 is laid out again at
+ * line 2's width; and what follows the two lines beside it at the column's
+ * full width. Each layout is cached like any other (useNativeLines), so the
+ * slide shown after the measuring pass has them at once. Null when there is
+ * no initial.
  */
-function useNativeInitialLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, initial) {
+function useNativeInitialLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, initial, firstWordStyle) {
   const active = Boolean(initial);
-  const short = useNativeLines(active ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - (initial?.one.room ?? 0), null, false);
-  const narrow = useNativeLines(active ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - (initial?.two.room ?? 0), null, false);
-  const fitsBesideShort = Boolean(short.lines && short.lines.length <= 1);
-  const besideTall = narrow.lines ? narrow.lines.slice(0, 2) : null;
-  const restText = active && besideTall && short.lines && !fitsBesideShort ? textAfterLines(text, besideTall) : "";
+  const hasOneLine = Boolean(initial?.one);
+  const room = initial?.two.room ?? 0;
+  const firstRoom = initial?.two.firstRoom ?? room;
+  const stepped = firstRoom !== room;
+  const short = useNativeLines(active && hasOneLine ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - (initial?.one?.room ?? 0), firstWordStyle, false);
+  const narrow = useNativeLines(active ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - firstRoom, firstWordStyle, false);
+  const fitsBesideShort = hasOneLine && Boolean(short.lines && short.lines.length <= 1);
+  const decided = Boolean(narrow.lines) && (!hasOneLine || Boolean(short.lines)) && !fitsBesideShort;
+  const lineTwoText = active && decided && stepped && narrow.lines.length > 1 ? textAfterLines(text, narrow.lines.slice(0, 1)) : "";
+  const lineTwo = useNativeLines(lineTwoText, style, fontSize, fontFamily, fontWeight, fontStyle, width - room, null, false);
+  const besideTall = !decided ? null
+    : !stepped || narrow.lines.length <= 1 ? narrow.lines.slice(0, 2)
+      : lineTwo.lines ? [narrow.lines[0], ...lineTwo.lines.slice(0, 1)] : null;
+  const restText = active && besideTall ? textAfterLines(text, besideTall) : "";
   const rest = useNativeLines(restText, style, fontSize, fontFamily, fontWeight, fontStyle, width, null, false);
   if (!active) return null;
 
-  const probes = [short.measuringNode, narrow.measuringNode, rest.measuringNode];
-  if (!short.lines || !narrow.lines) return { lines: null, probes };
+  const probes = [short.measuringNode, narrow.measuringNode, lineTwo.measuringNode, rest.measuringNode];
   if (fitsBesideShort) return { lines: short.lines.map((line) => ({ ...line, initial: "one" })), probes: [] };
-  if (!rest.lines) return { lines: null, probes };
-  return { lines: [...besideTall.map((line) => ({ ...line, initial: "two" })), ...rest.lines], probes: [] };
+  if (!besideTall || !rest.lines) return { lines: null, probes };
+  return { lines: withBlankLineBesideInitial([...besideTall.map((line) => ({ ...line, initial: "two" })), ...rest.lines]), probes: [] };
 }
 
 /**
@@ -441,6 +498,9 @@ export default function JustifiedText({
   width,
   rtl = false,
   firstWordStyle,
+  // How far to raise the first word, set at another size than its line, when
+  // it stands alone in a justified row (openingInitials.ts's baselineShift).
+  firstWordBaselineShift = 0,
   wordStyles,
   onLayout,
   onLines,
@@ -452,26 +512,33 @@ export default function JustifiedText({
   // The font size whose glyphs may reach past their lines (the Coptic
   // column's): each drawn line gets room for them (glyphRoomStyle).
   glyphRoomFontSize = 0,
-  // A decorated initial opening the text (ui/CopticInitial.tsx): the room it
-  // takes from a line set one or two lines tall ({ one: { room }, two: { room } },
-  // copticInitialMetrics), and render(mode) drawing it. Its lines are worked
-  // out around it and it is set beside them.
+  // An initial opening the text (ui/CopticInitial.tsx, ui/EnglishInitial.tsx):
+  // the room it takes from a line set one or two lines tall ({ one: { room },
+  // two: { room, firstRoom } } -- copticInitialMetrics; the English has no
+  // one-line form, and beside the two-line one line 1 may take less room than
+  // line 2), and render(mode) drawing it. Its lines are worked out around it
+  // and it is set beside them.
   initial = null,
 }) {
   const fallbackAlign = rtl ? "right" : "left";
   const reportedLinesForRef = useRef(null);
-  const firstWordWeight = firstWordStyle?.fontWeight || fontWeight;
-  const initialRoom = initial ? `${initial.one.room}/${initial.two.room}` : "";
+  const firstWordKey = firstWordLayoutKey(firstWordStyle, fontWeight);
+  const initialRoom = initial ? `${initial.one?.room ?? "-"}/${initial.two.firstRoom ?? initial.two.room}/${initial.two.room}` : "";
 
   const webLines = useMemo(
-    () => (IS_WEB && !forceLines
-      ? initial
-        ? computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, initial)
-        : computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordWeight)
-      : null),
-    // initialRoom stands for the initial: its render changes every time, its room doesn't.
+    () => {
+      if (!IS_WEB || forceLines) return null;
+      const firstWord = firstWordStyle
+        ? { fontSize: firstWordStyle.fontSize, fontWeight: firstWordStyle.fontWeight || fontWeight, letterSpacing: firstWordStyle.letterSpacing }
+        : fontWeight;
+      return initial
+        ? computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, initial, firstWord)
+        : computeLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, firstWord);
+    },
+    // initialRoom stands for the initial and firstWordKey for the first
+    // word's style: their objects change every time, their measures don't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [text, fontSize, fontFamily, fontWeight, fontStyle, width, forceLines, firstWordWeight, initialRoom],
+    [text, fontSize, fontFamily, fontWeight, fontStyle, width, forceLines, firstWordKey, initialRoom],
   );
   // Always called (never skipped), even when its result goes unused (web,
   // or forceLines supplied) -- calling a hook conditionally is a
@@ -479,7 +546,7 @@ export default function JustifiedText({
   // actually runs.
   const measuresInitial = Boolean(initial) && !forceLines && !IS_WEB;
   const native = useNativeLines(measuresInitial ? "" : text, style, fontSize, fontFamily, fontWeight, fontStyle, width, firstWordStyle, measureOnly && !forceLines && !measuresInitial);
-  const nativeInitial = useNativeInitialLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, measuresInitial ? initial : null);
+  const nativeInitial = useNativeInitialLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, measuresInitial ? initial : null, firstWordStyle);
 
   const forcedLines = useMemo(
     () => (forceLines ? forceLines.map((line) => ({
@@ -493,7 +560,7 @@ export default function JustifiedText({
   const lines = forcedLines ?? (IS_WEB ? webLines : nativeInitial ? nativeInitial.lines : native.lines);
   const lineWordOffsets = useMemo(() => getLineWordOffsets(lines), [lines]);
 
-  const reportKey = `${fontFamily}|${fontSize}|${fontWeight}/${firstWordWeight}|${fontStyle}|${width}|${initialRoom}|${text}`;
+  const reportKey = `${fontFamily}|${fontSize}|${fontWeight}/${firstWordKey}|${fontStyle}|${width}|${initialRoom}|${text}`;
   const reportableLines = useMemo(
     () => lines?.map((line) => ({
       text: line.words.join(" "),
@@ -608,6 +675,7 @@ export default function JustifiedText({
                 WORD_INTRINSIC_STYLE,
                 selectionStyle,
                 isFirstLine && wordIndex === 0 ? firstWordStyle : null,
+                isFirstLine && wordIndex === 0 && firstWordBaselineShift ? { position: "relative", top: -firstWordBaselineShift } : null,
                 wordStyles?.[lineWordOffsets[index] + wordIndex],
                 glyphRoom,
               ]
@@ -620,15 +688,21 @@ export default function JustifiedText({
     );
   };
 
-  // Lines beside a decorated initial are set in a narrower column beside it.
+  // Lines beside an initial are set in a narrower column beside it, line 2
+  // a little further in where the gap steps.
   const besideCount = initial ? countInitialLines(lines) : 0;
+  const lineTwoInset = besideCount && lines[0].initial === "two"
+    ? Math.max(0, initial.two.room - (initial.two.firstRoom ?? initial.two.room))
+    : 0;
 
   return (
     <View style={[{ width }, selectionStyle]} onLayout={onLayout}>
       {besideCount ? (
         <View style={INITIAL_ROW_STYLE}>
           {initial.render(lines[0].initial)}
-          <View style={BESIDE_INITIAL_STYLE}>{lines.slice(0, besideCount).map((line, index) => renderLine(line, index))}</View>
+          <View style={BESIDE_INITIAL_STYLE}>{lines.slice(0, besideCount).map((line, index) => (
+            index === 1 && lineTwoInset ? <View key={index} style={{ paddingLeft: lineTwoInset }}>{renderLine(line, index)}</View> : renderLine(line, index)
+          ))}</View>
         </View>
       ) : null}
       {lines.slice(besideCount).map((line, index) => renderLine(line, besideCount + index))}

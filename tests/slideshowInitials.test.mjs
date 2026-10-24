@@ -91,26 +91,47 @@ test("the hymn's capital takes the initial, on the verse the scrolling reader gi
   assert.match(finder, /if \(!\(section\.title\?\.english \|\| section\.title\?\.french \|\| section\.title\?\.arabic\)\) return null;/);
   // The first verse shown whose Coptic opens on a capital, past any kept in lower case; never after a verse number.
   assert.match(finder, /const showsCoptic = getVisibleVerseLanguages\(\{ verse, isRecitedPrayer: isCopticGatedVerse\(verse\) \}, visibleLanguages\)\.includes\("coptic"\);/);
-  assert.match(finder, /const split = showsCoptic && !verse\.bibleVerseNumber \? splitCopticInitial\(String\(verse\.coptic \|\| ""\)\) : null;\s+if \(!split\) continue;/);
+  // A standalone refrain before it takes none; the paragraph after one takes its capital's, kept in lower case or not.
+  assert.match(finder, /if \(copticStandsAlone\(verse\) && String\(verse\.coptic \|\| ""\)\.trim\(\)\) \{\s+refrains\.push\(index\);\s+continue;\s+\}/);
+  assert.match(finder, /const split = showsCoptic && !verse\.bibleVerseNumber \? splitCopticInitial\(String\(verse\.coptic \|\| ""\), refrains\.length > 0\) : null;\s+if \(!split\) continue;/);
+  assert.match(container, /copticRefrain: Boolean\(openingRow\?\.refrains\.includes\(verseIndex\)\),/);
+  assert.match(source("components/vine/VerseBlock.js"), /const copticText = copticRefrain \? formattedCoptic\.toLowerCase\(\) : formattedCoptic;/);
   // Centred on a line of its own too (Agios opening St Basil's Anaphora): it takes it a line tall.
-  assert.match(finder, /if \(!split\) continue;\s+return \{ index, initial: \{ letter: split\.letter, marks: split\.marks \} \};/);
+  assert.match(finder, /if \(!split\) continue;[\s\S]*?return \{ index, initial: \{ letter: split\.letter, marks: split\.marks, opensWord: \/\^\\S\/\.test\(split\.rest\) \}, refrains \};/);
+  // The English opening is decided from the whole verse too: a piece turned over the page carries only lines measured after it.
+  assert.match(container, /englishInitial: opensOtherColumns\(verse, verseIndex\) \? findEnglishInitial\(verse\) : null,/);
+  assert.match(source("components/vine/VerseBlock.js"), /if \(verse\.slideshowForcedLines\?\.english\) return \{ letter: englishInitial\.letter, text: englishText, hasWord: englishInitial\.opensWord \};/);
   assert.doesNotMatch(finder.slice(0, finder.indexOf("\n}\n")), /isSlideshowLanguageJustified/);
   assert.match(container, /copticInitial=\{item\.copticInitial\}/);
-  // The scrolling reader's rule, for the two to agree.
-  assert.match(source("components/vine/documentHtml.ts"), /const initial = opening\.initialPending && copticCell && !verse\.bibleVerseNumber \? splitCopticInitial\(copticCell\.text\) : null;\s+if \(initial\) opening\.initialPending = false;/);
+  // The scrolling reader's rule, for the two to agree: the row is decided whether or not the Coptic is shown.
+  const page = source("components/vine/documentHtml.ts");
+  assert.match(page, /const openingRefrain = opening\.initialPending && isInvincibleCoptic && !hasTranslationText && Boolean\(copticText\.trim\(\)\);/);
+  assert.match(page, /const opensHymn = !openingRefrain && opening\.initialPending && \(opening\.inTranslation\s+\? opensInTranslation\(verse\)\s+: !verse\.bibleVerseNumber && Boolean\(splitCopticInitial\(copticText, opening\.afterRefrain\)\)\);[\s\S]*?if \(opensHymn\) opening\.initialPending = false;/);
+  // A hymn nothing in Coptic opens opens on its first English and Arabic paragraph, in both readers.
+  assert.match(page, /if \(opening\.initialPending\) versesHtml = renderVerses\(\{ initialPending: true, afterRefrain: false, inTranslation: true \}\);/);
+  assert.match(finder, /const index = verses\.findIndex\(\(verse\) => opensInTranslation\(verse\)\);\s+return index !== -1 \|\| refrains\.length \? \{ index, initial: null, refrains \} : null;/);
+  assert.match(page, /const initial = opensHymn && copticCell \? splitCopticInitial\(copticCell\.text, capitalise\) : null;/);
+  // The English and Arabic open on that same row, the Coptic shown or not.
+  assert.match(container, /const openingRow = findOpeningInitial\(section, \{ \.\.\.visibleLanguages, coptic: true \}\);/);
 });
 
 test("the Coptic column measures and sets its text around the initial, in the ornaments' colour and the titles' gold", () => {
   const verse = source("components/vine/VerseBlock.js");
   // The letter is the initial's: the column's own text starts after it, unless pagination handed the lines in.
-  assert.match(verse, /text: initial && !verse\.slideshowForcedLines\?\.coptic\s+\? copticText\.trimStart\(\)\.slice\(initial\.letter\.length \+ initial\.marks\.length\)\s+: copticText,/);
-  assert.match(verse, /vineColor=\{theme\.colors\.gold\}/);
-  assert.match(verse, /letterColor=\{theme\.colors\.ornament \|\| theme\.colors\.gold\}/);
+  assert.match(verse, /const copticRest = initial \? copticText\.trimStart\(\)\.slice\(initial\.letter\.length \+ initial\.marks\.length\) : "";/);
+  assert.match(verse, /text: initial && !verse\.slideshowForcedLines\?\.coptic \? copticRest : copticText,/);
+  // In the initials' colours (documentInitialColors), the page's gold and ornament colour where none are given.
+  assert.match(verse, /const initialVineColor = theme\.colors\.initialVine \|\| theme\.colors\.gold;/);
+  assert.match(verse, /const initialLetterColor = theme\.colors\.initialLetter \|\| theme\.colors\.ornament \|\| theme\.colors\.gold;/);
+  assert.match(verse, /vineColor=\{initialVineColor\}\s+letterColor=\{initialLetterColor\}/);
   const justified = source("components/vine/JustifiedText.js");
-  // Beside the short initial if the whole of it fits there, else two lines narrowed beside the tall one.
+  // Beside the short initial if the whole of it fits there, else two lines narrowed beside the tall one:
+  // line 1 by its own room, line 2 by the other, the gap stepping between them.
   assert.match(justified, /if \(short\.length <= 1\) return short\.map\(\(line\) => \(\{ \.\.\.line, initial: "one" \}\)\);/);
-  assert.match(justified, /\(index\) => \(index < 2 \? narrow : width\)/);
-  assert.match(justified, /const restText = active && besideTall && short\.lines && !fitsBesideShort \? textAfterLines\(text, besideTall\) : "";/);
+  assert.match(justified, /\(index\) => width - \(index === 0 \? firstRoom : index === 1 \? initial\.two\.room : 0\)/);
+  assert.match(justified, /const lineTwoText = active && decided && stepped && narrow\.lines\.length > 1 \? textAfterLines\(text, narrow\.lines\.slice\(0, 1\)\) : "";/);
+  assert.match(justified, /const restText = active && besideTall \? textAfterLines\(text, besideTall\) : "";/);
+  assert.match(justified, /index === 1 && lineTwoInset \? <View key=\{index\} style=\{\{ paddingLeft: lineTwoInset \}\}>/);
   assert.match(justified, /\{initial\.render\(lines\[0\]\.initial\)\}\s+<View style=\{BESIDE_INITIAL_STYLE\}>\{lines\.slice\(0, besideCount\)\.map/);
   // The flag survives every hand-off: reported, and handed back by pagination.
   assert.equal((justified.match(/\.\.\.\(line\.initial \? \{ initial: line\.initial \} : null\),/g) || []).length, 2);

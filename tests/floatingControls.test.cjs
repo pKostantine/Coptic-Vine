@@ -107,6 +107,8 @@ function loadDocumentBuilder() {
     '../../constants/documentThemes': themes,
     '../../constants/copticInitialArt': loadFile('src/constants/copticInitialArt.ts'),
     './copticInitial': loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? loadFile('src/constants/copticInitialArt.ts') : require(name))),
+    './openingInitials': loadFile('src/components/vine/openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? loadFile('src/constants/englishInitialArt.ts') : require(name))),
+    '../../constants/englishInitialArt': loadFile('src/constants/englishInitialArt.ts'),
     '../../constants/documentOrnaments': loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name))),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),

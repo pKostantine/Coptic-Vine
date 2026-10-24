@@ -108,8 +108,8 @@ test('no guessed line breaks reach the page, and the deck shows only settled sli
 test('forced lines render line for line on every platform', () => {
   const verseBlock = fs.readFileSync('src/components/vine/VerseBlock.js', 'utf8');
   const justified = fs.readFileSync('src/components/vine/JustifiedText.js', 'utf8');
-  // A column opened by a decorated initial is set line by line on the web too, around it.
-  assert.match(verseBlock, /Platform\.OS === "web" && !language\.forceLines && !language\.initial \? \(\s*<CssJustifiedVerseBody/);
+  // A column opened by an initial, or by an opening word, is set line by line on the web too, around it.
+  assert.match(verseBlock, /Platform\.OS === "web" && !language\.forceLines && !initial && !language\.openingWord \? \(\s*<CssJustifiedVerseBody/);
   assert.match(verseBlock, /textAlign: alignmentFor\("coptic"\)/);
   assert.match(verseBlock, /annotateNativeLines\(event\.nativeEvent\.lines \|\| \[\], renderedText\)/);
   // A centered column measures its lines on web too, and a page's share of it renders line by line.
