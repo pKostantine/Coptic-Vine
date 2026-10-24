@@ -16,6 +16,16 @@ function loadBuilder() {
     'documentThemes.ts',
     (name) => (name === './theme' ? evaluateModule(fs.readFileSync('src/constants/theme.ts', 'utf8'), 'theme.ts', require) : require(name)),
   );
+  const copticInitialArt = evaluateModule(fs.readFileSync('src/constants/copticInitialArt.ts', 'utf8'), 'copticInitialArt.ts', require);
+  const englishInitialArt = evaluateModule(fs.readFileSync('src/constants/englishInitialArt.ts', 'utf8'), 'englishInitialArt.ts', require);
+  const copticInitial = evaluateModule(fs.readFileSync('src/components/vine/copticInitial.ts', 'utf8'), 'copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? copticInitialArt : require(name)));
+  const openingInitials = evaluateModule(fs.readFileSync('src/components/vine/openingInitials.ts', 'utf8'), 'openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? englishInitialArt : require(name)));
+  const openingModules = {
+    '../../constants/copticInitialArt': copticInitialArt,
+    '../../constants/englishInitialArt': englishInitialArt,
+    './copticInitial': copticInitial,
+    './openingInitials': openingInitials,
+  };
   // The builder's local imports: the shared highlighting layer, numerals, document metrics and the floating controls' fade.
   const localModules = {
     './textHighlights': evaluateModule(fs.readFileSync('src/components/vine/textHighlights.ts', 'utf8'), 'textHighlights.ts', require),
@@ -27,6 +37,15 @@ function loadBuilder() {
     ),
     '../../utils/bibleNumerals': evaluateModule(fs.readFileSync('src/utils/bibleNumerals.ts', 'utf8'), 'bibleNumerals.ts', require),
     '../../constants/documentThemes': documentThemes,
+    '../../constants/documentOrnaments': evaluateModule(
+      fs.readFileSync('src/constants/documentOrnaments.ts', 'utf8'),
+      'documentOrnaments.ts',
+      (name) => (name === './ornamentArt' ? evaluateModule(fs.readFileSync('src/constants/ornamentArt.ts', 'utf8'), 'ornamentArt.ts', require) : require(name)),
+    ),
+    // The chapter's opening: its decorated initials and first words.
+    './copticInitial': copticInitial,
+    './openingInitials': openingInitials,
+    './openingHtml': evaluateModule(fs.readFileSync('src/components/vine/openingHtml.ts', 'utf8'), 'openingHtml.ts', (name) => openingModules[name] || require(name)),
   };
   const localRequire = (name) => localModules[name] || require(name);
   return evaluateModule(source, 'bibleDocumentHtml.ts', localRequire).buildBibleChapterHtml;
@@ -155,4 +174,51 @@ test('Bible reading view highlights by stored chapter and verse, and offers Copy
     highlighting: true,
   });
   assert.doesNotMatch(slideshow, /sermon-annotatable-text"/);
+});
+
+test('a chapter opens on its verse 1 with the drop cap and decorated first words, its number ahead of the initial', () => {
+  const buildBibleChapterHtml = loadBuilder();
+  const verse = (verseNumber, extra) => ({ verseNumber, english: '', englishNkjv: '', englishFromCoptic: '', coptic: '', greek: '', arabic: '', arabicFromCoptic: '', french: '', ...extra });
+  const build = (isSlideshow) => buildBibleChapterHtml({
+    verses: [
+      verse(0, { english: 'A Psalm of David', isPsalmIntroduction: true }),
+      verse(1, { english: 'Blessed is the man', englishNkjv: 'Blessed is the man', coptic: 'ⲱⲟⲩⲙⲁⲕⲁⲣⲓⲟⲥ ⲡⲉ', greek: 'Μακάριος ἀνήρ', arabic: 'طوبى للرجل', french: 'Heureux l’homme' }),
+      verse(2, { english: 'But his delight', coptic: 'ⲁⲗⲗⲁ ⲡⲉϥⲟⲩⲱϣ', arabic: 'لكن في ناموس' }),
+    ],
+    languageKeys: ['english', 'englishNkjv', 'french', 'coptic', 'greek', 'arabic'],
+    fontSize: 20,
+    copticFontDataUri: 'data:font/ttf;base64,AA==',
+    isSlideshow,
+  });
+  const html = build(false);
+  const body = html.slice(html.indexOf('<body'), html.indexOf('<script>'));
+  // Verse 1, past the Psalm's introduction: the Coptic on its capital's decorated initial, drawn once with its vine.
+  assert.match(body, /<span class="coptic-initial" data-fit><svg class="coptic-initial-art"[^>]*><use class="coptic-initial-vine" href="#cv-initial-vine-2cb0"><\/use>/);
+  assert.ok(body.includes('<span class="coptic-initial-text">Ⲱ</span></span><span class="opening-word">ⲟⲩⲙⲁⲕⲁⲣⲓⲟⲥ</span> ⲡⲉ'));
+  assert.equal((html.match(/id="cv-initial-2cb0"/g) || []).length, 1);
+  // Every English column and the French on an Old English capital; the Arabic on its stretched word; the Greek as it is.
+  assert.equal((body.match(/<span class="english-initial-text">B<\/span><\/span><span class="opening-word english-small-caps">lessed<\/span> is the man/g) || []).length, 2);
+  assert.ok(body.includes('<span class="english-initial-text">H</span></span><span class="opening-word english-small-caps">eureux</span> l’homme'));
+  assert.ok(body.includes('<span class="opening-word arabic-opening">طوبـــى</span> للرجل'));
+  assert.ok(body.includes('>Μακάριος ἀνήρ<'));
+  // Its number shows ahead of each hanging initial, and in its line in the columns with none.
+  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="1">1<\/span><span class="verse-text"><span class="english-initial"/);
+  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="ⲁ̅">ⲁ̅<\/span><span class="verse-text"><span class="coptic-initial" data-fit>/);
+  assert.match(body, /<span class="verse-number" data-copy-text="١">١<\/span><span class="verse-text"><span class="opening-word arabic-opening">/);
+  assert.match(body, /<span class="verse-number" data-copy-text="Αʹ">Αʹ<\/span><span class="verse-text">Μακάριος/);
+  assert.match(html, /\.opening-verse-number \{ float: left; \}/);
+  // Only verse 1: its introduction and verse 2 read as written, verse 2's Coptic in lower case.
+  assert.ok(body.includes('>A Psalm of David<'));
+  assert.ok(body.includes('>ⲁⲗⲗⲁ ⲡⲉϥⲟⲩⲱϣ<'));
+  assert.match(body, /<span class="verse-number" data-copy-text="2">2<\/span>/);
+  assert.equal((body.match(/class="english-initial"/g) || []).length, 3);
+  // The page decides how tall the initial stands, before a slideshow cuts its pages and as the page reflows.
+  const script = html.slice(html.indexOf('<script>'));
+  assert.match(script, /function fitCopticInitials\(\) \{/);
+  assert.match(script, /fitCopticInitials\(\);\s+if \(document\.querySelector\('\.coptic-initial\[data-fit\]'\)\) \{/);
+  const slideshow = build(true).slice(build(true).indexOf('<script>'));
+  assert.match(slideshow, /initialPaginationDone = true;\s+fitCopticInitials\(\);\s+paginate\(initialAnchorVerse\);/);
+  assert.match(slideshow, /fitCopticInitials\(\);\s+paginate\(anchor\);/);
+  // A verse cut across slides is read as written, so its opening's letter is still its word's.
+  assert.match(slideshow, /var text = \(textNode\.textContent \|\| ''\)\.replace/);
 });

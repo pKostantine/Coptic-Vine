@@ -169,8 +169,8 @@ export function getItemSignature(item, displayedTitle = "") {
       item.hasSpeakerLabel,
       item.copticInitial?.letter,
       item.englishInitial?.letter,
+      item.frenchInitial?.letter,
       item.arabicOpening,
-      item.copticRefrain,
     ].join("\u241f")),
   ].join(":");
 }
@@ -847,7 +847,9 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
   segmentEntries.forEach(({ entry, lines, start }) => {
     const joinedBody = joinRenderedLines(lines);
     const beginsWithBibleNumber = Boolean(item.verse?.bibleVerseNumber) && start === 0;
-    const body = beginsWithBibleNumber
+    // A column opening on an initial sets the number ahead of it, not in its
+    // lines (VerseBlock.js), so there is none of it to take off them.
+    const body = beginsWithBibleNumber && !lines[0]?.initial
       ? joinedBody.replace(/^\S+\s*/, "")
       : joinedBody;
     const prefix = String(item.verse?.seasonalHoosVersePrefix || "").trim();

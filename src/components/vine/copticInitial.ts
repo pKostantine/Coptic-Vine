@@ -1,13 +1,17 @@
 import { COPTIC_INITIALS } from '../../constants/copticInitialArt';
 
 /**
- * The decorated initial a titled hymn's Coptic opens with (Coptic Vine Service
- * Reader, "How the drop cap is built"), shared by both readers: the scrolling
- * page (documentHtml.ts) and the slideshow (VerseBlock.js, JustifiedText.js).
+ * The decorated initial a line's Coptic opens with where it is marked to open
+ * with the drop cap (Coptic Vine Service Reader, "How the drop cap is built"),
+ * shared by the readers: the scrolling page (documentHtml.ts), the Bible
+ * reader (bibleDocumentHtml.ts) and the slideshow (VerseBlock.js,
+ * JustifiedText.js).
  */
 
 // The marks a letter can carry (the jinkim, an overline) ride with it into the initial.
 const COPTIC_INITIAL_PATTERN = /^\s*(\S)([\u0300-\u036F\uFE20-\uFE2F]*)/u;
+// Capitals some engines' case tables lack (as hymnLibrary.js's COPTIC_TO_UPPER).
+const COPTIC_TO_UPPER: Record<string, string> = { 'ⲭ': 'Ⲭ', 'ϭ': 'Ϭ', 'ϯ': 'Ϯ' };
 
 export interface CopticInitialSplit {
   letter: string;
@@ -17,14 +21,13 @@ export interface CopticInitialSplit {
 }
 
 /**
- * A Coptic paragraph's opening letter, when there's a decorated initial for
- * it, and the text after it. A paragraph opening on a small letter has none,
- * unless `capitalise` (the paragraph a hymn opens on after its standalone
- * refrain, kept in lower case in the books): then it takes its capital's.
+ * A Coptic paragraph's opening letter, as its capital when there's a
+ * decorated initial for it, and the text after it. A paragraph opening on
+ * anything else (a bracket, a numeral) has none.
  */
-export function splitCopticInitial(text: string, capitalise = false): CopticInitialSplit | null {
+export function splitCopticInitial(text: string): CopticInitialSplit | null {
   const match = COPTIC_INITIAL_PATTERN.exec(text);
-  const letter = match && capitalise ? match[1].toUpperCase() : match?.[1];
+  const letter = match ? COPTIC_TO_UPPER[match[1]] ?? match[1].toUpperCase() : null;
   if (!match || !letter || !COPTIC_INITIALS[letter]) return null;
   return { letter, marks: match[2], rest: text.slice(match[0].length) };
 }

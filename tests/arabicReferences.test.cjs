@@ -38,6 +38,8 @@ function loadDocumentBuilder() {
     '../../utils/versePresentation': loadFile('src/utils/versePresentation.js'),
     '../../utils/verseRubric': loadFile('src/utils/verseRubric.js'),
   };
+  // The drop caps' markup, from the same leaf modules.
+  local['./openingHtml'] = loadFile('src/components/vine/openingHtml.ts', (name) => local[name] || require(name));
   return loadFile('src/components/vine/documentHtml.ts', (name) => local[name] || require(name)).buildDocumentHtml;
 }
 

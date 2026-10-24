@@ -177,7 +177,7 @@ function splitOverwidthWord(word, maxWidth, fontSize, fontFamily, fontWeight, fo
 /**
  * How a paragraph's first word is set when it isn't set as the rest: a weight
  * alone (a Bible verse number, bold), or { fontSize, fontWeight, letterSpacing }
- * (an opening word: larger, or in small capitals). Null when it is set as the rest.
+ * (an opening word: in small capitals, or bold). Null when it is set as the rest.
  */
 function firstWordMetrics(firstWord, fontSize, fontWeight) {
   const spec = typeof firstWord === "string" ? { fontWeight: firstWord } : firstWord || {};

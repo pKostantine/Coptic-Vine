@@ -10,9 +10,8 @@ import { DOCUMENT_CONTROL_METRICS, getLanguageColumnGap } from "./documentPresen
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
 import { splitCopticInitial } from "./copticInitial";
-import { opensInTranslation, splitEnglishOpening, splitRestOfFirstWord } from "./openingInitials";
+import { splitEnglishOpening, splitRestOfFirstWord } from "./openingInitials";
 import {
-  copticStandsAlone,
   createSlideAnchor,
   estimateItemHeight,
   findSlideIndexForAnchor,
@@ -1462,8 +1461,8 @@ const SlideItem = memo(function SlideItem({
         selectableText={false}
         bishopPresent={item.bishopPresent}
         copticInitial={item.copticInitial}
-        copticRefrain={Boolean(item.copticRefrain)}
         englishInitial={item.englishInitial}
+        frenchInitial={item.frenchInitial}
         arabicOpening={Boolean(item.arabicOpening)}
         lineRanges={item.slideshowLineRanges}
         onLanguageLayout={(language, metric) =>
@@ -1578,12 +1577,10 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visi
     }
 
     const verses = section.verses || [];
-    const opening = findOpeningInitial(section, visibleLanguages);
-    // The row the hymn opens on whether or not its Coptic is shown: its
-    // English and Arabic open there too (openingInitials.ts) -- unless it is a
-    // Hoos verse, which opens on its seasonal line.
-    const openingRow = findOpeningInitial(section, { ...visibleLanguages, coptic: true });
-    const opensOtherColumns = (verse, verseIndex) => openingRow?.index === verseIndex && !hasSeasonalPrefixLine(verse);
+    // A verse marked to open with the drop cap opens in its English, French
+    // and Arabic too, whether or not its Coptic is shown (openingInitials.ts)
+    // -- unless it is a Hoos verse, which opens on its seasonal line.
+    const opensOtherColumns = (verse) => Boolean(verse.dropCap) && !hasSeasonalPrefixLine(verse);
 
     return [
       {
@@ -1627,10 +1624,10 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visi
         bishopPresent,
         isRecitedPrayer: isCopticGatedVerse(verse),
         isReading: Boolean(section.isReading),
-        copticInitial: opening?.index === verseIndex ? opening.initial : null,
-        copticRefrain: Boolean(openingRow?.refrains.includes(verseIndex)),
-        englishInitial: opensOtherColumns(verse, verseIndex) ? findEnglishInitial(verse) : null,
-        arabicOpening: opensOtherColumns(verse, verseIndex) && Boolean(String(verse.arabic || "").trim()),
+        copticInitial: findCopticInitial(verse, visibleLanguages),
+        englishInitial: opensOtherColumns(verse) ? findLatinInitial(verse.english) : null,
+        frenchInitial: opensOtherColumns(verse) ? findLatinInitial(verse.french) : null,
+        arabicOpening: opensOtherColumns(verse) && Boolean(String(verse.arabic || "").trim()),
         forceWhiteVerses: Boolean(section.forceWhiteVerses),
         verseIndex: sectionIndex + verseIndex,
       })),
@@ -1657,45 +1654,27 @@ function isCopticGatedVerse(verse) {
 }
 
 /**
- * The decorated initial a titled hymn opens with, as the scrolling reader sets
- * it (documentHtml.ts): the hymn's capital, on the first of its verses whose
- * Coptic, as shown, opens on a capital there is an initial for -- never after
- * a Bible verse number. Which verse that is depends on the languages shown.
- * A standalone refrain before it -- its Coptic alone on its row, like ⲁⲅⲓⲟⲥ
- * ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ or ⲇⲟⲝⲁⲥⲓ ⲟ ⲑⲉⲟⲥ ⲏⲙⲱⲛ -- takes none and is set in lower case
- * (`refrains`); the paragraph after it, kept in lower case in the books,
- * takes its capital's. A hymn with no such verse opens, without one, on its
- * first English and Arabic paragraph (opensInTranslation).
+ * The decorated initial a verse's Coptic opens with, as the scrolling reader
+ * sets it (documentHtml.ts): only on a verse marked to open with the drop cap
+ * (verse.dropCap), where its Coptic is shown and opens on a letter there is an
+ * initial for, in its capital's form.
  */
-function findOpeningInitial(section, visibleLanguages = {}) {
-  if (!(section.title?.english || section.title?.french || section.title?.arabic)) return null;
-  const verses = section.verses || [];
-  const refrains = [];
-  for (let index = 0; index < verses.length; index += 1) {
-    const verse = verses[index];
-    if (copticStandsAlone(verse) && String(verse.coptic || "").trim()) {
-      refrains.push(index);
-      continue;
-    }
-    const showsCoptic = getVisibleVerseLanguages({ verse, isRecitedPrayer: isCopticGatedVerse(verse) }, visibleLanguages).includes("coptic");
-    const split = showsCoptic && !verse.bibleVerseNumber ? splitCopticInitial(String(verse.coptic || ""), refrains.length > 0) : null;
-    if (!split) continue;
-    // Whether its first word goes on after the letter, to set the rest of it in the letter's colour.
-    return { index, initial: { letter: split.letter, marks: split.marks, opensWord: /^\S/.test(split.rest) }, refrains };
-  }
-  // No Coptic paragraph opens it, so it opens in its English and Arabic.
-  const index = verses.findIndex((verse) => opensInTranslation(verse));
-  return index !== -1 || refrains.length ? { index, initial: null, refrains } : null;
+function findCopticInitial(verse, visibleLanguages = {}) {
+  if (!verse.dropCap) return null;
+  const showsCoptic = getVisibleVerseLanguages({ verse, isRecitedPrayer: isCopticGatedVerse(verse) }, visibleLanguages).includes("coptic");
+  const split = showsCoptic ? splitCopticInitial(String(verse.coptic || "")) : null;
+  // Whether its first word goes on after the letter, to set the rest of it in the letter's colour.
+  return split ? { letter: split.letter, marks: split.marks, opensWord: /^\S/.test(split.rest) } : null;
 }
 
 /**
- * The English initial a verse the hymn opens on takes (openingInitials.ts):
- * its first capital, and whether its first word goes on after it. Decided from
- * the whole verse, since a piece of it turned over the page carries only the
- * lines measured after the initial.
+ * The Old English capital a marked verse's English or French opens with
+ * (openingInitials.ts): its first capital, and whether its first word goes on
+ * after it. Decided from the whole verse, since a piece of it turned over the
+ * page carries only the lines measured after the initial.
  */
-function findEnglishInitial(verse) {
-  const split = splitEnglishOpening(String(verse.english || ""));
+function findLatinInitial(text) {
+  const split = splitEnglishOpening(String(text || ""));
   return split ? { letter: split.letter, opensWord: Boolean(splitRestOfFirstWord(split.rest)) } : null;
 }
 

@@ -36,7 +36,8 @@ export type TableInfo = {
   table: string;
   /** Readable by the anon role in Supabase today: the Worker serves only these. */
   public: boolean;
-  columns: { name: string; kind: ColumnKind; pgType: string; notNull: boolean }[];
+  /** addedInD1: the migration that added a column D1 has gained since the cutover (D1_COLUMNS). */
+  columns: { name: string; kind: ColumnKind; pgType: string; notNull: boolean; addedInD1?: string }[];
   /** Columns dropped from the copy (generated tsvector). */
   dropped: string[];
   /** Primary key, or every column for the three tables without one. */
@@ -191,7 +192,7 @@ export function generate(catalog: PgCatalog): { migration: string; schema: Conte
       schema: relation.schema,
       table: relation.table,
       public: relation.anonReadable,
-      columns,
+      columns: [...columns, ...D1_COLUMNS.filter((added) => added.table === relation.table).map((added) => added.column)],
       dropped,
       rowKey: pk ? pk.columns : columns.map((column) => column.name),
       hasPrimaryKey: Boolean(pk),
@@ -213,6 +214,18 @@ export function generate(catalog: PgCatalog): { migration: string; schema: Conte
 
 /** Tables that exist only in D1 and also count as content: the Bible search index. */
 const D1_CONTENT_TABLES: [string, string][] = [['bible', 'verse_search']];
+
+/**
+ * Columns D1 has gained since the cutover, each by its own migration, in every
+ * schema's table of this name. They are listed for the Worker and the offline
+ * books, but 0001 (the catalog's tables) doesn't create them, and Supabase's
+ * frozen copy hasn't got them, so import and verify leave them out
+ * (scripts/lib/schema.ts).
+ */
+const D1_COLUMNS: { table: string; column: TableInfo['columns'][number] }[] = [
+  // Whether a hymn line opens with the drop cap and decorated first words.
+  { table: 'hymn_texts', column: { name: 'drop_cap', kind: 'boolean', pgType: 'boolean', notNull: true, addedInD1: '0032_drop_cap.sql' } },
+];
 
 /**
  * migrations/0003_content_revision.sql: the content revision and the record

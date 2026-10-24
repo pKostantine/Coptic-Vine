@@ -38,6 +38,16 @@ function loadBibleBuilder() {
     '../../utils/bibleNumerals': evaluateModule(fs.readFileSync('src/utils/bibleNumerals.ts', 'utf8'), 'bibleNumerals.ts', require),
     '../../constants/documentThemes': documentThemes,
   };
+  // The chapter's opening: its drop caps' markup and the leaf modules it draws on.
+  const load = (path, moduleRequire = require) => evaluateModule(fs.readFileSync(path, 'utf8'), path, moduleRequire);
+  Object.assign(localModules, {
+    '../../constants/documentOrnaments': load('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? load('src/constants/ornamentArt.ts') : require(name))),
+    '../../constants/copticInitialArt': load('src/constants/copticInitialArt.ts'),
+    '../../constants/englishInitialArt': load('src/constants/englishInitialArt.ts'),
+    './copticInitial': load('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? load('src/constants/copticInitialArt.ts') : require(name))),
+    './openingInitials': load('src/components/vine/openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? load('src/constants/englishInitialArt.ts') : require(name))),
+  });
+  localModules['./openingHtml'] = load('src/components/vine/openingHtml.ts', (name) => localModules[name] || require(name));
   return evaluateModule(source, 'bibleDocumentHtml.ts', (name) => localModules[name] || require(name)).buildBibleChapterHtml;
 }
 

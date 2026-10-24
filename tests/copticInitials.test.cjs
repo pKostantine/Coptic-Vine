@@ -30,6 +30,8 @@ function loadDocumentBuilder() {
     '../../utils/versePresentation': loadFile('src/utils/versePresentation.js'),
     '../../utils/verseRubric': loadFile('src/utils/verseRubric.js'),
   };
+  // The drop caps' markup, from the same leaf modules.
+  local['./openingHtml'] = loadFile('src/components/vine/openingHtml.ts', (name) => local[name] || require(name));
   return loadFile('src/components/vine/documentHtml.ts', (name) => local[name] || require(name)).buildDocumentHtml;
 }
 
@@ -54,8 +56,8 @@ test('every capital the Coptic face decorates has its letter and its vine', () =
   assert.ok(art.COPTIC_INITIAL_VINE_PIECES.length < 100);
 });
 
-test('a titled hymn opens its first Coptic paragraph with the decorated initial, the letter kept in the text', () => {
-  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛϣⲉⲡϩ̀ⲙⲟⲧ'), verse('Ϫⲉ ⲁϥⲉⲣⲥ̀ⲕⲉⲡⲁⲍⲓⲛ')])], OPTIONS);
+test('a line marked to open with the drop cap opens its Coptic with the decorated initial, the letter kept in the text', () => {
+  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛϣⲉⲡϩ̀ⲙⲟⲧ', { dropCap: true }), verse('Ϫⲉ ⲁϥⲉⲣⲥ̀ⲕⲉⲡⲁⲍⲓⲛ')])], OPTIONS);
   assert.deepEqual(initials(html), ['<span class="coptic-initial" data-fit>']);
   assert.ok(body(html).includes('<use class="coptic-initial-vine" href="#cv-initial-vine-2c98"></use><use class="coptic-initial-letter" href="#cv-initial-2c98"></use>'));
   // The rest of its first word follows in the letter's colour.
@@ -73,53 +75,62 @@ test('a titled hymn opens its first Coptic paragraph with the decorated initial,
 });
 
 test('the letter carries its jinkim into the copied text', () => {
-  const html = build([hymn([verse('  Ⲁ̀ⲙⲏⲛ ⲁⲗⲗⲏⲗⲟⲩⲓⲁ')])], OPTIONS);
+  const html = build([hymn([verse('  Ⲁ̀ⲙⲏⲛ ⲁⲗⲗⲏⲗⲟⲩⲓⲁ', { dropCap: true })])], OPTIONS);
   assert.ok(body(html).includes('<span class="coptic-initial-text">Ⲁ̀</span></span><span class="opening-word">ⲙⲏⲛ</span> ⲁⲗⲗⲏⲗⲟⲩⲓⲁ'));
 });
 
-test('the hymn\'s capital takes the initial: the first Coptic paragraph under a title to open on one, and only that one', () => {
-  // Untitled: a hymn's continuation, which never gets a capital.
-  assert.deepEqual(initials(build([hymn([verse('Ⲙⲁⲣⲉⲛ')], { english: '', arabic: '' })], OPTIONS)), []);
-  // The people's Kyrie kept in lower case before the Verses of the Cymbals: the capital after it takes the initial.
-  const cymbals = build([hymn([verse('ⲕⲩⲣⲓⲉ ⲉ̀ⲗⲉⲏ̀ⲥⲟⲛ'), verse('Ⲧⲉⲛⲟⲩⲱϣⲧ ⲙ̀Ⲫⲓⲱⲧ'), verse('Ⲭⲉⲣⲉ ⲧⲉⲕⲕⲗⲏⲥⲓⲁ')])], OPTIONS);
-  assert.deepEqual(initials(cymbals), ['<span class="coptic-initial" data-fit>']);
-  assert.ok(body(cymbals).includes('<span class="coptic-initial-text">Ⲧ</span></span><span class="opening-word">ⲉⲛⲟⲩⲱϣⲧ</span>'));
-  assert.ok(body(cymbals).includes('>Ⲭⲉⲣⲉ ⲧⲉⲕⲕⲗⲏⲥⲓⲁ<'), 'one initial a hymn');
-  // A capital that doesn't open its paragraph stays in its line.
-  assert.deepEqual(initials(build([hymn([verse('(Ⲙⲁⲣⲉⲛ)'), verse('ⲙⲁⲣⲉⲛ')])], OPTIONS)), []);
-  // A reading's verse opens on its number.
-  assert.deepEqual(initials(build([hymn([verse('Ⲡⲁⲩⲗⲟⲥ', { bibleVerseNumber: '1' })])], OPTIONS)), []);
-  // A line with no Coptic of its own leaves the initial to the paragraph that has some.
-  const html = build([hymn([verse('', { english: 'The priest says' }), verse('Ⲙⲁⲣⲉⲛ'), verse('Ⲡⲉⲛⲛⲟⲩϯ')])], OPTIONS);
-  assert.deepEqual(initials(html), ['<span class="coptic-initial" data-fit>']);
-  assert.ok(body(html).includes('<span class="coptic-initial-text">Ⲙ</span>'));
+test('only the lines marked open so: a hymn\'s title, and which of its lines comes first, decide nothing', () => {
+  const opened = (html) => initials(html).length + (body(html).match(/class="english-initial"|class="opening-word arabic-opening"/g) || []).length;
+  // A titled hymn with nothing marked opens nowhere, in any column.
+  assert.equal(opened(build([hymn([verse('Ⲙⲁⲣⲉⲛ'), verse('Ⲡⲉⲛⲛⲟⲩϯ')])], OPTIONS)), 0);
+  // An untitled one opens where it is marked; and every marked line opens.
+  assert.deepEqual(initials(build([hymn([verse('Ⲙⲁⲣⲉⲛ', { dropCap: true })], { english: '', arabic: '' })], OPTIONS)), ['<span class="coptic-initial" data-fit>']);
+  const twice = build([hymn([verse('Ⲧⲉⲛⲟⲩⲱϣⲧ ⲙ̀Ⲫⲓⲱⲧ'), verse('Ⲭⲉⲣⲉ ⲧⲉⲕⲕⲗⲏⲥⲓⲁ', { dropCap: true }), verse('Ⲡⲉⲛⲛⲟⲩϯ', { dropCap: true })])], OPTIONS);
+  assert.equal(initials(twice).length, 2);
+  assert.ok(body(twice).includes('>Ⲧⲉⲛⲟⲩⲱϣⲧ ⲙ̀Ⲫⲓⲱⲧ<'));
+  assert.ok(body(twice).includes('<span class="coptic-initial-text">Ⲭ</span>') && body(twice).includes('<span class="coptic-initial-text">Ⲡ</span>'));
+  // A marked line in lower case takes its capital's initial.
+  assert.ok(body(build([hymn([verse('ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ', { dropCap: true })])], OPTIONS)).includes('<span class="coptic-initial-text">Ⲭ</span></span><span class="opening-word">ⲟⲩⲁⲃ</span> ⲭⲟⲩⲁⲃ'));
+  // One opening on a bracket has none in Coptic, but its English still opens.
+  const bracket = build([hymn([verse('(Ⲙⲁⲣⲉⲛ)', { dropCap: true })])], OPTIONS);
+  assert.deepEqual(initials(bracket), []);
+  assert.ok(body(bracket).includes('<span class="english-initial-text">E</span>'));
+  // A reading's marked verse opens too, its number ahead of a hanging initial rather than between it and its word.
+  const reading = body(build([hymn([verse('Ⲡⲁⲩⲗⲟⲥ', { bibleVerseNumber: '1', dropCap: true }), verse('Ⲛⲉⲙ', { bibleVerseNumber: '2' })])], OPTIONS));
+  assert.deepEqual(initials(reading), ['<span class="coptic-initial" data-fit>']);
+  assert.match(reading, /<span class="bible-verse-number opening-verse-number" data-copy-text="1">1<\/span><span class="english-initial"/);
+  assert.match(reading, /<span class="bible-verse-number opening-verse-number" data-copy-text="ⲁ̅">ⲁ̅<\/span><span class="coptic-initial" data-fit>/);
+  // The Arabic, with no initial to stand ahead of, keeps its number in its line.
+  assert.match(reading, /<span class="bible-verse-number" data-copy-text="١">١<\/span><span class="bible-verse-number-gap"><\/span><span class="opening-word arabic-opening">/);
+  assert.match(reading, /<span class="bible-verse-number" data-copy-text="2">2<\/span><span class="bible-verse-number-gap"><\/span>English/);
+  const css = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], OPTIONS);
+  assert.match(css, /\.opening-verse-number \{ float: left; \}/);
+  assert.match(css, /\.bible-verse-number\.opening-verse-number \{ margin-right: 0\.25em; \}/);
+  assert.match(css, /\.coptic-initial-text, \.english-initial-text \{\s+clip: rect\(0 0 0 0\);/);
 });
 
-test('no Coptic column, no initial; an Invincible Coptic line alone on its row is a refrain and takes none either', () => {
+test('no Coptic column, no initial; a marked line alone on its row, centred, takes it a line tall', () => {
   const english = { english: true, french: false, coptic: false, arabic: true };
-  assert.deepEqual(initials(build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], { ...OPTIONS, visibleColumns: english })), []);
-  const invincible = build([hymn([verse('Ⲁⲅⲓⲟⲥ', { english: '', arabic: '', invincibleCoptic: true })])], { ...OPTIONS, visibleColumns: english });
-  assert.deepEqual(initials(invincible), []);
-  assert.ok(body(invincible).includes('>ⲁⲅⲓⲟⲥ<'));
+  assert.deepEqual(initials(build([hymn([verse('Ⲙⲁⲣⲉⲛ', { dropCap: true })])], { ...OPTIONS, visibleColumns: english })), []);
+  const invincible = (extra) => build([hymn([verse('Ⲁⲅⲓⲟⲥ', { english: '', arabic: '', invincibleCoptic: true, ...extra })])], { ...OPTIONS, visibleColumns: english });
+  assert.deepEqual(initials(invincible({})), []);
+  // The reader sets the line in the case it is given (the loader's casing, hymnLibrary.js).
+  assert.ok(body(invincible({})).includes('>Ⲁⲅⲓⲟⲥ<'));
+  assert.deepEqual(initials(invincible({ dropCap: true })), ['<span class="coptic-initial one-line">']);
 });
 
-test('a standalone refrain before the hymn is set in lower case without an initial; the paragraph after it opens the hymn', () => {
-  // The Sanctus: a rubric, ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ alone on its row, then the hymn, kept in lower case in the books.
+test('a refrain before a hymn is no different: the line marked after it opens, the refrain kept as given', () => {
+  // The Sanctus: a rubric, ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ alone on its row, then the hymn, the line after it marked.
   const sanctus = build([hymn([
     verse('', { english: 'The priest takes the veil', type: 'comment' }),
-    verse('Ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ.', { english: '', arabic: '', prayerType: 'Invincible Coptic' }),
-    verse('ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ', { english: 'Holy, holy, holy', arabic: 'قدوسٌ' }),
+    verse('ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ.', { english: '', arabic: '', prayerType: 'Invincible Coptic' }),
+    verse('ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ', { english: 'Holy, holy, holy', arabic: 'قدوسٌ', dropCap: true }),
   ])], OPTIONS);
   assert.deepEqual(initials(sanctus), ['<span class="coptic-initial" data-fit>']);
   assert.ok(body(sanctus).includes('>ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ.<'));
   assert.ok(body(sanctus).includes('<span class="coptic-initial-text">Ⲭ</span></span><span class="opening-word">ⲟⲩⲁⲃ</span> ⲭⲟⲩⲁⲃ ⲭⲟⲩⲁⲃ'));
   // Its English and Arabic open on that paragraph too.
   assert.ok(body(sanctus).includes('<span class="english-initial-text">H</span></span><span class="opening-word english-small-caps">oly,</span> holy, holy'));
-  // A seasonal Hoos's ⲇⲟⲝⲁⲥⲓ ⲟ ⲑⲉⲟⲥ ⲏⲙⲱⲛ, already in lower case.
-  const hoos = build([hymn([verse('ⲇⲟⲝⲁⲥⲓ ⲟ ⲑⲉⲟⲥ ⲏⲙⲱⲛ.', { english: '', arabic: '', invincibleCoptic: true }), verse('Ⲁⲣⲓⲯⲁⲗⲓⲛ')])], OPTIONS);
-  assert.ok(body(hoos).includes('<span class="coptic-initial-text">Ⲁ</span>'));
-  // Without a refrain before it, a paragraph in lower case still leaves the initial to the capital after it.
-  assert.ok(body(build([hymn([verse('ⲕⲩⲣⲓⲉ ⲉⲗⲉⲏⲥⲟⲛ'), verse('Ⲧⲉⲛⲟⲩⲱϣⲧ')])], OPTIONS)).includes('<span class="coptic-initial-text">Ⲧ</span>'));
 });
 
 test('the initial is exactly two lines tall, or one, and follows the text size', () => {
@@ -167,6 +178,22 @@ test('the page decides after layout whether the paragraph wraps, and decides aga
 const openings = loadFile('src/components/vine/openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? loadFile('src/constants/englishInitialArt.ts') : require(name)));
 const ornaments = loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name)));
 const coptic = loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? art : require(name)));
+
+test('the Arabic first word is made longer, never bigger: its size is the text\'s, only its weight and colour change', () => {
+  assert.deepEqual(openings.arabicOpeningWord('#EDBE45'), { style: { color: '#EDBE45', fontWeight: '700' }, baselineShift: 0 });
+  assert.equal(openings.ARABIC_OPENING_SIZE, undefined);
+  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ', { arabic: 'مبارك أنت', dropCap: true })])], OPTIONS);
+  assert.ok(html.includes('.arabic-opening { font-weight: 700; }'));
+  assert.doesNotMatch(html, /\.arabic-opening[^}]*font-size/);
+  assert.ok(body(html).includes('<span class="opening-word arabic-opening">مبـــارك</span> أنت'));
+});
+
+test('a verse number goes ahead of the initial on a slide, in a box as wide as its figures and a gap', () => {
+  assert.equal(openings.verseNumberLeadWidth('1', 20), 20);
+  assert.equal(openings.verseNumberLeadWidth('12', 20), 34);
+  // An overline takes no room of its own.
+  assert.equal(openings.verseNumberLeadWidth('ⲓ̅ⲃ̅', 25), openings.verseNumberLeadWidth('12', 25));
+});
 
 test('the Arabic first word is stretched once with kashida, only between letters that join', () => {
   assert.equal(openings.stretchArabicWord('مبارك'), 'مبـــارك');
@@ -234,8 +261,8 @@ test('on Night the initials take the season\'s own vine and letter; elsewhere th
   assert.ok(html.includes('.english-initial-art .english-initial-letter { fill: #EDBE45; }'));
 });
 
-test('the row the hymn opens on opens in English and Arabic too, its first words in the letter\'s colour', () => {
-  const html = build([hymn([verse('Ⲕⲥ̀ⲙⲁⲣⲱⲟⲩⲧ ⲡϭⲟⲓⲥ', { english: 'Blessed are You, O Lord', arabic: 'مبارك أنت أيها الرب' }), verse('Ⲡⲉⲛⲛⲟⲩϯ', { english: 'Our God', arabic: 'إلهنا' })])], OPTIONS);
+test('the line marked opens in English and Arabic too, its first words in the letter\'s colour', () => {
+  const html = build([hymn([verse('Ⲕⲥ̀ⲙⲁⲣⲱⲟⲩⲧ ⲡϭⲟⲓⲥ', { english: 'Blessed are You, O Lord', arabic: 'مبارك أنت أيها الرب', dropCap: true }), verse('Ⲡⲉⲛⲛⲟⲩϯ', { english: 'Our God', arabic: 'إلهنا' })])], OPTIONS);
   const page = body(html);
   // English: its capital, as wide as its letter, drawn once and pointed to, the letter kept unseen, the rest of the word in small capitals.
   assert.match(page, /<span class="english-initial" style="width: [\d.]+px;"><svg class="english-initial-art" viewBox="115 -1532 1323 1699" aria-hidden="true"><use class="english-initial-letter" href="#en-initial-42"><\/use><\/svg>/);
@@ -246,47 +273,70 @@ test('the row the hymn opens on opens in English and Arabic too, its first words
   assert.ok(page.includes('<span class="opening-word arabic-opening">مبـــارك</span> أنت أيها الرب'));
   // Coptic: the rest of the word after its initial.
   assert.ok(page.includes('<span class="opening-word">ⲥ̀ⲙⲁⲣⲱⲟⲩⲧ</span> ⲡϭⲟⲓⲥ'));
-  // Once a hymn.
+  // The line after it, unmarked, doesn't.
   assert.equal((page.match(/class="english-initial"/g) || []).length, 1);
   assert.ok(page.includes('>Our God<'));
   // With the Coptic hidden, the English and Arabic still open on that row.
-  const noCoptic = body(build([hymn([verse('Ⲕⲥ̀ⲙⲁⲣⲱⲟⲩⲧ', { english: 'Blessed', arabic: 'مبارك' })])], { ...OPTIONS, visibleColumns: { english: true, french: false, coptic: false, arabic: true } }));
+  const noCoptic = body(build([hymn([verse('Ⲕⲥ̀ⲙⲁⲣⲱⲟⲩⲧ', { english: 'Blessed', arabic: 'مبارك', dropCap: true })])], { ...OPTIONS, visibleColumns: { english: true, french: false, coptic: false, arabic: true } }));
   assert.equal((noCoptic.match(/class="english-initial"/g) || []).length, 1);
   assert.equal((noCoptic.match(/coptic-initial-text/g) || []).length, 0);
-});
-
-test('a hymn with no Coptic to open on opens in English and Arabic, on its first paragraph past any comment', () => {
-  const absolution = (verses) => build([hymn(verses, { english: 'Absolution of the Third Hour', arabic: '' })], OPTIONS);
-  const page = body(absolution([
-    verse('', { english: 'The priest says', arabic: '', type: 'comment' }),
-    verse('', { english: 'O God of all compassion', arabic: 'يا إله كل رأفة', type: 'recitedPrayer' }),
-    verse('', { english: 'We ask and entreat You', arabic: 'نسأل ونطلب', type: 'recitedPrayer' }),
-  ]));
-  assert.ok(page.includes('>The priest says<'));
-  assert.ok(page.includes('<span class="english-initial-text">O</span></span>'));
-  assert.ok(page.includes('<span class="opening-word arabic-opening">يـــا</span> إله كل رأفة'));
-  assert.equal((page.match(/class="english-initial"/g) || []).length, 1);
-  assert.equal((page.match(/class="opening-word arabic-opening"/g) || []).length, 1);
-  assert.ok(page.includes('>We ask and entreat You<'));
-  assert.deepEqual(initials(page), []);
-  // A recited prayer's Coptic switched off leaves it nothing in Coptic to open on, too.
-  const recited = body(build([hymn([verse('Ⲡⲉⲛⲓⲱⲧ', { english: 'Our Father', arabic: 'أبانا', type: 'recitedPrayer' })])], { ...OPTIONS, copticRecitedPrayers: false }));
+  // And so does a recited prayer's, its Coptic switched off.
+  const recited = body(build([hymn([verse('Ⲡⲉⲛⲓⲱⲧ', { english: 'Our Father', arabic: 'أبانا', type: 'recitedPrayer', dropCap: true })])], { ...OPTIONS, copticRecitedPrayers: false }));
   assert.ok(recited.includes('<span class="english-initial-text">O</span></span><span class="opening-word english-small-caps">ur</span> Father'));
   assert.deepEqual(initials(recited), []);
-  // Still never a reading's numbered verse, nor a hymn's untitled continuation.
-  assert.ok(!body(absolution([verse('', { english: 'In the beginning', bibleVerseNumber: '1' })])).includes('english-initial'));
-  assert.ok(!body(build([hymn([verse('', { english: 'And again' })], { english: '', arabic: '' })], OPTIONS)).includes('english-initial'));
-  // The Arabic alone opens it when the English has no capital to open on.
-  const arabicOnly = body(absolution([verse('', { english: '', arabic: 'مبارك أنت' })]));
-  assert.ok(arabicOnly.includes('<span class="opening-word arabic-opening">مبـــارك</span> أنت'));
 });
 
-test('which verse opens a hymn in English and Arabic when nothing in Coptic does', () => {
-  assert.equal(openings.opensInTranslation({ type: 'text', english: 'O God', arabic: '' }), true);
-  assert.equal(openings.opensInTranslation({ type: 'text', english: '', arabic: 'يا إله' }), true);
-  assert.equal(openings.opensInTranslation({ type: 'text', english: '(Bow down)', arabic: '' }), false);
-  for (const type of ['comment', 'silentComment', 'refrainLabel', 'readingReference']) {
-    assert.equal(openings.opensInTranslation({ type, english: 'Rubric', arabic: 'عربي' }), false, type);
-  }
-  assert.equal(openings.opensInTranslation({ type: 'text', english: 'In the beginning', bibleVerseNumber: '1' }), false);
+test('the French opens as the English does, on an Old English capital, the rest of its first word in small capitals', () => {
+  const columns = { english: true, french: true, coptic: true, arabic: true };
+  const page = body(build([hymn([verse('Ⲙⲁⲣⲉⲛϣⲉⲡϩ̀ⲙⲟⲧ', { english: 'Let us give thanks', french: 'Rendons grâce', dropCap: true })])], { ...OPTIONS, visibleColumns: columns }));
+  assert.ok(page.includes('<span class="english-initial-text">L</span></span><span class="opening-word english-small-caps">et</span> us give thanks'));
+  assert.ok(page.includes('<span class="english-initial-text">R</span></span><span class="opening-word english-small-caps">endons</span> grâce'));
+  // Each letter drawn once for the page, English and French alike.
+  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ', { english: 'Rejoice', french: 'Réjouis-toi', dropCap: true })])], { ...OPTIONS, visibleColumns: columns });
+  assert.equal((html.match(/id="en-initial-52"/g) || []).length, 1);
+  assert.equal((body(html).match(/class="english-initial"/g) || []).length, 2);
+  // A French line opening on a letter there is no Old English capital for (an accented one, a quote) is left as it is.
+  const accented = body(build([hymn([verse('Ⲙⲁⲣⲉⲛ', { english: 'To You', french: 'À toi', dropCap: true })])], { ...OPTIONS, visibleColumns: columns }));
+  assert.ok(accented.includes('>À toi<'));
+  assert.equal((accented.match(/class="english-initial"/g) || []).length, 1);
+  // An unmarked line's French doesn't open.
+  assert.ok(body(build([hymn([verse('Ⲙⲁⲣⲉⲛ', { french: 'Rendons grâce' })])], { ...OPTIONS, visibleColumns: columns })).includes('>Rendons grâce<'));
+});
+
+test('the Coptic initial is its letter\'s capital, whatever case the letter is in', () => {
+  assert.deepEqual(coptic.splitCopticInitial('ⲙⲁⲣⲉⲛ'), { letter: 'Ⲙ', marks: '', rest: 'ⲁⲣⲉⲛ' });
+  // The three some engines' case tables lack.
+  assert.equal(coptic.splitCopticInitial('ⲭⲉⲣⲉ').letter, 'Ⲭ');
+  assert.equal(coptic.splitCopticInitial('ϭⲓⲥⲓ').letter, 'Ϭ');
+  assert.equal(coptic.splitCopticInitial('ϯⲛⲟⲩ').letter, 'Ϯ');
+  assert.equal(coptic.splitCopticInitial('(Ⲙⲁⲣⲉⲛ)'), null);
+  assert.equal(coptic.splitCopticInitial(''), null);
+});
+
+test('the loader marks the lines that open, hymn_texts.drop_cap and each reading\'s first verse, and their Coptic takes the capital', () => {
+  const library = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
+  // Every column, drop_cap with them, whether or not the content Worker serving them knows it yet.
+  assert.match(library, /const SERVICE_TEXT_FIELDS = "\*";/);
+  assert.match(library, /const INLINE_TEXT_FIELDS = "\*";/);
+  assert.match(fs.readFileSync('src/utils/saintHymns.ts', 'utf8'), /const TEXT_COLUMNS = '\*';/);
+  // Each hymn line carries its own mark, by either road a line takes into a document.
+  assert.equal((library.match(/dropCap: Boolean\(row\.drop_cap\),/g) || []).length, 2);
+  assert.match(library, /drop_cap: Boolean\(line\?\.drop_cap\),/);
+  // The capital goes to the marked lines' Coptic, whatever the hymn's title.
+  const casing = library.slice(library.indexOf('function applyCopticCaseToSection'), library.indexOf('function lowercaseCoptic'));
+  assert.match(casing, /return \{ \.\.\.verse, coptic: verse\.dropCap \? uppercaseFirstCopticChar\(coptic\) : coptic \};/);
+  assert.doesNotMatch(casing, /title/);
+  assert.doesNotMatch(library, /skipHymnCapitalization/);
+  // Every reading opens on its first verse, Coptic or not: the Bible's, a Pascha Psalm read from its hymn, each commemoration of the Synaxarium.
+  assert.equal((library.match(/openOnFirstVerse\(/g) || []).length, 5);
+  assert.match(library, /return openOnFirstVerse\(applyCopticCaseToReadingVerses\(\[/);
+  assert.match(library, /return \{ verses: openOnFirstVerse\(applyCopticCaseToReadingVerses\(hymnVerses\)\), citation \};/);
+  assert.match(library, /const verses = openOnFirstVerse\(\(entry\.paragraphs \|\| \[\]\)\.map/);
+  const source = /function openOnFirstVerse\(verses\) \{[\s\S]*?\n\}/.exec(library)[0];
+  const openOnFirstVerse = new Function(`${source}; return openOnFirstVerse;`)();
+  assert.deepEqual(openOnFirstVerse([{ type: 'text', english: 'In' }, { type: 'text', english: 'And' }]), [{ type: 'text', english: 'In', dropCap: true }, { type: 'text', english: 'And' }]);
+  assert.deepEqual(openOnFirstVerse([{ type: 'comment', english: '(Chanted)' }, { type: 'text', english: 'O' }]).map((verse) => Boolean(verse.dropCap)), [false, true]);
+  assert.deepEqual(openOnFirstVerse([]), []);
+  // And so does the Lectionary's.
+  assert.match(fs.readFileSync('src/utils/readingsService.ts', 'utf8'), /verses: \[\.\.\.citationVerse, \.\.\.readingVerses\.map\(\(verse, index\) => \(index === 0 \? \{ \.\.\.verse, dropCap: true \} : verse\)\)\],/);
 });

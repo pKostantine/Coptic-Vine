@@ -331,10 +331,16 @@ interface TextRow {
   arabic: string | null;
   person_type: string | null;
   prayer_type: string | null;
+  drop_cap?: boolean | null;
 }
 
-/** Every column the document's own verse builder reads, so a previewed verse is the verse. */
-const TEXT_COLUMNS = 'hymn_key, line_order, english, coptic, arabic, person_type, prayer_type';
+/**
+ * Every column, so a previewed verse is the verse the document's own builder
+ * makes, drop_cap included -- which reaches the content Worker's table list
+ * only once it is deployed, so naming it would fail before then (as
+ * hymnLibrary.js's SERVICE_TEXT_FIELDS).
+ */
+const TEXT_COLUMNS = '*';
 
 const byLineOrder = (a: TextRow, b: TextRow) => (Number(a.line_order) || 0) - (Number(b.line_order) || 0);
 
@@ -475,7 +481,7 @@ async function loadPreview(token: string, category: SaintHymnCategory): Promise<
     const { data, error } = await supabase
       .schema(source.schema)
       .from('hymn_texts')
-      .select(`${TEXT_COLUMNS}, condition`)
+      .select(TEXT_COLUMNS)
       .eq('hymn_key', VENERATION_HYMN_KEY)
       .ilike('condition', `%${token}%`);
     if (error) throw new Error(`Unable to load this hymn: ${error.message}`);

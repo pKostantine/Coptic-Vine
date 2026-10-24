@@ -232,6 +232,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -786,6 +793,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -1815,6 +1829,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -2015,6 +2036,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -2215,6 +2243,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -2459,6 +2494,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -2659,6 +2701,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -3305,6 +3354,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -3725,6 +3781,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -3935,6 +3998,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -4225,6 +4295,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -4827,6 +4904,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -5025,6 +5109,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -5363,6 +5454,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -5783,6 +5881,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -6197,6 +6302,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -6485,6 +6597,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -6874,6 +6993,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],
@@ -7021,6 +7147,13 @@
      "kind": "text",
      "pgType": "text",
      "notNull": false
+    },
+    {
+     "name": "drop_cap",
+     "kind": "boolean",
+     "pgType": "boolean",
+     "notNull": true,
+     "addedInD1": "0032_drop_cap.sql"
     }
    ],
    "dropped": [],

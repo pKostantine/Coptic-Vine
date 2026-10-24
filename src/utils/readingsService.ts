@@ -1,4 +1,4 @@
-import type { DocumentSection } from '../components/vine/documentHtml';
+import type { DocumentSection, DocumentVerse } from '../components/vine/documentHtml';
 import { toIsoDate as toIsoDateString } from './dateUtils';
 import { FIXED_FEASTS } from './fixedFeasts';
 import { hydrateSupabaseServiceHymn } from './hymnLibrary';
@@ -769,26 +769,27 @@ async function buildReadingSection(rule: ReadingRule): Promise<{ section: Docume
   // "X according to Y" only makes sense when the book varies by day (Gospel/
   // Prophecy) — a Psalm reading is always from the Psalms, so naming the
   // book too would just read "Psalm according to Psalms".
+  const readingVerses: DocumentVerse[] = psalmVerses ??
+    applyCopticCaseToReadingVerses(
+      verses.map((v) => ({
+        english: v.english,
+        coptic: v.coptic || '',
+        arabic: v.arabic,
+        type: 'text',
+        bibleChapterNumber: String(v.displayChapter),
+        bibleVerseNumber: String(v.displayVerse),
+      })),
+    );
   const section: DocumentSection = {
     id: rule.reading_rule_id,
     title: {
       english: bookTitle && !isPsalm ? `${label.english} according to ${bookTitle.english}` : label.english,
       arabic: bookTitle && !isPsalm ? `${label.arabic} ${bookTitle.arabic}` : label.arabic,
     },
-    verses: [
-      ...citationVerse,
-      ...(psalmVerses ??
-        applyCopticCaseToReadingVerses(
-          verses.map((v) => ({
-            english: v.english,
-            coptic: v.coptic || '',
-            arabic: v.arabic,
-            type: 'text',
-            bibleChapterNumber: String(v.displayChapter),
-            bibleVerseNumber: String(v.displayVerse),
-          })),
-        )),
-    ],
+    // A reading opens on its first verse with the drop cap and decorated
+    // first words, whether or not it is read in Coptic (as hymnLibrary.js's
+    // openOnFirstVerse).
+    verses: [...citationVerse, ...readingVerses.map((verse, index) => (index === 0 ? { ...verse, dropCap: true } : verse))],
     forceWhiteVerses: true,
   };
 

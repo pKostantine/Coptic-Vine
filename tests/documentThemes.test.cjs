@@ -232,6 +232,8 @@ function loadDocumentBuilder() {
     '../../utils/versePresentation': loadFile('src/utils/versePresentation.js'),
     '../../utils/verseRubric': loadFile('src/utils/verseRubric.js'),
   };
+  // The drop caps' markup, from the same leaf modules.
+  local['./openingHtml'] = loadFile('src/components/vine/openingHtml.ts', (name) => local[name] || require(name));
   return loadFile('src/components/vine/documentHtml.ts', (name) => local[name] || require(name)).buildDocumentHtml;
 }
 
@@ -244,6 +246,15 @@ function loadBibleBuilder() {
     '../../utils/bibleNumerals': loadFile('src/utils/bibleNumerals.ts'),
     '../../utils/displayText': { formatEnglishDisplayText: (value) => String(value || '') },
   };
+  // The chapter's opening: its drop caps' markup and the leaf modules it draws on.
+  Object.assign(local, {
+    '../../constants/documentOrnaments': loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name))),
+    '../../constants/copticInitialArt': loadFile('src/constants/copticInitialArt.ts'),
+    '../../constants/englishInitialArt': loadFile('src/constants/englishInitialArt.ts'),
+    './copticInitial': loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? loadFile('src/constants/copticInitialArt.ts') : require(name))),
+    './openingInitials': loadFile('src/components/vine/openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? loadFile('src/constants/englishInitialArt.ts') : require(name))),
+  });
+  local['./openingHtml'] = loadFile('src/components/vine/openingHtml.ts', (name) => local[name] || require(name));
   return loadFile('src/components/vine/bibleDocumentHtml.ts', (name) => local[name] || require(name)).buildBibleChapterHtml;
 }
 
@@ -255,7 +266,7 @@ const SECTIONS = [
     alternateEvery: 1,
     collapsible: true,
     verses: [
-      verse('Priest line', { type: 'priest' }),
+      verse('Priest line', { type: 'priest', dropCap: true }),
       verse('Deacon line', { type: 'deacon' }),
       verse('People line', { type: 'people' }),
       verse('A comment', { type: 'comment' }),
@@ -289,8 +300,8 @@ test('the scrolling reader is set on its page, and no other', () => {
     assert.match(html, new RegExp(`stroke="${colors.accent}"`), `${id}'s collapse button`);
     assert.match(html, new RegExp(`\\.gospel-rite-toggle\\.is-on \\{\\s+background: ${colors.accent};\\s+color: ${colors.onAccent};`), `${id}'s lit toggle`);
     // Each kind of line is inked in the page's colour for it. The priest's
-    // opens the hymn, which has no Coptic (opensInTranslation): its P an
-    // initial, the rest of its first word in small capitals.
+    // is marked to open with the drop cap (dropCap): its P an initial, the
+    // rest of its first word in small capitals.
     for (const [text, key] of [['A comment', 'comment'], ['A silent prayer', 'silent'], ['Refrain', 'refrain'], ['Matthew 1:1', 'comment'], ['riest</span> line', 'text'], ['Deacon line', 'alternate']]) {
       const at = html.indexOf(`>${text}<`);
       assert.ok(at > 0, `${id} shows "${text}"`);
