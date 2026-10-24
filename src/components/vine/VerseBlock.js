@@ -58,15 +58,15 @@ export default function VerseBlock({
   usePeopleLineColor = false,
   selectableText = false,
   bishopPresent = false,
-  // The decorated initial this verse's Coptic opens its hymn with ({ letter,
-  // marks }, see flattenSections in SlideshowContainer.js), or none.
+  // The decorated initial this verse's Coptic opens with ({ letter, marks },
+  // see flattenSections in SlideshowContainer.js), or none.
   copticInitial = null,
-  // A standalone refrain before the hymn (ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ), set in lower case.
-  copticRefrain = false,
-  // The hymn opens on this verse in English and Arabic too: the English
-  // initial ({ letter, opensWord }), and whether the Arabic's first word is
-  // stretched (openingInitials.ts).
+  // A verse marked to open with the drop cap (verse.dropCap) opens in English,
+  // French and Arabic too: the English and French initials ({ letter,
+  // opensWord }), and whether the Arabic's first word is stretched
+  // (openingInitials.ts).
   englishInitial = null,
+  frenchInitial = null,
   arabicOpening = false,
   // Where in each column's lines this piece of the verse starts (a piece
   // turned over the page from a tall verse starts part way), so only the
@@ -133,34 +133,41 @@ export default function VerseBlock({
   // a line tall (PlainVerseBody).
   const initial = copticInitial || null;
   const formattedCoptic = formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd();
-  const copticText = copticRefrain ? formattedCoptic.toLowerCase() : formattedCoptic;
+  const copticText = formattedCoptic;
   // The initials' colours (documentInitialColors): the letter's is the opening words' too.
   const initialVineColor = theme.colors.initialVine || theme.colors.gold;
   const initialLetterColor = theme.colors.initialLetter || theme.colors.ornament || theme.colors.gold;
   const startsParagraph = (language) => (lineRanges?.[language]?.start ?? 0) === 0;
   // The opening: the rest of each column's first word in the letter's colour,
-  // the English set after its initial in small capitals (passed here in
-  // capitals) and the Arabic's stretched and set larger, in bold. Only a
-  // justified column opens so.
+  // the English and French set after their initials in small capitals (passed
+  // here in capitals) and the Arabic's stretched and set larger, in bold.
+  // Only a justified column opens so.
   const copticRest = initial ? copticText.trimStart().slice(initial.letter.length + initial.marks.length) : "";
   const englishText = String(verse.english || "").trimEnd();
+  const frenchText = String(verse.french || "").trimEnd();
   // A piece turned over the page carries the lines measured after the
   // initial already, so only the whole verse is split here.
-  const englishOpening = (() => {
-    if (!englishInitial || alignmentFor("english") !== "justify") return null;
-    if (verse.slideshowForcedLines?.english) return { letter: englishInitial.letter, text: englishText, hasWord: englishInitial.opensWord };
-    const split = splitEnglishOpening(englishText);
-    if (!split || split.letter !== englishInitial.letter) return null;
+  const latinOpening = (language, text, latinInitial) => {
+    if (!latinInitial || alignmentFor(language) !== "justify") return null;
+    if (verse.slideshowForcedLines?.[language]) return { letter: latinInitial.letter, text, hasWord: latinInitial.opensWord };
+    const split = splitEnglishOpening(text);
+    if (!split || split.letter !== latinInitial.letter) return null;
     const first = splitRestOfFirstWord(split.rest);
     return { letter: split.letter, text: first ? first.word.toUpperCase() + first.after : split.rest, hasWord: Boolean(first) };
-  })();
+  };
+  const englishOpening = latinOpening("english", englishText, englishInitial);
+  const frenchOpening = latinOpening("french", frenchText, frenchInitial);
   const arabicText = formatArabicNumbers(verse.arabic).trimEnd();
   const arabicSplit = arabicOpening && alignmentFor("arabic") === "justify" ? splitArabicOpening(arabicText) : null;
   const englishFontSize = getSlideshowLanguageFontSize("english", { verse }, fontSize);
+  const frenchFontSize = getSlideshowLanguageFontSize("french", { verse }, fontSize);
   const arabicFontSize = getSlideshowLanguageFontSize("arabic", { verse }, fontSize);
+  // A verse that opens with the drop cap shows no number, which would stand
+  // between the initial and its word (as documentHtml.ts keeps it unseen).
   const bibleNumberFor = (language) =>
-    !Array.isArray(verse.slideshowBibleNumberLanguages) ||
-    verse.slideshowBibleNumberLanguages.includes(language)
+    !verse.dropCap &&
+    (!Array.isArray(verse.slideshowBibleNumberLanguages) ||
+      verse.slideshowBibleNumberLanguages.includes(language))
       ? verse.bibleVerseNumber
       : "";
   const rowLanguages = [
@@ -184,12 +191,15 @@ export default function VerseBlock({
     {
       key: "french",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "french", bishopPresent),
-      text: String(verse.french || "").trimEnd(),
+      text: frenchOpening && !verse.slideshowForcedLines?.french ? frenchOpening.text : frenchText,
+      englishInitial: frenchOpening?.letter ?? null,
+      englishOpensWord: Boolean(frenchOpening?.hasWord),
+      openingWord: frenchOpening?.hasWord && startsParagraph("french") ? englishOpeningWord(frenchFontSize, initialLetterColor) : null,
       bibleVerseNumber: bibleNumberFor("french"),
       // The seasonal prefix is English/Arabic text; French keeps its line
       // blank so its verse starts level with theirs.
       seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
-      fontSize: getSlideshowLanguageFontSize("french", { verse }, fontSize),
+      fontSize: frenchFontSize,
       fontFamily: "Georgia",
       lineHeight: getSlideshowLanguageLineHeight("french", { verse }, fontSize),
       styles: [styles.english],

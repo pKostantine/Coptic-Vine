@@ -169,8 +169,8 @@ export function getItemSignature(item, displayedTitle = "") {
       item.hasSpeakerLabel,
       item.copticInitial?.letter,
       item.englishInitial?.letter,
+      item.frenchInitial?.letter,
       item.arabicOpening,
-      item.copticRefrain,
     ].join("\u241f")),
   ].join(":");
 }

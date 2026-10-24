@@ -35,6 +35,7 @@ way to write to it. It also accepts a church id (`x-church-id` or
 | `0003_content_revision.sql` | The content revision, the record of changed tables, and the triggers that keep both. Generated. |
 | `0004_offline_plan.sql` | The offline books' plan (books, resources, dependencies). |
 | `0005_publish_requests.sql` | The revision the offline books were last asked to be rebuilt for (see [Building the offline books](#building-the-offline-books)). |
+| `0032_drop_cap.sql` | `drop_cap` on every `hymn_texts` table: 1 where a line opens with the drop cap and decorated first words, 0 (the default) elsewhere. A column D1 gained after the cutover, so `D1_COLUMNS` in `scripts/gen-schema.ts` lists it in `schema/content-tables.json` rather than 0001. |
 
 ## Decisions made in Phase 1
 

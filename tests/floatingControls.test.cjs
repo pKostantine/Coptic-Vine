@@ -116,6 +116,8 @@ function loadDocumentBuilder() {
     '../../utils/versePresentation': loadFile('src/utils/versePresentation.js'),
     '../../utils/verseRubric': loadFile('src/utils/verseRubric.js'),
   };
+  // The drop caps' markup, from the same leaf modules.
+  local['./openingHtml'] = loadFile('src/components/vine/openingHtml.ts', (name) => local[name] || require(name));
   return loadFile('src/components/vine/documentHtml.ts', (name) => local[name] || require(name)).buildDocumentHtml;
 }
 
@@ -131,6 +133,15 @@ function loadBibleBuilder() {
     '../../utils/bibleNumerals': loadFile('src/utils/bibleNumerals.ts'),
     '../../constants/documentThemes': themes,
   };
+  // The chapter's opening: its drop caps' markup and the leaf modules it draws on.
+  Object.assign(local, {
+    '../../constants/documentOrnaments': loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name))),
+    '../../constants/copticInitialArt': loadFile('src/constants/copticInitialArt.ts'),
+    '../../constants/englishInitialArt': loadFile('src/constants/englishInitialArt.ts'),
+    './copticInitial': loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? loadFile('src/constants/copticInitialArt.ts') : require(name))),
+    './openingInitials': loadFile('src/components/vine/openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? loadFile('src/constants/englishInitialArt.ts') : require(name))),
+  });
+  local['./openingHtml'] = loadFile('src/components/vine/openingHtml.ts', (name) => local[name] || require(name));
   return evaluateModule(source, 'bibleDocumentHtml.ts', (name) => local[name] || require(name)).buildBibleChapterHtml;
 }
 

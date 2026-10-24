@@ -335,7 +335,7 @@ function buildReadingVerses(readingRow, withCoptic, isPsalm) {
   // has it on roughly every other Psalm verse), showing it again here reads
   // as a duplicated, out-of-place acclamation.
   if (isPsalm) {
-    return applyCopticCaseToReadingVerses([
+    return openOnFirstVerse(applyCopticCaseToReadingVerses([
       stripAlleluiaFromPsalmVerse({
         english: flatVerses.map((v) => v.english || "").filter(Boolean).join(" "),
         coptic: withCoptic ? flatVerses.map((v) => v.coptic || "").filter(Boolean).join(" ") : "",
@@ -343,10 +343,10 @@ function buildReadingVerses(readingRow, withCoptic, isPsalm) {
         french: flatVerses.map((v) => v.french || "").filter(Boolean).join(" "),
         type: "text",
       }),
-    ]);
+    ]));
   }
 
-  return applyCopticCaseToReadingVerses(
+  return openOnFirstVerse(applyCopticCaseToReadingVerses(
     flatVerses.map((v) => ({
       english: v.english || "",
       coptic: withCoptic ? v.coptic || "" : "",
@@ -356,7 +356,17 @@ function buildReadingVerses(readingRow, withCoptic, isPsalm) {
       bibleChapterNumber: String(v.chapter_number),
       bibleVerseNumber: String(v.verse_number),
     })),
-  );
+  ));
+}
+
+/**
+ * A reading opens on its first verse -- the drop cap and decorated first
+ * words -- whether or not it is read in Coptic: past any rubric before it,
+ * as a Pascha Psalm read from its hymn_texts rows can have.
+ */
+function openOnFirstVerse(verses) {
+  const first = verses.findIndex((verse) => verse.type !== "comment" && verse.type !== "silentComment");
+  return first === -1 ? verses : verses.map((verse, index) => (index === first ? { ...verse, dropCap: true } : verse));
 }
 
 const bibleBookTitleCache = new Map();
@@ -718,8 +728,9 @@ async function resolveSynaxariumSections(isoDate) {
     // role on all of them would restart the rubric and print "Reader:" over
     // every commemoration in the day.
     const personType = index === 0 ? SYNAXARIUM_ENTRY_PERSON_TYPE : null;
-    const verses = (entry.paragraphs || []).map((p) =>
-      synaxariumVerse({ english: p.english || "", arabic: p.arabic ?? null }, personType));
+    // Each commemoration is read as a reading is, opening on its first paragraph.
+    const verses = openOnFirstVerse((entry.paragraphs || []).map((p) =>
+      synaxariumVerse({ english: p.english || "", arabic: p.arabic ?? null }, personType)));
     sections.push({
       id: entry.entry_key,
       title: { english: entry.title_english || "", arabic: entry.title_arabic || "" },
@@ -922,7 +933,7 @@ async function resolvePaschaRiteReading(mapping, flags) {
     const verse = buildVerseFromTextRow(textRow.person_type === "Comment" ? textRow : { ...textRow, person_type: null });
     return [{ ...verse, coptic: mapping.withCoptic ? verse.coptic : "", bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }];
   });
-  if (hymnVerses.length) return { verses: applyCopticCaseToReadingVerses(hymnVerses), citation };
+  if (hymnVerses.length) return { verses: openOnFirstVerse(applyCopticCaseToReadingVerses(hymnVerses)), citation };
   return { verses: buildReadingVerses(reading, mapping.withCoptic, isPsalm), citation };
 }
 
@@ -1148,15 +1159,16 @@ async function resolveProphecySections(section, flags, depth, isoDate, coptic) {
 // naming it would fail on every other table.
 const ORDER_FIELDS = "*";
 const SERVICE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, title_french, category, toggled, prayer_type";
-// Note: line_id is deliberately NOT selected here — doxologies.hymn_texts is
-// missing that column (every other schema's hymn_texts has it), and line_id
-// isn't actually needed: line_order is sufficient for sorting.
+// Every column rather than a list, as ORDER_FIELDS: drop_cap reaches the
+// content Worker's table list only once it is deployed, and naming it before
+// then would fail every hymn (a downloaded book made before it has none
+// either; both read as 0). doxologies.hymn_texts has text_id where the rest
+// have line_id, which isn't needed: line_order is sufficient for sorting.
 // inline_hymn_title_shown/inline_hymn_minimization live on the row that
 // carries inline_hymn_key — they decide whether the spliced-in hymn shows
 // its own title, and (when shown) whether that title gets a minimize
 // button, the same way the order table's own `minimization` column works.
-const SERVICE_TEXT_FIELDS =
-  "hymn_key, line_order, english, coptic, arabic, french, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
+const SERVICE_TEXT_FIELDS = "*";
 // These schemas only have their own order table + hymn_texts — no native
 // hymn_titles table at all (confirmed against the live schema). Skip just
 // their native title fetch; later schemas in the shared lookup order can
@@ -1340,6 +1352,7 @@ function createFlatServiceRow(orderRow, title, line) {
     inline_hymn_key: normalizeText(line?.inline_hymn_key),
     inline_hymn_title_shown: Boolean(line?.inline_hymn_title_shown),
     inline_hymn_minimization: normalizeText(line?.inline_hymn_minimization),
+    drop_cap: Boolean(line?.drop_cap),
   };
 }
 
@@ -1523,7 +1536,7 @@ function resolveEffectiveVerseType(personType, prayerType, sectionTitlePrayerTyp
  * `sectionTitlePrayerType` is the hymn's own overall prayer_type, which a
  * verse without one of its own inherits.
  *
- * @param {{ english?: string | null, coptic?: string | null, arabic?: string | null, french?: string | null, condition?: string | null, person_type?: string | null, prayer_type?: string | null }} row
+ * @param {{ english?: string | null, coptic?: string | null, arabic?: string | null, french?: string | null, condition?: string | null, person_type?: string | null, prayer_type?: string | null, drop_cap?: boolean | null }} row
  * @param {string | null} [sectionTitlePrayerType]
  */
 export function buildVerseFromTextRow(row, sectionTitlePrayerType = null) {
@@ -1532,6 +1545,9 @@ export function buildVerseFromTextRow(row, sectionTitlePrayerType = null) {
     coptic: row.coptic || "",
     arabic: row.arabic || "",
     french: row.french || "",
+    // hymn_texts.drop_cap: the line opens with the drop cap and decorated
+    // first words, and its Coptic takes the capital (applyCopticCaseToSection).
+    dropCap: Boolean(row.drop_cap),
     condition: normalizeText(row.condition),
     type: resolveEffectiveVerseType(row.person_type, row.prayer_type, sectionTitlePrayerType),
     prayerType: row.prayer_type || null,
@@ -2423,16 +2439,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       // in the merged VOC section — force white so it's excluded from the
       // alternating parity count in both renderers.
       const forceWhiteText = section.hymn_key === "vocKyrieEleison" ? true : (verse.forceWhiteText || false);
-      // copticPsalm's own fixed intro line ("Ⲯⲁⲗⲙⲟⲥ ⲧⲱ ⲇⲁⲩⲓⲇ...") announces the
-      // psalm that follows — the section's one capital letter belongs to the
-      // actual (spliced-in, live) Psalm text after it, not to this framing
-      // line, so it's excluded from applyCopticCaseToSection's search for
-      // which verse to capitalize (it still gets lowercased normally).
-      // vocKyrieEleison is a short refrain opener; the capital belongs to the
-      // first verse of the following hymn (Adam/Vatos introduction, etc.).
-      const skipHymnCapitalization =
-        section.hymn_key === "copticPsalm" || section.hymn_key === "vocKyrieEleison" ? true : (verse.skipHymnCapitalization || false);
-      verses.push({ ...verse, bishopOnly: combined.bishopOnly, priestOnly: combined.priestOnly, forceWhiteText, skipHymnCapitalization });
+      verses.push({ ...verse, bishopOnly: combined.bishopOnly, priestOnly: combined.priestOnly, forceWhiteText });
     }
 
     flushVerses();
@@ -2469,8 +2476,8 @@ export function addTuneMarkersToAntiphonarySections(sections) {
 // ─── Coptic case normalization ──────────────────────────────────────────────
 // Coptic hymn_texts rows are stored uppercase/mixed-case; the traditional
 // print convention is all-lowercase Coptic with a single capitalized initial
-// letter opening the hymn (only when the hymn actually has an English title
-// to "open" — untitled continuation sections don't get a capital).
+// letter opening the hymn: here, the first letter of each line marked
+// drop_cap, which the readers set as the decorated initial.
 // ⲭ/Ⲭ (U+2CAC/U+2CAD), ϭ/Ϭ (U+03EC/U+03ED), ϯ/Ϯ (U+03EE/U+03EF) are
 // Coptic letters that toLocaleLowerCase/toLocaleUpperCase do not reliably
 // case-fold in all JS engines — listed explicitly below and handled via a
@@ -2485,28 +2492,13 @@ const COPTIC_TO_UPPER = { ⲭ: 'Ⲭ', ϭ: 'Ϭ', ϯ: 'Ϯ' };
 // through its own independent Coptic case pass -- applyCopticCaseToReadingVerses,
 // which capitalizes the reading's own first letter, not the housing hymn's.
 // Without excluding those verses here, this section-wide pass would
-// re-lowercase them (undoing that) and could hand the ONE capital this hymn
-// gets to whatever the housing hymn's own leading verse happens to be
-// instead of the actual reading text -- see buildReadingVerses.
-//
-// skipHymnCapitalization (set on copticPsalm's own framing verse -- see
-// hydrateWholeTableInlineNested) opts a verse OUT of ever receiving that one
-// capital, without exempting it from the ordinary lowercase pass -- unlike
-// readingCaseNormalized, which is fully hands-off (already correctly cased).
+// re-lowercase them, undoing that -- see buildReadingVerses.
 function applyCopticCaseToSection(section) {
-  const verses = section.verses.map((verse) =>
-    verse.coptic && !verse.readingCaseNormalized ? { ...verse, coptic: lowercaseCoptic(verse.coptic) } : verse,
-  );
-
-  if (section.title?.english) {
-    const firstIndex = verses.findIndex(
-      (verse) => !verse.readingCaseNormalized && !verse.skipHymnCapitalization && verse.coptic && verse.coptic.trim(),
-    );
-    if (firstIndex !== -1) {
-      verses[firstIndex] = { ...verses[firstIndex], coptic: uppercaseFirstCopticChar(verses[firstIndex].coptic) };
-    }
-  }
-
+  const verses = section.verses.map((verse) => {
+    if (!verse.coptic || verse.readingCaseNormalized) return verse;
+    const coptic = lowercaseCoptic(verse.coptic);
+    return { ...verse, coptic: verse.dropCap ? uppercaseFirstCopticChar(coptic) : coptic };
+  });
   return { ...section, verses };
 }
 
@@ -2549,8 +2541,8 @@ function applyCopticCaseToReadingVerses(verses) {
   return normalized;
 }
 
-const INLINE_TEXT_FIELDS =
-  "hymn_key, line_order, english, coptic, arabic, french, person_type, prayer_type, condition, item_type, inline_hymn_key, inline_hymn_title_shown, inline_hymn_minimization";
+// Every column, for drop_cap, as SERVICE_TEXT_FIELDS.
+const INLINE_TEXT_FIELDS = "*";
 
 async function fetchInlineHymnVerses(schema, hymnKey) {
   for (const lookupSchema of await getHymnKeyLookupSchemas(schema)) {
@@ -2683,6 +2675,7 @@ async function resolveInlineHymnVerses(
       coptic: row.coptic || "",
       arabic: row.arabic || "",
       french: row.french || "",
+      dropCap: Boolean(row.drop_cap),
       type: resolveEffectiveVerseType(effectivePersonType, effectivePrayerType, inlineTitlePrayerType),
       prayerType: effectivePrayerType || null,
       personRole: resolvePersonRole(effectivePersonType),

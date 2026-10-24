@@ -7,17 +7,17 @@ import {
 } from '../../constants/englishInitialArt';
 
 /**
- * How a hymn's first paragraph opens in English and Arabic, beside the Coptic
- * decorated initial (Coptic Vine Design, "Drop caps and decorated initials",
- * English and Arabic openings), shared by both readers: the scrolling page
- * (documentHtml.ts) and the slideshow (VerseBlock.js). The first word of each
- * column takes the season's letter colour. A hymn with no Coptic to open on
- * opens so in its English and Arabic alone (opensInTranslation).
+ * How a line marked to open with the drop cap opens in English, French and
+ * Arabic, beside the Coptic decorated initial (Coptic Vine Design, "Drop caps
+ * and decorated initials", English and Arabic openings), shared by the
+ * readers: the scrolling page (documentHtml.ts), the Bible reader
+ * (bibleDocumentHtml.ts) and the slideshow (VerseBlock.js). The first word of
+ * each column takes the season's letter colour.
  *
- * English: its first letter an Old English capital, in the initials' letter
- * colour as the Coptic's letter is, the rest of its first word in small
- * capitals. Arabic, which has no capitals: its first word stretched once with
- * kashida, in bold.
+ * English and French: the first letter an Old English capital, in the
+ * initials' letter colour as the Coptic's letter is, the rest of the first
+ * word in small capitals. Arabic, which has no capitals: its first word
+ * stretched once with kashida, in bold.
  */
 
 /** Georgia's vertical metrics, in ems: where its line's baseline and capitals fall. */
@@ -29,26 +29,11 @@ const GEORGIA = { ascent: 0.917, descent: 0.219, capHeight: 0.693 };
 const GAP_AFTER = 10 / 22;
 const FIRST_WORD_NEARER = 8 / 22;
 
-/** A paragraph's first letter, when there's an English initial for it, and the text after it. */
+/** An English or French paragraph's first letter, when there's an Old English initial for it, and the text after it. */
 export function splitEnglishOpening(text: string): { letter: string; rest: string } | null {
   const match = /^\s*([A-Z])/.exec(text);
   if (!match || !ENGLISH_INITIALS[match[1]]) return null;
   return { letter: match[1], rest: text.slice(match[0].length) };
-}
-
-/** Verse types that never open a hymn: comments, and the centred refrain labels and reading references. */
-const NEVER_OPENS = new Set(['comment', 'silentComment', 'refrainLabel', 'readingReference']);
-
-/**
- * Whether a hymn with no Coptic paragraph to open on -- none in its rows, or
- * none shown, as a recited prayer's with its Coptic switched off -- opens on
- * this verse in its English and Arabic: the first of its verses whose English
- * opens on a capital there is an initial for, or that has Arabic. Never a
- * comment, and never after a Bible verse number.
- */
-export function opensInTranslation(verse: { type?: string; english?: string | null; arabic?: string | null; bibleVerseNumber?: string | null }) {
-  if (verse.bibleVerseNumber || NEVER_OPENS.has(verse.type ?? '')) return false;
-  return Boolean(splitEnglishOpening(verse.english || '')) || Boolean((verse.arabic || '').trim());
 }
 
 export interface EnglishInitialMetrics {

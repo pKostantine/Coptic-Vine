@@ -312,12 +312,16 @@ invisible overlays.
 - Columns share the table width less `getLanguageColumnGap` between them.
   A Coptic line with no translation spans the row, centered.
 - Chrome (titles, buttons) follows `getDocumentChromeMetrics`.
-- A titled hymn opens in all three columns on one verse (Coptic Vine
-  Design, "Drop caps and decorated initials"): the Coptic with the decorated
-  initial (`copticInitial.ts`), the English with its first letter an Old
-  English capital with a rising vine (`openingInitials.ts`, drawn from
-  `englishInitialArt.ts`, built from `assets/initials/english`), and the
-  Arabic with its first word stretched once with kashida, in bold. Both
+- A verse marked to open with the drop cap opens in every column (Coptic
+  Vine Design, "Drop caps and decorated initials"). Only the mark decides
+  it: `hymn_texts.drop_cap` (1 where the line opens so, 0 by default), and
+  every reading's first verse (`openOnFirstVerse` in `hymnLibrary.js`). The
+  Coptic opens with the decorated initial, in its capital's form
+  (`copticInitial.ts`), and its first letter is the line's capital. The
+  English and French open with their first letter an Old English capital
+  with a rising vine (`openingInitials.ts`, drawn from
+  `englishInitialArt.ts`, built from `assets/initials/english`). The Arabic
+  opens with its first word stretched once with kashida, in bold. Both
   initials draw their vine and letter in the initials' colours
   (`documentInitialColors`: by season on Night), and the rest of each first
   word takes the letter's, the English in small capitals. Beside the Coptic
@@ -325,11 +329,12 @@ invisible overlays.
   (`firstRoom`, `room`); the English square runs from line 1's capitals to
   line 2's baseline, the rest of its first word a little nearer, and an
   English paragraph of one line keeps a blank second line beside it. A
-  standalone refrain before the hymn (Coptic alone on its row, like ⲁⲅⲓⲟⲥ
-  ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ) is set in lower case without an initial, and the hymn opens
-  on the paragraph after it. The verse and the English initial are decided
-  from the whole verse in `flattenSections`, so a piece turned over the page
-  keeps them.
+  marked verse with a Bible verse number shows none, so it doesn't stand
+  between the initial and its word. The English and French initials are
+  decided from the whole verse in `flattenSections`, so a piece turned over
+  the page keeps them. The scrolling reader (`documentHtml.ts`) and the
+  Bible reader (`bibleDocumentHtml.ts`, each chapter's verse 1) set the same
+  openings through `openingHtml.ts`.
 
 ## 8. Checking it
 

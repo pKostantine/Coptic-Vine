@@ -1,7 +1,11 @@
+import { documentInitialColors, type InitialColors } from '../../constants/documentOrnaments';
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 import { formatCopticNumber, formatGreekNumber } from '../../utils/bibleNumerals';
 import { formatEnglishDisplayText } from '../../utils/displayText';
+import { splitCopticInitial } from './copticInitial';
 import { getLanguageColumnGap } from './documentPresentationMetrics';
+import { FIT_COPTIC_INITIALS_SCRIPT, openingInitialDefs, openingInitialStyles, renderCopticInitial, renderEnglishInitial, renderOpeningRest } from './openingHtml';
+import { splitArabicOpening, splitEnglishOpening } from './openingInitials';
 import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
 
@@ -63,6 +67,7 @@ export function buildBibleChapterHtml({
   highlightLabels = { copy: 'Copy', remove: 'Remove' },
   copyReference = null,
   theme = NIGHT_DOCUMENT_THEME,
+  initialColors = documentInitialColors(theme),
 }: {
   verses: BibleDisplayVerse[];
   languageKeys: BibleLanguageKey[];
@@ -98,6 +103,8 @@ export function buildBibleChapterHtml({
   copyReference?: Partial<Record<'english' | 'arabic' | 'coptic' | 'greek' | 'french', string>> | null;
   /** The page the chapter is read on — see constants/documentThemes.ts. */
   theme?: DocumentTheme;
+  /** The decorated initials' vine and letter (documentInitialColors); the letter's colour is the opening words' too. */
+  initialColors?: InitialColors;
 }) {
   const colors = theme.colors;
   const chromeTop = isSlideshow ? 0 : Math.max(0, Math.round(topContentInset));
@@ -105,19 +112,50 @@ export function buildBibleChapterHtml({
   const effectiveSelectText = Boolean(selectText) && !isSlideshow;
   const effectiveLanguages: BibleLanguageKey[] = languageKeys.length ? languageKeys : ['english'];
   const columnTemplate = `repeat(${Math.max(effectiveLanguages.length, 1)}, minmax(0, 1fr))`;
-  const firstCopticVerse = verses.find((verse) => !verse.isPsalmIntroduction && String(verse.coptic || '').trim());
+  // A chapter opens on its verse 1 -- or, without one, on its first verse past
+  // a Psalm's introduction -- with the drop cap and decorated first words
+  // (openingHtml.ts), and that verse's Coptic takes the chapter's capital.
+  const openingVerse = verses.find((verse) => !verse.isPsalmIntroduction && String(verse.verseNumber) === '1')
+    ?? verses.find((verse) => !verse.isPsalmIntroduction);
   const arabicVerseLineHeight = Math.round(fontSize * 1.6);
   const effectiveHighlighting = Boolean(highlighting) && !isSlideshow;
+  // Every verse line but the Arabic's is this tall (getLanguageLineHeight).
+  const verseLineHeight = Math.round(safeFontSize * 1.3);
+  const copticInitialsUsed = new Set<string>();
+  const englishInitialsUsed = new Set<string>();
+  // The opening verse's text in one column: the Coptic on its decorated
+  // initial, the English and French on an Old English capital, the Arabic on
+  // its stretched first word, each where it opens on one. Greek has none yet.
+  const openingHtml = (text: string, language: BibleLanguageKey) => {
+    if (language === 'coptic') {
+      const initial = splitCopticInitial(text);
+      if (!initial) return null;
+      copticInitialsUsed.add(initial.letter);
+      return renderCopticInitial(initial, false) + renderOpeningRest(initial.rest, escapeHtml);
+    }
+    if (isArabicLanguage(language)) {
+      const opening = splitArabicOpening(text);
+      return opening ? `<span class="opening-word arabic-opening">${escapeHtml(opening.word)}</span>${escapeHtml(opening.rest)}` : null;
+    }
+    if (language === 'greek') return null;
+    const initial = splitEnglishOpening(text);
+    if (!initial) return null;
+    englishInitialsUsed.add(initial.letter);
+    return renderEnglishInitial(initial.letter, safeFontSize, verseLineHeight) + renderOpeningRest(initial.rest, escapeHtml, 'english-small-caps');
+  };
 
   const rowHtml = verses
     .map((verse) => {
       const isPsalmIntroduction = Boolean(verse.isPsalmIntroduction);
+      const opens = verse === openingVerse;
       const cellHtml = effectiveLanguages
         .map((language) => {
           const text = verse[language];
           const verseNumberText = isPsalmIntroduction ? '' : formatVerseNumber(verse.verseNumber, language);
+          // The opening verse's number stays in the text unseen, so it doesn't
+          // stand between the initial and its word (openingHtml.ts).
           const verseNumberHtml = verseNumberText
-            ? `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`
+            ? `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}${opens ? ' opening-verse-number' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`
             : '';
           if (!String(text || '').trim()) {
             return `<div class="cell placeholder ${language}" data-language="${language}"></div>`;
@@ -129,10 +167,11 @@ export function buildBibleChapterHtml({
           const annotation = effectiveHighlighting
             ? ` data-sermon-section-id="bible" data-sermon-verse-id="${escapeHtml(bibleHighlightVerseId(verse))}" data-sermon-language="${language}"`
             : '';
+          const formatted = formatVerseText(text, language, opens);
           return [
             `<div class="cell ${language}${isPsalmIntroduction ? ' psalm-introduction' : ''}" data-language="${language}" dir="${isArabicLanguage(language) ? 'rtl' : 'ltr'}">`,
             verseNumberHtml,
-            `<span class="${textClass}"${annotation}>${escapeHtml(formatVerseText(text, language, verse === firstCopticVerse))}</span>`,
+            `<span class="${textClass}"${annotation}>${(opens && openingHtml(formatted, language)) || escapeHtml(formatted)}</span>`,
             '</div>',
           ].join('');
         })
@@ -157,7 +196,7 @@ export function buildBibleChapterHtml({
         .join('')}</section>`
     : '';
 
-  const chapterHtml = `${prefaceHtml}${rowHtml}`;
+  const chapterHtml = `${openingInitialDefs(copticInitialsUsed, englishInitialsUsed)}${prefaceHtml}${rowHtml}`;
   const bodyContent = isSlideshow
     ? `
     <div id="pager" class="pager">
@@ -317,6 +356,13 @@ export function buildBibleChapterHtml({
       .verse-text {
         white-space: pre-line;
       }
+      .ornament-defs {
+        height: 0;
+        overflow: hidden;
+        position: absolute;
+        width: 0;
+      }
+      ${openingInitialStyles(verseLineHeight, safeFontSize, initialColors)}
       .cell.psalm-introduction {
         color: var(--psalm-introduction);
         font-style: italic;
@@ -411,6 +457,10 @@ export function buildBibleChapterHtml({
         var restoreVerse = ${JSON.stringify(restoreVerse === null || restoreVerse === undefined ? '' : String(restoreVerse))};
         var initialAnchorVerse = restoreVerse || initialVerse;
         var readerId = ${JSON.stringify(readerId)};
+        // The opening verse's decorated initial: two lines tall or one
+        // (openingHtml.ts), decided before the pages are cut, as the page
+        // reflows, and once the Coptic face has arrived.
+        ${FIT_COPTIC_INITIALS_SCRIPT}
         var lastReportedVerse = '';
         function reportVerse(verse) {
           verse = String(verse || '');
@@ -701,7 +751,10 @@ export function buildBibleChapterHtml({
 
         function getRowTextEntries(sourceRow) {
           return Array.prototype.slice.call(sourceRow.querySelectorAll('.verse-text')).map(function (textNode) {
-            var text = (textNode.innerText || textNode.textContent || '').replace(/\\s+/g, ' ').trim();
+            // As written, not as laid out: an opening's letter, kept unseen
+            // beside its initial, is a word's start, not a line of its own.
+            // (A verse cut across pages loses its opening's drawing.)
+            var text = (textNode.textContent || '').replace(/\\s+/g, ' ').trim();
             var hasWordSeparators = /\\s/.test(text);
             return {
               offset: 0,
@@ -1035,6 +1088,7 @@ export function buildBibleChapterHtml({
             var finishInitialLayout = function () {
               if (initialPaginationDone) return;
               initialPaginationDone = true;
+              fitCopticInitials();
               paginate(initialAnchorVerse);
               if (initialVerse && !restoreVerse) highlightVerse(initialVerse);
             };
@@ -1053,6 +1107,7 @@ export function buildBibleChapterHtml({
                 resizeFrame = 0;
                 var anchor = pendingResizeAnchor;
                 pendingResizeAnchor = null;
+                fitCopticInitials();
                 paginate(anchor);
               });
             }, 80);
@@ -1077,6 +1132,18 @@ export function buildBibleChapterHtml({
             requestAnimationFrame(reportScrollVerse);
           }
           window.addEventListener('scroll', scheduleScrollReport, { passive: true });
+          fitCopticInitials();
+          if (document.querySelector('.coptic-initial[data-fit]')) {
+            var initialsWidth = document.documentElement.clientWidth;
+            window.addEventListener('resize', function () {
+              if (document.documentElement.clientWidth === initialsWidth) return;
+              initialsWidth = document.documentElement.clientWidth;
+              fitCopticInitials();
+            });
+            if (document.fonts && document.fonts.load) {
+              document.fonts.load('${getLanguageFontSize(safeFontSize, 'coptic')}px CopticVine').then(fitCopticInitials);
+            }
+          }
           requestAnimationFrame(function () {
             if (initialAnchorVerse) {
               var target = document.querySelector('[data-verse="' + String(initialAnchorVerse).replace(/"/g, '\\\\22 ') + '"]');
@@ -1122,13 +1189,13 @@ function isArabicLanguage(language: BibleLanguageKey): boolean {
   return language === 'arabic' || language === 'arabicFromCoptic';
 }
 
-function formatVerseText(text: string, language: BibleLanguageKey, isFirstCopticVerse: boolean): string {
+function formatVerseText(text: string, language: BibleLanguageKey, takesCapital: boolean): string {
   if (isArabicLanguage(language)) return formatArabicDigits(text);
   if (language === 'greek') return String(text || '');
   if (language === 'coptic') {
     const normalized = lowercaseCopticCharacters(String(text || ''));
     const withCopticNumbers = formatCopticNumbers(normalized);
-    return isFirstCopticVerse ? uppercaseFirstCopticCharacter(withCopticNumbers) : withCopticNumbers;
+    return takesCapital ? uppercaseFirstCopticCharacter(withCopticNumbers) : withCopticNumbers;
   }
   return formatEnglishDisplayText(text);
 }

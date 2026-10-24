@@ -12,10 +12,10 @@ import {
 import { annotateNativeLines, countInitialLines, textAfterLines } from "../src/components/vine/textLines.js";
 
 /**
- * The decorated initial in the slideshow: a titled hymn's first Coptic
- * paragraph opens with it as it does in the scrolling reader, its first two
- * lines narrowed beside it (or one, beside a paragraph that fits on one), and
- * those lines turned over the page only together.
+ * The decorated initial in the slideshow: a verse marked to open with the
+ * drop cap opens its Coptic with it as it does in the scrolling reader, its
+ * first two lines narrowed beside it (or one, beside a paragraph that fits on
+ * one), and those lines turned over the page only together.
  */
 
 const source = (file) => fs.readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8");
@@ -82,37 +82,39 @@ test("a page never takes one of the initial's lines without the other", () => {
   assert.equal(createVerseLineSegment(copticItem(), state(), { english: 1, coptic: 0 }, 0).item.slideshowLineCounts.coptic, undefined);
 });
 
-test("the hymn's capital takes the initial, on the verse the scrolling reader gives it", () => {
+test("a verse opens with the initial only where it is marked to, as in the scrolling reader", () => {
   const container = source("components/vine/SlideshowContainer.js");
-  assert.match(container, /const opening = findOpeningInitial\(section, visibleLanguages\);/);
-  assert.match(container, /copticInitial: opening\?\.index === verseIndex \? opening\.initial : null,/);
+  assert.match(container, /copticInitial: findCopticInitial\(verse, visibleLanguages\),/);
   assert.match(container, /flattenSections\(sections, bishopPresent, suppressAllSpeakerLabels, visibleLanguages\),\s+\[sections, bishopPresent, suppressAllSpeakerLabels, visibleLanguages\],/);
-  const finder = container.slice(container.indexOf("function findOpeningInitial"));
-  assert.match(finder, /if \(!\(section\.title\?\.english \|\| section\.title\?\.french \|\| section\.title\?\.arabic\)\) return null;/);
-  // The first verse shown whose Coptic opens on a capital, past any kept in lower case; never after a verse number.
+  const finder = container.slice(container.indexOf("function findCopticInitial"), container.indexOf("function findLatinInitial"));
+  // Nothing but the verse's own mark decides it: not the hymn's title, not which verse comes first.
+  assert.match(finder, /if \(!verse\.dropCap\) return null;/);
+  assert.doesNotMatch(finder, /section|title|refrain/);
+  // Where its Coptic is shown, in its capital's form, whether or not a number or a centred line is beside it.
   assert.match(finder, /const showsCoptic = getVisibleVerseLanguages\(\{ verse, isRecitedPrayer: isCopticGatedVerse\(verse\) \}, visibleLanguages\)\.includes\("coptic"\);/);
-  // A standalone refrain before it takes none; the paragraph after one takes its capital's, kept in lower case or not.
-  assert.match(finder, /if \(copticStandsAlone\(verse\) && String\(verse\.coptic \|\| ""\)\.trim\(\)\) \{\s+refrains\.push\(index\);\s+continue;\s+\}/);
-  assert.match(finder, /const split = showsCoptic && !verse\.bibleVerseNumber \? splitCopticInitial\(String\(verse\.coptic \|\| ""\), refrains\.length > 0\) : null;\s+if \(!split\) continue;/);
-  assert.match(container, /copticRefrain: Boolean\(openingRow\?\.refrains\.includes\(verseIndex\)\),/);
-  assert.match(source("components/vine/VerseBlock.js"), /const copticText = copticRefrain \? formattedCoptic\.toLowerCase\(\) : formattedCoptic;/);
-  // Centred on a line of its own too (Agios opening St Basil's Anaphora): it takes it a line tall.
-  assert.match(finder, /if \(!split\) continue;[\s\S]*?return \{ index, initial: \{ letter: split\.letter, marks: split\.marks, opensWord: \/\^\\S\/\.test\(split\.rest\) \}, refrains \};/);
-  // The English opening is decided from the whole verse too: a piece turned over the page carries only lines measured after it.
-  assert.match(container, /englishInitial: opensOtherColumns\(verse, verseIndex\) \? findEnglishInitial\(verse\) : null,/);
-  assert.match(source("components/vine/VerseBlock.js"), /if \(verse\.slideshowForcedLines\?\.english\) return \{ letter: englishInitial\.letter, text: englishText, hasWord: englishInitial\.opensWord \};/);
-  assert.doesNotMatch(finder.slice(0, finder.indexOf("\n}\n")), /isSlideshowLanguageJustified/);
-  assert.match(container, /copticInitial=\{item\.copticInitial\}/);
-  // The scrolling reader's rule, for the two to agree: the row is decided whether or not the Coptic is shown.
+  assert.match(finder, /const split = showsCoptic \? splitCopticInitial\(String\(verse\.coptic \|\| ""\)\) : null;/);
+  assert.match(finder, /return split \? \{ letter: split\.letter, marks: split\.marks, opensWord: \/\^\\S\/\.test\(split\.rest\) \} : null;/);
+  // Its English, French and Arabic open on it too, the Coptic shown or not -- but a Hoos verse's on its seasonal line.
+  assert.match(container, /const opensOtherColumns = \(verse\) => Boolean\(verse\.dropCap\) && !hasSeasonalPrefixLine\(verse\);/);
+  assert.match(container, /englishInitial: opensOtherColumns\(verse\) \? findLatinInitial\(verse\.english\) : null,/);
+  assert.match(container, /frenchInitial: opensOtherColumns\(verse\) \? findLatinInitial\(verse\.french\) : null,/);
+  assert.match(container, /arabicOpening: opensOtherColumns\(verse\) && Boolean\(String\(verse\.arabic \|\| ""\)\.trim\(\)\),/);
+  assert.match(container, /copticInitial=\{item\.copticInitial\}\s+englishInitial=\{item\.englishInitial\}\s+frenchInitial=\{item\.frenchInitial\}/);
+  // No line is set in lower case to leave the initial to another.
+  const verseBlock = source("components/vine/VerseBlock.js");
+  assert.doesNotMatch(container + verseBlock, /copticRefrain|findOpeningInitial|opensInTranslation/);
+  assert.match(verseBlock, /const copticText = formattedCoptic;/);
+  // The English and French openings are decided from the whole verse: a piece turned over the page carries only lines measured after it.
+  assert.match(verseBlock, /if \(verse\.slideshowForcedLines\?\.\[language\]\) return \{ letter: latinInitial\.letter, text, hasWord: latinInitial\.opensWord \};/);
+  assert.match(verseBlock, /const englishOpening = latinOpening\("english", englishText, englishInitial\);\s+const frenchOpening = latinOpening\("french", frenchText, frenchInitial\);/);
+  // A verse that opens so shows no number between the initial and its word.
+  assert.match(verseBlock, /!verse\.dropCap &&\s+\(!Array\.isArray\(verse\.slideshowBibleNumberLanguages\)/);
+  // The scrolling reader's rule, for the two to agree.
   const page = source("components/vine/documentHtml.ts");
-  assert.match(page, /const openingRefrain = opening\.initialPending && isInvincibleCoptic && !hasTranslationText && Boolean\(copticText\.trim\(\)\);/);
-  assert.match(page, /const opensHymn = !openingRefrain && opening\.initialPending && \(opening\.inTranslation\s+\? opensInTranslation\(verse\)\s+: !verse\.bibleVerseNumber && Boolean\(splitCopticInitial\(copticText, opening\.afterRefrain\)\)\);[\s\S]*?if \(opensHymn\) opening\.initialPending = false;/);
-  // A hymn nothing in Coptic opens opens on its first English and Arabic paragraph, in both readers.
-  assert.match(page, /if \(opening\.initialPending\) versesHtml = renderVerses\(\{ initialPending: true, afterRefrain: false, inTranslation: true \}\);/);
-  assert.match(finder, /const index = verses\.findIndex\(\(verse\) => opensInTranslation\(verse\)\);\s+return index !== -1 \|\| refrains\.length \? \{ index, initial: null, refrains \} : null;/);
-  assert.match(page, /const initial = opensHymn && copticCell \? splitCopticInitial\(copticCell\.text, capitalise\) : null;/);
-  // The English and Arabic open on that same row, the Coptic shown or not.
-  assert.match(container, /const openingRow = findOpeningInitial\(section, \{ \.\.\.visibleLanguages, coptic: true \}\);/);
+  assert.match(page, /const opens = Boolean\(verse\.dropCap\);/);
+  assert.match(page, /const initial = opens && copticCell \? splitCopticInitial\(copticCell\.text\) : null;/);
+  assert.match(page, /const frenchOpening = opens && !isCentered \? splitEnglishOpening\(verse\.french \|\| ''\) : null;/);
+  assert.doesNotMatch(page, /initialPending|opensInTranslation|openingRefrain/);
 });
 
 test("the Coptic column measures and sets its text around the initial, in the ornaments' colour and the titles' gold", () => {
