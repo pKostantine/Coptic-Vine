@@ -125,23 +125,24 @@ export function buildBibleChapterHtml({
   const englishInitialsUsed = new Set<string>();
   // The opening verse's text in one column: the Coptic on its decorated
   // initial, the English and French on an Old English capital, the Arabic on
-  // its stretched first word, each where it opens on one. Greek has none yet.
+  // its stretched first word, each where it opens on one (`initial`: on one
+  // that hangs, which the verse number goes ahead of). Greek has none yet.
   const openingHtml = (text: string, language: BibleLanguageKey) => {
     if (language === 'coptic') {
       const initial = splitCopticInitial(text);
       if (!initial) return null;
       copticInitialsUsed.add(initial.letter);
-      return renderCopticInitial(initial, false) + renderOpeningRest(initial.rest, escapeHtml);
+      return { html: renderCopticInitial(initial, false) + renderOpeningRest(initial.rest, escapeHtml), initial: true };
     }
     if (isArabicLanguage(language)) {
       const opening = splitArabicOpening(text);
-      return opening ? `<span class="opening-word arabic-opening">${escapeHtml(opening.word)}</span>${escapeHtml(opening.rest)}` : null;
+      return opening ? { html: `<span class="opening-word arabic-opening">${escapeHtml(opening.word)}</span>${escapeHtml(opening.rest)}`, initial: false } : null;
     }
     if (language === 'greek') return null;
     const initial = splitEnglishOpening(text);
     if (!initial) return null;
     englishInitialsUsed.add(initial.letter);
-    return renderEnglishInitial(initial.letter, safeFontSize, verseLineHeight) + renderOpeningRest(initial.rest, escapeHtml, 'english-small-caps');
+    return { html: renderEnglishInitial(initial.letter, safeFontSize, verseLineHeight) + renderOpeningRest(initial.rest, escapeHtml, 'english-small-caps'), initial: true };
   };
 
   const rowHtml = verses
@@ -151,11 +152,13 @@ export function buildBibleChapterHtml({
       const cellHtml = effectiveLanguages
         .map((language) => {
           const text = verse[language];
+          const formatted = formatVerseText(text, language, opens);
+          const opening = opens ? openingHtml(formatted, language) : null;
           const verseNumberText = isPsalmIntroduction ? '' : formatVerseNumber(verse.verseNumber, language);
-          // The opening verse's number stays in the text unseen, so it doesn't
-          // stand between the initial and its word (openingHtml.ts).
+          // Ahead of the opening verse's initial, rather than between it and
+          // its word (openingHtml.ts).
           const verseNumberHtml = verseNumberText
-            ? `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}${opens ? ' opening-verse-number' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`
+            ? `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}${opening?.initial ? ' opening-verse-number' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`
             : '';
           if (!String(text || '').trim()) {
             return `<div class="cell placeholder ${language}" data-language="${language}"></div>`;
@@ -167,11 +170,10 @@ export function buildBibleChapterHtml({
           const annotation = effectiveHighlighting
             ? ` data-sermon-section-id="bible" data-sermon-verse-id="${escapeHtml(bibleHighlightVerseId(verse))}" data-sermon-language="${language}"`
             : '';
-          const formatted = formatVerseText(text, language, opens);
           return [
             `<div class="cell ${language}${isPsalmIntroduction ? ' psalm-introduction' : ''}" data-language="${language}" dir="${isArabicLanguage(language) ? 'rtl' : 'ltr'}">`,
             verseNumberHtml,
-            `<span class="${textClass}"${annotation}>${(opens && openingHtml(formatted, language)) || escapeHtml(formatted)}</span>`,
+            `<span class="${textClass}"${annotation}>${opening ? opening.html : escapeHtml(formatted)}</span>`,
             '</div>',
           ].join('');
         })

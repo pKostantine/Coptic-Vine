@@ -95,12 +95,18 @@ test('only the lines marked open so: a hymn\'s title, and which of its lines com
   const bracket = build([hymn([verse('(Ⲙⲁⲣⲉⲛ)', { dropCap: true })])], OPTIONS);
   assert.deepEqual(initials(bracket), []);
   assert.ok(body(bracket).includes('<span class="english-initial-text">E</span>'));
-  // A reading's marked verse opens too, its number kept unseen rather than between the initial and its word.
+  // A reading's marked verse opens too, its number ahead of a hanging initial rather than between it and its word.
   const reading = body(build([hymn([verse('Ⲡⲁⲩⲗⲟⲥ', { bibleVerseNumber: '1', dropCap: true }), verse('Ⲛⲉⲙ', { bibleVerseNumber: '2' })])], OPTIONS));
   assert.deepEqual(initials(reading), ['<span class="coptic-initial" data-fit>']);
   assert.match(reading, /<span class="bible-verse-number opening-verse-number" data-copy-text="1">1<\/span><span class="english-initial"/);
+  assert.match(reading, /<span class="bible-verse-number opening-verse-number" data-copy-text="ⲁ̅">ⲁ̅<\/span><span class="coptic-initial" data-fit>/);
+  // The Arabic, with no initial to stand ahead of, keeps its number in its line.
+  assert.match(reading, /<span class="bible-verse-number" data-copy-text="١">١<\/span><span class="bible-verse-number-gap"><\/span><span class="opening-word arabic-opening">/);
   assert.match(reading, /<span class="bible-verse-number" data-copy-text="2">2<\/span><span class="bible-verse-number-gap"><\/span>English/);
-  assert.match(build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], OPTIONS), /\.coptic-initial-text, \.english-initial-text, \.opening-verse-number \{\s+clip: rect\(0 0 0 0\);/);
+  const css = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], OPTIONS);
+  assert.match(css, /\.opening-verse-number \{ float: left; \}/);
+  assert.match(css, /\.bible-verse-number\.opening-verse-number \{ margin-right: 0\.25em; \}/);
+  assert.match(css, /\.coptic-initial-text, \.english-initial-text \{\s+clip: rect\(0 0 0 0\);/);
 });
 
 test('no Coptic column, no initial; a marked line alone on its row, centred, takes it a line tall', () => {
@@ -172,6 +178,22 @@ test('the page decides after layout whether the paragraph wraps, and decides aga
 const openings = loadFile('src/components/vine/openingInitials.ts', (name) => (name === '../../constants/englishInitialArt' ? loadFile('src/constants/englishInitialArt.ts') : require(name)));
 const ornaments = loadFile('src/constants/documentOrnaments.ts', (name) => (name === './ornamentArt' ? loadFile('src/constants/ornamentArt.ts') : require(name)));
 const coptic = loadFile('src/components/vine/copticInitial.ts', (name) => (name === '../../constants/copticInitialArt' ? art : require(name)));
+
+test('the Arabic first word is made longer, never bigger: its size is the text\'s, only its weight and colour change', () => {
+  assert.deepEqual(openings.arabicOpeningWord('#EDBE45'), { style: { color: '#EDBE45', fontWeight: '700' }, baselineShift: 0 });
+  assert.equal(openings.ARABIC_OPENING_SIZE, undefined);
+  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ', { arabic: 'مبارك أنت', dropCap: true })])], OPTIONS);
+  assert.ok(html.includes('.arabic-opening { font-weight: 700; }'));
+  assert.doesNotMatch(html, /\.arabic-opening[^}]*font-size/);
+  assert.ok(body(html).includes('<span class="opening-word arabic-opening">مبـــارك</span> أنت'));
+});
+
+test('a verse number goes ahead of the initial on a slide, in a box as wide as its figures and a gap', () => {
+  assert.equal(openings.verseNumberLeadWidth('1', 20), 20);
+  assert.equal(openings.verseNumberLeadWidth('12', 20), 34);
+  // An overline takes no room of its own.
+  assert.equal(openings.verseNumberLeadWidth('ⲓ̅ⲃ̅', 25), openings.verseNumberLeadWidth('12', 25));
+});
 
 test('the Arabic first word is stretched once with kashida, only between letters that join', () => {
   assert.equal(openings.stretchArabicWord('مبارك'), 'مبـــارك');

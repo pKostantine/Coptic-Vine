@@ -79,11 +79,6 @@ export const ENGLISH_FIRST_WORD_NEARER = FIRST_WORD_NEARER;
 
 /** The first word's small capitals: its letters as capitals this share of the text's size, spaced by `letterSpacing` ems. */
 export const SMALL_CAPS = { size: 0.7, letterSpacing: 0.05 };
-/** The Arabic first word: bold, at the text's own size. */
-export const ARABIC_OPENING_SIZE = 1;
-
-/** Arial's vertical metrics, in ems. */
-const ARIAL = { ascent: 0.905, descent: 0.212 };
 
 /**
  * How far to raise a word set at another size than its line, when it stands
@@ -108,13 +103,24 @@ export function englishOpeningWord(fontSize: number, color: string) {
   };
 }
 
-/** The slideshow's Arabic opening word: bold, in the letter's colour. */
-export function arabicOpeningWord(fontSize: number, color: string) {
-  const size = Math.round(fontSize * ARABIC_OPENING_SIZE * 100) / 100;
-  return {
-    style: { color, fontSize: size, fontWeight: '700' as const },
-    baselineShift: baselineShift(size, fontSize, ARIAL),
-  };
+/**
+ * The slideshow's Arabic opening word: bold, in the letter's colour, at the
+ * text's own size -- made longer by its kashida, never bigger.
+ */
+export function arabicOpeningWord(color: string) {
+  return { style: { color, fontWeight: '700' as const }, baselineShift: 0 };
+}
+
+/**
+ * The room a verse number takes ahead of the initial its verse opens with on a
+ * slide: its figures (a combining overline takes none) and the gap after them,
+ * in the text's size. An estimate erring wide, since a slide's lines are
+ * worked out before anything is drawn: the lines beside it are justified to
+ * whatever room is left.
+ */
+export function verseNumberLeadWidth(number: string, fontSize: number) {
+  const figures = Array.from(number).filter((char) => !/\p{M}/u.test(char)).length;
+  return Math.round(fontSize * (figures * 0.7 + 0.3) * 100) / 100;
 }
 
 /** Letters that join the letter after them (Unicode's dual-joining Arabic letters). */

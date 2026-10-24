@@ -14,6 +14,7 @@ import {
   splitArabicOpening,
   splitEnglishOpening,
   splitRestOfFirstWord,
+  verseNumberLeadWidth,
 } from "./openingInitials";
 import { getLanguageColumnGap } from "./documentPresentationMetrics";
 import {
@@ -37,6 +38,8 @@ const DISABLED_SELECTION_STYLE = Platform.OS === "web"
   : null;
 // A centred line opening its hymn, and the decorated initial a line tall before it (PlainVerseBody).
 const CENTERED_INITIAL_ROW_STYLE = { alignItems: "flex-start", flexDirection: "row", justifyContent: "center" };
+// A verse number and the initial after it, side by side.
+const LEAD_ROW_STYLE = { alignItems: "flex-start", flexDirection: "row" };
 
 export default function VerseBlock({
   verse,
@@ -140,7 +143,8 @@ export default function VerseBlock({
   const startsParagraph = (language) => (lineRanges?.[language]?.start ?? 0) === 0;
   // The opening: the rest of each column's first word in the letter's colour,
   // the English and French set after their initials in small capitals (passed
-  // here in capitals) and the Arabic's stretched and set larger, in bold.
+  // here in capitals) and the Arabic's stretched with kashida, in bold at
+  // the text's own size.
   // Only a justified column opens so.
   const copticRest = initial ? copticText.trimStart().slice(initial.letter.length + initial.marks.length) : "";
   const englishText = String(verse.english || "").trimEnd();
@@ -162,14 +166,18 @@ export default function VerseBlock({
   const englishFontSize = getSlideshowLanguageFontSize("english", { verse }, fontSize);
   const frenchFontSize = getSlideshowLanguageFontSize("french", { verse }, fontSize);
   const arabicFontSize = getSlideshowLanguageFontSize("arabic", { verse }, fontSize);
-  // A verse that opens with the drop cap shows no number, which would stand
-  // between the initial and its word (as documentHtml.ts keeps it unseen).
   const bibleNumberFor = (language) =>
-    !verse.dropCap &&
-    (!Array.isArray(verse.slideshowBibleNumberLanguages) ||
-      verse.slideshowBibleNumberLanguages.includes(language))
+    !Array.isArray(verse.slideshowBibleNumberLanguages) ||
+    verse.slideshowBibleNumberLanguages.includes(language)
       ? verse.bibleVerseNumber
       : "";
+  // A column that opens on an initial sets its verse number ahead of the
+  // initial rather than in its text, where it would stand between the
+  // initial and its word (as documentHtml.ts floats it there).
+  const numberFor = (language, opensOnInitial) => ({
+    bibleVerseNumber: opensOnInitial ? "" : bibleNumberFor(language),
+    leadNumber: opensOnInitial ? bibleNumberFor(language) : "",
+  });
   const rowLanguages = [
     {
       key: "english",
@@ -178,7 +186,7 @@ export default function VerseBlock({
       englishInitial: englishOpening?.letter ?? null,
       englishOpensWord: Boolean(englishOpening?.hasWord),
       openingWord: englishOpening?.hasWord && startsParagraph("english") ? englishOpeningWord(englishFontSize, initialLetterColor) : null,
-      bibleVerseNumber: bibleNumberFor("english"),
+      ...numberFor("english", Boolean(englishOpening)),
       seasonalHoosVersePrefix: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
       fontSize: englishFontSize,
       fontFamily: "Georgia",
@@ -195,7 +203,7 @@ export default function VerseBlock({
       englishInitial: frenchOpening?.letter ?? null,
       englishOpensWord: Boolean(frenchOpening?.hasWord),
       openingWord: frenchOpening?.hasWord && startsParagraph("french") ? englishOpeningWord(frenchFontSize, initialLetterColor) : null,
-      bibleVerseNumber: bibleNumberFor("french"),
+      ...numberFor("french", Boolean(frenchOpening)),
       // The seasonal prefix is English/Arabic text; French keeps its line
       // blank so its verse starts level with theirs.
       seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
@@ -212,7 +220,7 @@ export default function VerseBlock({
       text: initial && !verse.slideshowForcedLines?.coptic ? copticRest : copticText,
       initial,
       openingWord: initial?.opensWord && startsParagraph("coptic") ? { style: { color: initialLetterColor }, baselineShift: 0 } : null,
-      bibleVerseNumber: bibleNumberFor("coptic"),
+      ...numberFor("coptic", Boolean(initial)),
       seasonalHoosVersePrefixSpacer: hasSeasonalPrefixLine
         ? verse.seasonalHoosVersePrefix
         : "",
@@ -229,7 +237,7 @@ export default function VerseBlock({
       key: "arabic",
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "arabic", bishopPresent),
       text: arabicSplit && !verse.slideshowForcedLines?.arabic ? arabicSplit.word + arabicSplit.rest : arabicText,
-      openingWord: arabicSplit && startsParagraph("arabic") ? arabicOpeningWord(arabicFontSize, initialLetterColor) : null,
+      openingWord: arabicSplit && startsParagraph("arabic") ? arabicOpeningWord(initialLetterColor) : null,
       bibleVerseNumber: bibleNumberFor("arabic"),
       seasonalHoosVersePrefix: hasSeasonalPrefixLine
         ? formatArabicNumbers(verse.seasonalHoosVersePrefix)
@@ -311,22 +319,41 @@ export default function VerseBlock({
     // would have the system slant that a second time.
     const languageFontStyle = slantsArabic ? arabicFontStyle(true) : language.key === "coptic" ? "normal" : bodyFontStyle;
     // The initial: the Coptic's decorated one, its room in a line one or two
-    // lines tall and drawn in either; or the English one, two lines tall.
+    // lines tall and drawn in either; or the English (and French) one, two
+    // lines tall. The verse's number, if it has one, goes ahead of it, in a
+    // box of its own that the lines beside them make room for.
     const englishMetrics = language.englishInitial ? englishInitialMetrics(language.englishInitial, language.fontSize, language.lineHeight, language.englishOpensWord) : null;
-    const initial = language.initial ? {
-      ...copticInitialMetrics(language.lineHeight),
-      render: (mode) => (
+    const leadNumber = language.initial || englishMetrics ? formatBibleVerseNumber(language.leadNumber, language.key) : "";
+    const leadWidth = leadNumber ? verseNumberLeadWidth(leadNumber, language.fontSize) : 0;
+    const withLead = (box) => (box && leadWidth ? { ...box, room: box.room + leadWidth, ...(box.firstRoom != null ? { firstRoom: box.firstRoom + leadWidth } : null) } : box);
+    const ahead = (drawn) => (leadWidth ? (
+      <View style={LEAD_ROW_STYLE}>
+        <Text
+          allowFontScaling={false}
+          style={[{ color: theme.colors.gold, fontFamily: language.fontFamily, fontSize: language.fontSize, fontWeight: "700", lineHeight: language.lineHeight, width: leadWidth }, glyphRoomStyle(language.key === "coptic" ? language.fontSize : 0)]}
+        >
+          {leadNumber}
+        </Text>
+        {drawn}
+      </View>
+    ) : drawn);
+    const copticMetrics = language.initial ? copticInitialMetrics(language.lineHeight) : null;
+    const initial = copticMetrics ? {
+      ...copticMetrics,
+      one: withLead(copticMetrics.one),
+      two: withLead(copticMetrics.two),
+      render: (mode) => ahead(
         <CopticInitial
           letter={language.initial.letter}
           mode={mode}
           lineHeight={language.lineHeight}
           vineColor={initialVineColor}
           letterColor={initialLetterColor}
-        />
+        />,
       ),
     } : englishMetrics ? {
-      two: { room: englishMetrics.room, firstRoom: englishMetrics.firstRoom },
-      render: () => <EnglishInitial letter={language.englishInitial} metrics={englishMetrics} color={initialLetterColor} />,
+      two: withLead({ room: englishMetrics.room, firstRoom: englishMetrics.firstRoom }),
+      render: () => ahead(<EnglishInitial letter={language.englishInitial} metrics={englishMetrics} color={initialLetterColor} />),
     } : null;
     const textStyle = [
       styles.text,

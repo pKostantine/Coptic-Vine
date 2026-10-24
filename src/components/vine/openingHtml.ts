@@ -113,12 +113,15 @@ export function openingInitialStyles(lineHeight: number, fontSize: number, color
         letter-spacing: 0.05em;
         margin-left: -${ENGLISH_FIRST_WORD_NEARER.toFixed(4)}em;
       }
-      /* Arabic has no capitals: its first word is stretched with kashida, in bold. */
+      /* Arabic has no capitals: its first word is stretched with kashida, in
+         bold at the text's own size -- longer, never bigger. */
       .arabic-opening { font-weight: 700; }
-      /* The letter itself stays in the text, unseen, for copying and for
-         screen readers; and so does the number of a verse that opens so,
-         which would otherwise stand between the initial and its word. */
-      .coptic-initial-text, .english-initial-text, .opening-verse-number {
+      /* The number of a verse that opens on an initial goes ahead of it, so it
+         doesn't stand between the initial and its word; the lines beside the
+         initial are set beside it too. */
+      .opening-verse-number { float: left; }
+      /* The letter itself stays in the text, unseen, for copying and for screen readers. */
+      .coptic-initial-text, .english-initial-text {
         clip: rect(0 0 0 0);
         clip-path: inset(50%);
         height: 1px;

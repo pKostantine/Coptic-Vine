@@ -107,8 +107,16 @@ test("a verse opens with the initial only where it is marked to, as in the scrol
   // The English and French openings are decided from the whole verse: a piece turned over the page carries only lines measured after it.
   assert.match(verseBlock, /if \(verse\.slideshowForcedLines\?\.\[language\]\) return \{ letter: latinInitial\.letter, text, hasWord: latinInitial\.opensWord \};/);
   assert.match(verseBlock, /const englishOpening = latinOpening\("english", englishText, englishInitial\);\s+const frenchOpening = latinOpening\("french", frenchText, frenchInitial\);/);
-  // A verse that opens so shows no number between the initial and its word.
-  assert.match(verseBlock, /!verse\.dropCap &&\s+\(!Array\.isArray\(verse\.slideshowBibleNumberLanguages\)/);
+  // A column opening on an initial sets its number ahead of it, not between it and its word; the others in their text.
+  assert.match(verseBlock, /const numberFor = \(language, opensOnInitial\) => \(\{\s+bibleVerseNumber: opensOnInitial \? "" : bibleNumberFor\(language\),\s+leadNumber: opensOnInitial \? bibleNumberFor\(language\) : "",\s+\}\);/);
+  for (const [language, opening] of [["english", "Boolean(englishOpening)"], ["french", "Boolean(frenchOpening)"], ["coptic", "Boolean(initial)"]]) {
+    assert.ok(verseBlock.includes(`...numberFor("${language}", ${opening}),`), language);
+  }
+  assert.match(verseBlock, /bibleVerseNumber: bibleNumberFor\("arabic"\),/);
+  // In a box of its own ahead of the initial, which the lines beside them make room for.
+  assert.match(verseBlock, /const leadWidth = leadNumber \? verseNumberLeadWidth\(leadNumber, language\.fontSize\) : 0;/);
+  assert.match(verseBlock, /one: withLead\(copticMetrics\.one\),\s+two: withLead\(copticMetrics\.two\),/);
+  assert.match(verseBlock, /two: withLead\(\{ room: englishMetrics\.room, firstRoom: englishMetrics\.firstRoom \}\),/);
   // The scrolling reader's rule, for the two to agree.
   const page = source("components/vine/documentHtml.ts");
   assert.match(page, /const opens = Boolean\(verse\.dropCap\);/);
@@ -176,4 +184,19 @@ test("where only one of the initial's lines fits beneath its title, the verse st
   const roomy = paginateItems([title, item], { "hymn-title": 40, "hymn-0": 200 }, { "hymn-0": metric }, budget + lineHeight, fontSize, languages, 1024);
   assert.deepEqual(ids(roomy)[0], ["hymn-title", "hymn-0-segment-0"]);
   assert.equal(roomy[0][1].slideshowLineCounts.coptic, 2);
+});
+
+test("a verse split over the page keeps its first word where its number stands ahead of the initial", () => {
+  // Pagination takes the number off a column's first lines only when it is in them.
+  const item = { ...copticItem(), verse: { ...copticItem().verse, bibleVerseNumber: "1" } };
+  const state = () => ({
+    languages: [
+      { language: "english", lineHeight: 24, lines: [{ text: "1 Let us give", isParagraphEnd: false }, { text: "thanks", isParagraphEnd: true }], offset: 0, end: 2 },
+      { language: "coptic", lineHeight: 24, lines: lines(3, "two"), offset: 0, end: 3 },
+    ],
+  });
+  const segment = createVerseLineSegment(item, state(), { english: 1, coptic: 2 }, 0).item;
+  assert.equal(segment.verse.coptic, "ⲗⲉⲝⲓⲥ1 ⲗⲉⲝⲓⲥ2", "beside its initial, the number isn't in the lines");
+  assert.equal(segment.verse.english, "Let us give");
+  assert.deepEqual(segment.verse.slideshowBibleNumberLanguages, ["english", "coptic"]);
 });

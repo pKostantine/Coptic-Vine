@@ -176,7 +176,7 @@ test('Bible reading view highlights by stored chapter and verse, and offers Copy
   assert.doesNotMatch(slideshow, /sermon-annotatable-text"/);
 });
 
-test('a chapter opens on its verse 1 with the drop cap and decorated first words, its number kept unseen', () => {
+test('a chapter opens on its verse 1 with the drop cap and decorated first words, its number ahead of the initial', () => {
   const buildBibleChapterHtml = loadBuilder();
   const verse = (verseNumber, extra) => ({ verseNumber, english: '', englishNkjv: '', englishFromCoptic: '', coptic: '', greek: '', arabic: '', arabicFromCoptic: '', french: '', ...extra });
   const build = (isSlideshow) => buildBibleChapterHtml({
@@ -201,9 +201,12 @@ test('a chapter opens on its verse 1 with the drop cap and decorated first words
   assert.ok(body.includes('<span class="english-initial-text">H</span></span><span class="opening-word english-small-caps">eureux</span> l’homme'));
   assert.ok(body.includes('<span class="opening-word arabic-opening">طوبـــى</span> للرجل'));
   assert.ok(body.includes('>Μακάριος ἀνήρ<'));
-  // Its number stays in the text unseen, for copying.
-  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="1">1<\/span>/);
-  assert.match(html, /\.coptic-initial-text, \.english-initial-text, \.opening-verse-number \{\s+clip: rect\(0 0 0 0\);/);
+  // Its number shows ahead of each hanging initial, and in its line in the columns with none.
+  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="1">1<\/span><span class="verse-text"><span class="english-initial"/);
+  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="ⲁ̅">ⲁ̅<\/span><span class="verse-text"><span class="coptic-initial" data-fit>/);
+  assert.match(body, /<span class="verse-number" data-copy-text="١">١<\/span><span class="verse-text"><span class="opening-word arabic-opening">/);
+  assert.match(body, /<span class="verse-number" data-copy-text="Αʹ">Αʹ<\/span><span class="verse-text">Μακάριος/);
+  assert.match(html, /\.opening-verse-number \{ float: left; \}/);
   // Only verse 1: its introduction and verse 2 read as written, verse 2's Coptic in lower case.
   assert.ok(body.includes('>A Psalm of David<'));
   assert.ok(body.includes('>ⲁⲗⲗⲁ ⲡⲉϥⲟⲩⲱϣ<'));
