@@ -131,8 +131,7 @@ test('every drawn Coptic line has room for the ornamented capitals and descender
   assert.equal((justified.match(/\{ textAlign: fallbackAlign \}, glyphRoom\]/g) || []).length, 2);
   assert.match(justified, /wordStyles\?\.\[lineWordOffsets\[index\] \+ wordIndex\],\n\s+glyphRoom,/);
   const verse = fs.readFileSync('src/components/vine/VerseBlock.js', 'utf8');
-  // The Arabic's larger opening word has its room too.
-  assert.match(verse, /glyphRoomFontSize=\{language\.key === "coptic" \? language\.fontSize : language\.key === "arabic" && language\.openingWord \? language\.openingWord\.style\.fontSize : 0\}/);
+  assert.match(verse, /glyphRoomFontSize=\{language\.key === "coptic" \? language\.fontSize : 0\}/);
   assert.match(verse, /const glyphRoom = language\.key === "coptic" \? glyphRoomStyle\(language\.fontSize\) : null;/);
   // The plain body reports its text's height, not the room around it.
   assert.match(verse, /height: event\.nativeEvent\.layout\.height - roomHeight/);

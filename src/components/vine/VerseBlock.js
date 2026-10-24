@@ -169,6 +169,7 @@ export default function VerseBlock({
       speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "english", bishopPresent),
       text: englishOpening && !verse.slideshowForcedLines?.english ? englishOpening.text : englishText,
       englishInitial: englishOpening?.letter ?? null,
+      englishOpensWord: Boolean(englishOpening?.hasWord),
       openingWord: englishOpening?.hasWord && startsParagraph("english") ? englishOpeningWord(englishFontSize, initialLetterColor) : null,
       bibleVerseNumber: bibleNumberFor("english"),
       seasonalHoosVersePrefix: hasSeasonalPrefixLine ? verse.seasonalHoosVersePrefix : "",
@@ -301,7 +302,7 @@ export default function VerseBlock({
     const languageFontStyle = slantsArabic ? arabicFontStyle(true) : language.key === "coptic" ? "normal" : bodyFontStyle;
     // The initial: the Coptic's decorated one, its room in a line one or two
     // lines tall and drawn in either; or the English one, two lines tall.
-    const englishMetrics = language.englishInitial ? englishInitialMetrics(language.englishInitial, language.fontSize, language.lineHeight) : null;
+    const englishMetrics = language.englishInitial ? englishInitialMetrics(language.englishInitial, language.fontSize, language.lineHeight, language.englishOpensWord) : null;
     const initial = language.initial ? {
       ...copticInitialMetrics(language.lineHeight),
       render: (mode) => (
@@ -315,7 +316,7 @@ export default function VerseBlock({
       ),
     } : englishMetrics ? {
       two: { room: englishMetrics.room, firstRoom: englishMetrics.firstRoom },
-      render: () => <EnglishInitial letter={language.englishInitial} metrics={englishMetrics} color={initialLetterColor} />,
+      render: () => <EnglishInitial letter={language.englishInitial} metrics={englishMetrics} vineColor={initialVineColor} letterColor={initialLetterColor} />,
     } : null;
     const textStyle = [
       styles.text,
@@ -377,7 +378,7 @@ export default function VerseBlock({
               minWordsToJustify={language.minWordsToJustify}
               fontStyle={languageFontStyle}
               fontWeight={bodyFontWeight}
-              glyphRoomFontSize={language.key === "coptic" ? language.fontSize : language.key === "arabic" && language.openingWord ? language.openingWord.style.fontSize : 0}
+              glyphRoomFontSize={language.key === "coptic" ? language.fontSize : 0}
               initial={initial}
               measureOnly={isMeasuring}
               onMetric={(metric) => reportLanguageMetric(language.key, metric)}

@@ -2,30 +2,32 @@ import { memo } from 'react';
 import { View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
+import { ENGLISH_INITIAL_VIEWBOX } from '../../../constants/englishInitialArt';
 import type { EnglishInitialMetrics } from '../openingInitials';
 
 /**
  * A hymn's English opening initial on a slide (openingInitials.ts): its first
- * letter two lines tall in Corinthia, in the season's letter colour, stroked
- * in that colour over its shadow, as the scrolling reader draws it. It takes
- * line 1's room beside it; JustifiedText sets line 2 a little further in.
+ * letter, an Old English capital with a rising vine, in a square from line 1's
+ * capitals to line 2's baseline, its vine and letter in the initials' colours
+ * as the Coptic's are. It takes line 1's room beside it; JustifiedText sets
+ * line 2 a little further in when the gap steps.
  */
-export const EnglishInitial = memo(function EnglishInitial({ letter, metrics, color }: {
+export const EnglishInitial = memo(function EnglishInitial({ letter, metrics, vineColor, letterColor }: {
   letter: string;
   metrics: EnglishInitialMetrics;
-  color: string;
+  vineColor: string;
+  letterColor: string;
 }) {
-  const { drawing, glyph } = metrics;
   return (
     <View accessible accessibilityLabel={letter} style={{ height: metrics.height, width: metrics.firstRoom }}>
       <Svg
-        width={drawing.width}
-        height={drawing.height}
-        viewBox={drawing.viewBox}
-        style={{ left: drawing.left, position: 'absolute', top: drawing.top }}
+        width={metrics.size}
+        height={metrics.size}
+        viewBox={ENGLISH_INITIAL_VIEWBOX}
+        style={{ left: 0, position: 'absolute', top: metrics.top }}
       >
-        <Path d={glyph.path} fill="rgba(0, 0, 0, 0.6)" transform={`translate(${metrics.shadowOffset} ${metrics.shadowOffset})`} />
-        <Path d={glyph.path} fill={color} stroke={color} strokeWidth={metrics.strokeWidth} strokeLinejoin="round" />
+        <Path d={metrics.art.vine} fill={vineColor} />
+        <Path d={metrics.art.letter} fill={letterColor} />
       </Svg>
     </View>
   );

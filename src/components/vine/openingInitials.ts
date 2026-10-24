@@ -1,41 +1,26 @@
-import {
-  ENGLISH_INITIAL_CAP_HEIGHT,
-  ENGLISH_INITIAL_UNITS_PER_EM,
-  ENGLISH_INITIALS,
-  type EnglishInitialGlyph,
-} from '../../constants/englishInitialArt';
+import { ENGLISH_INITIALS, type EnglishInitialArt } from '../../constants/englishInitialArt';
 
 /**
  * How a hymn's first paragraph opens in English and Arabic, beside the Coptic
  * decorated initial (Coptic Vine Design, "Drop caps and decorated initials",
- * English and Arabic openings, option 3), shared by both readers: the
- * scrolling page (documentHtml.ts) and the slideshow (VerseBlock.js). The
- * first word of each column takes the season's letter colour.
+ * English and Arabic openings), shared by both readers: the scrolling page
+ * (documentHtml.ts) and the slideshow (VerseBlock.js). The first word of each
+ * column takes the season's letter colour.
  *
- * English: its first letter two lines tall in Corinthia Bold, the rest of its
- * first word in small capitals. Arabic, which has no capitals: its first word
- * stretched once with kashida, in bold, 1.4 times the text.
+ * English: its first letter an Old English capital with a rising vine, its
+ * vine and letter in the initials' colours as the Coptic's are, the rest of
+ * its first word in small capitals. Arabic, which has no capitals: its first
+ * word stretched once with kashida, in bold.
  */
 
 /** Georgia's vertical metrics, in ems: where its line's baseline and capitals fall. */
 const GEORGIA = { ascent: 0.917, descent: 0.219, capHeight: 0.693 };
 /**
- * The design's initial is 3.84 times its text beside lines 1.5 apart: its
- * baseline on line 2's, its capitals reaching to a tenth of an em below line
- * 1's. Kept so at whatever spacing the lines are set.
+ * In the text's ems (the design's 10px and 8px beside 22px Georgia): the gap
+ * after the initial, and how much nearer the rest of its first word sits.
  */
-const CAP_TOP_BELOW_LINE_ONE = 0.1;
-/** In the initial's own ems: its margin before it, the gap after its swash beside line 2, and how much nearer line 1 sits. */
-const INITIAL_LEFT = -0.02;
-const GAP_AFTER_SWASH = 0.03;
-const LINE_ONE_TUCK = 0.02;
-/** The faint stroke of the letter's own colour that weights it, and its shadow, in the initial's ems. */
-const STROKE = 0.014;
-const SHADOW = 0.025;
-/** Room around the drawing for its stroke and shadow, in font units. */
-const DRAWING_PAD = 60;
-
-const UNITS = ENGLISH_INITIAL_UNITS_PER_EM;
+const GAP_AFTER = 10 / 22;
+const FIRST_WORD_NEARER = 8 / 22;
 
 /** A paragraph's first letter, when there's an English initial for it, and the text after it. */
 export function splitEnglishOpening(text: string): { letter: string; rest: string } | null {
@@ -45,58 +30,45 @@ export function splitEnglishOpening(text: string): { letter: string; rest: strin
 }
 
 export interface EnglishInitialMetrics {
-  glyph: EnglishInitialGlyph;
-  /** Pixels to a font unit. */
-  unit: number;
-  /** Where line 2 starts, and line 1 (a little nearer), from the column's edge. */
+  art: EnglishInitialArt;
+  /** The square's side, and how far below the paragraph's top it starts. */
+  size: number;
+  top: number;
+  /** Where line 2 starts, and line 1, from the column's edge. */
   room: number;
   firstRoom: number;
   /** Two lines. */
   height: number;
-  /** The drawing: where it sits from the paragraph's top left, how large, and its viewBox. */
-  drawing: { left: number; top: number; width: number; height: number; viewBox: string };
-  strokeWidth: number;
-  shadowOffset: number;
 }
 
 /**
- * The English initial beside text of this size and line spacing: as tall as
- * from line 1's capitals to line 2's baseline, its baseline on line 2's (a
- * line's baseline falls where Georgia's ascent puts it, the leading split
- * above and below as the browser and React Native both split it), and wide
- * enough that line 2 starts just past its swash and line 1 a little nearer.
+ * The English initial beside text of this size and line spacing: a square
+ * from line 1's capitals to line 2's baseline (a line's baseline falls where
+ * Georgia's ascent puts it, the leading split above and below as the browser
+ * and React Native both split it), the gap after it, and line 1 a little
+ * nearer when the rest of the first word follows it there.
  */
-export function englishInitialMetrics(letter: string, fontSize: number, lineHeight: number): EnglishInitialMetrics {
-  const glyph = ENGLISH_INITIALS[letter];
-  const em = (lineHeight + (GEORGIA.capHeight - CAP_TOP_BELOW_LINE_ONE) * fontSize) / (ENGLISH_INITIAL_CAP_HEIGHT / UNITS);
-  const unit = em / UNITS;
-  const overhang = Math.max(0, glyph.xMax - glyph.advance) / UNITS;
-  const room = em * (INITIAL_LEFT + glyph.advance / UNITS + overhang + GAP_AFTER_SWASH);
-  const baseline = lineHeight + (lineHeight - (GEORGIA.ascent + GEORGIA.descent) * fontSize) / 2 + GEORGIA.ascent * fontSize;
-  const width = glyph.xMax - glyph.xMin + DRAWING_PAD * 2;
-  const height = glyph.yMax - glyph.yMin + DRAWING_PAD * 2;
+export function englishInitialMetrics(letter: string, fontSize: number, lineHeight: number, opensWord = true): EnglishInitialMetrics {
+  const capTop = (lineHeight - (GEORGIA.ascent + GEORGIA.descent) * fontSize) / 2 + (GEORGIA.ascent - GEORGIA.capHeight) * fontSize;
+  const size = lineHeight + GEORGIA.capHeight * fontSize;
+  const room = size + GAP_AFTER * fontSize;
   return {
-    glyph,
-    unit,
+    art: ENGLISH_INITIALS[letter],
+    size,
+    top: capTop,
     room,
-    firstRoom: room - em * LINE_ONE_TUCK,
+    firstRoom: opensWord ? room - FIRST_WORD_NEARER * fontSize : room,
     height: lineHeight * 2,
-    drawing: {
-      left: em * INITIAL_LEFT + (glyph.xMin - DRAWING_PAD) * unit,
-      top: baseline - (glyph.yMax + DRAWING_PAD) * unit,
-      width: width * unit,
-      height: height * unit,
-      viewBox: `${glyph.xMin - DRAWING_PAD} ${-glyph.yMax - DRAWING_PAD} ${width} ${height}`,
-    },
-    strokeWidth: STROKE * UNITS,
-    shadowOffset: SHADOW * UNITS,
   };
 }
 
+/** How much nearer the rest of an English first word sits to its initial, in ems. */
+export const ENGLISH_FIRST_WORD_NEARER = FIRST_WORD_NEARER;
+
 /** The first word's small capitals: its letters as capitals this share of the text's size, spaced by `letterSpacing` ems. */
 export const SMALL_CAPS = { size: 0.7, letterSpacing: 0.06 };
-/** The Arabic first word: bold, this many times the text's size. */
-export const ARABIC_OPENING_SIZE = 1.4;
+/** The Arabic first word: bold, at the text's own size. */
+export const ARABIC_OPENING_SIZE = 1;
 
 /** Arial's vertical metrics, in ems. */
 const ARIAL = { ascent: 0.905, descent: 0.212 };
@@ -124,7 +96,7 @@ export function englishOpeningWord(fontSize: number, color: string) {
   };
 }
 
-/** The slideshow's Arabic opening word: bold, 1.4 times the text, in the letter's colour. */
+/** The slideshow's Arabic opening word: bold, in the letter's colour. */
 export function arabicOpeningWord(fontSize: number, color: string) {
   const size = Math.round(fontSize * ARABIC_OPENING_SIZE * 100) / 100;
   return {
