@@ -179,22 +179,25 @@ test('the Arabic first word is stretched once with kashida, only between letters
   assert.deepEqual(openings.splitArabicOpening('مبارك أنت'), { word: 'مبـــارك', rest: ' أنت' });
 });
 
-test('the English initial is the first capital: an Old English letter with its vine, a square from line 1\'s capitals to line 2\'s baseline', () => {
+test('the English initial is the first capital: an Old English letter, its capitals from line 1\'s to line 2\'s baseline, as wide as its own letter', () => {
   assert.deepEqual(openings.splitEnglishOpening('Blessed are You'), { letter: 'B', rest: 'lessed are You' });
   assert.equal(openings.splitEnglishOpening('“Blessed'), null);
   assert.equal(openings.splitEnglishOpening('the light'), null);
-  // Every capital, its vine and its letter apart, to colour each.
+  // Every capital, on one scale: all as tall, each as wide as its letter.
   const englishArt = loadFile('src/constants/englishInitialArt.ts');
   assert.equal(Object.keys(englishArt.ENGLISH_INITIALS).join(''), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
   for (const [letter, initial] of Object.entries(englishArt.ENGLISH_INITIALS)) {
-    assert.match(initial.vine, /^M\d+ \d+l/, letter);
-    assert.match(initial.letter, /^M\d+ \d+l/, letter);
+    assert.match(initial.letter, /^M-?[\d.]+ -?[\d.]+l/, letter);
+    assert.match(initial.viewBox, /^-?\d+ -1532 \d+ 1699$/, letter);
+    assert.equal(Number(initial.viewBox.split(' ')[2]), initial.width, letter);
   }
-  // The design's own reader, 22px Georgia on 29px lines: 44px square, 7px down, 10px after it, the rest of the word 8px nearer.
+  assert.ok(englishArt.ENGLISH_INITIALS.W.width > englishArt.ENGLISH_INITIALS.I.width);
+  // The design's own reader, 22px Georgia on 29px lines: 51.9px tall, 4.2px down (capitals 44px), 10px after it, the rest of the word 8px nearer.
   const metrics = openings.englishInitialMetrics('A', 22, 29);
-  assert.ok(Math.abs(metrics.size - 44) < 0.5, `${metrics.size}`);
-  assert.ok(Math.abs(metrics.top - 7) < 0.2, `${metrics.top}`);
-  assert.ok(Math.abs(metrics.room - metrics.size - 10) < 0.01);
+  assert.ok(Math.abs(metrics.drawingHeight - 51.9) < 0.5, `${metrics.drawingHeight}`);
+  assert.ok(Math.abs(metrics.top - 4.2) < 0.2, `${metrics.top}`);
+  assert.ok(Math.abs(metrics.width - metrics.drawingHeight * englishArt.ENGLISH_INITIALS.A.width / 1699) < 0.01);
+  assert.ok(Math.abs(metrics.room - metrics.width - 10) < 0.01);
   assert.ok(Math.abs(metrics.room - metrics.firstRoom - 8) < 0.01);
   assert.equal(metrics.height, 58);
   // A first word that is the letter alone leaves line 1 no nearer.
@@ -227,18 +230,17 @@ test('on Night the initials take the season\'s own vine and letter; elsewhere th
   assert.ok(html.includes('.coptic-initial-vine { fill: #5FAE68; }'));
   assert.ok(html.includes('.coptic-initial-art .coptic-initial-letter { fill: #EDBE45; }'));
   assert.ok(html.includes('.opening-word { color: #EDBE45; }'));
-  // The English initial takes the same pair.
-  assert.ok(html.includes('.english-initial-vine { fill: #5FAE68; }'));
+  // The English initial, one colour, takes the letter's.
   assert.ok(html.includes('.english-initial-art .english-initial-letter { fill: #EDBE45; }'));
 });
 
 test('the row the hymn opens on opens in English and Arabic too, its first words in the letter\'s colour', () => {
   const html = build([hymn([verse('Ⲕⲥ̀ⲙⲁⲣⲱⲟⲩⲧ ⲡϭⲟⲓⲥ', { english: 'Blessed are You, O Lord', arabic: 'مبارك أنت أيها الرب' }), verse('Ⲡⲉⲛⲛⲟⲩϯ', { english: 'Our God', arabic: 'إلهنا' })])], OPTIONS);
   const page = body(html);
-  // English: its capital with its vine, drawn once and pointed to, the letter kept unseen, the rest of the word in small capitals.
-  assert.ok(page.includes('<span class="english-initial"><svg class="english-initial-art" viewBox="0 0 1000 1000" aria-hidden="true"><use class="english-initial-vine" href="#en-initial-vine-42"></use><use class="english-initial-letter" href="#en-initial-42"></use></svg>'));
-  assert.match(html, /<path id="en-initial-vine-42" d="M/);
-  assert.equal((html.match(/id="en-initial-vine-[0-9a-f]+"/g) || []).length, 1);
+  // English: its capital, as wide as its letter, drawn once and pointed to, the letter kept unseen, the rest of the word in small capitals.
+  assert.match(page, /<span class="english-initial" style="width: [\d.]+px;"><svg class="english-initial-art" viewBox="115 -1532 1323 1699" aria-hidden="true"><use class="english-initial-letter" href="#en-initial-42"><\/use><\/svg>/);
+  assert.match(html, /<path id="en-initial-42" d="M/);
+  assert.equal((html.match(/id="en-initial-[0-9a-f]+"/g) || []).length, 1);
   assert.ok(page.includes('<span class="english-initial-text">B</span></span><span class="opening-word english-small-caps">lessed</span> are You, O Lord'));
   // Arabic: its first word stretched, larger and bold.
   assert.ok(page.includes('<span class="opening-word arabic-opening">مبـــارك</span> أنت أيها الرب'));

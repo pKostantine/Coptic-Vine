@@ -11,7 +11,7 @@ import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGap } from './documentPresentationMetrics';
 import { copticInitialMetrics, splitCopticInitial } from './copticInitial';
-import { ENGLISH_INITIAL_VIEWBOX, ENGLISH_INITIALS } from '../../constants/englishInitialArt';
+import { ENGLISH_INITIALS } from '../../constants/englishInitialArt';
 import { ENGLISH_FIRST_WORD_NEARER, englishInitialMetrics, splitArabicOpening, splitEnglishOpening, splitRestOfFirstWord } from './openingInitials';
 import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
@@ -336,10 +336,8 @@ export function buildDocumentHtml(
     }).join('')}</defs></svg>`
     : '';
   const englishInitialDefs = englishInitialsUsed.size
-    ? `<svg class="ornament-defs" aria-hidden="true"><defs>${[...englishInitialsUsed].map((letter) => {
-      const key = copticInitialKey(letter);
-      return `<path id="en-initial-vine-${key}" d="${ENGLISH_INITIALS[letter].vine}"></path><path id="en-initial-${key}" d="${ENGLISH_INITIALS[letter].letter}"></path>`;
-    }).join('')}</defs></svg>`
+    ? `<svg class="ornament-defs" aria-hidden="true"><defs>${[...englishInitialsUsed].map((letter) =>
+      `<path id="en-initial-${copticInitialKey(letter)}" d="${ENGLISH_INITIALS[letter].letter}"></path>`).join('')}</defs></svg>`
     : '';
   // The initial's measures for this page's Coptic line (copticInitial.ts), and the English square's beside its line.
   const initialBox = copticInitialMetrics(verseLineHeight);
@@ -554,28 +552,26 @@ export function buildDocumentHtml(
       }
       .coptic-initial-vine { fill: ${initialColors.vine}; }
       .coptic-initial-art .coptic-initial-letter { fill: ${initialColors.letter}; }
-      /* The English opening: its first letter an Old English capital with a
-         rising vine, in a square from line 1's capitals to line 2's baseline,
-         its vine and letter in the initials' colours, and the rest of its
-         first word, a little nearer, in small capitals. */
+      /* The English opening: its first letter an Old English capital, its
+         capitals from line 1's to line 2's baseline and as wide as its own
+         letter (set where it is drawn), in the initials' letter colour, and
+         the rest of its first word, a little nearer, in small capitals. */
       .english-initial {
         float: left;
-        height: ${cssPx(englishInitialBox.size)};
-        margin: ${cssPx(englishInitialBox.top)} ${cssPx(englishInitialBox.room - englishInitialBox.size)} 0 0;
-        width: ${cssPx(englishInitialBox.size)};
+        height: ${cssPx(englishInitialBox.drawingHeight)};
+        margin: ${cssPx(englishInitialBox.top)} ${cssPx(englishInitialBox.room - englishInitialBox.width)} 0 0;
       }
       .english-initial-art {
         display: block;
         height: 100%;
         width: 100%;
       }
-      .english-initial-vine { fill: ${initialColors.vine}; }
       .english-initial-art .english-initial-letter { fill: ${initialColors.letter}; }
       /* The first word of every column, after its initial, in the letter's colour. */
       .opening-word { color: ${initialColors.letter}; }
       .english-small-caps {
         font-variant: small-caps;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.05em;
         margin-left: -${ENGLISH_FIRST_WORD_NEARER.toFixed(4)}em;
       }
       /* Arabic has no capitals: its first word is stretched with kashida, in bold. */
@@ -1630,6 +1626,7 @@ function renderVerse(
   {
     initialsUsed,
     englishInitialsUsed,
+    fontSize,
     visibleColumns,
     bishopPresent,
     copticRecitedPrayers,
@@ -1756,6 +1753,8 @@ function renderVerse(
   const initial = opensHymn && copticCell ? splitCopticInitial(copticCell.text, capitalise) : null;
   const englishOpening = opensHymn && !isCentered ? splitEnglishOpening(verse.english || '') : null;
   const arabicOpening = opensHymn && !isCentered ? splitArabicOpening(formatArabicDigits(verse.arabic || '')) : null;
+  // The English line's height, as the page sets it, for the initial beside it.
+  const englishLineHeight = Math.round(fontSize * 1.3);
   const columnLanguages = copticStandsAlone ? languages.filter((language) => language.key !== 'coptic') : languages;
   const gridTemplateColumns = `repeat(${Math.max(columnLanguages.length, 1)}, minmax(0, 1fr))`;
   const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
@@ -1783,7 +1782,7 @@ function renderVerse(
     const bodyText = cellInitial
       ? renderCopticInitial(cellInitial, centered) + renderOpeningRest(cellInitial.rest)
       : englishInitial
-        ? renderEnglishInitial(englishInitial.letter) + renderOpeningRest(englishInitial.rest, 'english-small-caps')
+        ? renderEnglishInitial(englishInitial.letter, fontSize, englishLineHeight) + renderOpeningRest(englishInitial.rest, 'english-small-caps')
         : arabicWord
           ? `<span class="opening-word arabic-opening">${escapeHtml(arabicWord.word)}</span>${highlightMetropolitanBrackets(arabicWord.rest)}`
           : highlightMetropolitanBrackets(language.text);
@@ -1821,14 +1820,14 @@ function renderOpeningRest(rest: string, className = '') {
 const cssPx = (value: number) => `${Math.round(value * 100) / 100}px`;
 
 /**
- * The English opening initial (openingInitials.ts), drawn from the shapes the
- * document defines once (englishInitialDefs), its square sized and spaced by
- * the page's styles, with the letter itself kept in the text unseen.
+ * The English opening initial (openingInitials.ts), drawn from the shape the
+ * document defines once (englishInitialDefs), as wide as its own letter beside
+ * the page's line, with the letter itself kept in the text unseen.
  */
-function renderEnglishInitial(letter: string) {
-  const key = copticInitialKey(letter);
-  return `<span class="english-initial"><svg class="english-initial-art" viewBox="${ENGLISH_INITIAL_VIEWBOX}" aria-hidden="true">`
-    + `<use class="english-initial-vine" href="#en-initial-vine-${key}"></use><use class="english-initial-letter" href="#en-initial-${key}"></use>`
+function renderEnglishInitial(letter: string, fontSize: number, lineHeight: number) {
+  const metrics = englishInitialMetrics(letter, fontSize, lineHeight);
+  return `<span class="english-initial" style="width: ${cssPx(metrics.width)};"><svg class="english-initial-art" viewBox="${metrics.art.viewBox}" aria-hidden="true">`
+    + `<use class="english-initial-letter" href="#en-initial-${copticInitialKey(letter)}"></use>`
     + `</svg><span class="english-initial-text">${escapeHtml(letter)}</span></span>`;
 }
 

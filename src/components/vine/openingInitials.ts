@@ -1,4 +1,10 @@
-import { ENGLISH_INITIALS, type EnglishInitialArt } from '../../constants/englishInitialArt';
+import {
+  ENGLISH_INITIAL_ABOVE_CAPS,
+  ENGLISH_INITIAL_CAP_HEIGHT,
+  ENGLISH_INITIAL_VIEW_HEIGHT,
+  ENGLISH_INITIALS,
+  type EnglishInitialArt,
+} from '../../constants/englishInitialArt';
 
 /**
  * How a hymn's first paragraph opens in English and Arabic, beside the Coptic
@@ -7,10 +13,10 @@ import { ENGLISH_INITIALS, type EnglishInitialArt } from '../../constants/englis
  * (documentHtml.ts) and the slideshow (VerseBlock.js). The first word of each
  * column takes the season's letter colour.
  *
- * English: its first letter an Old English capital with a rising vine, its
- * vine and letter in the initials' colours as the Coptic's are, the rest of
- * its first word in small capitals. Arabic, which has no capitals: its first
- * word stretched once with kashida, in bold.
+ * English: its first letter an Old English capital, in the initials' letter
+ * colour as the Coptic's letter is, the rest of its first word in small
+ * capitals. Arabic, which has no capitals: its first word stretched once with
+ * kashida, in bold.
  */
 
 /** Georgia's vertical metrics, in ems: where its line's baseline and capitals fall. */
@@ -31,8 +37,9 @@ export function splitEnglishOpening(text: string): { letter: string; rest: strin
 
 export interface EnglishInitialMetrics {
   art: EnglishInitialArt;
-  /** The square's side, and how far below the paragraph's top it starts. */
-  size: number;
+  /** The drawing: its width (the letter's own) and height, and how far below the paragraph's top it starts. */
+  width: number;
+  drawingHeight: number;
   top: number;
   /** Where line 2 starts, and line 1, from the column's edge. */
   room: number;
@@ -42,20 +49,24 @@ export interface EnglishInitialMetrics {
 }
 
 /**
- * The English initial beside text of this size and line spacing: a square
- * from line 1's capitals to line 2's baseline (a line's baseline falls where
- * Georgia's ascent puts it, the leading split above and below as the browser
- * and React Native both split it), the gap after it, and line 1 a little
- * nearer when the rest of the first word follows it there.
+ * The English initial beside text of this size and line spacing: its
+ * capitals from line 1's capitals to line 2's baseline (a line's baseline
+ * falls where Georgia's ascent puts it, the leading split above and below as
+ * the browser and React Native both split it), its flourishes past them, as
+ * wide as its own letter; the gap after it, and line 1 a little nearer when
+ * the rest of the first word follows it there.
  */
 export function englishInitialMetrics(letter: string, fontSize: number, lineHeight: number, opensWord = true): EnglishInitialMetrics {
+  const art = ENGLISH_INITIALS[letter];
   const capTop = (lineHeight - (GEORGIA.ascent + GEORGIA.descent) * fontSize) / 2 + (GEORGIA.ascent - GEORGIA.capHeight) * fontSize;
-  const size = lineHeight + GEORGIA.capHeight * fontSize;
-  const room = size + GAP_AFTER * fontSize;
+  const unit = (lineHeight + GEORGIA.capHeight * fontSize) / ENGLISH_INITIAL_CAP_HEIGHT;
+  const width = art.width * unit;
+  const room = width + GAP_AFTER * fontSize;
   return {
-    art: ENGLISH_INITIALS[letter],
-    size,
-    top: capTop,
+    art,
+    width,
+    drawingHeight: ENGLISH_INITIAL_VIEW_HEIGHT * unit,
+    top: capTop - ENGLISH_INITIAL_ABOVE_CAPS * unit,
     room,
     firstRoom: opensWord ? room - FIRST_WORD_NEARER * fontSize : room,
     height: lineHeight * 2,
@@ -66,7 +77,7 @@ export function englishInitialMetrics(letter: string, fontSize: number, lineHeig
 export const ENGLISH_FIRST_WORD_NEARER = FIRST_WORD_NEARER;
 
 /** The first word's small capitals: its letters as capitals this share of the text's size, spaced by `letterSpacing` ems. */
-export const SMALL_CAPS = { size: 0.7, letterSpacing: 0.06 };
+export const SMALL_CAPS = { size: 0.7, letterSpacing: 0.05 };
 /** The Arabic first word: bold, at the text's own size. */
 export const ARABIC_OPENING_SIZE = 1;
 

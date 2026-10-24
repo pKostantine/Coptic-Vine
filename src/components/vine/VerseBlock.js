@@ -316,7 +316,7 @@ export default function VerseBlock({
       ),
     } : englishMetrics ? {
       two: { room: englishMetrics.room, firstRoom: englishMetrics.firstRoom },
-      render: () => <EnglishInitial letter={language.englishInitial} metrics={englishMetrics} vineColor={initialVineColor} letterColor={initialLetterColor} />,
+      render: () => <EnglishInitial letter={language.englishInitial} metrics={englishMetrics} color={initialLetterColor} />,
     } : null;
     const textStyle = [
       styles.text,
