@@ -174,7 +174,7 @@ test('the engine plays an entry with a picture on the video player, for either r
   // The web player resumes from its ready event: a play() beside a source replacement is thrown away there.
   assert.match(context, /if \(wasPlaying && Platform\.OS !== 'web'\) video\.play\(\);/);
   assert.match(context, /if \(pendingPlay\.current\) \{\n\s+pendingPlay\.current = false;\n\s+video\.play\(\);/);
-  assert.match(context, /video\.replace\(videoSourceFor\(entry, uri, to\)\);\n\s+setVideoRendition\(to\);\n\s+video\.currentTime = positionMs \/ 1000;/);
+  assert.match(context, /video\.replace\(videoSourceFor\(entry, uri, to\)\);\n\s+if \(PLAYER_VOLUME_ADJUSTABLE\) video\.volume = volumeRef\.current;\n\s+setVideoRendition\(to\);\n\s+video\.currentTime = positionMs \/ 1000;/);
   // The rendition follows the rules, with the navigation grace (utils/lessonPlayback.ts).
   assert.match(context, /const delay = renditionSwitchDelayMs\(videoRendition, desiredRendition, cause\);/);
   // Backgrounded without the system's window, the picture counts as hidden.

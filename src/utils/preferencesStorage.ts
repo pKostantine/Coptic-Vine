@@ -3,6 +3,7 @@ import { Dimensions, Platform } from 'react-native';
 
 import { DEFAULT_DOCUMENT_THEME_ID, isDocumentThemeId, type DocumentThemeId } from '../constants/documentThemes';
 import { DEFAULT_SELECTED_INTERPRETATIONS, normalizeSelectedInterpretations } from './kiahkInterpretations';
+import { clampVolume } from './playerVolume';
 import {
   classifyReadingDevice,
   DEFAULT_FONT_SCALE,
@@ -125,6 +126,12 @@ export interface ReadingPreferences {
   lessonVideoMode: LessonVideoMode;
   /** Whether a lesson's video may stream over cellular data; off, it plays as sound alone until Wi-Fi. */
   lessonVideoOnCellular: boolean;
+  /**
+   * The player's volume, 0 to 1, where the listener left the volume bar: the
+   * same on every song and lesson, and when the app is next opened. A device
+   * choice: it is about this device's speakers.
+   */
+  playerVolume: number;
 }
 
 export type NowPlayingButtonSide = 'left' | 'right';
@@ -189,6 +196,7 @@ export const DEFAULT_READING_PREFERENCES: ReadingPreferences = {
   nowPlayingButtonSide: 'right',
   lessonVideoMode: 'video',
   lessonVideoOnCellular: false,
+  playerVolume: 1,
 };
 
 let currentAppLanguage: AppLanguage = DEFAULT_READING_PREFERENCES.appLanguage;
@@ -304,6 +312,7 @@ function mergePreferences(stored: Partial<ReadingPreferences> | null | undefined
   merged.nowPlayingButtonSide = stored?.nowPlayingButtonSide === 'left' ? 'left' : 'right';
   merged.lessonVideoMode = stored?.lessonVideoMode === 'audio' ? 'audio' : 'video';
   merged.lessonVideoOnCellular = booleanValue(stored?.lessonVideoOnCellular, DEFAULT_READING_PREFERENCES.lessonVideoOnCellular);
+  merged.playerVolume = clampVolume(stored?.playerVolume);
   return merged;
 }
 

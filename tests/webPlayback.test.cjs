@@ -134,7 +134,7 @@ test('the keyboard\'s and Chrome\'s next/previous change tracks, taken back from
   assert.match(provider, /session\?\.setActionHandler\?\.\('nexttrack', next\);/);
   assert.match(provider, /session\?\.setActionHandler\?\.\('previoustrack', previous\);/);
   // After every new source (expo-audio's replace() takes the session again)…
-  assert.match(provider, /name: entry\.playable\.title,\n      \}\);\n      claimTrackButtons\(\);/);
+  assert.match(provider, /name: entry\.playable\.title,\n      \}\);\n(?: {6}\/\/[^\n]*\n)* {6}if \(PLAYER_VOLUME_ADJUSTABLE\) audioPlayerRef\.current\.volume = volumeRef\.current;\n {6}claimTrackButtons\(\);/);
   // …and after every activation, including the one 600 ms later.
   assert.match(provider, /player\.updateLockScreenMetadata\(metadata\);\n        claimTrackButtons\(\);\n      \};\n      activate\(\);\n[\s\S]*?timer = setTimeout\(activate, 600\);/);
 });

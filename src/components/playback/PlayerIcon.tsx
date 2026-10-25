@@ -24,7 +24,10 @@ export type PlayerIconName =
   | 'lyrics-expand'
   | 'lyrics-collapse'
   | 'drag-dots'
-  | 'videocam-outline';
+  | 'videocam-outline'
+  | 'volume-mute'
+  | 'volume-low'
+  | 'volume-high';
 
 interface PlayerIconProps {
   name: PlayerIconName;
@@ -128,6 +131,26 @@ export default function PlayerIcon({ name, size = 24, color = '#FFFFFF', style }
           <Circle cx="7.5" cy="8" r="1.5" fill={color} />
           <Circle cx="2.5" cy="13.5" r="1.5" fill={color} />
           <Circle cx="7.5" cy="13.5" r="1.5" fill={color} />
+        </Svg>
+      );
+    case 'volume-mute':
+    case 'volume-low':
+    case 'volume-high':
+      // The volume bar's speakers: muted (crossed), quiet (one wave), loud (two).
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+          <Path d="M11 5L6 9H2v6h4l5 4V5z" fill={color} stroke={color} strokeWidth={1.6} strokeLinejoin="round" />
+          {name === 'volume-mute' ? (
+            <Path d="M22 9l-6 6M16 9l6 6" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" />
+          ) : (
+            <Path
+              d={name === 'volume-high' ? 'M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14' : 'M15.54 8.46a5 5 0 010 7.07'}
+              fill="none"
+              stroke={color}
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+          )}
         </Svg>
       );
     default:

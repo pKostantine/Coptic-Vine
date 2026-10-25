@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Platform, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { PlayerTitleBlock, type PlayerLayout } from '@/components/playback/PlayerParts';
+import { PLAYER_VOLUME_HEIGHT } from '@/components/playback/PlayerVolume';
 
 /**
  * The player's compositions (Coptic Vine Player design) with the design's
@@ -19,6 +20,8 @@ export interface PlayerSlots {
   transport: (size: 'regular' | 'small', maxWidth: number, align: 'center' | 'left') => ReactNode;
   /** The round buttons along the foot, at the size given. */
   bar: (size: number) => ReactNode;
+  /** The volume bar under the transport (PlayerVolume), where the volume can be set. */
+  volume?: () => ReactNode;
   /** A lesson: a smaller cover (the speed chip and the ±10 need the room). */
   lesson?: boolean;
 }
@@ -73,8 +76,9 @@ export function PlayerStacked({ layout, slots }: { layout: PlayerLayout; slots: 
   const minGap = tablet ? 16 : 12;
   const barHeight = tablet ? 44 + 10 : 12 + 44 + Math.max(28, insets.bottom);
   const seekHeight = slots.lesson ? 37 : 28;
+  const volumeHeight = slots.volume ? PLAYER_VOLUME_HEIGHT + minGap : 0;
   const fixed = Number(frame.paddingTop) + Number(frame.paddingBottom ?? 0) + 52 + 18
-    + titleBlockHeight(titleSize) + seekHeight + 74 + barHeight + minGap * 4;
+    + titleBlockHeight(titleSize) + seekHeight + 74 + volumeHeight + barHeight + minGap * 4;
   const widest = Math.min(tablet ? 520 : contentWidth, contentWidth) * (slots.lesson ? LESSON_ART : 1);
   const art = Math.floor(Math.max(120, Math.min(widest, height - fixed)));
 
@@ -89,6 +93,12 @@ export function PlayerStacked({ layout, slots }: { layout: PlayerLayout; slots: 
       {/* A lesson's five controls keep their spacing and may reach 10pt into
           the margins, as drawn, before they close up. */}
       {slots.transport('regular', contentWidth + 20, 'center')}
+      {slots.volume ? (
+        <>
+          <View style={[styles.spring, { minHeight: minGap }]} />
+          {slots.volume()}
+        </>
+      ) : null}
       <View style={[styles.spring, { minHeight: minGap }]} />
       <View style={[styles.bar, tablet ? styles.barTablet : [styles.barPhone, { paddingBottom: Math.max(28, insets.bottom) }]]}>
         {slots.bar(44)}
@@ -112,6 +122,7 @@ export function PlayerLandscape({ layout, slots }: { layout: PlayerLayout; slots
         {/* The bar sits 10pt under the words; its touch band takes those 10pt. */}
         <View>{slots.seek(true)}</View>
         <View style={styles.landscapeRow}>{slots.transport('small', across - art - 30, 'left')}</View>
+        {slots.volume ? <View style={styles.landscapeVolume}>{slots.volume()}</View> : null}
         <View style={[styles.bar, styles.barLandscape]}>{slots.bar(40)}</View>
       </View>
     </View>
@@ -151,7 +162,8 @@ export function playerColumns(layout: PlayerLayout, panels: { lyrics: boolean; q
 export function PlayerColumn({ layout, slots, columns }: { layout: PlayerLayout; slots: PlayerSlots; columns: PlayerColumns }) {
   const frame = playerFrame(layout);
   const tall = layout.height - Number(frame.paddingTop) - Number(frame.paddingBottom) - 52 - 16;
-  const below = 20 + titleBlockHeight(25) + 22 + (slots.lesson ? 37 : 28) + 12 + 74 + 20 + 44;
+  const below = 20 + titleBlockHeight(25) + 22 + (slots.lesson ? 37 : 28) + 12 + 74
+    + (slots.volume ? 14 + PLAYER_VOLUME_HEIGHT : 0) + 20 + 44;
   const art = Math.floor(Math.max(140, Math.min(columns.artMax, columns.inner, tall - below)));
 
   return (
@@ -160,6 +172,7 @@ export function PlayerColumn({ layout, slots, columns }: { layout: PlayerLayout;
       <PlayerTitleBlock title={slots.title} subtitle={slots.subtitle} meta={slots.meta} titleSize={25} style={styles.columnTitle} />
       <View style={styles.columnSeek}>{slots.seek(false)}</View>
       <View style={styles.columnTransport}>{slots.transport('regular', columns.inner, 'center')}</View>
+      {slots.volume ? <View style={styles.columnVolume}>{slots.volume()}</View> : null}
       <View style={[styles.bar, styles.barCentred]}>{slots.bar(44)}</View>
     </View>
   );
@@ -187,9 +200,11 @@ const styles = StyleSheet.create({
   landscape: { flex: 1, minHeight: 0, flexDirection: 'row', alignItems: 'center', gap: 30 },
   landscapeInfo: { flex: 1, minWidth: 0 },
   landscapeRow: { marginTop: 8 },
+  landscapeVolume: { marginTop: 6 },
   column: { alignSelf: 'center' },
   columnArt: { alignItems: 'center' },
   columnTitle: { marginTop: 20 },
   columnSeek: { marginTop: 12 },
   columnTransport: { marginTop: 12 },
+  columnVolume: { marginTop: 14 },
 });
