@@ -314,8 +314,10 @@ invisible overlays.
 - Chrome (titles, buttons) follows `getDocumentChromeMetrics`.
 - A verse marked to open with the drop cap opens in every column (Coptic
   Vine Design, "Drop caps and decorated initials"). Only the mark decides
-  it: `hymn_texts.drop_cap` (1 where the line opens so, 0 by default), and
-  every reading's first verse (`openOnFirstVerse` in `hymnLibrary.js`). The
+  it: `hymn_texts.drop_cap` (1 where the line opens so, 0 by default),
+  every reading's first verse (`openOnFirstVerse` in `hymnLibrary.js`), and
+  the first verse the Praxis and Gospel Responses show, past any rubric,
+  whatever their `drop_cap` says (`openResponseOnFirstVerse`). The
   Coptic opens with the decorated initial, in its capital's form
   (`copticInitial.ts`), and its first letter is the line's capital. The
   English and French open with their first letter an Old English capital
