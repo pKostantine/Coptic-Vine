@@ -255,3 +255,95 @@ test('HolyThursdayMatins is raised by the Holy Thursday 1st hour alone', () => {
   assert.equal(raising[0].table, 'thursday_first_hour');
   assert.equal(raising[0].extraContext.Matins, true);
 });
+
+function loadTs(path, stubs = {}) {
+  const { outputText } = ts.transpileModule(fs.readFileSync(path, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, allowJs: true },
+  });
+  const module = { exports: {} };
+  new Function('module', 'exports', 'require', outputText)(module, module.exports, (id) => (id in stubs ? stubs[id] : require(id)));
+  return module.exports;
+}
+
+const dateUtils = loadTs('src/utils/dateUtils.js');
+const { evaluateCondition } = loadTs('src/utils/conditionEngine.js', { './dateUtils': dateUtils, '../services/contentDataClient': { contentDataClient: {} } });
+const hourById = (id) => manifest.HOLY_WEEK_HOURS.find((hour) => hour.id === id);
+const hoursWhere = (condition) => manifest.HOLY_WEEK_HOURS.filter((hour) => evaluateCondition(condition, hour.extraContext)).map((hour) => hour.id);
+
+test('every hour of Holy Week raises a token of its own, and no other hour raises it', () => {
+  const tokens = manifest.HOLY_WEEK_HOURS.filter((hour) => hour.hourNumber).map((hour) => {
+    const own = Object.keys(hour.extraContext).filter((key) => /^(PalmSunday|Holy(Monday|Tuesday|Wednesday|Thursday)|GoodFriday|(Monday|Tuesday|Wednesday|Thursday|Friday)Eve)\d+(st|rd|th)Hour$/.test(key));
+    assert.equal(own.length, 1, `${hour.id}: ${own.join(', ')}`);
+    assert.equal(hour.extraContext[own[0]], true);
+    return [hour.id, own[0]];
+  });
+  assert.deepEqual(Object.fromEntries(tokens), {
+    sunday_9th: 'PalmSunday9thHour', sunday_11th: 'PalmSunday11thHour',
+    monday_eve_1st: 'MondayEve1stHour', monday_eve_3rd: 'MondayEve3rdHour', monday_eve_6th: 'MondayEve6thHour', monday_eve_9th: 'MondayEve9thHour', monday_eve_11th: 'MondayEve11thHour',
+    monday_1st: 'HolyMonday1stHour', monday_3rd: 'HolyMonday3rdHour', monday_6th: 'HolyMonday6thHour', monday_9th: 'HolyMonday9thHour', monday_11th: 'HolyMonday11thHour',
+    tuesday_eve_1st: 'TuesdayEve1stHour', tuesday_eve_3rd: 'TuesdayEve3rdHour', tuesday_eve_6th: 'TuesdayEve6thHour', tuesday_eve_9th: 'TuesdayEve9thHour', tuesday_eve_11th: 'TuesdayEve11thHour',
+    tuesday_1st: 'HolyTuesday1stHour', tuesday_3rd: 'HolyTuesday3rdHour', tuesday_6th: 'HolyTuesday6thHour', tuesday_9th: 'HolyTuesday9thHour', tuesday_11th: 'HolyTuesday11thHour',
+    wednesday_eve_1st: 'WednesdayEve1stHour', wednesday_eve_3rd: 'WednesdayEve3rdHour', wednesday_eve_6th: 'WednesdayEve6thHour', wednesday_eve_9th: 'WednesdayEve9thHour', wednesday_eve_11th: 'WednesdayEve11thHour',
+    wednesday_1st: 'HolyWednesday1stHour', wednesday_3rd: 'HolyWednesday3rdHour', wednesday_6th: 'HolyWednesday6thHour', wednesday_9th: 'HolyWednesday9thHour', wednesday_11th: 'HolyWednesday11thHour',
+    thursday_eve_1st: 'ThursdayEve1stHour', thursday_eve_3rd: 'ThursdayEve3rdHour', thursday_eve_6th: 'ThursdayEve6thHour', thursday_eve_9th: 'ThursdayEve9thHour', thursday_eve_11th: 'ThursdayEve11thHour',
+    thursday_1st: 'HolyThursday1stHour', thursday_3rd: 'HolyThursday3rdHour', thursday_6th: 'HolyThursday6thHour', thursday_9th: 'HolyThursday9thHour', thursday_11th: 'HolyThursday11thHour',
+    friday_eve_1st: 'FridayEve1stHour', friday_eve_3rd: 'FridayEve3rdHour', friday_eve_6th: 'FridayEve6thHour', friday_eve_9th: 'FridayEve9thHour', friday_eve_11th: 'FridayEve11thHour',
+    friday_1st: 'GoodFriday1stHour', friday_3rd: 'GoodFriday3rdHour', friday_6th: 'GoodFriday6thHour', friday_9th: 'GoodFriday9thHour', friday_11th: 'GoodFriday11thHour', friday_12th: 'GoodFriday12thHour',
+  });
+  // Each names one hour only, wherever it is tested.
+  for (const [id, token] of tokens) assert.deepEqual(hoursWhere(token), [id], token);
+  // The older names still answer for their hour.
+  assert.deepEqual(hoursWhere('CovenantThursday11thHour'), ['thursday_11th']);
+  assert.deepEqual(hoursWhere('HolyThursdayMatins'), ['thursday_1st']);
+});
+
+test("the content's hour conditions show in exactly the hours they name", () => {
+  // holy_week.hymn_texts daytimeLitanies: not on Palm Sunday, nor at Holy Thursday's 11th hour.
+  const litanies = hoursWhere('!PalmSunday && !HolyThursday11thHour');
+  assert.ok(!litanies.includes('thursday_11th') && !litanies.includes('sunday_9th') && !litanies.includes('sunday_11th'));
+  assert.ok(litanies.includes('thursday_9th') && litanies.includes('friday_eve_11th') && litanies.includes('monday_1st'));
+  // public.hymn_texts hymnOfTheCenser: its two Holy Week tunes, at Good Friday's 6th and 9th hours alone.
+  assert.deepEqual(hoursWhere('((Feasts || (NormalFastingDays && Weekends) || (Annual && !NormalFastingDays)) && !HolyWeek) || (GoodFriday6thHour)'), ['friday_6th']);
+  assert.deepEqual(hoursWhere('(((NormalFastingDays && !Weekends) || LentWeekends) && !HolyWeek) || (GoodFriday9thHour)'), ['friday_9th']);
+  // gospel_rite.hymn_texts: the four Gospels of John at the Friday Eve 1st hour alone.
+  assert.deepEqual(hoursWhere('FridayEve1stHour'), ['friday_eve_1st']);
+  // The general hour tokens still pick every hour of their kind.
+  assert.equal(hoursWhere('PaschaEveHour && EleventhHour').length, 5);
+  assert.deepEqual(hoursWhere('GoodFriday && TwelfthHour'), ['friday_12th']);
+});
+
+test('every Holy Week service is read for the day it is prayed on, in the Holy Week to come', () => {
+  const { copticEaster, holyWeekDate } = loadTs('src/utils/holyWeekDates.ts', { './dateUtils': dateUtils });
+  const iso = (date) => date.toISOString().slice(0, 10);
+  // The Feast of the Resurrection, as the Church keeps it (and as calendar.season_ranges has it for 2026 and 2027).
+  assert.deepEqual([2024, 2025, 2026, 2027, 2028, 2029, 2030].map((year) => iso(copticEaster(year))), [
+    '2024-05-05', '2025-04-20', '2026-04-12', '2027-05-02', '2028-04-16', '2029-04-08', '2030-04-28',
+  ]);
+  const at = (day) => new Date(`${day}T00:00:00Z`);
+  // Read in October, Holy Week is next spring's.
+  assert.equal(iso(holyWeekDate('GoodFriday', at('2026-10-25'))), '2027-04-30');
+  assert.equal(iso(holyWeekDate('PalmSunday', at('2026-10-25'))), '2027-04-25');
+  // Within Holy Week, this year's, the days already past included, up to Bright Saturday.
+  assert.equal(iso(holyWeekDate('HolyThursday', at('2026-04-10'))), '2026-04-09');
+  assert.equal(iso(holyWeekDate('BrightSaturday', at('2026-04-11'))), '2026-04-11');
+  // From the Feast on, the next year's.
+  assert.equal(iso(holyWeekDate('HolyMonday', at('2026-04-12'))), '2027-04-26');
+
+  const prayedOn = Object.fromEntries(manifest.HOLY_WEEK_HOURS.map((hour) => [hour.id, hour.prayedOn]));
+  assert.equal(prayedOn.general_funeral_prayer, 'PalmSunday');
+  assert.equal(prayedOn.monday_eve_1st, 'HolyMonday', 'an eve is read for the day it leads into');
+  assert.equal(prayedOn.friday_eve_11th, 'GoodFriday');
+  assert.equal(prayedOn.liturgy_of_the_waters, 'HolyThursday');
+  assert.equal(prayedOn.holy_thursday_liturgy, 'HolyThursday');
+  assert.equal(prayedOn.friday_12th, 'GoodFriday');
+  assert.equal(prayedOn.bright_saturday, 'BrightSaturday');
+  for (const hour of manifest.HOLY_WEEK_HOURS) assert.ok(hour.prayedOn, hour.id);
+
+  const route = fs.readFileSync('src/app/holy-week/[dayId]/[hourId].tsx', 'utf8');
+  assert.match(route, /const conditionDate = useMemo\(\n\s+\(\) => \(prayedOn \? holyWeekDate\(prayedOn, new Date\(fromIso\)\) : undefined\),\n\s+\[fromIso, prayedOn\],/);
+  assert.match(route, /conditionDate=\{conditionDate\}/);
+  const document = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+  assert.match(document, /const effectiveDate = conditionDate \?\? calendarEffectiveDate;\n\s+const vespersEffectiveDate = conditionDate \?\? calendar\.vespersEffectiveDate;/);
+  // Offline, past what an old downloaded calendar holds: the calendar's day rather than an error.
+  assert.match(document, /return conditionDate\n\s+\? hydrated\.catch\(\(\) => hydrateSupabaseServiceHymn\(schema, table, calendarEffectiveDate, flags, undefined\)\)\n\s+: hydrated;/);
+});

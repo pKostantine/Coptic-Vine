@@ -80,6 +80,13 @@ interface ServiceDocumentProps {
   appendHyperlinkKey?: string;
   /** The season the document's ornaments always wear, whatever day the calendar is on: Holy Week's own services. Otherwise the season of the day being prayed. */
   ornamentSeason?: SeasonThemeKey;
+  /**
+   * The day the document's conditions are read for, in place of the
+   * calendar's: Holy Week's services, read for the day they are prayed on in
+   * the coming Holy Week (utils/holyWeekDates.ts), whatever day it is. Keep it
+   * the same Date between renders; a new one hydrates the document again.
+   */
+  conditionDate?: Date;
 }
 
 /** Appends a hyperlink button to the next service, labelled with that service's own name, after a hydrated document. The same section shape hymnLibrary builds for an order row whose item_type is Hyperlink. */
@@ -128,7 +135,7 @@ interface AntiphonaryModalTarget {
  * native swipe-back gesture of its own to conflict with. The swipe gestures
  * are native-only: web always uses the visible header and never swipe-exits.
  */
-export default function ServiceDocument({ schema, table, title, arabic, french, extraContext, entryId, backHref, appendHyperlinkKey, ornamentSeason: fixedOrnamentSeason }: ServiceDocumentProps) {
+export default function ServiceDocument({ schema, table, title, arabic, french, extraContext, entryId, backHref, appendHyperlinkKey, ornamentSeason: fixedOrnamentSeason, conditionDate }: ServiceDocumentProps) {
   const router = useRouter();
   const { user } = useAuth();
   const {
@@ -139,7 +146,10 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     toggleCopticGospelRite,
     toggleSermonPlannerLanguage,
   } = useReadingPreferences();
-  const { effectiveDate, vespersEffectiveDate } = useCalendar();
+  const calendar = useCalendar();
+  const calendarEffectiveDate = calendar.effectiveDate;
+  const effectiveDate = conditionDate ?? calendarEffectiveDate;
+  const vespersEffectiveDate = conditionDate ?? calendar.vespersEffectiveDate;
   const isSermonPlanner = schema === 'liturgy' && table === 'sermon_planner';
   // Read for a day, and often for another day than today: the day is changed
   // from a bar across the top (DocumentDateBar) rather than the content list.
@@ -481,17 +491,17 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         .catch(() => null);
 
     Promise.all([
-      epistleFlagsPromise.then((epistleFlags) =>
-        hydrateSupabaseServiceHymn(
-          schema,
-          table,
-          effectiveDate,
-          // Explicit Book Settings choices (including Monastery) take priority
-          // over entry-point context, so no route can silently override the toggle.
-          { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext, ...userConditionFlags },
-          weekdayConditionDate,
-        ),
-      ),
+      epistleFlagsPromise.then((epistleFlags) => {
+        // Explicit Book Settings choices (including Monastery) take priority
+        // over entry-point context, so no route can silently override the toggle.
+        const flags = { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext, ...userConditionFlags };
+        const hydrated = hydrateSupabaseServiceHymn(schema, table, effectiveDate, flags, weekdayConditionDate);
+        // A day of its own (Holy Week's) that an old downloaded calendar no
+        // longer reaches, read offline: the calendar's day, rather than nothing.
+        return conditionDate
+          ? hydrated.catch(() => hydrateSupabaseServiceHymn(schema, table, calendarEffectiveDate, flags, undefined))
+          : hydrated;
+      }),
       seasonPromise,
     ])
       .then(([result, season]) => {
@@ -562,7 +572,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     return () => {
       cancelled = true;
     };
-  }, [schema, table, title, arabic, french, isSermonPlanner, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, openAtHymnKey, documentPositionKey]);
+  }, [schema, table, title, arabic, french, isSermonPlanner, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, openAtHymnKey, documentPositionKey, conditionDate, calendarEffectiveDate]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle

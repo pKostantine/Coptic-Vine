@@ -296,7 +296,10 @@ export default function LearningNowPlayingScreen({
     } : undefined,
     title: currentItem.title,
     subtitle: currentItem.cantorName,
-    meta: `${kindLabel} · ${currentItem.containerTitle}`,
+    // A lesson that couldn't be played says so where its details are; play tries again.
+    meta: player.playbackError
+      ? tr('Couldn’t play this lesson. Press play to try again.', 'Impossible de lire cette leçon. Appuyez sur lecture pour réessayer.', 'تعذّر تشغيل هذا الدرس. اضغط تشغيل للمحاولة مجدداً.')
+      : `${kindLabel} · ${currentItem.containerTitle}`,
     seek: (dense) => (
       <SeekBar
         key={currentItem.id}

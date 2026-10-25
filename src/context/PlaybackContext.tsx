@@ -253,6 +253,9 @@ function setupVideoPlayer(instance: VideoPlayer): void {
  * player starts each new source by itself, so it is paused again there if it
  * should not play.
  */
+// VPROBE (temporary): device diagnostics in Metro's log.
+const vprobe = (...args: unknown[]) => { if (__DEV__) console.log('[vprobe]', ...args); };
+
 async function replaceVideoSource(video: VideoPlayer, source: VideoSource, options: {
   positionMs: number;
   play: boolean;
@@ -260,8 +263,15 @@ async function replaceVideoSource(video: VideoPlayer, source: VideoSource, optio
   volume: number;
   rate: number | null;
 }): Promise<void> {
-  if (Platform.OS === 'ios') await video.replaceAsync(source);
-  else video.replace(source);
+  vprobe('replace start', Platform.OS, typeof (source as { uri?: string })?.uri === 'string' ? (source as { uri: string }).uri.split('/').pop() : source, options);
+  try {
+    if (Platform.OS === 'ios') await video.replaceAsync(source);
+    else video.replace(source);
+  } catch (cause) {
+    vprobe('replace threw', String(cause));
+    throw cause;
+  }
+  vprobe('replace done; status', video.status, 'playing', video.playing);
   video.keepScreenOnWhilePlaying = options.rendition === 'video';
   if (PLAYER_VOLUME_ADJUSTABLE) video.volume = options.volume;
   if (options.rate != null) video.playbackRate = options.rate;
@@ -271,6 +281,7 @@ async function replaceVideoSource(video: VideoPlayer, source: VideoSource, optio
     if (!options.play) video.pause();
   } else if (options.play) {
     video.play();
+    vprobe('play() called; playing now', video.playing);
   }
 }
 
@@ -483,7 +494,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const stopAudioEngine = useCallback(() => {
     player.pause();
     player.setActiveForLockScreen(false);
-    player.replace(null);
+    // Only the web's player takes no source: iOS's and Android's throw on
+    // one, which stopped every lesson with a picture loading there. Paused
+    // and off the lock screen, the song is stopped.
+    if (Platform.OS === 'web') player.replace(null);
   }, [player]);
 
   // The video player's source is ready: a seek that was waiting goes now (the
@@ -530,8 +544,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         ? positionMs
         : isLearningEntry(entry) ? resumePositionFor(peekLearningResume()[entry.playable.id], entry.playable.durationMs) : 0;
 
+      vprobe('loadEntry', entry.playable.title, 'video?', entryHasVideo(entry), 'autoplay', autoplay, 'startMs', startMs);
       if (entryHasVideo(entry)) {
         const [pictureUri, soundUri] = await Promise.all([resolveVideoUri(entry), resolveAudioUri(entry)]);
+        vprobe('uris', pictureUri, soundUri, 'stale?', requestId !== sourceRequestId.current);
         if (requestId !== sourceRequestId.current) return;
         // Fetched right the first time: the rendition for where the picture
         // will be, decided once both are known, so a page that opened the
@@ -539,6 +555,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         const wanted = startingRenditionFor();
         const rendition: LessonRendition = wanted === 'video' && pictureUri ? 'video' : 'audio';
         const uri = rendition === 'video' ? pictureUri : soundUri ?? pictureUri;
+        vprobe('rendition', wanted, '->', rendition, 'inputs', JSON.stringify(renditionInputsRef.current));
         if (!uri) throw new Error('No playable local or remote source is available.');
 
         // One player at a time owns the sound and the lock screen.
@@ -590,6 +607,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       }
       if (autoplay) player.play();
     } catch (cause) {
+      vprobe('loadEntry threw', String(cause), cause instanceof Error ? cause.stack : '');
       if (requestId !== sourceRequestId.current) return;
       setPlaybackError(cause instanceof Error ? cause.message : 'Unable to load audio.');
       player.pause();
@@ -645,6 +663,11 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const togglePlayback = useCallback(() => {
     if (!currentItem) return;
     resumeOnGesture.current = false;
+    // It never loaded (the network, a file gone): play tries it again, from where it was.
+    if (playbackError && currentIndex >= 0) {
+      void loadEntry(queue, currentIndex, true, currentTimeMs);
+      return;
+    }
     if (activeEngine === 'video') {
       const video = videoPlayerRef.current;
       if (playing) video.pause();
@@ -659,7 +682,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     // status still says false, and pressing pause then would restart playback.
     if (playing) player.pause();
     else player.play();
-  }, [activeEngine, currentItem, player, playing]);
+  }, [activeEngine, currentIndex, currentItem, currentTimeMs, loadEntry, playbackError, player, playing, queue]);
 
   const seekToMs = useCallback(async (positionMs: number) => {
     const knownDurationMs = Math.max(durationMs, currentItem?.playable.durationMs ?? 0);
@@ -916,7 +939,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     setTrackControls(canGoNext, hasCurrentItem);
   }, [activeEngine, canGoNext, currentKey, hasCurrentItem, playing]);
 
+  useEventListener(videoPlayer, 'playingChange', (payload) => vprobe('event playingChange', JSON.stringify(payload)));
+  useEventListener(videoPlayer, 'sourceChange', () => vprobe('event sourceChange'));
   useEventListener(videoPlayer, 'statusChange', (payload) => {
+    vprobe('event statusChange', payload.status, payload.error?.message ?? '', 'pendingPlay', pendingPlay.current);
     if (payload.status === 'error') {
       setPlaybackError(payload.error?.message ?? 'Unable to play this lesson.');
       swapRef.current = null;
@@ -1096,6 +1122,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
   // Swapping the picture for the sound alone (or back) at the same place.
   const switchRendition = useCallback(async (to: LessonRendition) => {
+    vprobe('switchRendition', to);
     const entry = currentItemRef.current;
     if (!entry || !entryHasVideo(entry)) return;
     const requestId = ++videoRequestId.current;
