@@ -51,7 +51,7 @@ test('hiding Now Playing is one app-wide state shared by every bar', () => {
   assert.doesNotMatch(overlay, /\[isCollapsed, setIsCollapsed\]\s*=\s*useState/);
   // So is the corner its button was dragged to, kept with the device's preferences.
   assert.match(overlay, /const side = preferences\.nowPlayingButtonSide;/);
-  assert.match(overlay, /nowPlayingCollapsed: isCollapsed,\s*setNowPlayingCollapsed: setIsCollapsed,\s*\} = useBottomChrome\(\)/);
+  assert.match(overlay, /nowPlayingCollapsed: isCollapsed,\s*setNowPlayingCollapsed: setIsCollapsed,[^}]*\} = useBottomChrome\(\)/);
   assert.match(chrome, /const \[nowPlayingCollapsed, setNowPlayingCollapsed\] = useState\(false\)/);
 });
 

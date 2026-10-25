@@ -97,7 +97,9 @@ test('the volume goes on every new source, and the bar is offered only where it 
   const engine = fs.readFileSync('src/context/PlaybackContext.tsx', 'utf8');
   // The web player builds a new element for each source, at full volume.
   assert.match(engine, /player\.replace\(\{[\s\S]*?\}\);\s+\/\/[^\n]*\n[^\n]*\n\s+if \(PLAYER_VOLUME_ADJUSTABLE\) audioPlayerRef\.current\.volume = volumeRef\.current;/);
-  assert.equal((engine.match(/video\.replace\([^\n]*\);\n\s+if \(PLAYER_VOLUME_ADJUSTABLE\) video\.volume = volumeRef\.current;/g) || []).length, 2);
+  // The video player's new sources, both renditions, go through one helper that sets the level on each.
+  assert.match(engine, /if \(Platform\.OS === 'ios'\) await video\.replaceAsync\(source\);\n\s+else video\.replace\(source\);\n[^\n]*\n\s+if \(PLAYER_VOLUME_ADJUSTABLE\) video\.volume = options\.volume;/);
+  assert.equal((engine.match(/await replaceVideoSource\(video, videoSourceFor\([^\n]*\{\n\s+positionMs[,:][^\n]*volume: volumeRef\.current/g) || []).length, 2);
   for (const screen of ['src/components/music/MusicNowPlayingScreen.tsx', 'src/components/learning/LearningNowPlayingScreen.tsx']) {
     assert.match(fs.readFileSync(screen, 'utf8'), /volume: PLAYER_VOLUME_ADJUSTABLE \? \(\) => <PlayerVolume \/> : undefined,/, screen);
   }

@@ -36,7 +36,8 @@ test('Download moves into the lesson’s More menu, drawn as the song menu draws
   assert.match(row, /<Text style=\{\[styles\.index, active && styles\.activeText\]\}>\{index \+ 1\}<\/Text>/);
   assert.doesNotMatch(row, /indexBadge/);
   assert.match(row, /\{trailing \? null : <Text style=\{\[styles\.play/);
-  assert.match(row, /event\.stopPropagation\(\);\s+onToggleLike\(\);/);
+  // The heart sits beside the row's button, not inside it (the web may not nest one <button> in another).
+  assert.match(row, /<\/Pressable>\n\s+\{\/\*[^\n]*\*\/\}\n\s+\{onToggleLike \? \(\n\s+<Pressable\n[\s\S]*?onPress=\{onToggleLike\}/);
   assert.match(row, /event\.stopPropagation\(\);\s+onTitlePress\(\);/);
 
   const likes = read('src/hooks/useLearningItemLikes.ts');

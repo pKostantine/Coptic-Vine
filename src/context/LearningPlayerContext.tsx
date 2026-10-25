@@ -57,6 +57,7 @@ interface LearningPlayerContextValue {
   seekToMs: (positionMs: number) => Promise<void>;
   selectQueueIndex: (index: number) => void;
   moveQueueItem: (fromIndex: number, toIndex: number) => void;
+  removeQueueItem: (index: number) => void;
   clearUpcoming: () => void;
   clearQueue: () => void;
   cycleRepeatMode: () => void;
@@ -72,6 +73,8 @@ interface LearningPlayerContextValue {
   /** What is loaded for it right now: the picture, or the sound alone. */
   videoRendition: LessonRendition | null;
   videoSwitching: boolean;
+  /** The picture's shape when the player has measured it, else from the catalogue, else null. */
+  videoAspectRatio: number | null;
   /** Cellular data is keeping the picture back (utils/lessonPlayback.ts). */
   cellularBlocked: boolean;
   allowVideoOverCellularNow: () => void;
@@ -226,6 +229,7 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     seekToMs: playback.seekToMs,
     selectQueueIndex: playback.selectQueueIndex,
     moveQueueItem: playback.moveQueueItem,
+    removeQueueItem: playback.removeQueueItem,
     clearUpcoming: playback.clearUpcoming,
     clearQueue: playback.clearQueue,
     cycleRepeatMode: playback.cycleRepeatMode,
@@ -237,6 +241,7 @@ export function useLearningPlayer(): LearningPlayerContextValue {
     currentHasVideo: currentItem ? Boolean(playback.currentHasVideo) : false,
     videoRendition: currentItem ? playback.videoRendition ?? null : null,
     videoSwitching: currentItem ? Boolean(playback.videoSwitching) : false,
+    videoAspectRatio: currentItem ? playback.videoAspectRatio ?? null : null,
     cellularBlocked: Boolean(playback.cellularBlocked),
     allowVideoOverCellularNow: playback.allowVideoOverCellularNow ?? noop,
   };

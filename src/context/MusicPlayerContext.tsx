@@ -44,6 +44,7 @@ interface MusicPlayerContextValue {
   seekToMs: (positionMs: number) => Promise<void>;
   selectQueueIndex: (index: number) => void;
   moveQueueItem: (fromIndex: number, toIndex: number) => void;
+  removeQueueItem: (index: number) => void;
   clearUpcoming: () => void;
   clearQueue: () => void;
   cycleRepeatMode: () => void;
@@ -227,6 +228,7 @@ export function useMusicPlayer(): MusicPlayerContextValue {
     seekToMs: playback.seekToMs,
     selectQueueIndex: playback.selectQueueIndex,
     moveQueueItem: playback.moveQueueItem,
+    removeQueueItem: playback.removeQueueItem,
     clearUpcoming: playback.clearUpcoming,
     clearQueue: playback.clearQueue,
     cycleRepeatMode: playback.cycleRepeatMode,

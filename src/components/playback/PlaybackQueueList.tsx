@@ -59,6 +59,8 @@ interface PlaybackQueueListProps {
   isArabic: boolean;
   onSelect: (index: number) => void;
   onMove: (fromIndex: number, toIndex: number) => void;
+  /** Takes a row out of the queue (any but the one playing). */
+  onRemove?: (index: number) => void;
   onClear: () => void;
   shuffleEnabled: boolean;
   repeatMode: PlaybackRepeatMode;
@@ -100,7 +102,7 @@ function clamp(value: number, min: number, max: number): number {
  * The queue as the engine holds it (Coptic Vine Player design, "Queue
  * sheet"): the rows already heard, faded under "Played", the one playing in
  * gold with its bars moving, and the rest to come, each dragged by its grip
- * into any order. Music tracks and Learn & Study items share the one list,
+ * into any order and taken out with the × beside it. Music tracks and Learn & Study items share the one list,
  * so what a lesson queued after a song looks like is the same whichever
  * player is open; only when both kinds are queued does each row mark its own.
  */
@@ -111,6 +113,7 @@ export default function PlaybackQueueList({
   isArabic,
   onSelect,
   onMove,
+  onRemove,
   onClear,
   shuffleEnabled,
   repeatMode,
@@ -241,6 +244,7 @@ export default function PlaybackQueueList({
           dragging={drag != null}
           handlers={handlers}
           onSelect={onSelect}
+          onRemove={onRemove}
           isArabic={isArabic}
           showKind={mixed}
         />
@@ -331,6 +335,7 @@ interface QueueRowProps {
   dragging: boolean;
   handlers: MutableRefObject<DragHandlers>;
   onSelect: (index: number) => void;
+  onRemove?: (index: number) => void;
   isArabic: boolean;
   showKind: boolean;
 }
@@ -372,7 +377,7 @@ function describeRow(
   }
 }
 
-function QueueRow({ index, top, entry, state, playing, offset, lifted, dragging, handlers, onSelect, isArabic, showKind }: QueueRowProps) {
+function QueueRow({ index, top, entry, state, playing, offset, lifted, dragging, handlers, onSelect, onRemove, isArabic, showKind }: QueueRowProps) {
   const reduced = useReducedMotion();
   const [translateY] = useState(() => new Animated.Value(0));
   const indexRef = useRef(index);
@@ -445,6 +450,22 @@ function QueueRow({ index, top, entry, state, playing, offset, lifted, dragging,
           </View>
         </View>
       </Pressable>
+      {!current && onRemove && !dragging ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={tr(`Remove ${row.title} from the queue`, `Retirer ${row.title} de la file`, `إزالة ${row.title} من قائمة الانتظار`)}
+          hitSlop={4}
+          onPress={() => onRemove(index)}
+          style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+            styles.remove,
+            hovered && styles.removeHovered,
+            pressed && styles.pressed,
+            Platform.OS === 'web' && styles.webCursor,
+          ]}
+        >
+          <PlayerIcon name="close" size={15} color="rgba(255, 255, 255, 0.6)" />
+        </Pressable>
+      ) : null}
       {current ? <NowPlayingBars playing={playing} /> : !dragging ? row.actions : <View style={styles.actionsPlaceholder} />}
     </Animated.View>
   );
@@ -543,6 +564,8 @@ const styles = StyleSheet.create({
   rowSubtitle: { flexShrink: 1, color: PLAYER_FAINT, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, textAlign: 'left' },
   unknownArt: { width: 46, height: 46, borderRadius: 10, backgroundColor: COLORS.surfaceSoft },
   actionsPlaceholder: { width: 34, height: 34 },
+  remove: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: -6 },
+  removeHovered: { backgroundColor: 'rgba(255, 255, 255, 0.1)' },
   bars: { width: 18.5, height: 18, marginRight: 8, flexDirection: 'row', alignItems: 'flex-end', gap: 2.5 },
   bar: { width: 3, height: 18, borderRadius: 2, backgroundColor: COLORS.gold },
   pressed: { opacity: 0.7 },

@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import PlayerIcon, { type PlayerIconName } from '@/components/playback/PlayerIcon';
 import Icon from '@/components/vine/ui/Icon';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
@@ -30,6 +31,8 @@ interface MiniPlayerCardProps {
   onPrevious?: () => void;
   onHide?: () => void;
   nextLabel: string;
+  /** One more round button before the like: a video lesson's switch to its sound alone, or back to its picture. */
+  extraButton?: { icon: PlayerIconName; label: string; onPress: () => void } | null;
 }
 
 /**
@@ -55,6 +58,7 @@ export default function MiniPlayerCard({
   onPrevious,
   onHide,
   nextLabel,
+  extraButton,
 }: MiniPlayerCardProps) {
   const clamped = Math.max(0, Math.min(1, progress));
   const reduced = useReducedMotion();
@@ -155,6 +159,18 @@ export default function MiniPlayerCard({
               {subtitle ? <Text numberOfLines={1} style={styles.subtitle}>{subtitle}</Text> : null}
             </View>
           </Pressable>
+
+          {extraButton ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={extraButton.label}
+              hitSlop={6}
+              style={({ pressed }) => [styles.iconButton, pressed && styles.pressedButton]}
+              onPress={unlessSwiped(extraButton.onPress)}
+            >
+              <PlayerIcon name={extraButton.icon} size={19} color={COLORS.white} />
+            </Pressable>
+          ) : null}
 
           {onToggleLike ? (
             <Pressable

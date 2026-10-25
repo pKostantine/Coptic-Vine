@@ -114,6 +114,16 @@ export function insertQueueEntry<T>(
 }
 
 /** Drops everything except the entry that is playing now. */
+/**
+ * Takes one entry out of the queue. What plays keeps playing, at its new
+ * index; it is never the one taken out (that would be "next", not "remove").
+ */
+export function removeQueueEntry<T>(entries: T[], currentIndex: number, index: number): { queue: T[]; currentIndex: number } {
+  if (index < 0 || index >= entries.length || index === currentIndex) return { queue: [...entries], currentIndex };
+  const queue = entries.filter((_, position) => position !== index);
+  return { queue, currentIndex: index < currentIndex ? currentIndex - 1 : currentIndex };
+}
+
 export function keepOnlyCurrentEntry<T>(entries: T[], currentIndex: number): { queue: T[]; currentIndex: number } {
   const safeIndex = clampPlaybackIndex(entries.length, currentIndex);
   if (safeIndex < 0 || safeIndex !== currentIndex) return { queue: [], currentIndex: -1 };

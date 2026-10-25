@@ -3,6 +3,7 @@ import { Platform, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { PlayerTitleBlock, type PlayerLayout } from '@/components/playback/PlayerParts';
 import { PLAYER_VOLUME_HEIGHT } from '@/components/playback/PlayerVolume';
+import { fitVideo } from '@/utils/lessonPlayback';
 
 /**
  * The player's compositions (Coptic Vine Player design) with the design's
@@ -24,6 +25,35 @@ export interface PlayerSlots {
   volume?: () => ReactNode;
   /** A lesson: a smaller cover (the speed chip and the ±10 need the room). */
   lesson?: boolean;
+  /**
+   * A lesson with a picture: in place of the square cover, a frame of the
+   * video's shape (its video, or as sound alone its cover), sized here to
+   * the room there is, with what goes above it (the Video | Audio switch).
+   */
+  media?: PlayerMedia;
+}
+
+export interface PlayerMedia {
+  /** Width over height. */
+  aspect: number;
+  render: (width: number, height: number) => ReactNode;
+  above?: ReactNode;
+  /** The height of what goes above. */
+  aboveHeight?: number;
+}
+
+/** The video's frame at its size, with what goes above it. */
+function MediaBlock({ media, width, height, gap }: { media: PlayerMedia; width: number; height: number; gap: number }) {
+  return (
+    <View style={styles.media}>
+      {media.above ? <View style={{ marginBottom: gap }}>{media.above}</View> : null}
+      {media.render(width, height)}
+    </View>
+  );
+}
+
+function aboveRoom(media: PlayerMedia, gap: number): number {
+  return media.above ? (media.aboveHeight ?? 0) + gap : 0;
 }
 
 // The phone's cover is 300 wide for a lesson where a song's is 322.
@@ -81,10 +111,15 @@ export function PlayerStacked({ layout, slots }: { layout: PlayerLayout; slots: 
     + titleBlockHeight(titleSize) + seekHeight + 74 + volumeHeight + barHeight + minGap * 4;
   const widest = Math.min(tablet ? 520 : contentWidth, contentWidth) * (slots.lesson ? LESSON_ART : 1);
   const art = Math.floor(Math.max(120, Math.min(widest, height - fixed)));
+  const { media } = slots;
+  // The video takes the width the cover would and, being wider than tall, less of the height.
+  const box = media ? fitVideo(contentWidth, Math.max(90, height - fixed - aboveRoom(media, minGap)), media.aspect) : null;
 
   return (
     <View style={styles.stack}>
-      <View style={styles.stackArt}>{slots.artwork(art)}</View>
+      {media && box
+        ? <View style={styles.stackArt}><MediaBlock media={media} width={box.width} height={box.height} gap={minGap} /></View>
+        : <View style={styles.stackArt}>{slots.artwork(art)}</View>}
       <View style={[styles.spring, { minHeight: minGap }]} />
       <PlayerTitleBlock title={slots.title} subtitle={slots.subtitle} meta={slots.meta} titleSize={titleSize} />
       <View style={[styles.spring, { minHeight: minGap }]} />
@@ -113,10 +148,13 @@ export function PlayerLandscape({ layout, slots }: { layout: PlayerLayout; slots
   const main = layout.height - Number(frame.paddingTop) - Number(frame.paddingBottom) - 42;
   const across = layout.width - Number(frame.paddingLeft) - Number(frame.paddingRight);
   const art = Math.floor(Math.max(120, Math.min(236, main - 12, across * 0.36)));
+  const { media } = slots;
+  // A wide picture takes more of the width than the cover, the controls the rest.
+  const box = media ? fitVideo(across * 0.56, Math.max(90, main - 12 - aboveRoom(media, 8)), media.aspect) : null;
 
   return (
     <View style={styles.landscape}>
-      {slots.artwork(art)}
+      {media && box ? <MediaBlock media={media} width={box.width} height={box.height} gap={8} /> : slots.artwork(art)}
       <View style={styles.landscapeInfo}>
         <PlayerTitleBlock title={slots.title} subtitle={slots.subtitle} meta={slots.meta} titleSize={21} lines={1} align="left" />
         {/* The bar sits 10pt under the words; its touch band takes those 10pt. */}
@@ -140,22 +178,24 @@ export interface PlayerColumns {
   artMax: number;
 }
 
-export function playerColumns(layout: PlayerLayout, panels: { lyrics: boolean; queue: boolean }): PlayerColumns {
+export function playerColumns(layout: PlayerLayout, panels: { lyrics: boolean; queue: boolean }, video = false): PlayerColumns {
   const frame = playerFrame(layout);
   const across = layout.width - Number(frame.paddingLeft) - Number(frame.paddingRight);
   const desktop = layout.kind === 'desktop';
   const shown = Number(panels.lyrics) + Number(panels.queue);
   if (shown === 2) {
     // Lyrics | player | queue: the player 400 wide, the panels sharing the rest.
-    return { gap: 40, panelWidth: null, playerWidth: 400, inner: 400, artMax: 380 };
+    // A video takes what the panels can spare at 340 each, up to 720.
+    const playerWidth = video ? Math.round(Math.max(400, Math.min(720, across - 2 * 340 - 80))) : 400;
+    return { gap: 40, panelWidth: null, playerWidth, inner: playerWidth, artMax: 380 };
   }
   if (shown === 1) {
     const panelWidth = desktop ? 460 : 440;
     const gap = desktop ? 56 : 48;
     const column = across - panelWidth - gap;
-    return { gap, panelWidth, playerWidth: null, inner: Math.min(desktop ? 420 : 380, column), artMax: desktop ? 360 : 320 };
+    return { gap, panelWidth, playerWidth: null, inner: Math.min(video ? 760 : desktop ? 420 : 380, column), artMax: desktop ? 360 : 320 };
   }
-  return { gap: 0, panelWidth: null, playerWidth: null, inner: Math.min(420, across), artMax: desktop ? 380 : 320 };
+  return { gap: 0, panelWidth: null, playerWidth: null, inner: Math.min(video ? 900 : 420, across), artMax: desktop ? 380 : 320 };
 }
 
 /** The player in its column beside the panels: cover, words, seek, transport, buttons. */
@@ -165,10 +205,14 @@ export function PlayerColumn({ layout, slots, columns }: { layout: PlayerLayout;
   const below = 20 + titleBlockHeight(25) + 22 + (slots.lesson ? 37 : 28) + 12 + 74
     + (slots.volume ? 14 + PLAYER_VOLUME_HEIGHT : 0) + 20 + 44;
   const art = Math.floor(Math.max(140, Math.min(columns.artMax, columns.inner, tall - below)));
+  const { media } = slots;
+  const box = media ? fitVideo(columns.inner, Math.max(120, tall - below - aboveRoom(media, 14)), media.aspect) : null;
 
   return (
     <View style={[styles.column, { width: columns.inner }]}>
-      <View style={styles.columnArt}>{slots.artwork(art)}</View>
+      {media && box
+        ? <View style={styles.columnArt}><MediaBlock media={media} width={box.width} height={box.height} gap={14} /></View>
+        : <View style={styles.columnArt}>{slots.artwork(art)}</View>}
       <PlayerTitleBlock title={slots.title} subtitle={slots.subtitle} meta={slots.meta} titleSize={25} style={styles.columnTitle} />
       <View style={styles.columnSeek}>{slots.seek(false)}</View>
       <View style={styles.columnTransport}>{slots.transport('regular', columns.inner, 'center')}</View>
@@ -187,6 +231,7 @@ const styles = StyleSheet.create({
     }),
   },
   stack: { flex: 1, minHeight: 0 },
+  media: { alignItems: 'center' },
   stackArt: { alignItems: 'center', marginTop: 18 },
   spring: { flex: 1 },
   // The seek bar's touch band reaches 10pt above the bar; drawn where the

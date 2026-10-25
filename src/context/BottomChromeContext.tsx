@@ -34,6 +34,12 @@ interface BottomChromeContextValue {
   /** Each overlay reports its own state, for the same reason insets are per-overlay. */
   reportNowPlayingExpanded: (id: string, expanded: boolean) => void;
   /**
+   * Counts the requests to open the full player from a page (a lesson started
+   * to be watched): the app's now-playing bar opens it on each.
+   */
+  nowPlayingOpenRequests: number;
+  requestNowPlayingOpen: () => void;
+  /**
    * The page a document is read on, while a document is the screen showing
    * (null elsewhere): the now-playing button floating over it takes the
    * page's colours rather than the app's gold.
@@ -51,6 +57,8 @@ const BottomChromeContext = createContext<BottomChromeContextValue>({
   setNowPlayingCollapsed: () => undefined,
   nowPlayingExpanded: false,
   reportNowPlayingExpanded: () => undefined,
+  nowPlayingOpenRequests: 0,
+  requestNowPlayingOpen: () => undefined,
   documentTheme: null,
   reportDocumentTheme: () => undefined,
 });
@@ -67,6 +75,8 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
   const [nowPlayingCollapsed, setNowPlayingCollapsed] = useState(false);
   const [expandedOverlays, setExpandedOverlays] = useState<Record<string, true>>({});
   const [documentThemes, setDocumentThemes] = useState<Record<string, DocumentTheme>>({});
+  const [nowPlayingOpenRequests, setNowPlayingOpenRequests] = useState(0);
+  const requestNowPlayingOpen = useCallback(() => setNowPlayingOpenRequests((count) => count + 1), []);
 
   const reportTabBar = useCallback((id: string, inset: number | null) => {
     setInsets((current) => {
@@ -133,9 +143,11 @@ export function BottomChromeProvider({ children }: { children: ReactNode }) {
     setNowPlayingCollapsed,
     nowPlayingExpanded,
     reportNowPlayingExpanded,
+    nowPlayingOpenRequests,
+    requestNowPlayingOpen,
     documentTheme,
     reportDocumentTheme,
-  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset, nowPlayingCollapsed, nowPlayingExpanded, reportNowPlayingExpanded, documentTheme, reportDocumentTheme]);
+  }), [insets, nowPlayingInset, reportTabBar, reportNowPlayingInset, nowPlayingCollapsed, nowPlayingExpanded, reportNowPlayingExpanded, nowPlayingOpenRequests, requestNowPlayingOpen, documentTheme, reportDocumentTheme]);
 
   return <BottomChromeContext.Provider value={value}>{children}</BottomChromeContext.Provider>;
 }
