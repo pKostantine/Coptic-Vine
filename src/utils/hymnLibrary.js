@@ -1753,7 +1753,8 @@ async function safeHydrateNested(schema, table, flags, depth, isoDate) {
  */
 async function hydrateWholeTableInlineNested(hymnKey, target, flags, depth, isoDate) {
   if (!GOSPEL_RITE_KEYS.has(hymnKey)) {
-    return safeHydrateNested(target.schema, target.table, flags, depth, isoDate);
+    const sections = await safeHydrateNested(target.schema, target.table, flags, depth, isoDate);
+    return RESPONSE_KEYS.has(hymnKey) ? openResponseOnFirstVerse(sections) : sections;
   }
 
   const [onSections, offSections] = await Promise.all([
@@ -1783,6 +1784,29 @@ async function hydrateWholeTableInlineNested(hymnKey, target, flags, depth, isoD
   });
   const offOnly = offSections.filter((s) => !onIds.has(s.id)).map((s) => ({ ...s, nonCopticGospelRiteOnly: true }));
   return [...merged, ...offOnly];
+}
+
+/** The Praxis and Gospel Responses, spliced whole into the Liturgy and the Raising of Incense. */
+const RESPONSE_KEYS = new Set(["PRAXIS_RESPONSE", "GOSPEL_RESPONSES"]);
+
+/**
+ * A response opens on the first verse it shows, past any rubric before it --
+ * the drop cap and decorated first words, its Coptic on the capital. The day
+ * picks which of the table's hymns are said, so no one line could carry
+ * hymn_texts.drop_cap for every day: here the flag decides nothing, and no
+ * other line opens so.
+ */
+function openResponseOnFirstVerse(sections) {
+  let opened = false;
+  return sections.map((section) => {
+    if (!section.verses?.length) return section;
+    const verses = section.verses.map((verse) => {
+      const opens = !opened && verse.type !== "comment" && verse.type !== "silentComment";
+      if (opens) opened = true;
+      return { ...verse, dropCap: opens };
+    });
+    return applyCopticCaseToSection({ ...section, verses });
+  });
 }
 
 /**

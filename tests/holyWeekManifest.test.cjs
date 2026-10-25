@@ -184,7 +184,7 @@ test('Holy Week hours splice the mournful rites like GOSPEL_RITE, toggle and all
   assert.match(hymnLibrarySource, /MOURNFUL_4_GOSPELS_RITE: \{ schema: "gospel_rite", table: "mournful_4_gospels_rite" \}/);
   assert.match(hymnLibrarySource, /const GOSPEL_RITE_KEYS = new Set\(\[[^\]]*"MOURNFUL_GOSPEL_RITE", "MOURNFUL_4_GOSPELS_RITE"\]\)/);
   assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) return null;/);
-  assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) \{\r?\n\s+return safeHydrateNested/);
+  assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) \{\r?\n\s+const sections = await safeHydrateNested/);
 
   // The rites' reading rows resolve as reading sentinels.
   const start = hymnLibrarySource.indexOf('export const READING_SENTINELS');

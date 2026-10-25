@@ -356,3 +356,22 @@ test('the loader marks the lines that open, hymn_texts.drop_cap and each reading
   // And so does the Lectionary's.
   assert.match(fs.readFileSync('src/utils/readingsService.ts', 'utf8'), /verses: \[\.\.\.citationVerse, \.\.\.readingVerses\.map\(\(verse, index\) => \(index === 0 \? \{ \.\.\.verse, dropCap: true \} : verse\)\)\],/);
 });
+
+test('the Praxis and Gospel Responses open on the first verse they show, whatever drop_cap says', () => {
+  const library = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
+  assert.match(library, /const RESPONSE_KEYS = new Set\(\["PRAXIS_RESPONSE", "GOSPEL_RESPONSES"\]\);/);
+  assert.match(library, /return RESPONSE_KEYS\.has\(hymnKey\) \? openResponseOnFirstVerse\(sections\) : sections;/);
+  const casing = library.slice(library.indexOf('const COPTIC_CHAR_PATTERN'), library.indexOf('// Readings (buildReadingVerses above)'));
+  const source = /function openResponseOnFirstVerse\(sections\) \{[\s\S]*?\n\}/.exec(library)[0];
+  const openResponseOnFirstVerse = new Function(`${casing}\n${source}; return openResponseOnFirstVerse;`)();
+  // The day's hymns, each its own section until merged under the response's title: a rubric, then the line said first.
+  const sections = openResponseOnFirstVerse([
+    { id: 'title', verses: [] },
+    { id: 'grNativity', verses: [{ type: 'comment', english: 'For the Feast of the Nativity:', coptic: '' }, { type: 'people', english: 'A star shone', coptic: 'ⲀⲨⲤⲒⲞⲨ ⲈϤϢⲀⲒ', dropCap: false }] },
+    { id: 'grThisIsHeToWhomIsDueGlory', verses: [{ type: 'people', english: 'This is He', coptic: 'Ⲫⲁⲓ ⲉ̀ⲣⲉ', dropCap: true }] },
+  ]);
+  assert.deepEqual(sections.map((section) => section.verses.map((verse) => verse.dropCap)), [[], [false, true], [false]]);
+  assert.equal(sections[1].verses[1].coptic, 'Ⲁⲩⲥⲓⲟⲩ ⲉϥϣⲁⲓ');
+  assert.equal(sections[2].verses[0].coptic, 'ⲫⲁⲓ ⲉ̀ⲣⲉ');
+  assert.deepEqual(openResponseOnFirstVerse([]), []);
+});
