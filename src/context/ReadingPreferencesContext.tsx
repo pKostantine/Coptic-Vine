@@ -5,6 +5,7 @@ import type { DocumentThemeId } from '../constants/documentThemes';
 import { loadBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
 import { normalizeSelectedInterpretations, toggleSelectedInterpretation } from '../utils/kiahkInterpretations';
 import { markPendingDocumentRestoresDirty } from '../utils/lastDocumentPosition';
+import { clampVolume } from '../utils/playerVolume';
 import {
     applySyncedReadingPreferences,
     AppLanguage,
@@ -66,6 +67,8 @@ interface ReadingPreferencesContextValue {
   /** Lessons with a video: play the picture, or the sound alone (utils/lessonPlayback.ts). */
   setLessonVideoMode: (mode: LessonVideoMode) => void;
   toggleLessonVideoOnCellular: () => void;
+  /** Keeps the player's volume (0 to 1) for the next time the app is opened. */
+  setPlayerVolume: (volume: number) => void;
   bookmarks: string[];
   isBookmarked: (id: string) => boolean;
   toggleBookmark: (id: string) => void;
@@ -382,6 +385,11 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     setPreferences((prev) => ({ ...prev, lessonVideoOnCellular: !prev.lessonVideoOnCellular }));
   }, []);
 
+  const setPlayerVolume = useCallback((volume: number) => {
+    const playerVolume = clampVolume(volume);
+    setPreferences((prev) => (prev.playerVolume === playerVolume ? prev : { ...prev, playerVolume }));
+  }, []);
+
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks]);
 
   const toggleBookmark = useCallback((id: string) => {
@@ -418,6 +426,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       setNowPlayingButtonSide,
       setLessonVideoMode,
       toggleLessonVideoOnCellular,
+      setPlayerVolume,
       bookmarks,
       isBookmarked,
       toggleBookmark,
@@ -451,6 +460,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       setNowPlayingButtonSide,
       setLessonVideoMode,
       toggleLessonVideoOnCellular,
+      setPlayerVolume,
       bookmarks,
       isBookmarked,
       toggleBookmark,

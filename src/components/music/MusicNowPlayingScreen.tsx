@@ -41,6 +41,7 @@ import {
     usePlayerLayout,
 } from '@/components/playback/PlayerParts';
 import PlayerSheet from '@/components/playback/PlayerSheet';
+import PlayerVolume from '@/components/playback/PlayerVolume';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
@@ -49,6 +50,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { PublishedLyricSet } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
+import { PLAYER_VOLUME_ADJUSTABLE } from '@/utils/playerVolume';
 import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 import { useArtworkPalette } from '@/utils/useArtworkPalette';
 
@@ -350,6 +352,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         align={align}
       />
     ),
+    volume: PLAYER_VOLUME_ADJUSTABLE ? () => <PlayerVolume /> : undefined,
     bar: (size) => (
       <>
         <PlayerBarButton

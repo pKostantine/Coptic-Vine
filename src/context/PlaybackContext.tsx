@@ -53,6 +53,7 @@ import {
   savePlaybackSnapshot,
   saveReloadPoint,
 } from '@/utils/playbackStateStorage';
+import { clampVolume, PLAYER_VOLUME_ADJUSTABLE } from '@/utils/playerVolume';
 import { addTrackControlListener, hasTrackControls, setTrackControls } from '@/utils/trackControls';
 
 /** Which player an entry plays on: the audio player, or the video player for a lesson with a picture. */
@@ -111,6 +112,12 @@ export interface PlaybackContextValue {
    */
   learningRate: number;
   setLearningRate: (rate: number) => void;
+  /**
+   * The volume bar's level, 0 to 1: one level for both players and every
+   * entry, kept for the next time the app is opened (utils/playerVolume.ts).
+   */
+  volume: number;
+  setVolume: (volume: number) => void;
 
   /** The player the current entry plays on. */
   activeEngine: PlaybackEngine;
@@ -255,7 +262,7 @@ function samePresentation(a: VideoPresentation, b: VideoPresentation): boolean {
 }
 
 export function PlaybackProvider({ children }: { children: ReactNode }) {
-  const { preferences, setLessonVideoMode: setLessonVideoModePreference } = useReadingPreferences();
+  const { preferences, setLessonVideoMode: setLessonVideoModePreference, setPlayerVolume } = useReadingPreferences();
   const lessonVideoMode = preferences.lessonVideoMode;
   const lessonVideoOnCellular = preferences.lessonVideoOnCellular;
 
@@ -280,6 +287,11 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   // A session carried over from before a rebuild is already in place.
   const [hydrated, setHydrated] = useState(live != null);
   const [learningRate, setLearningRate] = useState(live?.learningRate ?? 1);
+  // The bar's level while it moves, ahead of the saved preference: saved to
+  // the device once the bar has come to rest, not at every step of a drag.
+  const [movingVolume, setMovingVolume] = useState<number | null>(null);
+  const volume = movingVolume ?? preferences.playerVolume;
+  const volumeRef = useRef(volume);
   const sourceRequestId = useRef(0);
   const restorePositionMs = useRef<number | null>(null);
 
@@ -306,6 +318,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   // The video player's properties are set through this ref: it is the same
   // instance for the provider's life, and a ref may be written to after render.
   const videoPlayerRef = useRef(videoPlayer);
+  // The audio player's volume likewise.
+  const audioPlayerRef = useRef(player);
   // Media Session action handlers outlive renders, so they read the latest
   // queue navigation through refs instead of capturing stale callbacks.
   const nextRef = useRef<() => void>(() => undefined);
@@ -487,6 +501,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         const video = videoPlayerRef.current;
         video.showNowPlayingNotification = true;
         video.replace(videoSourceFor(entry, uri, rendition));
+        if (PLAYER_VOLUME_ADJUSTABLE) video.volume = volumeRef.current;
         setVideoRendition(rendition);
         if (startMs > 0) {
           // iOS keeps a seek made while the source loads; the others take it once ready.
@@ -511,6 +526,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         headers: entry.playable.source.headers ?? undefined,
         name: entry.playable.title,
       });
+      // The web player builds a new element for each source, at full volume:
+      // the listener's level goes on it before it can start.
+      if (PLAYER_VOLUME_ADJUSTABLE) audioPlayerRef.current.volume = volumeRef.current;
       claimTrackButtons();
 
       if (Platform.OS === 'web') {
@@ -799,6 +817,26 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     player.setPlaybackRate(playbackRate);
   }, [activeEngine, currentKey, playbackRate, player, status.isLoaded, videoRendition]);
 
+  // Both players at the bar's level as it moves; each new source is given it
+  // in loadEntry and switchRendition.
+  useEffect(() => {
+    volumeRef.current = volume;
+    if (!PLAYER_VOLUME_ADJUSTABLE) return;
+    audioPlayerRef.current.volume = volume;
+    videoPlayerRef.current.volume = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    if (movingVolume == null) return;
+    const timer = setTimeout(() => {
+      setPlayerVolume(movingVolume);
+      setMovingVolume(null);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [movingVolume, setPlayerVolume]);
+
+  const setVolume = useCallback((next: number) => setMovingVolume(clampVolume(next)), []);
+
   useEffect(() => {
     const requestedPosition = restorePositionMs.current;
     if (requestedPosition == null || !status.isLoaded) return;
@@ -1011,6 +1049,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     swapRef.current = { positionMs, wasPlaying };
     setVideoSwitch({ positionMs, wasPlaying });
     video.replace(videoSourceFor(entry, uri, to));
+    if (PLAYER_VOLUME_ADJUSTABLE) video.volume = volumeRef.current;
     setVideoRendition(to);
     video.currentTime = positionMs / 1000;
     pendingVideoSeekMs.current = positionMs;
@@ -1078,6 +1117,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     toggleShuffle,
     learningRate,
     setLearningRate,
+    volume,
+    setVolume,
     activeEngine,
     currentHasVideo,
     videoPlayer,
@@ -1122,6 +1163,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     selectQueueIndex,
     setLessonVideoMode,
     setVideoPresentation,
+    setVolume,
     shuffleEnabled,
     togglePlayback,
     toggleShuffle,
@@ -1131,6 +1173,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     videoPresentation,
     videoRendition,
     videoSwitching,
+    volume,
   ]);
 
   return <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>;
