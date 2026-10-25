@@ -29,11 +29,38 @@ const GEORGIA = { ascent: 0.917, descent: 0.219, capHeight: 0.693 };
 const GAP_AFTER = 10 / 22;
 const FIRST_WORD_NEARER = 8 / 22;
 
-/** An English or French paragraph's first letter, when there's an Old English initial for it, and the text after it. */
-export function splitEnglishOpening(text: string): { letter: string; rest: string } | null {
-  const match = /^\s*([A-Z])/.exec(text);
-  if (!match || !ENGLISH_INITIALS[match[1]]) return null;
-  return { letter: match[1], rest: text.slice(match[0].length) };
+/**
+ * What a paragraph can open on before its first letter: quotation marks, a
+ * bracket, a dash. They give way to the initial, as an opening quotation mark
+ * does to a display initial (the page keeps them in the text unseen).
+ */
+const OPENING_MARKS = /^[\s"'`“‘«‹„‚([{–—]*/u;
+/** Ligatures there's no Old English capital for: the initial they open on, and what follows it. */
+const LIGATURES: Record<string, [string, string]> = { Æ: ['A', 'e'], æ: ['A', 'e'], Œ: ['O', 'e'], œ: ['O', 'e'] };
+
+export interface EnglishOpeningSplit {
+  /** The Old English capital: the first letter as a capital, an accented one as its plain letter. */
+  letter: string;
+  /** What of the text the initial stands for: the marks before the letter, and the letter as written. */
+  source: string;
+  /** The text after it. */
+  rest: string;
+}
+
+/**
+ * An English or French paragraph's opening, when there's an Old English
+ * initial for its first letter. It opens so whatever case that letter is in
+ * (a reading that begins part way through a verse opens on a small one) and
+ * past any marks before it.
+ */
+export function splitEnglishOpening(text: string): EnglishOpeningSplit | null {
+  const marks = OPENING_MARKS.exec(text)![0];
+  const first = text.charAt(marks.length);
+  const ligature = LIGATURES[first];
+  const letter = ligature ? ligature[0] : first.normalize('NFD').charAt(0).toUpperCase();
+  if (!ENGLISH_INITIALS[letter]) return null;
+  const after = text.slice(marks.length + 1).replace(/^\p{M}+/u, '');
+  return { letter, source: text.slice(0, text.length - after.length).trim(), rest: (ligature ? ligature[1] : '') + after };
 }
 
 export interface EnglishInitialMetrics {
@@ -109,18 +136,6 @@ export function englishOpeningWord(fontSize: number, color: string) {
  */
 export function arabicOpeningWord(color: string) {
   return { style: { color, fontWeight: '700' as const }, baselineShift: 0 };
-}
-
-/**
- * The room a verse number takes ahead of the initial its verse opens with on a
- * slide: its figures (a combining overline takes none) and the gap after them,
- * in the text's size. An estimate erring wide, since a slide's lines are
- * worked out before anything is drawn: the lines beside it are justified to
- * whatever room is left.
- */
-export function verseNumberLeadWidth(number: string, fontSize: number) {
-  const figures = Array.from(number).filter((char) => !/\p{M}/u.test(char)).length;
-  return Math.round(fontSize * (figures * 0.7 + 0.3) * 100) / 100;
 }
 
 /** Letters that join the letter after them (Unicode's dual-joining Arabic letters). */

@@ -1,7 +1,7 @@
 import { COPTIC_INITIAL_VIEWBOX, COPTIC_INITIAL_VINE_PIECES, COPTIC_INITIALS } from '../../constants/copticInitialArt';
 import { ENGLISH_INITIALS } from '../../constants/englishInitialArt';
 import { copticInitialMetrics } from './copticInitial';
-import { ENGLISH_FIRST_WORD_NEARER, englishInitialMetrics, splitRestOfFirstWord } from './openingInitials';
+import { ENGLISH_FIRST_WORD_NEARER, type EnglishOpeningSplit, englishInitialMetrics, splitRestOfFirstWord } from './openingInitials';
 
 /**
  * The drop cap and decorated first words as the web pages set them, shared by
@@ -9,7 +9,7 @@ import { ENGLISH_FIRST_WORD_NEARER, englishInitialMetrics, splitRestOfFirstWord 
  * (bibleDocumentHtml.ts); the slideshow sets the same ones natively
  * (VerseBlock.js). copticInitial.ts and openingInitials.ts say how each is
  * made. A line opens so only where it is marked to (DocumentVerse.dropCap, a
- * Bible chapter's verse 1).
+ * Bible chapter's verse 1), and a verse that opens so shows no verse number.
  */
 
 const cssPx = (value: number) => `${Math.round(value * 100) / 100}px`;
@@ -116,12 +116,9 @@ export function openingInitialStyles(lineHeight: number, fontSize: number, color
       /* Arabic has no capitals: its first word is stretched with kashida, in
          bold at the text's own size -- longer, never bigger. */
       .arabic-opening { font-weight: 700; }
-      /* The number of a verse that opens on an initial goes ahead of it, so it
-         doesn't stand between the initial and its word; the lines beside the
-         initial are set beside it too. */
-      .opening-verse-number { float: left; }
-      /* The letter itself stays in the text, unseen, for copying and for screen readers. */
-      .coptic-initial-text, .english-initial-text {
+      /* The letter itself stays in the text, unseen, for copying and for
+         screen readers; and so does the number of a verse that opens so. */
+      .coptic-initial-text, .english-initial-text, .opening-verse-number {
         clip: rect(0 0 0 0);
         clip-path: inset(50%);
         height: 1px;
@@ -150,14 +147,14 @@ export function renderCopticInitial(initial: { letter: string; marks: string }, 
 /**
  * The English (or French) opening initial (openingInitials.ts), drawn from
  * the shape the page defines once (openingInitialDefs), as wide as its own
- * letter beside the page's line, with the letter itself kept in the text
- * unseen.
+ * letter beside the page's line, with what it stands for (the letter as
+ * written, and any quotation mark before it) kept in the text unseen.
  */
-export function renderEnglishInitial(letter: string, fontSize: number, lineHeight: number) {
-  const metrics = englishInitialMetrics(letter, fontSize, lineHeight);
+export function renderEnglishInitial(initial: Pick<EnglishOpeningSplit, 'letter' | 'source'>, fontSize: number, lineHeight: number) {
+  const metrics = englishInitialMetrics(initial.letter, fontSize, lineHeight);
   return `<span class="english-initial" style="width: ${cssPx(metrics.width)};"><svg class="english-initial-art" viewBox="${metrics.art.viewBox}" aria-hidden="true">`
-    + `<use class="english-initial-letter" href="#en-initial-${initialKey(letter)}"></use>`
-    + `</svg><span class="english-initial-text">${escapeText(letter)}</span></span>`;
+    + `<use class="english-initial-letter" href="#en-initial-${initialKey(initial.letter)}"></use>`
+    + `</svg><span class="english-initial-text">${escapeText(initial.source)}</span></span>`;
 }
 
 /**

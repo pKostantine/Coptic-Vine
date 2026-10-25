@@ -846,10 +846,10 @@ export function createVerseLineSegment(item, state, lineCapacities, segmentIndex
   let showsPrefix = false;
   segmentEntries.forEach(({ entry, lines, start }) => {
     const joinedBody = joinRenderedLines(lines);
-    const beginsWithBibleNumber = Boolean(item.verse?.bibleVerseNumber) && start === 0;
-    // A column opening on an initial sets the number ahead of it, not in its
-    // lines (VerseBlock.js), so there is none of it to take off them.
-    const body = beginsWithBibleNumber && !lines[0]?.initial
+    // A verse opening with the drop cap shows no number (VerseBlock.js), so
+    // there is none of it in its lines to take off them.
+    const beginsWithBibleNumber = Boolean(item.verse?.bibleVerseNumber) && !item.verse?.dropCap && start === 0;
+    const body = beginsWithBibleNumber
       ? joinedBody.replace(/^\S+\s*/, "")
       : joinedBody;
     const prefix = String(item.verse?.seasonalHoosVersePrefix || "").trim();
