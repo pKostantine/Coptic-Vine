@@ -29,10 +29,12 @@ import {
   lessonRendition,
   type LessonRendition,
   type LessonVideoMode,
+  pictureVisible,
+  type RenditionCause,
   renditionSwitchDelayMs,
-  startingPlacement,
-  type VideoPlacementKind,
+  startingPictureVisible,
 } from '@/utils/lessonPlayback';
+import { lessonVideoElement } from '@/utils/lessonVideoElement';
 import {
   choosePlaybackUri,
   clampPlaybackIndex,
@@ -43,6 +45,7 @@ import {
   insertQueueEntry,
   moveQueueEntry,
   nextRepeatMode,
+  removeQueueEntry,
   restoreOriginalQueue,
   shuffleQueuePreservingCurrent,
 } from '@/utils/playbackEngine';
@@ -59,14 +62,13 @@ import { addTrackControlListener, hasTrackControls, setTrackControls } from '@/u
 /** Which player an entry plays on: the audio player, or the video player for a lesson with a picture. */
 export type PlaybackEngine = 'audio' | 'video';
 
-/** Where the one video surface is, as the stage reports it (utils/lessonPlayback.ts). */
+/** Where the picture can be drawn, as the stage reports it (context/VideoStageContext.tsx). */
 export interface VideoPresentation {
-  placement: VideoPlacementKind;
+  /** A surface (the bar's thumbnail, the full player) is mounted to show the picture. */
+  surfaceShowing: boolean;
+  /** A now-playing bar is out, so a new lesson's picture will show in its thumbnail. */
+  barShowsPicture: boolean;
   pictureInPicture: boolean;
-  /** The lessons whose pages are showing, so a new entry's first rendition is the right one. */
-  claimedItemIds: readonly string[];
-  /** A subdocument covers the app, surface included. */
-  covered: boolean;
 }
 
 export interface PlaybackContextValue {
@@ -92,6 +94,8 @@ export interface PlaybackContextValue {
   selectQueueIndex: (index: number) => void;
   /** Drag-to-reorder. The playing entry keeps playing wherever it lands. */
   moveQueueItem: (fromIndex: number, toIndex: number) => void;
+  /** Takes one entry out of the queue; what plays keeps playing (it is never the one taken out). */
+  removeQueueItem: (index: number) => void;
   /** Empties the queue but keeps the current entry playing. */
   clearUpcoming: () => void;
   /** Stops playback and forgets the queue entirely. */
@@ -123,7 +127,7 @@ export interface PlaybackContextValue {
   activeEngine: PlaybackEngine;
   /** The current entry is a lesson with a picture (it plays on the video player either way). */
   currentHasVideo: boolean;
-  /** The video player, for the one surface that draws it (components/playback/LessonVideoStage.tsx). */
+  /** The video player, for the surfaces that draw it (components/playback/LessonVideoSurface.tsx). */
   videoPlayer: VideoPlayer;
   /** Video or sound alone, as the listener chose (a device preference). */
   lessonVideoMode: LessonVideoMode;
@@ -134,9 +138,13 @@ export interface PlaybackContextValue {
   videoSwitching: boolean;
   /** The picture's shape when the player has measured it, else from the catalogue, else null. */
   videoAspectRatio: number | null;
-  /** The stage reports where the surface is, so the picture is streamed only while it can be seen. */
+  /** The stage reports where the picture can be drawn, so it is streamed only while it can be seen. */
   setVideoPresentation: (presentation: VideoPresentation) => void;
-  videoPresentation: VideoPresentation;
+  /**
+   * The full player is about to open for the lesson being started, to watch
+   * it: its picture is fetched the first time rather than its sound alone.
+   */
+  expectVideoSurface: () => void;
   /** On cellular data with video not allowed over it: the lesson plays as sound alone. */
   cellularBlocked: boolean;
   /** "Play the video anyway": allows the picture over cellular until the app is next opened. */
@@ -200,11 +208,12 @@ function isLearningEntry(entry: PlaybackQueueEntry | null): entry is PlaybackQue
 /**
  * On the web the player reports "ready" only when its status changes, and a
  * quick source swap never leaves "ready"; the element itself says when the
- * new source can play. The stage keeps exactly one <video> in the document.
+ * new source can play. The lesson's one <video> lives in the home view,
+ * or in the surface showing it (components/playback/LessonVideoHome.web.tsx).
  */
 function whenWebVideoReady(callback: () => void): void {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-  const element = document.querySelector('video');
+  if (Platform.OS !== 'web') return;
+  const element = lessonVideoElement();
   if (!element) return;
   if (element.readyState >= 3) {
     callback();
@@ -230,6 +239,52 @@ function setupVideoPlayer(instance: VideoPlayer): void {
   instance.staysActiveInBackground = true;
   instance.audioMixingMode = 'doNotMix';
   instance.timeUpdateEventInterval = 0.25;
+  // Half a minute ahead, not iOS's own choice (minutes of a long lesson):
+  // what is fetched and never watched, when the listener switches to the
+  // sound alone or stops, is data spent for nothing.
+  instance.bufferOptions = { preferredForwardBufferDuration: 30, waitsToMinimizeStalling: true };
+  // The screen stays on only while the picture plays (set with each rendition).
+  instance.keepScreenOnWhilePlaying = false;
+}
+
+/**
+ * Puts a rendition on the video player at a place in it, playing or not.
+ * iOS loads the item off the main thread (replace would block it); the web
+ * player starts each new source by itself, so it is paused again there if it
+ * should not play.
+ */
+async function replaceVideoSource(video: VideoPlayer, source: VideoSource, options: {
+  positionMs: number;
+  play: boolean;
+  rendition: LessonRendition;
+  volume: number;
+  rate: number | null;
+}): Promise<void> {
+  if (Platform.OS === 'ios') await video.replaceAsync(source);
+  else video.replace(source);
+  video.keepScreenOnWhilePlaying = options.rendition === 'video';
+  if (PLAYER_VOLUME_ADJUSTABLE) video.volume = options.volume;
+  if (options.rate != null) video.playbackRate = options.rate;
+  // iOS keeps a seek made while the item loads; the others take it again once ready (videoReady).
+  if (options.positionMs > 0) video.currentTime = options.positionMs / 1000;
+  if (Platform.OS === 'web') {
+    if (!options.play) video.pause();
+  } else if (options.play) {
+    video.play();
+  }
+}
+
+/**
+ * A play() the browser gives up on — interrupted by a pause or a new source,
+ * or refused until the listener first touches the page — rejects a promise
+ * expo-video doesn't catch. Both are expected here (replaceVideoSource,
+ * armResumeOnGesture); any other rejection still reports.
+ */
+function quietInterruptedPlay(event: PromiseRejectionEvent): void {
+  const reason = event.reason as { name?: string; message?: string } | null;
+  if ((reason?.name === 'AbortError' || reason?.name === 'NotAllowedError') && String(reason.message ?? '').includes('play()')) {
+    event.preventDefault();
+  }
 }
 
 /**
@@ -251,14 +306,12 @@ function claimWebTrackButtons(next: () => void, previous: () => void): void {
   }
 }
 
-const HIDDEN_PRESENTATION: VideoPresentation = { placement: 'hidden', pictureInPicture: false, claimedItemIds: [], covered: false };
+const HIDDEN_PRESENTATION: VideoPresentation = { surfaceShowing: false, barShowsPicture: false, pictureInPicture: false };
+/** How long a page that opens the full player to watch a lesson is taken at its word. */
+const SURFACE_EXPECTED_MS = 3000;
 
 function samePresentation(a: VideoPresentation, b: VideoPresentation): boolean {
-  return a.placement === b.placement
-    && a.pictureInPicture === b.pictureInPicture
-    && a.covered === b.covered
-    && a.claimedItemIds.length === b.claimedItemIds.length
-    && a.claimedItemIds.every((id, index) => id === b.claimedItemIds[index]);
+  return a.surfaceShowing === b.surfaceShowing && a.barShowsPicture === b.barShowsPicture && a.pictureInPicture === b.pictureInPicture;
 }
 
 export function PlaybackProvider({ children }: { children: ReactNode }) {
@@ -370,14 +423,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const network = Network.useNetworkState();
   const onCellular = network.type === Network.NetworkStateType.CELLULAR;
   const cellularBlocked = onCellular && !lessonVideoOnCellular && !cellularOverride;
-  const effectivePlacement: VideoPlacementKind = appActive || videoPresentation.pictureInPicture
-    ? videoPresentation.placement
-    : 'hidden';
   const desiredRendition = lessonRendition({
     hasVideo: currentHasVideo,
     mode: lessonVideoMode,
-    placement: effectivePlacement,
-    pictureInPicture: videoPresentation.pictureInPicture,
+    pictureVisible: pictureVisible({ surfaceShowing: videoPresentation.surfaceShowing, appActive, pictureInPicture: videoPresentation.pictureInPicture }),
     cellularBlocked,
   });
   // The same inputs as last rendered, for a load started from an event: a new
@@ -386,20 +435,20 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     renditionInputsRef.current = { mode: lessonVideoMode, cellularBlocked, appActive, presentation: videoPresentation };
   }, [appActive, cellularBlocked, lessonVideoMode, videoPresentation]);
-  const startingRenditionFor = useCallback((entry: PlaybackQueueEntry): LessonRendition => {
+  // Until when a page that opened the full player to watch a lesson is taken at its word (expectVideoSurface).
+  const surfaceExpectedUntil = useRef(0);
+  const startingRenditionFor = useCallback((): LessonRendition => {
     const { mode, cellularBlocked: blocked, appActive: active, presentation } = renditionInputsRef.current;
     return lessonRendition({
       hasVideo: true,
       mode,
-      placement: startingPlacement({
-        itemId: entry.playable.id,
-        claimedItemIds: presentation.claimedItemIds,
+      pictureVisible: startingPictureVisible({
+        surfaceShowing: presentation.surfaceShowing,
+        barShowsPicture: presentation.barShowsPicture,
+        surfaceExpected: Date.now() < surfaceExpectedUntil.current,
         appActive: active,
-        covered: presentation.covered,
         pictureInPicture: presentation.pictureInPicture,
-        current: active || presentation.pictureInPicture ? presentation.placement : 'hidden',
       }),
-      pictureInPicture: presentation.pictureInPicture,
       cellularBlocked: blocked,
     });
   }, []);
@@ -482,35 +531,34 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         : isLearningEntry(entry) ? resumePositionFor(peekLearningResume()[entry.playable.id], entry.playable.durationMs) : 0;
 
       if (entryHasVideo(entry)) {
-        // Fetched right the first time: the rendition for where the picture
-        // will be, not for where the entry before it was.
-        const rendition = startingRenditionFor(entry);
-        const uri = await resolveRenditionUri(entry, rendition);
+        const [pictureUri, soundUri] = await Promise.all([resolveVideoUri(entry), resolveAudioUri(entry)]);
         if (requestId !== sourceRequestId.current) return;
+        // Fetched right the first time: the rendition for where the picture
+        // will be, decided once both are known, so a page that opened the
+        // full player to watch this lesson has had its say (expectVideoSurface).
+        const wanted = startingRenditionFor();
+        const rendition: LessonRendition = wanted === 'video' && pictureUri ? 'video' : 'audio';
+        const uri = rendition === 'video' ? pictureUri : soundUri ?? pictureUri;
         if (!uri) throw new Error('No playable local or remote source is available.');
 
         // One player at a time owns the sound and the lock screen.
         stopAudioEngine();
-        videoRequestId.current += 1;
-        pendingVideoSeekMs.current = null;
+        const videoRequest = ++videoRequestId.current;
+        pendingVideoSeekMs.current = startMs > 0 ? startMs : null;
         swapRef.current = null;
         setVideoSwitch(null);
         setVideoDurationMs(entry.playable.durationMs ?? 0);
         setMeasuredAspectRatio(null);
         setCurrentIndex(boundedIndex);
-        const video = videoPlayerRef.current;
-        video.showNowPlayingNotification = true;
-        video.replace(videoSourceFor(entry, uri, rendition));
-        if (PLAYER_VOLUME_ADJUSTABLE) video.volume = volumeRef.current;
         setVideoRendition(rendition);
-        if (startMs > 0) {
-          // iOS keeps a seek made while the source loads; the others take it once ready.
-          video.currentTime = startMs / 1000;
-          pendingVideoSeekMs.current = startMs;
-        }
         restorePositionMs.current = null;
         pendingPlay.current = autoplay;
-        if (autoplay) video.play();
+        const video = videoPlayerRef.current;
+        video.showNowPlayingNotification = true;
+        await replaceVideoSource(video, videoSourceFor(entry, uri, rendition), {
+          positionMs: startMs, play: autoplay, rendition, volume: volumeRef.current, rate: null,
+        });
+        if (videoRequest !== videoRequestId.current) return;
         whenWebVideoReady(videoReady);
         return;
       }
@@ -668,6 +716,16 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     // must survive toggling shuffle on and off again.
     if (!shuffleEnabled) setOriginalQueue(moved.queue);
   }, [currentIndex, queue, shuffleEnabled]);
+
+  const removeQueueItem = useCallback((index: number) => {
+    const removed = queue[index];
+    if (!removed || index === currentIndex) return;
+    const next = removeQueueEntry(queue, currentIndex, index);
+    setQueue(next.queue);
+    setCurrentIndex(next.currentIndex);
+    // Gone from the order shuffle returns to as well, so it doesn't come back.
+    setOriginalQueue((entries) => entries.filter((entry) => entry.key !== removed.key));
+  }, [currentIndex, queue]);
 
   const clearUpcoming = useCallback(() => {
     const kept = keepOnlyCurrentEntry(queue, currentIndex);
@@ -1045,41 +1103,45 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     if (requestId !== videoRequestId.current || !uri) return;
     const video = videoPlayerRef.current;
     const positionMs = Math.max(0, Math.round(video.currentTime * 1000));
-    const wasPlaying = video.playing;
+    // Playing, or about to (a source still loading to play).
+    const wasPlaying = video.playing || pendingPlay.current;
     swapRef.current = { positionMs, wasPlaying };
     setVideoSwitch({ positionMs, wasPlaying });
-    video.replace(videoSourceFor(entry, uri, to));
-    if (PLAYER_VOLUME_ADJUSTABLE) video.volume = volumeRef.current;
     setVideoRendition(to);
-    video.currentTime = positionMs / 1000;
     pendingVideoSeekMs.current = positionMs;
-    video.playbackRate = playbackRate;
     pendingPlay.current = wasPlaying;
-    // Started here as well where that works (the native players); the web
-    // player starts from its ready event, as a play() now would be thrown away.
-    if (wasPlaying && Platform.OS !== 'web') video.play();
+    await replaceVideoSource(video, videoSourceFor(entry, uri, to), {
+      positionMs, play: wasPlaying, rendition: to, volume: volumeRef.current, rate: playbackRate,
+    });
+    if (requestId !== videoRequestId.current) return;
     whenWebVideoReady(videoReady);
   }, [playbackRate, videoReady]);
 
-  // The rendition follows the rules with a short grace for navigation: a
-  // page swap passes through "nowhere" on the way to the next page.
-  const previousInputs = useRef({ mode: lessonVideoMode, pictureInPicture: videoPresentation.pictureInPicture, cellularBlocked });
+  // The rendition follows the rules. Why it differs decides how soon: the
+  // listener's choice and cellular data at once, the picture put out of
+  // sight only once it has stayed so (utils/lessonPlayback.ts).
   useEffect(() => {
-    const cause: 'mode' | 'placement' | 'network' | 'pip' = previousInputs.current.mode !== lessonVideoMode
-      ? 'mode'
-      : previousInputs.current.pictureInPicture !== videoPresentation.pictureInPicture
-        ? 'pip'
-        : previousInputs.current.cellularBlocked !== cellularBlocked ? 'network' : 'placement';
-    previousInputs.current = { mode: lessonVideoMode, pictureInPicture: videoPresentation.pictureInPicture, cellularBlocked };
     if (!currentHasVideo || !videoRendition || loadingSource || videoSwitching) return;
     if (desiredRendition === videoRendition) return;
+    const cause: RenditionCause = lessonVideoMode !== 'video'
+      ? 'mode'
+      : cellularBlocked ? 'network' : !appActive ? 'background' : 'visibility';
     const delay = renditionSwitchDelayMs(videoRendition, desiredRendition, cause);
     const timer = setTimeout(() => void switchRendition(desiredRendition), delay);
     return () => clearTimeout(timer);
-  }, [cellularBlocked, currentHasVideo, desiredRendition, lessonVideoMode, loadingSource, switchRendition, videoPresentation.pictureInPicture, videoRendition, videoSwitching]);
+  }, [appActive, cellularBlocked, currentHasVideo, desiredRendition, lessonVideoMode, loadingSource, switchRendition, videoRendition, videoSwitching]);
 
   const setVideoPresentation = useCallback((presentation: VideoPresentation) => {
     setVideoPresentationState((current) => (samePresentation(current, presentation) ? current : presentation));
+  }, []);
+  const expectVideoSurface = useCallback(() => {
+    surfaceExpectedUntil.current = Date.now() + SURFACE_EXPECTED_MS;
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    window.addEventListener('unhandledrejection', quietInterruptedPlay);
+    return () => window.removeEventListener('unhandledrejection', quietInterruptedPlay);
   }, []);
 
   const allowVideoOverCellularNow = useCallback(() => setCellularOverride(true), []);
@@ -1109,6 +1171,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     seekToMs,
     selectQueueIndex,
     moveQueueItem,
+    removeQueueItem,
     clearUpcoming,
     clearQueue,
     updateQueueEntries,
@@ -1128,7 +1191,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     videoSwitching,
     videoAspectRatio,
     setVideoPresentation,
-    videoPresentation,
+    expectVideoSurface,
     cellularBlocked,
     allowVideoOverCellularNow,
   }), [
@@ -1146,6 +1209,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     currentTimeMs,
     cycleRepeatMode,
     durationMs,
+    expectVideoSurface,
     hydrated,
     learningRate,
     lessonVideoMode,
@@ -1158,6 +1222,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     playing,
     previous,
     queue,
+    removeQueueItem,
     repeatMode,
     seekToMs,
     selectQueueIndex,
@@ -1170,7 +1235,6 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     updateQueueEntries,
     videoAspectRatio,
     videoPlayer,
-    videoPresentation,
     videoRendition,
     videoSwitching,
     volume,

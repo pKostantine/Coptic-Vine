@@ -11,10 +11,12 @@ import LearningBackHeader from '@/components/learning/LearningBackHeader';
 import LearningDownloadButton from '@/components/learning/LearningDownloadButton';
 import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
+import LessonModeSwitch from '@/components/learning/LessonModeSwitch';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import { learningLessonSetQueue, lessonHasVideo, useLearningPlayer } from '@/context/LearningPlayerContext';
+import { learningLessonSetQueue, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useLearningItemLikes } from '@/hooks/useLearningItemLikes';
+import { usePlayLessons } from '@/hooks/usePlayLessons';
 import { learningService } from '@/services/learningService';
 import {
   learningLessonDownloadRequest,
@@ -35,8 +37,9 @@ function rowProgress(resume: LearningResumeMap, lesson: LearningLesson): number 
 /**
  * A lesson set: its cover and its words, then its lessons in order. Play
  * plays them all, video and audio lessons alike, on the one queue; a lesson
- * with a picture, watched as video, opens on its own page where the picture
- * is, and plays in place as sound alone.
+ * with a picture, watched as video, opens the full player on its picture,
+ * and as audio only plays where the listener is. A set with video lessons
+ * offers that choice beside Play, before anything is fetched.
  */
 export default function LearningLessonSetScreen() {
   const router = useRouter();
@@ -50,7 +53,8 @@ export default function LearningLessonSetScreen() {
   const [resume, setResume] = useState<LearningResumeMap>(() => peekLearningResume());
   const player = useLearningPlayer();
   const likes = useLearningItemLikes(locale);
-  const { currentItem, playQueue, playing, lessonVideoMode } = player;
+  const playLessons = usePlayLessons();
+  const { currentItem, playing, lessonVideoMode } = player;
   const queue = useMemo(() => (lessonSet ? learningLessonSetQueue(lessonSet) : []), [lessonSet]);
   const downloadRequest = useMemo(
     () => (lessonSet ? learningLessonSetDownloadRequest(lessonSet, locale) : null),
@@ -85,8 +89,8 @@ export default function LearningLessonSetScreen() {
     router.push({ pathname: '/learn/lesson/[id]', params: { id: lessonId, setId: lessonSet.id } });
   };
 
-  // Plays the lesson in the set's order. Watched as video, it opens its page
-  // where the picture shows; as sound, it plays where the listener stands.
+  // Plays the lesson in the set's order (usePlayLessons): watched as video,
+  // the full player opens on its picture.
   const playLesson = (index: number) => {
     if (!lessonSet || index < 0 || index >= queue.length) return;
     const item = queue[index];
@@ -94,8 +98,7 @@ export default function LearningLessonSetScreen() {
       player.togglePlayback();
       return;
     }
-    playQueue(queue, index);
-    if (lessonHasVideo(item) && lessonVideoMode === 'video') openLessonPage(item.id);
+    playLessons(queue, index);
   };
 
   const count = lessonSet?.lessons.length ?? 0;
@@ -139,6 +142,16 @@ export default function LearningLessonSetScreen() {
                   <LearningDownloadButton packageKey={downloadRequest.packageKey} request={downloadRequest} isArabic={isArabic} />
                 ) : null}
               </View>
+              {videoCount ? (
+                <View style={styles.mode}>
+                  <LessonModeSwitch mode={lessonVideoMode} onChange={player.setLessonVideoMode} variant="page" isArabic={isArabic} />
+                  <Text style={[styles.modeNote, isArabic && styles.arabicCentered]}>
+                    {lessonVideoMode === 'video'
+                      ? tr('Video lessons open on their picture. Audio only uses far less data.', 'Les leçons vidéo s’ouvrent sur leur image. L’audio seul utilise bien moins de données.', 'تُفتح دروس الفيديو على صورتها. الصوت فقط يستهلك بيانات أقل بكثير.')
+                      : tr('Video lessons play as audio only, to save data.', 'Les leçons vidéo sont lues en audio seulement, pour économiser les données.', 'تُشغَّل دروس الفيديو صوتاً فقط لتوفير البيانات.')}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -205,6 +218,8 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: SPACING.sm, marginTop: SPACING.lg },
   playAll: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SPACING.lg, borderRadius: RADII.pill, backgroundColor: COLORS.gold },
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
+  mode: { alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.md },
+  modeNote: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, textAlign: 'center', paddingHorizontal: SPACING.md },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.75 },
   headingRow: { marginTop: SPACING.xl, marginBottom: SPACING.md },

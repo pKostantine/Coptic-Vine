@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -13,6 +13,7 @@ import LearningMediaRow from '@/components/learning/LearningMediaRow';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { usePlayLessons } from '@/hooks/usePlayLessons';
 import { learningService } from '@/services/learningService';
 import { learningPlaylistDownloadRequest } from '@/services/offlineDownloadRequests';
 import type { LearningPlaylistDetail, LearningPlaylistItem } from '@/types/learningPlatform';
@@ -53,7 +54,6 @@ function toQueueItem(item: LearningPlaylistItem): LearningQueueItem | null {
 }
 
 export default function LearningPlaylistScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
   const { preferences } = useReadingPreferences();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
@@ -63,7 +63,8 @@ export default function LearningPlaylistScreen() {
   const [owned, setOwned] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { currentItem, playQueue, playing, lessonVideoMode } = useLearningPlayer();
+  const { currentItem, playing } = useLearningPlayer();
+  const playLessons = usePlayLessons();
   const audioQueue = useMemo(() => (
     playlist?.items.map(toQueueItem).filter((item): item is LearningQueueItem => Boolean(item)) ?? []
   ), [playlist]);
@@ -93,17 +94,11 @@ export default function LearningPlaylistScreen() {
   }, [locale, playlistId]);
 
   // Every item plays on the one queue; a lesson with a picture, watched as
-  // video, also opens on its own page where the picture shows.
+  // video, opens the full player on its picture (usePlayLessons).
   const openItem = (item: LearningPlaylistItem) => {
     const id = item.kind === 'album_recording' ? item.recording.id : item.lesson.id;
     const index = audioQueue.findIndex((entry) => entry.id === id);
-    if (index >= 0) playQueue(audioQueue, index);
-    if (item.kind === 'lesson' && item.lesson.mediaType === 'video' && lessonVideoMode === 'video') {
-      router.push({
-        pathname: '/learn/lesson/[id]',
-        params: { id: item.lesson.id, setId: item.lesson.lessonSetId },
-      });
-    }
+    if (index >= 0) playLessons(audioQueue, index);
   };
 
   const removeItem = async (item: LearningPlaylistItem) => {
@@ -145,7 +140,7 @@ export default function LearningPlaylistScreen() {
               )}
             </Text>
             <View style={styles.actions}>
-              <Pressable accessibilityRole="button" disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playQueue(audioQueue, 0)}>
+              <Pressable accessibilityRole="button" disabled={!audioQueue.length} style={[styles.playAll, !audioQueue.length && styles.disabled]} onPress={() => audioQueue.length && playLessons(audioQueue, 0)}>
                 <Text style={styles.playAllText}>▶  {tr('Play Audio', 'Lire l’audio', 'تشغيل الصوت')}</Text>
               </Pressable>
               {downloadRequest ? (

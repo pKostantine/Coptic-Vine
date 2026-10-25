@@ -82,22 +82,20 @@ export default function LearningMediaRow({
           {mediaType === 'video' ? <Text style={styles.type}>VIDEO</Text> : null}
           <Text style={styles.duration}>{formatDuration(durationMs)}</Text>
         </View>
-        {onToggleLike ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={liked ? 'Unlike ' + title : 'Like ' + title}
-            hitSlop={6}
-            onPress={(event) => {
-              event.stopPropagation();
-              onToggleLike();
-            }}
-            style={styles.likeButton}
-          >
-            <Icon name={liked ? 'heart' : 'heart-outline'} size={16} color={liked ? COLORS.goldBright : COLORS.muted} />
-          </Pressable>
-        ) : null}
         {trailing ? null : <Text style={[styles.play, active && styles.activeText]}>{active && playing ? '❚❚' : '▶'}</Text>}
       </Pressable>
+      {/* Beside the row's button, not in it: the web draws both as <button>, which may not hold one another. */}
+      {onToggleLike ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={liked ? 'Unlike ' + title : 'Like ' + title}
+          hitSlop={6}
+          onPress={onToggleLike}
+          style={styles.likeButton}
+        >
+          <Icon name={liked ? 'heart' : 'heart-outline'} size={16} color={liked ? COLORS.goldBright : COLORS.muted} />
+        </Pressable>
+      ) : null}
       {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
       {watched > 0 ? (
         <View style={styles.progressTrack}>

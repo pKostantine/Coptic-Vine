@@ -26,6 +26,7 @@ import TabHeader from '@/components/vine/ui/TabHeader';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { usePlayLessons } from '@/hooks/usePlayLessons';
 import { learningService } from '@/services/learningService';
 import type {
   LearningItemLibraryPayload,
@@ -72,7 +73,8 @@ export default function LearningLibraryScreen() {
   const insets = useSafeAreaInsets();
   const layout = useLayoutMode();
   const { preferences } = useReadingPreferences();
-  const { currentItem, playQueue, lessonVideoMode } = useLearningPlayer();
+  const { currentItem } = useLearningPlayer();
+  const playLessons = usePlayLessons();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const arabic = locale === 'ar';
   const wide = layout !== 'phone';
@@ -124,16 +126,10 @@ export default function LearningLibraryScreen() {
     finished: { title: tr('Finished', 'Terminé', 'أكملت'), empty: tr('Completed lessons and recordings will appear here.', 'Les leçons et enregistrements terminés apparaîtront ici.', 'ستظهر الدروس التي أكملتها هنا.') },
   };
 
+  // A lesson with a picture, watched as video, opens the full player on it (usePlayLessons).
   const openItem = (item: LearningLibraryItem) => {
     const index = audioQueue.findIndex((entry) => entry.id === item.itemId);
-    if (index >= 0) playQueue(audioQueue, index);
-    // A lesson with a picture, watched as video, opens where the picture is.
-    if (item.mediaType === 'video' && lessonVideoMode === 'video') {
-      router.push({
-        pathname: '/learn/lesson/[id]',
-        params: { id: item.itemId, setId: item.containerId },
-      });
-    }
+    if (index >= 0) playLessons(audioQueue, index);
   };
 
   const moveItem = async (item: LearningLibraryItem, nextState: LearningProgressState) => {
@@ -194,7 +190,7 @@ export default function LearningLibraryScreen() {
           {tr('Move each recording or lesson forward as you learn it.', 'Faites avancer chaque enregistrement ou leçon à mesure que vous l’apprenez.', 'نظّم ما ستتعلّمه، وما تدرسه الآن، وما أكملته.')}
         </Text>
         {audioQueue.length ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={tr('Play this list', 'Lire cette liste', 'تشغيل هذه القائمة')} style={({ pressed }) => [styles.playAll, pressed && styles.pressed]} onPress={() => playQueue(audioQueue, 0)}>
+          <Pressable accessibilityRole="button" accessibilityLabel={tr('Play this list', 'Lire cette liste', 'تشغيل هذه القائمة')} style={({ pressed }) => [styles.playAll, pressed && styles.pressed]} onPress={() => playLessons(audioQueue, 0)}>
             <Icon name="play" size={16} color={COLORS.greenDeep} />
           </Pressable>
         ) : null}

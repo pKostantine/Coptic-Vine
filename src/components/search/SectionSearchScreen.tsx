@@ -24,6 +24,7 @@ import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPla
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useAuth } from '@/context/AuthContext';
+import { usePlayLessons } from '@/hooks/usePlayLessons';
 import { learningService } from '@/services/learningService';
 import { musicService } from '@/services/musicService';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
@@ -130,6 +131,7 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
   const from = Array.isArray(params.from) ? params.from[0] : params.from;
   const musicPlayer = useMusicPlayer();
   const learningPlayer = useLearningPlayer();
+  const playLessons = usePlayLessons();
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<SearchFilter>('all');
@@ -356,14 +358,8 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
           coverAsset: result.metadata.coverAsset,
           hymnId: result.metadata.hymnId,
         };
-        learningPlayer.playItem(item);
-        // Watched as video, the lesson opens where its picture is.
-        if (result.metadata.mediaType === 'video' && learningPlayer.lessonVideoMode === 'video') {
-          router.push({
-            pathname: '/learn/lesson/[id]',
-            params: { id: result.entityId, setId: result.metadata.lessonSetId },
-          });
-        }
+        // Watched as video, the lesson opens the full player on its picture.
+        playLessons([item], 0);
       }
     }
   };

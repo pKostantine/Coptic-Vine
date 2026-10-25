@@ -168,3 +168,26 @@ test('one list shows the mixed queue in both players, each row by its kind, and 
   assert.match(menu, /from '@\/components\/playback\/ActionsSheet'/);
   assert.match(read('src/components/music/MusicTrackActionsMenu.tsx'), /from '@\/components\/playback\/ActionsSheet'/);
 });
+
+test('a row is taken out of the queue, what plays keeps playing, and it stays out when shuffle is undone', () => {
+  const { removeQueueEntry } = load('src/utils/playbackEngine.ts');
+  const queue = ['a', 'b', 'c', 'd', 'e'];
+  // A row still to come: the one playing keeps its index.
+  assert.deepEqual(removeQueueEntry(queue, 2, 4), { queue: ['a', 'b', 'c', 'd'], currentIndex: 2 });
+  // A row already played: the one playing moves up with the rest.
+  assert.deepEqual(removeQueueEntry(queue, 2, 0), { queue: ['b', 'c', 'd', 'e'], currentIndex: 1 });
+  // The one playing is never taken out, nor a row that isn't there.
+  assert.deepEqual(removeQueueEntry(queue, 2, 2), { queue, currentIndex: 2 });
+  assert.deepEqual(removeQueueEntry(queue, 2, 9), { queue, currentIndex: 2 });
+  assert.notEqual(removeQueueEntry(queue, 2, 4).queue, queue, 'a new list, the old one untouched');
+
+  const engine = fs.readFileSync('src/context/PlaybackContext.tsx', 'utf8');
+  assert.match(engine, /const next = removeQueueEntry\(queue, currentIndex, index\);\n\s+setQueue\(next\.queue\);\n\s+setCurrentIndex\(next\.currentIndex\);\n[^\n]*\n\s+setOriginalQueue\(\(entries\) => entries\.filter\(\(entry\) => entry\.key !== removed\.key\)\);/);
+  // Both players offer it, on every row but the one playing.
+  for (const screen of ['src/components/music/MusicNowPlayingScreen.tsx', 'src/components/learning/LearningNowPlayingScreen.tsx']) {
+    assert.match(fs.readFileSync(screen, 'utf8'), /onRemove: (player\.)?removeQueueItem,/, screen);
+  }
+  const list = fs.readFileSync('src/components/playback/PlaybackQueueList.tsx', 'utf8');
+  assert.match(list, /\{!current && onRemove && !dragging \? \(\n\s+<Pressable\n\s+accessibilityRole="button"\n\s+accessibilityLabel=\{tr\(`Remove \$\{row\.title\} from the queue`/);
+  assert.match(list, /onPress=\{\(\) => onRemove\(index\)\}/);
+});

@@ -47,6 +47,8 @@ import { PLAYER_VOLUME_ADJUSTABLE } from '@/utils/playerVolume';
 import { useArtworkPalette } from '@/utils/useArtworkPalette';
 import LearningArtwork from './LearningArtwork';
 import LearningItemActionsMenu from './LearningItemActionsMenu';
+import LessonModeSwitch, { LESSON_MODE_SWITCH_HEIGHT } from './LessonModeSwitch';
+import LessonVideoPanel, { lessonVideoAspect } from './LessonVideoPanel';
 
 import { tr } from '../../utils/appText';
 // How far the lesson player's step buttons move through a lesson.
@@ -61,7 +63,10 @@ function itemKind(item: LearningQueueItem): 'album_recording' | 'lesson' {
 /**
  * The Learn & Study player — the same player as Music's (Coptic Vine Player
  * design, "Lesson player"), with what learning needs besides: a step of ten
- * seconds either side of the skips, and the speed between the times.
+ * seconds either side of the skips, and the speed between the times. A
+ * lesson with a picture shows it in place of the cover, in a frame of the
+ * video's shape, with Video | Audio only above it and full screen in its
+ * corner; switching keeps the lesson playing where it is.
  */
 export default function LearningNowPlayingScreen({
   embedded = false,
@@ -111,14 +116,6 @@ export default function LearningNowPlayingScreen({
   const closePlayer = () => {
     if (embedded && onClose) onClose();
     else goBack(router, '/learn');
-  };
-  // The picture lives on the lesson's own page: watching it means going there.
-  const watchVideo = () => {
-    const item = player.currentItem;
-    if (!item || item.kind !== 'lesson') return;
-    player.setLessonVideoMode('video');
-    closePlayer();
-    router.push({ pathname: '/learn/lesson/[id]', params: { id: item.id, setId: item.containerId } });
   };
   // Pulled down, the player goes away, as the music player does.
   const pullDown = usePullDownToClose(closePlayer);
@@ -247,6 +244,10 @@ export default function LearningNowPlayingScreen({
     void player.seekToMs(Math.max(0, effectiveDuration > 0 ? Math.min(target, effectiveDuration) : target));
   };
 
+  // A lesson with a picture: its video, or its sound alone, in the video's frame.
+  const videoLesson = player.currentHasVideo && currentItem.kind === 'lesson';
+  const aspect = lessonVideoAspect(currentItem, player.videoAspectRatio);
+
   const lyricsProps = {
     lyricSets,
     selectedSetId: selectedLyricSetId,
@@ -262,6 +263,7 @@ export default function LearningNowPlayingScreen({
     isArabic,
     onSelect: player.selectQueueIndex,
     onMove: player.moveQueueItem,
+    onRemove: player.removeQueueItem,
     onClear: player.clearUpcoming,
     shuffleEnabled,
     repeatMode,
@@ -286,6 +288,12 @@ export default function LearningNowPlayingScreen({
         <LearningArtwork asset={currentItem.coverAsset} size={size} radius={18} label={currentItem.containerTitle} />
       </PlayerArtworkFrame>
     ),
+    media: videoLesson ? {
+      aspect,
+      render: (width, height) => <LessonVideoPanel item={currentItem} width={width} height={height} aspect={aspect} isArabic={isArabic} />,
+      above: <LessonModeSwitch mode={player.lessonVideoMode} onChange={player.setLessonVideoMode} isArabic={isArabic} />,
+      aboveHeight: LESSON_MODE_SWITCH_HEIGHT,
+    } : undefined,
     title: currentItem.title,
     subtitle: currentItem.cantorName,
     meta: `${kindLabel} · ${currentItem.containerTitle}`,
@@ -316,14 +324,6 @@ export default function LearningNowPlayingScreen({
     volume: PLAYER_VOLUME_ADJUSTABLE ? () => <PlayerVolume /> : undefined,
     bar: (size) => (
       <>
-        {player.currentHasVideo && currentItem.kind === 'lesson' ? (
-          <PlayerBarButton
-            icon="videocam-outline"
-            accessibilityLabel={tr('Watch the video', 'Regarder la vidéo', 'مشاهدة الفيديو')}
-            onPress={watchVideo}
-            size={size}
-          />
-        ) : null}
         <PlayerBarButton
           icon="reader-outline"
           accessibilityLabel={tr('Lyrics', 'Paroles', 'الكلمات')}
@@ -360,7 +360,7 @@ export default function LearningNowPlayingScreen({
     ),
   };
 
-  const columns = playerColumns(layout, { lyrics: lyricsPanelShown, queue: queuePanelShown });
+  const columns = playerColumns(layout, { lyrics: lyricsPanelShown, queue: queuePanelShown }, videoLesson);
   const sharedPanels = columns.panelWidth == null;
 
   return (

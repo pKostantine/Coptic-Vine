@@ -1,52 +1,45 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { usePlayback } from '@/context/PlaybackContext';
-import {
-  resolveVideoPlacement,
-  type SurfaceRect,
-  type VideoPlacementClaim,
-  type VideoPlacementKind,
-} from '@/utils/lessonPlayback';
+import { activeVideoSurface, type VideoSurfaceEntry, type VideoSurfaceKind } from '@/utils/lessonPlayback';
 
 /**
- * Where the one video surface is drawn (utils/lessonPlayback.ts). Lesson
- * pages claim it for the lesson they show; the now-playing bars say whether
- * their floating window may show; a subdocument says it covers the app; the
- * stage says when the system has taken the picture into its own window. From
- * those the placement is decided here and told to the engine, which streams
- * the picture only while it has somewhere to be seen.
+ * Where a lesson's picture is drawn (utils/lessonPlayback.ts). Each surface
+ * that can show it, the now-playing bar's thumbnail and the full player,
+ * registers here while it is mounted; one of them shows the picture
+ * (`activeVideoSurface`) and the others their poster. The now-playing bars
+ * say whether they are out, so a new lesson's picture is fetched the first
+ * time; the surfaces say when the system takes the picture into its own
+ * window. From those the engine hears where the picture can be seen, and
+ * streams it only then.
  */
-interface HeroClaim extends VideoPlacementClaim {
-  rect: SurfaceRect | null;
-}
-
 interface VideoStageContextValue {
-  placement: VideoPlacementKind;
-  /** The current lesson's own page is showing (the page is the player; the bar steps aside). */
-  currentItemOnPage: boolean;
-  /** Where the lesson page's slot is, in window coordinates, while the placement is `hero`. */
-  heroRect: SurfaceRect | null;
-  claimHero: (id: string, itemId: string, rect: SurfaceRect | null) => void;
-  releaseHero: (id: string) => void;
-  /** A now-playing bar reports whether its floating window could show (shown, not hidden, no full player open). */
-  reportFloatingSlot: (id: string, available: boolean) => void;
-  /** A subdocument's bar reports that a Modal covers the app, the stage with it. */
-  reportCovering: (id: string, covering: boolean) => void;
+  /** The surface that shows the picture right now. */
+  activeSurfaceId: string | null;
+  registerSurface: (id: string, kind: VideoSurfaceKind) => void;
+  unregisterSurface: (id: string) => void;
+  /** A now-playing bar reports whether it is out (shown, not hidden, no full player open). */
+  reportBarSlot: (id: string, available: boolean) => void;
   pictureInPicture: boolean;
-  /** The stage reports the system's window opening (with where the surface was) or closing. */
-  setPictureInPicture: (active: boolean, atPlacement?: VideoPlacementKind) => void;
+  setPictureInPicture: (active: boolean) => void;
+  /**
+   * Counts the hidden home view's mounts (components/playback/LessonVideoHome):
+   * a surface mounts its view again after each, so the newest view, the one
+   * that shows, holds the player (Android draws a player in one view only).
+   */
+  homeGeneration: number;
+  markHomeMounted: () => void;
 }
 
 const VideoStageContext = createContext<VideoStageContextValue>({
-  placement: 'hidden',
-  currentItemOnPage: false,
-  heroRect: null,
-  claimHero: () => undefined,
-  releaseHero: () => undefined,
-  reportFloatingSlot: () => undefined,
-  reportCovering: () => undefined,
+  activeSurfaceId: null,
+  registerSurface: () => undefined,
+  unregisterSurface: () => undefined,
+  reportBarSlot: () => undefined,
   pictureInPicture: false,
   setPictureInPicture: () => undefined,
+  homeGeneration: 0,
+  markHomeMounted: () => undefined,
 });
 
 function withoutKey<T>(record: Record<string, T>, id: string): Record<string, T> {
@@ -58,81 +51,67 @@ function withoutKey<T>(record: Record<string, T>, id: string): Record<string, T>
 
 export function VideoStageProvider({ children }: { children: ReactNode }) {
   const playback = usePlayback();
-  const [claims, setClaims] = useState<Record<string, HeroClaim>>({});
-  const [floatingSlots, setFloatingSlots] = useState<Record<string, boolean>>({});
-  const [covering, setCovering] = useState<Record<string, true>>({});
-  // The system's picture-in-picture, with the placement the surface had when
-  // it opened: frozen there until it closes, so the surface is never pulled
-  // out from under the system's window.
-  const [pip, setPip] = useState<{ active: boolean; frozenPlacement: VideoPlacementKind }>({ active: false, frozenPlacement: 'hidden' });
+  const [surfaces, setSurfaces] = useState<Record<string, VideoSurfaceEntry>>({});
+  const [barSlots, setBarSlots] = useState<Record<string, boolean>>({});
+  const [pip, setPip] = useState(false);
+  const [homeGeneration, setHomeGeneration] = useState(0);
+  const order = useRef(0);
 
-  const claimHero = useCallback((id: string, itemId: string, rect: SurfaceRect | null) => {
-    setClaims((current) => {
-      const existing = current[id];
-      if (existing && existing.itemId === itemId && existing.rect === rect) return current;
-      return { ...current, [id]: { id, kind: 'hero', itemId, rect } };
-    });
+  const registerSurface = useCallback((id: string, kind: VideoSurfaceKind) => {
+    order.current += 1;
+    const next = order.current;
+    setSurfaces((current) => (current[id]?.kind === kind ? current : { ...current, [id]: { id, kind, order: next } }));
   }, []);
-  const releaseHero = useCallback((id: string) => setClaims((current) => withoutKey(current, id)), []);
-  const reportFloatingSlot = useCallback((id: string, available: boolean) => {
-    setFloatingSlots((current) => (current[id] === available ? current : { ...current, [id]: available }));
-  }, []);
-  const reportCovering = useCallback((id: string, isCovering: boolean) => {
-    setCovering((current) => {
-      if (!isCovering) return withoutKey(current, id);
+  const unregisterSurface = useCallback((id: string) => setSurfaces((current) => withoutKey(current, id)), []);
+  const reportBarSlot = useCallback((id: string, available: boolean) => {
+    setBarSlots((current) => {
+      if (!available) return withoutKey(current, id);
       return current[id] ? current : { ...current, [id]: true };
     });
   }, []);
-  const setPictureInPicture = useCallback((active: boolean, atPlacement?: VideoPlacementKind) => {
-    setPip((current) => {
-      if (current.active === active) return current;
-      return { active, frozenPlacement: active ? (atPlacement ?? 'floating') : 'hidden' };
-    });
-  }, []);
+  const setPictureInPicture = useCallback((active: boolean) => setPip(active), []);
+  const markHomeMounted = useCallback(() => setHomeGeneration((value) => value + 1), []);
 
-  const currentItemId = playback.currentItem?.playable.id ?? null;
-  const claimList = useMemo(() => Object.values(claims), [claims]);
-  const currentClaim = currentItemId ? claimList.filter((claim) => claim.itemId === currentItemId).at(-1) ?? null : null;
-  const floatingAvailable = Object.values(floatingSlots).some(Boolean);
-  const isCovered = Object.keys(covering).length > 0;
+  const surfaceList = useMemo(() => Object.values(surfaces), [surfaces]);
+  const activeSurfaceId = activeVideoSurface(surfaceList);
+  const barShowsPicture = Object.keys(barSlots).length > 0;
   // Nothing plays with a picture: the system's window, if any, closed with it.
-  const pictureInPicture = pip.active && playback.currentHasVideo;
+  const pictureInPicture = pip && playback.currentHasVideo;
 
-  const placement = resolveVideoPlacement({
-    hasVideo: playback.currentHasVideo,
-    mode: playback.lessonVideoMode,
-    currentItemId,
-    claims: claimList,
-    collapsed: !floatingAvailable,
-    overlayAllowed: floatingAvailable,
-    covered: isCovered,
-    pictureInPicture,
-  }, pip.frozenPlacement);
-
-  // The engine also hears which lessons' pages are showing and whether a
-  // subdocument covers the app, to fetch the right rendition of a new entry
-  // the first time (utils/lessonPlayback.ts, `startingPlacement`).
-  const claimedItemIds = useMemo(() => claimList.map((claim) => claim.itemId), [claimList]);
   const setVideoPresentation = playback.setVideoPresentation;
   useEffect(() => {
-    setVideoPresentation({ placement, pictureInPicture, claimedItemIds, covered: isCovered });
-  }, [claimedItemIds, isCovered, pictureInPicture, placement, setVideoPresentation]);
+    setVideoPresentation({ surfaceShowing: activeSurfaceId != null, barShowsPicture, pictureInPicture });
+  }, [activeSurfaceId, barShowsPicture, pictureInPicture, setVideoPresentation]);
 
   const value = useMemo<VideoStageContextValue>(() => ({
-    placement,
-    currentItemOnPage: currentClaim != null,
-    heroRect: placement === 'hero' ? currentClaim?.rect ?? null : null,
-    claimHero,
-    releaseHero,
-    reportFloatingSlot,
-    reportCovering,
+    activeSurfaceId,
+    registerSurface,
+    unregisterSurface,
+    reportBarSlot,
     pictureInPicture,
     setPictureInPicture,
-  }), [claimHero, currentClaim, pictureInPicture, placement, releaseHero, reportCovering, reportFloatingSlot, setPictureInPicture]);
+    homeGeneration,
+    markHomeMounted,
+  }), [activeSurfaceId, homeGeneration, markHomeMounted, pictureInPicture, registerSurface, reportBarSlot, setPictureInPicture, unregisterSurface]);
 
   return <VideoStageContext.Provider value={value}>{children}</VideoStageContext.Provider>;
 }
 
 export function useVideoStage(): VideoStageContextValue {
   return useContext(VideoStageContext);
+}
+
+/**
+ * A surface's place in the stage: registered while it is mounted, and told
+ * whether it is the one that shows the picture.
+ */
+export function useVideoSurface(kind: VideoSurfaceKind) {
+  const id = useId();
+  const { activeSurfaceId, registerSurface, unregisterSurface, homeGeneration, setPictureInPicture } = useVideoStage();
+  // Before paint, so the surface it takes the picture from gives it up in the same frame.
+  useLayoutEffect(() => {
+    registerSurface(id, kind);
+    return () => unregisterSurface(id);
+  }, [id, kind, registerSurface, unregisterSurface]);
+  return { active: activeSurfaceId === id, homeGeneration, setPictureInPicture };
 }

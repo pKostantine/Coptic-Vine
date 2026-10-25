@@ -11,14 +11,15 @@ import LearningDownloadButton from '@/components/learning/LearningDownloadButton
 import LearningItemActionsMenu from '@/components/learning/LearningItemActionsMenu';
 import LearningMediaRow from '@/components/learning/LearningMediaRow';
 import LearningPlaylistPicker from '@/components/learning/LearningPlaylistPicker';
-import LessonVideoSlot from '@/components/learning/LessonVideoSlot';
+import LessonModeSwitch from '@/components/learning/LessonModeSwitch';
+import { LESSON_VIDEO_RADIUS, LessonPoster } from '@/components/learning/LessonVideoPanel';
 import MusicLyricsView, { LyricsLanguageSwitch } from '@/components/music/MusicLyricsView';
-import SeekBar from '@/components/music/SeekBar';
-import { STAGE_RADIUS } from '@/components/playback/LessonVideoStage';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { nextLearningSpeed, PlayerBackdrop, PlayerTransport, SpeedChip } from '@/components/playback/PlayerParts';
+import PlayerIcon from '@/components/playback/PlayerIcon';
+import { PLAYER_INK } from '@/components/playback/PlayerParts';
 import Icon from '@/components/vine/ui/Icon';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useBottomChrome } from '@/context/BottomChromeContext';
 import {
   learningLessonSetQueue,
   lessonHasAudioRendition,
@@ -26,23 +27,16 @@ import {
   useLearningPlayer,
 } from '@/context/LearningPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { usePlayLessons } from '@/hooks/usePlayLessons';
 import { learningService, type LearningLessonDetailPayload } from '@/services/learningService';
 import { learningLessonDownloadRequest } from '@/services/offlineDownloadRequests';
 import type { LearningLesson } from '@/types/learningPlatform';
 import type { PublishedLyricSet } from '@/types/musicConsumer';
 import { loadLearningResume, peekLearningResume, subscribeLearningResume, type LearningResumeMap } from '@/utils/learningResume';
+import { audioSavings } from '@/utils/lessonPlayback';
 import { goBack } from '@/utils/navigation';
 
 import { tr } from '../../../utils/appText';
-
-/** How far the lesson's step buttons move. */
-const STEP_MS = 10000;
-
-function videoAspectRatio(lesson: LearningLesson): number {
-  const { width, height } = lesson.mediaAsset;
-  if (width && height && width > 0 && height > 0) return width / height;
-  return 16 / 9;
-}
 
 function rowProgress(resume: LearningResumeMap, lesson: LearningLesson): number {
   const entry = resume[lesson.id];
@@ -52,11 +46,11 @@ function rowProgress(resume: LearningResumeMap, lesson: LearningLesson): number 
 }
 
 /**
- * A lesson's page: its video (or its cover) pinned at the top, with the
- * player's controls under it, then its words, its lyrics and the rest of its
- * set. The page is the lesson's player — the one video surface lies over the
- * slot here (LessonVideoSlot) while this lesson plays with its picture — so
- * the now-playing bar steps aside while it shows.
+ * A lesson's page: its cover with Play, then its words, its lyrics and the
+ * rest of its set. A lesson with a picture says whether it plays as video or
+ * as audio only, and what that costs in data; watched as video, Play opens
+ * the full player on its picture (the bar and the full player are where a
+ * lesson's picture is shown).
  */
 export default function LearningLessonScreen() {
   const router = useRouter();
@@ -70,6 +64,8 @@ export default function LearningLessonScreen() {
   const [data, setData] = useState<LearningLessonDetailPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const player = useLearningPlayer();
+  const playLessons = usePlayLessons();
+  const { requestNowPlayingOpen } = useBottomChrome();
   const [resume, setResume] = useState<LearningResumeMap>(() => peekLearningResume());
   // The lyrics loaded for a lesson, under its id: another lesson's are stale,
   // and "loading" is simply not having this lesson's yet.
@@ -89,8 +85,8 @@ export default function LearningLessonScreen() {
     () => (data ? learningLessonDownloadRequest(data.lessonSet, data.lesson, locale) : null),
     [data, locale],
   );
-  // A phone on its side, an iPad, a desktop window: the video keeps the
-  // left, the words and the lessons scroll on the right.
+  // A phone on its side, an iPad, a desktop window: the cover and the words
+  // keep the left, the lyrics and the lessons scroll on the right.
   const twoColumns = width > height && width >= 640;
 
   useEffect(() => {
@@ -157,23 +153,17 @@ export default function LearningLessonScreen() {
     })?.id ?? null;
   }, [isCurrent, positionMs, selectedSet]);
 
-  const playFromHere = () => {
-    if (index >= 0) player.playQueue(queue, index);
-  };
   const playLesson = (lessonIndex: number) => {
     if (!data || lessonIndex < 0 || lessonIndex >= queue.length) return;
-    player.playQueue(queue, lessonIndex);
     const target = queue[lessonIndex];
+    if (player.currentItem?.id === target.id) {
+      player.togglePlayback();
+      return;
+    }
+    playLessons(queue, lessonIndex);
     if (target.id !== data.lesson.id) {
       router.replace({ pathname: '/learn/lesson/[id]', params: { id: target.id, setId: data.lessonSet.id } });
     }
-  };
-
-  const durationMs = isCurrent && player.durationMs > 0 ? player.durationMs : data?.lesson.durationMs ?? 0;
-  const stepBy = (deltaMs: number) => {
-    if (!isCurrent) return;
-    const target = player.currentTimeMs + deltaMs;
-    void player.seekToMs(Math.max(0, durationMs > 0 ? Math.min(target, durationMs) : target));
   };
 
   if (!data) {
@@ -190,56 +180,49 @@ export default function LearningLessonScreen() {
   }
 
   const { lesson, lessonSet } = data;
-  const artworkUri = learningService.resolveAsset(lessonSet.coverAsset);
+  const coverUri = learningService.resolveAsset(lessonSet.coverAsset);
   const number = index + 1;
   const audioReady = item ? lessonHasAudioRendition(item) : true;
+  const savings = audioReady ? audioSavings(lesson.mediaAsset.fileSizeBytes, lesson.audioAsset?.fileSizeBytes) : null;
+  const playing = isCurrent && player.playing;
 
   const hero = (
-    <LessonVideoSlot itemId={lesson.id} aspectRatio={hasVideo ? videoAspectRatio(lesson) : 16 / 9} style={styles.hero}>
-      {/* Under the picture: the cover, and a way to start when this lesson is not the one playing. */}
-      <PlayerBackdrop uri={artworkUri} flat />
+    <View style={[styles.hero, { maxWidth: twoColumns ? undefined : 720 }]}>
+      <LessonPoster uri={coverUri} />
       <View style={styles.heroInner}>
-        <LearningArtwork asset={lessonSet.coverAsset} size={twoColumns ? 96 : 112} radius={16} label={lessonSet.title} />
-        {!isCurrent ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={tr('Play lesson', 'Lire la leçon', 'تشغيل الدرس')}
-            onPress={playFromHere}
-            style={({ pressed }) => [styles.heroPlay, pressed && styles.pressed]}
-          >
-            <Icon name="play" size={26} color={COLORS.black} style={styles.playNudge} />
-          </Pressable>
-        ) : null}
-        {isCurrent && hasVideo && mode === 'audio' ? (
-          <Text style={styles.heroNote}>{tr('Audio only', 'Audio seulement', 'صوت فقط')}</Text>
-        ) : null}
-        {isCurrent && hasVideo && mode === 'video' && player.cellularBlocked ? (
-          <Text style={styles.heroNote}>{tr('Audio only on cellular', 'Audio seulement en données cellulaires', 'صوت فقط على بيانات الجوال')}</Text>
-        ) : null}
+        {!coverUri ? <LearningArtwork asset={lessonSet.coverAsset} size={twoColumns ? 96 : 112} radius={16} label={lessonSet.title} /> : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={playing ? tr('Pause', 'Pause', 'إيقاف مؤقت') : tr('Play lesson', 'Lire la leçon', 'تشغيل الدرس')}
+          onPress={() => playLesson(index)}
+          style={({ pressed }) => [styles.heroPlay, pressed && styles.pressed]}
+        >
+          {isCurrent && player.buffering ? (
+            <ActivityIndicator color={COLORS.black} />
+          ) : (
+            <Icon name={playing ? 'pause' : 'play'} size={26} color={COLORS.black} style={playing ? undefined : styles.playNudge} />
+          )}
+        </Pressable>
       </View>
-    </LessonVideoSlot>
+    </View>
   );
 
-  const modeSwitch = hasVideo ? (
+  const openPlayer = isCurrent ? (
+    <Pressable
+      accessibilityRole="button"
+      onPress={requestNowPlayingOpen}
+      style={({ pressed }) => [styles.openPlayer, pressed && styles.pressed]}
+    >
+      <PlayerIcon name={hasVideo && mode === 'video' ? 'videocam-outline' : 'open-in-full'} size={16} color={PLAYER_INK} />
+      <Text style={[styles.openPlayerText, isArabic && styles.arabic]}>
+        {hasVideo && mode === 'video' ? tr('Watch in the player', 'Regarder dans le lecteur', 'شاهد في المشغّل') : tr('Open the player', 'Ouvrir le lecteur', 'افتح المشغّل')}
+      </Text>
+    </Pressable>
+  ) : null;
+
+  const modeBlock = hasVideo ? (
     <View style={styles.modeBlock}>
-      <View style={styles.modeSwitch} accessibilityRole="tablist">
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: mode === 'video' }}
-          onPress={() => player.setLessonVideoMode('video')}
-          style={[styles.modeButton, mode === 'video' && styles.modeButtonActive]}
-        >
-          <Text style={[styles.modeText, mode === 'video' && styles.modeTextActive]}>{tr('Video', 'Vidéo', 'فيديو')}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: mode === 'audio' }}
-          onPress={() => player.setLessonVideoMode('audio')}
-          style={[styles.modeButton, mode === 'audio' && styles.modeButtonActive]}
-        >
-          <Text style={[styles.modeText, mode === 'audio' && styles.modeTextActive]}>{tr('Audio only', 'Audio seulement', 'صوت فقط')}</Text>
-        </Pressable>
-      </View>
+      <LessonModeSwitch mode={mode} onChange={player.setLessonVideoMode} variant="page" isArabic={isArabic} />
       {mode === 'video' && player.cellularBlocked ? (
         <View style={styles.noteRow}>
           <Text style={[styles.note, isArabic && styles.arabic]}>
@@ -252,41 +235,16 @@ export default function LearningLessonScreen() {
       ) : null}
       {mode === 'audio' && !audioReady ? (
         <Text style={[styles.note, isArabic && styles.arabic]}>
-          {tr('The audio-only version is still being prepared, so this plays the video’s sound for now.', 'La version audio est encore en préparation ; le son de la vidéo est lu en attendant.', 'ما زالت النسخة الصوتية قيد التجهيز، لذلك يُشغَّل صوت الفيديو الآن.')}
+          {tr('The audio-only version is still being made, so this plays the video’s sound for now.', 'La version audio est encore en préparation ; le son de la vidéo est lu en attendant.', 'ما زالت النسخة الصوتية قيد التجهيز، لذلك يُشغَّل صوت الفيديو الآن.')}
         </Text>
       ) : null}
-      {mode === 'audio' && audioReady ? (
+      {audioReady && savings ? (
         <Text style={[styles.note, isArabic && styles.arabic]}>
-          {tr('Uses the smaller audio version instead of streaming the video.', 'Utilise la version audio, plus légère, au lieu de la vidéo.', 'يستخدم النسخة الصوتية الأصغر بدلاً من بث الفيديو.')}
+          {tr(`Audio only uses ${savings.audio} instead of ${savings.video}.`, `L’audio seul utilise ${savings.audio} au lieu de ${savings.video}.`, `الصوت فقط يستخدم ${savings.audio} بدلاً من ${savings.video}.`)}
         </Text>
       ) : null}
     </View>
   ) : null;
-
-  const transport = (
-    <View style={styles.transport}>
-      <SeekBar
-        key={lesson.id}
-        positionMs={positionMs}
-        durationMs={durationMs}
-        onSeek={(position) => { if (isCurrent) void player.seekToMs(position); }}
-        center={<SpeedChip rate={player.playbackRate} onPress={() => player.setPlaybackRate(nextLearningSpeed(player.playbackRate))} />}
-        dense={twoColumns}
-      />
-      <PlayerTransport
-        playing={isCurrent && player.playing}
-        buffering={isCurrent && player.buffering}
-        onPrevious={isCurrent ? player.previous : () => playLesson(index - 1)}
-        onTogglePlayback={isCurrent ? player.togglePlayback : playFromHere}
-        onNext={isCurrent ? player.next : () => playLesson(index + 1)}
-        onBack10={() => stepBy(-STEP_MS)}
-        onForward10={() => stepBy(STEP_MS)}
-        size={twoColumns ? 'small' : 'regular'}
-        maxWidth={twoColumns ? Math.round(width * 0.5) : width - SPACING.md * 2}
-        align="center"
-      />
-    </View>
-  );
 
   const words = (
     <View style={styles.meta}>
@@ -362,11 +320,12 @@ export default function LearningLessonScreen() {
     </View>
   );
 
-  const scrollContent = (
+  const top = (
     <>
-      {!twoColumns ? words : null}
-      {lyrics}
-      {lessons}
+      {hero}
+      {openPlayer}
+      {modeBlock}
+      {words}
     </>
   );
 
@@ -377,26 +336,19 @@ export default function LearningLessonScreen() {
       {twoColumns ? (
         <View style={styles.columns}>
           <NowPlayingAwareScrollView style={styles.leftColumn} contentContainerStyle={styles.leftContent} showsVerticalScrollIndicator={false}>
-            {hero}
-            {modeSwitch}
-            {transport}
-            {words}
+            {top}
           </NowPlayingAwareScrollView>
           <NowPlayingAwareScrollView style={styles.rightColumn} contentContainerStyle={styles.rightContent} showsVerticalScrollIndicator={false}>
-            {scrollContent}
+            {lyrics}
+            {lessons}
           </NowPlayingAwareScrollView>
         </View>
       ) : (
-        <>
-          <View style={styles.pinned}>
-            {hero}
-            {modeSwitch}
-            {transport}
-          </View>
-          <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            {scrollContent}
-          </NowPlayingAwareScrollView>
-        </>
+        <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {top}
+          {lyrics}
+          {lessons}
+        </NowPlayingAwareScrollView>
       )}
     </SafeAreaView>
   );
@@ -406,36 +358,41 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   loader: { marginTop: SPACING.xl },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, textAlign: 'center', margin: SPACING.xl },
-  pinned: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, gap: SPACING.sm },
-  content: { padding: SPACING.md, paddingTop: SPACING.sm, paddingBottom: SPACING.xl },
+  content: { padding: SPACING.md, paddingTop: SPACING.sm, paddingBottom: SPACING.xl, gap: SPACING.sm },
   columns: { flex: 1, flexDirection: 'row', minHeight: 0 },
   leftColumn: { flex: 11, minWidth: 0 },
   leftContent: { padding: SPACING.md, gap: SPACING.sm },
   rightColumn: { flex: 9, minWidth: 0, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: COLORS.border },
   rightContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
   hero: {
-    borderRadius: STAGE_RADIUS,
+    width: '100%',
+    aspectRatio: 16 / 9,
+    alignSelf: 'center',
+    overflow: 'hidden',
+    borderRadius: LESSON_VIDEO_RADIUS,
     backgroundColor: COLORS.learningDeep,
     borderWidth: 1,
     borderColor: COLORS.learningLine,
-    maxWidth: 960,
-    alignSelf: 'center',
   },
   heroInner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: SPACING.sm },
   heroPlay: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.gold },
-  heroNote: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800', letterSpacing: 0.6, backgroundColor: 'rgba(0, 0, 0, 0.45)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADII.pill, overflow: 'hidden' },
   playNudge: { marginLeft: 4 },
   pressed: { opacity: 0.75 },
-  modeBlock: { alignItems: 'center', gap: SPACING.xs },
-  modeSwitch: { alignSelf: 'center', flexDirection: 'row', padding: 3, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.surface },
-  modeButton: { minHeight: 36, minWidth: 104, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADII.pill },
-  modeButtonActive: { backgroundColor: COLORS.gold },
-  modeText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '800' },
-  modeTextActive: { color: COLORS.black },
+  openPlayer: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADII.pill,
+    backgroundColor: COLORS.gold,
+  },
+  openPlayerText: { color: PLAYER_INK, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '900' },
+  modeBlock: { alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.xs },
   noteRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs },
   note: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 11, textAlign: 'center', paddingHorizontal: SPACING.md },
   noteAction: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800' },
-  transport: { width: '100%', maxWidth: 720, alignSelf: 'center', gap: 6 },
   meta: { alignItems: 'center', maxWidth: 720, width: '100%', alignSelf: 'center', marginTop: SPACING.md },
   type: { color: COLORS.learning, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 26, fontWeight: '700', textAlign: 'center', marginTop: SPACING.sm },

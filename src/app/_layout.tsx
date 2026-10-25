@@ -9,7 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
 import NotificationBootstrap from '@/components/NotificationBootstrap';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
-import LessonVideoStage from '@/components/playback/LessonVideoStage';
+import LessonVideoHome from '@/components/playback/LessonVideoHome';
 import SideBar from '@/components/vine/ui/SideBar';
 import { COLORS } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
@@ -131,10 +131,9 @@ function AppFrame() {
         <AppStack />
         <GlobalNowPlayingOverlay />
       </View>
-      {/* The one video surface, over the whole window: it is measured against
-          the window, so it can lie over a lesson page's slot as much as sit in
-          a corner, beside the sidebar on a desktop. */}
-      <LessonVideoStage />
+      {/* Where a lesson's player waits, out of sight, while no surface shows
+          its picture (components/playback/LessonVideoHome). */}
+      <LessonVideoHome />
     </View>
   );
 }

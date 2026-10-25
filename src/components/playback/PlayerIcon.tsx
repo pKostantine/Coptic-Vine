@@ -25,6 +25,8 @@ export type PlayerIconName =
   | 'lyrics-collapse'
   | 'drag-dots'
   | 'videocam-outline'
+  | 'headset-outline'
+  | 'picture-in-picture'
   | 'volume-mute'
   | 'volume-low'
   | 'volume-high';
@@ -44,6 +46,22 @@ export default function PlayerIcon({ name, size = 24, color = '#FFFFFF', style }
         <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
           <Path d="M374.79 308.78L457.5 367a16 16 0 0022.5-14.62V159.62A16 16 0 00457.5 145l-82.71 58.22A16 16 0 00368 216.3v79.4a16 16 0 006.79 13.08z" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={32} />
           <Path d="M268 384H84a52.15 52.15 0 01-52-52V180a52.15 52.15 0 0152-52h184.48A51.68 51.68 0 01320 179.52V332a52.15 52.15 0 01-52 52z" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={32} />
+        </Svg>
+      );
+    case 'headset-outline':
+      // Ionicons' outlined headphones: a lesson's sound alone.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Path d="M83 384c-13.33-33-35-93.37-35-128C48 141.12 149.33 48 256 48s208 93.12 208 208c0 34.63-21.67 95-35 128" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={32} />
+          <Path d="M108.39 270.13l-13.69 8h0c-30.23 17.7-31.7 72.41-3.38 122.2s75.87 75.81 106.1 58.12h0l13.69-8a16.16 16.16 0 005.78-21.87L130 276a15.74 15.74 0 00-21.61-5.87zM403.61 270.13l13.69 8h0c30.23 17.69 31.74 72.4 3.38 122.19s-75.87 75.81-106.1 58.12h0l-13.69-8a16.16 16.16 0 01-5.78-21.87L382 276a15.74 15.74 0 0121.61-5.87z" fill="none" stroke={color} strokeMiterlimit={10} strokeWidth={32} />
+        </Svg>
+      );
+    case 'picture-in-picture':
+      // A screen with a smaller one in its corner: every player's picture in picture.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+          <Rect x="2.75" y="4.75" width="18.5" height="14.5" rx="2.25" fill="none" stroke={color} strokeWidth={1.6} />
+          <Rect x="11.5" y="11.5" width="7.5" height="5.5" rx="1" fill={color} />
         </Svg>
       );
     case 'reader-outline':
