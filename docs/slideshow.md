@@ -320,7 +320,11 @@ invisible overlays.
   (`copticInitial.ts`), and its first letter is the line's capital. The
   English and French open with their first letter an Old English capital
   with a rising vine (`openingInitials.ts`, drawn from
-  `englishInitialArt.ts`, built from `assets/initials/english`). The Arabic
+  `englishInitialArt.ts`, built from `assets/initials/english`), whatever
+  its case (a reading that starts part way through a verse opens on a
+  small letter), an accented letter on its plain one's, and past any
+  quotation mark, bracket or dash before it, which gives way to the
+  initial. The Arabic
   opens with its first word stretched once with kashida, in bold. Both
   initials draw their vine and letter in the initials' colours
   (`documentInitialColors`: by season on Night), and the rest of each first
@@ -329,8 +333,9 @@ invisible overlays.
   (`firstRoom`, `room`); the English square runs from line 1's capitals to
   line 2's baseline, the rest of its first word a little nearer, and an
   English paragraph of one line keeps a blank second line beside it. A
-  marked verse with a Bible verse number shows none, so it doesn't stand
-  between the initial and its word. The English and French initials are
+  marked verse with a Bible verse number shows none in any column, whether
+  it is a Bible chapter's verse 1 or a reading's first verse in a service.
+  The English and French initials are
   decided from the whole verse in `flattenSections`, so a piece turned over
   the page keeps them. The scrolling reader (`documentHtml.ts`) and the
   Bible reader (`bibleDocumentHtml.ts`, each chapter's verse 1) set the same

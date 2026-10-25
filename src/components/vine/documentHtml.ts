@@ -501,8 +501,6 @@ export function buildDocumentHtml(
         display: inline-block;
         width: 0.25em;
       }
-      /* Ahead of an initial (openingHtml.ts), the gap is its own margin. */
-      .bible-verse-number.opening-verse-number { margin-right: 0.25em; }
       .metropolitan { color: ${colors.metropolitan}; }
       ${openingInitialStyles(verseLineHeight, fontSize, initialColors)}
       ${sermonPlannerMode ? sermonPlannerStyles() : ''}
@@ -1624,7 +1622,7 @@ function renderVerse(
   // Arabic on its stretched first word. A column with no letter there is an
   // initial for is left as it is, and so is a centred line's English, French
   // and Arabic, which have no side to hang from. Its verse number, if it has
-  // one, goes ahead of a hanging initial rather than between it and its word.
+  // one, stays in the text unseen (openingHtml.ts), in every column.
   const opens = Boolean(verse.dropCap);
   const copticCell = languages.find((language) => language.key === 'coptic');
   const initial = opens && copticCell ? splitCopticInitial(copticCell.text) : null;
@@ -1657,11 +1655,10 @@ function renderVerse(
     const englishInitial = language.key === 'english' ? englishOpening : language.key === 'french' ? frenchOpening : null;
     if (englishInitial) englishInitialsUsed.add(englishInitial.letter);
     const arabicWord = language.key === 'arabic' ? arabicOpening : null;
-    const numberAhead = Boolean(verseNumberText) && Boolean((cellInitial && !centered) || englishInitial);
     const bodyText = cellInitial
       ? renderCopticInitial(cellInitial, centered) + renderOpeningRest(cellInitial.rest, highlightMetropolitanBrackets)
       : englishInitial
-        ? renderEnglishInitial(englishInitial.letter, fontSize, englishLineHeight) + renderOpeningRest(englishInitial.rest, highlightMetropolitanBrackets, 'english-small-caps')
+        ? renderEnglishInitial(englishInitial, fontSize, englishLineHeight) + renderOpeningRest(englishInitial.rest, highlightMetropolitanBrackets, 'english-small-caps')
         : arabicWord
           ? `<span class="opening-word arabic-opening">${escapeHtml(arabicWord.word)}</span>${highlightMetropolitanBrackets(arabicWord.rest)}`
           : highlightMetropolitanBrackets(language.text);
@@ -1672,7 +1669,7 @@ function renderVerse(
         <div class="cell" data-language="${escapeAttribute(language.key)}"${spansRow ? ' style="grid-column: 1 / -1;"' : ''}>
           <p class="verse-text ${language.className} ${centered ? 'centered' : ''}" style="${textStyle}">${
             speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(speakerLabel)}</span><br/>` : ''
-          }${verseNumberText ? `<span class="bible-verse-number${numberAhead ? ' opening-verse-number' : ''}" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span>${numberAhead ? '' : '<span class="bible-verse-number-gap"></span>'}` : ''}${renderedBody}</p>
+          }${verseNumberText ? `<span class="bible-verse-number${opens ? ' opening-verse-number' : ''}" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span>${opens ? '' : '<span class="bible-verse-number-gap"></span>'}` : ''}${renderedBody}</p>
         </div>
       `;
   };

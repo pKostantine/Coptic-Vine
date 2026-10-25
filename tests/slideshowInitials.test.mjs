@@ -107,16 +107,12 @@ test("a verse opens with the initial only where it is marked to, as in the scrol
   // The English and French openings are decided from the whole verse: a piece turned over the page carries only lines measured after it.
   assert.match(verseBlock, /if \(verse\.slideshowForcedLines\?\.\[language\]\) return \{ letter: latinInitial\.letter, text, hasWord: latinInitial\.opensWord \};/);
   assert.match(verseBlock, /const englishOpening = latinOpening\("english", englishText, englishInitial\);\s+const frenchOpening = latinOpening\("french", frenchText, frenchInitial\);/);
-  // A column opening on an initial sets its number ahead of it, not between it and its word; the others in their text.
-  assert.match(verseBlock, /const numberFor = \(language, opensOnInitial\) => \(\{\s+bibleVerseNumber: opensOnInitial \? "" : bibleNumberFor\(language\),\s+leadNumber: opensOnInitial \? bibleNumberFor\(language\) : "",\s+\}\);/);
-  for (const [language, opening] of [["english", "Boolean(englishOpening)"], ["french", "Boolean(frenchOpening)"], ["coptic", "Boolean(initial)"]]) {
-    assert.ok(verseBlock.includes(`...numberFor("${language}", ${opening}),`), language);
+  // A verse that opens so shows no number, in any column.
+  assert.match(verseBlock, /const bibleNumberFor = \(language\) =>\s+!verse\.dropCap &&/);
+  for (const language of ["english", "french", "coptic", "arabic"]) {
+    assert.ok(verseBlock.includes(`bibleVerseNumber: bibleNumberFor("${language}"),`), language);
   }
-  assert.match(verseBlock, /bibleVerseNumber: bibleNumberFor\("arabic"\),/);
-  // In a box of its own ahead of the initial, which the lines beside them make room for.
-  assert.match(verseBlock, /const leadWidth = leadNumber \? verseNumberLeadWidth\(leadNumber, language\.fontSize\) : 0;/);
-  assert.match(verseBlock, /one: withLead\(copticMetrics\.one\),\s+two: withLead\(copticMetrics\.two\),/);
-  assert.match(verseBlock, /two: withLead\(\{ room: englishMetrics\.room, firstRoom: englishMetrics\.firstRoom \}\),/);
+  assert.doesNotMatch(verseBlock, /leadNumber|verseNumberLeadWidth|withLead|LEAD_ROW_STYLE/);
   // The scrolling reader's rule, for the two to agree.
   const page = source("components/vine/documentHtml.ts");
   assert.match(page, /const opens = Boolean\(verse\.dropCap\);/);
@@ -186,17 +182,34 @@ test("where only one of the initial's lines fits beneath its title, the verse st
   assert.equal(roomy[0][1].slideshowLineCounts.coptic, 2);
 });
 
-test("a verse split over the page keeps its first word where its number stands ahead of the initial", () => {
-  // Pagination takes the number off a column's first lines only when it is in them.
-  const item = { ...copticItem(), verse: { ...copticItem().verse, bibleVerseNumber: "1" } };
-  const state = () => ({
+test("a verse that opens with the drop cap shows no number, so a piece of it turned over the page keeps every column's first word", () => {
+  const verse = { ...copticItem().verse, bibleVerseNumber: "1" };
+  const state = (englishLines, arabicLines) => ({
     languages: [
-      { language: "english", lineHeight: 24, lines: [{ text: "1 Let us give", isParagraphEnd: false }, { text: "thanks", isParagraphEnd: true }], offset: 0, end: 2 },
+      { language: "english", lineHeight: 24, lines: englishLines, offset: 0, end: 2 },
       { language: "coptic", lineHeight: 24, lines: lines(3, "two"), offset: 0, end: 3 },
+      { language: "arabic", lineHeight: 24, lines: arabicLines, offset: 0, end: 2 },
     ],
   });
-  const segment = createVerseLineSegment(item, state(), { english: 1, coptic: 2 }, 0).item;
-  assert.equal(segment.verse.coptic, "ⲗⲉⲝⲓⲥ1 ⲗⲉⲝⲓⲥ2", "beside its initial, the number isn't in the lines");
-  assert.equal(segment.verse.english, "Let us give");
-  assert.deepEqual(segment.verse.slideshowBibleNumberLanguages, ["english", "coptic"]);
+  // No number is measured into its lines, the Arabic's (with no initial) included, so none comes off them.
+  const opening = createVerseLineSegment(
+    { ...copticItem(), verse: { ...verse, dropCap: true } },
+    state([{ text: "Let us give", isParagraphEnd: false }, { text: "thanks", isParagraphEnd: true }], [{ text: "فلنشكر صانع", isParagraphEnd: false }, { text: "الخيرات", isParagraphEnd: true }]),
+    { english: 1, coptic: 2, arabic: 1 },
+    0,
+  ).item;
+  assert.equal(opening.verse.coptic, "ⲗⲉⲝⲓⲥ1 ⲗⲉⲝⲓⲥ2");
+  assert.equal(opening.verse.english, "Let us give");
+  assert.equal(opening.verse.arabic, "فلنشكر صانع");
+  assert.deepEqual(opening.verse.slideshowBibleNumberLanguages, []);
+  // Any other verse's number leads its first lines, and comes off them there to be set again in its place.
+  const numbered = createVerseLineSegment(
+    { ...copticItem(), copticInitial: null, verse },
+    state([{ text: "1 Let us give", isParagraphEnd: false }, { text: "thanks", isParagraphEnd: true }], [{ text: "١ فلنشكر", isParagraphEnd: false }, { text: "صانع", isParagraphEnd: true }]),
+    { english: 1, coptic: 3, arabic: 1 },
+    0,
+  ).item;
+  assert.equal(numbered.verse.english, "Let us give");
+  assert.equal(numbered.verse.arabic, "فلنشكر");
+  assert.deepEqual(numbered.verse.slideshowBibleNumberLanguages, ["english", "coptic", "arabic"]);
 });

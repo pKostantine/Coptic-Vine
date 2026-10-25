@@ -125,24 +125,23 @@ export function buildBibleChapterHtml({
   const englishInitialsUsed = new Set<string>();
   // The opening verse's text in one column: the Coptic on its decorated
   // initial, the English and French on an Old English capital, the Arabic on
-  // its stretched first word, each where it opens on one (`initial`: on one
-  // that hangs, which the verse number goes ahead of). Greek has none yet.
+  // its stretched first word, each where it opens on one. Greek has none yet.
   const openingHtml = (text: string, language: BibleLanguageKey) => {
     if (language === 'coptic') {
       const initial = splitCopticInitial(text);
       if (!initial) return null;
       copticInitialsUsed.add(initial.letter);
-      return { html: renderCopticInitial(initial, false) + renderOpeningRest(initial.rest, escapeHtml), initial: true };
+      return renderCopticInitial(initial, false) + renderOpeningRest(initial.rest, escapeHtml);
     }
     if (isArabicLanguage(language)) {
       const opening = splitArabicOpening(text);
-      return opening ? { html: `<span class="opening-word arabic-opening">${escapeHtml(opening.word)}</span>${escapeHtml(opening.rest)}`, initial: false } : null;
+      return opening ? `<span class="opening-word arabic-opening">${escapeHtml(opening.word)}</span>${escapeHtml(opening.rest)}` : null;
     }
     if (language === 'greek') return null;
     const initial = splitEnglishOpening(text);
     if (!initial) return null;
     englishInitialsUsed.add(initial.letter);
-    return { html: renderEnglishInitial(initial.letter, safeFontSize, verseLineHeight) + renderOpeningRest(initial.rest, escapeHtml, 'english-small-caps'), initial: true };
+    return renderEnglishInitial(initial, safeFontSize, verseLineHeight) + renderOpeningRest(initial.rest, escapeHtml, 'english-small-caps');
   };
 
   const rowHtml = verses
@@ -155,10 +154,10 @@ export function buildBibleChapterHtml({
           const formatted = formatVerseText(text, language, opens);
           const opening = opens ? openingHtml(formatted, language) : null;
           const verseNumberText = isPsalmIntroduction ? '' : formatVerseNumber(verse.verseNumber, language);
-          // Ahead of the opening verse's initial, rather than between it and
-          // its word (openingHtml.ts).
+          // The opening verse shows no number, in any column: it stays in the
+          // text unseen (openingHtml.ts).
           const verseNumberHtml = verseNumberText
-            ? `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}${opening?.initial ? ' opening-verse-number' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`
+            ? `<span class="verse-number${verse.isLxxAddition ? ' lxx-addition' : ''}${opens ? ' opening-verse-number' : ''}" data-copy-text="${escapeHtml(verseNumberText)}">${escapeHtml(verseNumberText)}</span>`
             : '';
           if (!String(text || '').trim()) {
             return `<div class="cell placeholder ${language}" data-language="${language}"></div>`;
@@ -173,7 +172,7 @@ export function buildBibleChapterHtml({
           return [
             `<div class="cell ${language}${isPsalmIntroduction ? ' psalm-introduction' : ''}" data-language="${language}" dir="${isArabicLanguage(language) ? 'rtl' : 'ltr'}">`,
             verseNumberHtml,
-            `<span class="${textClass}"${annotation}>${opening ? opening.html : escapeHtml(formatted)}</span>`,
+            `<span class="${textClass}"${annotation}>${opening ?? escapeHtml(formatted)}</span>`,
             '</div>',
           ].join('');
         })

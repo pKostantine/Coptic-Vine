@@ -95,18 +95,16 @@ test('only the lines marked open so: a hymn\'s title, and which of its lines com
   const bracket = build([hymn([verse('(Ⲙⲁⲣⲉⲛ)', { dropCap: true })])], OPTIONS);
   assert.deepEqual(initials(bracket), []);
   assert.ok(body(bracket).includes('<span class="english-initial-text">E</span>'));
-  // A reading's marked verse opens too, its number ahead of a hanging initial rather than between it and its word.
+  // A reading's marked verse opens too, and shows no number in any column: it stays in the text unseen, for copying.
   const reading = body(build([hymn([verse('Ⲡⲁⲩⲗⲟⲥ', { bibleVerseNumber: '1', dropCap: true }), verse('Ⲛⲉⲙ', { bibleVerseNumber: '2' })])], OPTIONS));
   assert.deepEqual(initials(reading), ['<span class="coptic-initial" data-fit>']);
   assert.match(reading, /<span class="bible-verse-number opening-verse-number" data-copy-text="1">1<\/span><span class="english-initial"/);
   assert.match(reading, /<span class="bible-verse-number opening-verse-number" data-copy-text="ⲁ̅">ⲁ̅<\/span><span class="coptic-initial" data-fit>/);
-  // The Arabic, with no initial to stand ahead of, keeps its number in its line.
-  assert.match(reading, /<span class="bible-verse-number" data-copy-text="١">١<\/span><span class="bible-verse-number-gap"><\/span><span class="opening-word arabic-opening">/);
+  assert.match(reading, /<span class="bible-verse-number opening-verse-number" data-copy-text="١">١<\/span><span class="opening-word arabic-opening">/);
   assert.match(reading, /<span class="bible-verse-number" data-copy-text="2">2<\/span><span class="bible-verse-number-gap"><\/span>English/);
   const css = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], OPTIONS);
-  assert.match(css, /\.opening-verse-number \{ float: left; \}/);
-  assert.match(css, /\.bible-verse-number\.opening-verse-number \{ margin-right: 0\.25em; \}/);
-  assert.match(css, /\.coptic-initial-text, \.english-initial-text \{\s+clip: rect\(0 0 0 0\);/);
+  assert.match(css, /\.coptic-initial-text, \.english-initial-text, \.opening-verse-number \{\s+clip: rect\(0 0 0 0\);/);
+  assert.doesNotMatch(css, /opening-verse-number \{ (float|margin)/);
 });
 
 test('no Coptic column, no initial; a marked line alone on its row, centred, takes it a line tall', () => {
@@ -188,11 +186,31 @@ test('the Arabic first word is made longer, never bigger: its size is the text\'
   assert.ok(body(html).includes('<span class="opening-word arabic-opening">مبـــارك</span> أنت'));
 });
 
-test('a verse number goes ahead of the initial on a slide, in a box as wide as its figures and a gap', () => {
-  assert.equal(openings.verseNumberLeadWidth('1', 20), 20);
-  assert.equal(openings.verseNumberLeadWidth('12', 20), 34);
-  // An overline takes no room of its own.
-  assert.equal(openings.verseNumberLeadWidth('ⲓ̅ⲃ̅', 25), openings.verseNumberLeadWidth('12', 25));
+test('an English or French opening takes its initial whatever its first letter: a small one, an accented one, one after a quotation mark', () => {
+  // A reading starting part way through a verse (Psalm 70:7b), and its French.
+  assert.deepEqual(openings.splitEnglishOpening('but You are my strong refuge.'), { letter: 'B', source: 'b', rest: 'ut You are my strong refuge.' });
+  assert.deepEqual(openings.splitEnglishOpening('et toi, tu es ma force'), { letter: 'E', source: 'e', rest: 't toi, tu es ma force' });
+  // A quotation mark, a bracket or a dash before it gives way to the initial.
+  assert.deepEqual(openings.splitEnglishOpening('“Behold, the virgin'), { letter: 'B', source: '“B', rest: 'ehold, the virgin' });
+  assert.deepEqual(openings.splitEnglishOpening(' ‘(Now'), { letter: 'N', source: '‘(N', rest: 'ow' });
+  assert.deepEqual(openings.splitEnglishOpening('«\u00a0Je suis'), { letter: 'J', source: '«\u00a0J', rest: 'e suis' });
+  assert.deepEqual(openings.splitEnglishOpening('– Viens'), { letter: 'V', source: '– V', rest: 'iens' });
+  // An accented letter, written as one character or two, opens on its plain letter's initial.
+  assert.deepEqual(openings.splitEnglishOpening('À toi'), { letter: 'A', source: 'À', rest: ' toi' });
+  assert.deepEqual(openings.splitEnglishOpening('E\u0301ternel'), { letter: 'E', source: 'E\u0301', rest: 'ternel' });
+  assert.deepEqual(openings.splitEnglishOpening('été'), { letter: 'E', source: 'é', rest: 'té' });
+  assert.deepEqual(openings.splitEnglishOpening('Œuvre'), { letter: 'O', source: 'Œ', rest: 'euvre' });
+  // Nothing else has one.
+  for (const text of ['', '“', '2 Then', '…and', 'ⲁⲛⲟⲕ', 'مبارك']) assert.equal(openings.splitEnglishOpening(text), null, text);
+});
+
+test('a reading opening on a small letter, or a quotation mark, still opens with the drop cap and its first word recoloured', () => {
+  const psalm = build([hymn([verse('Ⲟⲩⲟϩ ⲛ̀ⲑⲟⲕ', { english: 'but You are my strong refuge.', french: 'et toi, tu es ma force', arabic: 'أما أنت', dropCap: true })])], { ...OPTIONS, visibleColumns: { english: true, french: true, coptic: true, arabic: true } });
+  assert.ok(body(psalm).includes('<span class="english-initial-text">b</span></span><span class="opening-word english-small-caps">ut</span> You are my strong refuge.'));
+  assert.ok(body(psalm).includes('<span class="english-initial-text">e</span></span><span class="opening-word english-small-caps">t</span> toi, tu es ma force'));
+  assert.ok(psalm.includes('id="en-initial-42"') && psalm.includes('id="en-initial-45"'));
+  const gospel = build([hymn([verse('Ϩⲏⲡⲡⲉ', { english: '“Behold, the virgin', bibleVerseNumber: '23', dropCap: true })])], OPTIONS);
+  assert.ok(body(gospel).includes('<span class="english-initial-text">“B</span></span><span class="opening-word english-small-caps">ehold,</span> the virgin'));
 });
 
 test('the Arabic first word is stretched once with kashida, only between letters that join', () => {
@@ -207,9 +225,7 @@ test('the Arabic first word is stretched once with kashida, only between letters
 });
 
 test('the English initial is the first capital: an Old English letter, its capitals from line 1\'s to line 2\'s baseline, as wide as its own letter', () => {
-  assert.deepEqual(openings.splitEnglishOpening('Blessed are You'), { letter: 'B', rest: 'lessed are You' });
-  assert.equal(openings.splitEnglishOpening('“Blessed'), null);
-  assert.equal(openings.splitEnglishOpening('the light'), null);
+  assert.deepEqual(openings.splitEnglishOpening('Blessed are You'), { letter: 'B', source: 'B', rest: 'lessed are You' });
   // Every capital, on one scale: all as tall, each as wide as its letter.
   const englishArt = loadFile('src/constants/englishInitialArt.ts');
   assert.equal(Object.keys(englishArt.ENGLISH_INITIALS).join(''), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
@@ -295,10 +311,10 @@ test('the French opens as the English does, on an Old English capital, the rest 
   const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ', { english: 'Rejoice', french: 'Réjouis-toi', dropCap: true })])], { ...OPTIONS, visibleColumns: columns });
   assert.equal((html.match(/id="en-initial-52"/g) || []).length, 1);
   assert.equal((body(html).match(/class="english-initial"/g) || []).length, 2);
-  // A French line opening on a letter there is no Old English capital for (an accented one, a quote) is left as it is.
-  const accented = body(build([hymn([verse('Ⲙⲁⲣⲉⲛ', { english: 'To You', french: 'À toi', dropCap: true })])], { ...OPTIONS, visibleColumns: columns }));
-  assert.ok(accented.includes('>À toi<'));
-  assert.equal((accented.match(/class="english-initial"/g) || []).length, 1);
+  // One opening on an accented capital, past a guillemet, opens on its plain letter's, the guillemet and the accent kept in the text unseen.
+  const accented = body(build([hymn([verse('Ⲙⲁⲣⲉⲛ', { english: 'To You', french: '« À toi', dropCap: true })])], { ...OPTIONS, visibleColumns: columns }));
+  assert.ok(accented.includes('<use class="english-initial-letter" href="#en-initial-41"></use></svg><span class="english-initial-text">« À</span></span> toi'));
+  assert.equal((accented.match(/class="english-initial"/g) || []).length, 2);
   // An unmarked line's French doesn't open.
   assert.ok(body(build([hymn([verse('Ⲙⲁⲣⲉⲛ', { french: 'Rendons grâce' })])], { ...OPTIONS, visibleColumns: columns })).includes('>Rendons grâce<'));
 });
