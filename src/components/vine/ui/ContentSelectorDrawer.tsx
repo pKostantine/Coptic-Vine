@@ -405,7 +405,10 @@ export default function ContentSelectorDrawer({
             const isNested = !searching && dividerOwners.has(section.id);
             const isLastNested = isNested && !dividerOwners.has(visibleListable[listIndex + 1]?.id ?? '');
             const isHere = section.id === highlightedSectionId;
-            const isPast = places[section.id] === 'past' && !isHere;
+            // What has been read is dimmed, but not the choice of
+            // interpretations: it is a button that works from here whatever
+            // has been read, as the Up next cards are, and never dim.
+            const isPast = places[section.id] === 'past' && !isHere && !isChoice;
             const foldableDividerId = !searching && isDivider && foldableDividerIds.has(section.id) ? section.id : null;
             const isFolded = Boolean(foldableDividerId && foldedDividerIds[foldableDividerId]);
 
