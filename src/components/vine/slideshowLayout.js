@@ -12,7 +12,6 @@ import { countInitialLines } from "./textLines.js";
 
 const SPACING_XS = 4;
 const SPACING_SM = 8;
-const SPACING_MD = 16;
 const MIN_USEFUL_FRAGMENT_LINES = 2;
 
 function clamp(value, minimum, maximum) {
@@ -101,12 +100,15 @@ function getVerseCommonHeight(item, fontSize, visibleLanguages) {
 }
 
 /**
- * The slide's margin above and below its text: the same as the scrolling
- * page's (documentHtml.ts's `.document` padding), so a slide uses as much
- * of the screen as the page does.
+ * The slide's own margin above and below its text: none. Each verse already
+ * keeps SPACING_SM above and below itself (getVerseVerticalPadding), and that
+ * is all the room its first and last lines need from the slide's edges; a
+ * margin of the slide's own on top of it took more than half a line from
+ * every slide at the larger sizes, and turned verses over the page that
+ * would have fitted.
  */
 export function getSlidePadding() {
-  return { bottom: SPACING_MD, top: SPACING_MD };
+  return { bottom: 0, top: 0 };
 }
 
 /** The content budget is always bounded by the real viewport. */
