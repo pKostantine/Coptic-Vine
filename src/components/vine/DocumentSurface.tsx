@@ -58,6 +58,8 @@ interface DocumentSurfaceProps {
   topContentInset?: number;
   /** Scroll mode: whether the headpiece the document opens with still shows below the floating controls. */
   onHeadpieceInViewChange?: (inView: boolean) => void;
+  /** Scroll mode: whether the page reports a swipe to the right as the way out (DocumentWebView's swipeExitsInPage). */
+  swipeExitsInPage?: boolean;
 }
 
 /** A comment verse counts as "within" a silent prayer if its section is titled Silent Prayer overall, or if the nearest non-comment neighbor verse is itself a silentPrayer/silentComment — mirrors documentHtml.ts's isWithinSilentPrayer so slideshow mode applies the same display-preference filtering as the WebView reader. */
@@ -160,6 +162,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       initialColors: initialColorsProp,
       topContentInset = 0,
       onHeadpieceInViewChange,
+      swipeExitsInPage = true,
     },
     ref,
   ) => {
@@ -371,6 +374,9 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
           suppressAllSpeakerLabels={suppressAllSpeakerLabels}
           onToggleCollapse={handleToggleCollapse}
           keyboardNavigationEnabled={keyboardNavigationEnabled}
+          // On a phone or a tablet a swipe is the reader's way out or in to
+          // the contents (hooks/useReaderSwipes.ts); a tap turns the slide.
+          swipesTurnSlides={Platform.OS === 'web'}
         />
       );
     }
@@ -397,6 +403,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         bottomContentInset={nowPlayingInset}
         topContentInset={topContentInset}
         onHeadpieceInViewChange={onHeadpieceInViewChange}
+        swipeExitsInPage={swipeExitsInPage}
         sermonPlannerMode={sermonPlannerMode}
         sermonHighlights={sermonHighlights}
         theme={theme}

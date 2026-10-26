@@ -87,6 +87,10 @@ export default function SlideshowContainer({
   copticGospelRite,
   suppressAllSpeakerLabels,
   keyboardNavigationEnabled = true,
+  // Whether a swipe turns the slide. Not on a phone or a tablet, where a
+  // swipe leaves or brings the contents in (hooks/useReaderSwipes.ts) and a
+  // tap on either half turns the slide.
+  swipesTurnSlides = true,
 }) {
   const [viewportHeight, setViewportHeight] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -897,6 +901,7 @@ export default function SlideshowContainer({
         onPrevious={goToPreviousSlide}
         onNext={goToNextSlide}
         onOpenSelector={onOpenSelector}
+        swipesTurnSlides={swipesTurnSlides}
       >
         {deckHidden ? null : (
           <SlideDeck
@@ -1005,6 +1010,7 @@ export function NavigationSurface({
   onPrevious,
   onNext,
   onOpenSelector,
+  swipesTurnSlides = true,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   // The slideshow does not always occupy the whole browser window (drawers,
@@ -1047,7 +1053,7 @@ export function NavigationSurface({
   const panResponder = useMemo(() => {
     return PanResponder.create({
         onMoveShouldSetPanResponder: (event, gestureState) => {
-          if (isStylusGestureEvent(event) || isInteractivePointerTarget(event?.target || event?.nativeEvent?.target)) return false;
+          if (!swipesTurnSlides || isStylusGestureEvent(event) || isInteractivePointerTarget(event?.target || event?.nativeEvent?.target)) return false;
           const direction = getPageTurnForSwipe(gestureState.dx);
           const shouldCapture = Boolean(direction) &&
             Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
@@ -1079,7 +1085,7 @@ export function NavigationSurface({
           }
         },
       });
-  }, [onNext, onOpenSelector, onPrevious, surfaceBounds]);
+  }, [onNext, onOpenSelector, onPrevious, surfaceBounds, swipesTurnSlides]);
 
   return (
     <Pressable

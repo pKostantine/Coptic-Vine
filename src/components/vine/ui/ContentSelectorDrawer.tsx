@@ -47,6 +47,10 @@ interface ContentSelectorDrawerProps {
   theme?: DocumentTheme;
   /** The document's own name, heading the panel under "Contents". */
   title?: { english: string; arabic: string; french?: string } | null;
+  /** The share of the panel a finger has already brought in (ReaderPanel's openFrom). */
+  openFrom?: number;
+  /** Once the panel is up on the screen. */
+  onShown?: () => void;
 }
 
 /**
@@ -102,6 +106,8 @@ export default function ContentSelectorDrawer({
   appLanguage = 'en',
   theme = NIGHT_DOCUMENT_THEME,
   title,
+  openFrom,
+  onShown,
 }: ContentSelectorDrawerProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const panelColors = useMemo(() => readerPanelColors(theme), [theme]);
@@ -305,6 +311,8 @@ export default function ContentSelectorDrawer({
       titleArabic={documentTitle.arabic}
       actions={actions}
       theme={theme}
+      openFrom={openFrom}
+      onShown={onShown}
       top={(layout) => (
         <View style={[styles.search, layout.compact && styles.searchCompact]}>
           <Icon name="search-outline" size={layout.compact ? 15 : 17} color={panelColors.voice} />

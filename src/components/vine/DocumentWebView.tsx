@@ -52,6 +52,8 @@ interface DocumentWebViewProps {
   /** Whether the headpiece the document opens with still shows below the floating controls: the title pill's cue. */
   onHeadpieceInViewChange?: (inView: boolean) => void;
   sermonPlannerMode?: boolean;
+  /** Whether the page reports a swipe to the right as the reader's way out (documentHtml.ts's swipeExitsInPage): not where iOS's own back swipe leaves. */
+  swipeExitsInPage?: boolean;
   sermonHighlights?: SermonHighlight[];
   /** The page the document is read on — see constants/documentThemes.ts. */
   theme?: DocumentTheme;
@@ -99,6 +101,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       onHeadpieceInViewChange,
       collapsedSectionIds,
       sermonPlannerMode = false,
+      swipeExitsInPage = true,
       sermonHighlights = [],
       theme = NIGHT_DOCUMENT_THEME,
       ornamentColor,
@@ -329,6 +332,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               ornamentColor,
               initialColors,
               nativeSwipeNavigation: true,
+              swipeExitsInPage,
             })
           : null,
       [
@@ -347,6 +351,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         suppressAllSpeakerLabels,
         topContentInset,
         sermonPlannerMode,
+        swipeExitsInPage,
         theme,
         ornamentColor,
         initialColors,

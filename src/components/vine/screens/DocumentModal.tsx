@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type GestureResponderEvent, Modal, PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Animated, type GestureResponderEvent, Modal, PanResponder, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
@@ -24,6 +24,8 @@ import { floatingControlsLayout } from '../ui/floatingControls';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
 import CalendarSheet from '../ui/CalendarSheet';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
+import { ReaderPanelSheet, useReaderPanelLayout } from '../ui/ReaderPanel';
+import { useReaderSwipes } from '@/hooks/useReaderSwipes';
 import LoadingScreen from '../ui/LoadingScreen';
 import SeasonSelectorScreen from './SeasonSelectorScreen';
 import { BookSettingsSheet } from './SettingsScreen';
@@ -75,9 +77,8 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
   return reference ? reference.english || reference.arabic || null : null;
 }
 
-/** Where a swipe began, in page coordinates -- see swipeGesturePanResponder. */
 /**
- * The edge swipes, for a swipe that starts in the side safe-area inset.
+ * The reader's swipes, for one that starts in the side safe-area inset.
  *
  * In landscape a phone insets a document from the notch on both sides, so a
  * swipe from the screen edge starts in the SafeAreaView's padding, outside
@@ -92,10 +93,10 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
  * navigationBarTranslucent, below), so the strip is the SafeAreaView's there
  * as well, rather than a dialog's own margin beside the page.
  */
-function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwipeFromRight?: () => void, ignoresTouch?: () => boolean) {
+function useInsetEdgeSwipe(enabled: boolean, onSwipeRight: () => void, onSwipeLeft?: () => void, ignoresTouch?: () => boolean) {
   const { left: leftInset, right: rightInset } = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const startRef = useRef<{ x: number; y: number; edge: 'left' | 'right' } | null>(null);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
 
   const startsInInset = useCallback(
     (x: number) => (leftInset > 0 && x < leftInset) || (rightInset > 0 && x > screenWidth - rightInset),
@@ -109,7 +110,7 @@ function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwip
       if (!enabled || isStylusGestureEvent(event) || event.nativeEvent.touches.length > 1 || ignoresTouch?.()) return;
       const { pageX, pageY } = touchPoint(event);
       if (!startsInInset(pageX)) return;
-      startRef.current = { x: pageX, y: pageY, edge: pageX < leftInset ? 'left' : 'right' };
+      startRef.current = { x: pageX, y: pageY };
     },
     onTouchEnd: (event: GestureResponderEvent) => {
       const start = startRef.current;
@@ -118,8 +119,11 @@ function useInsetEdgeSwipe(enabled: boolean, onSwipeFromLeft: () => void, onSwip
       const { pageX, pageY } = touchPoint(event);
       const dx = pageX - start.x;
       if (Math.abs(dx) <= Math.abs(pageY - start.y)) return;
-      if (start.edge === 'left' && dx > 60) onSwipeFromLeft();
-      else if (start.edge === 'right' && dx < -36) onSwipeFromRight?.();
+      // Either way from either side, as from anywhere on the page
+      // (hooks/useReaderSwipes.ts): to the right it closes, to the left the
+      // contents open. Read only as it ends, so it goes at once.
+      if (dx > 60) onSwipeRight();
+      else if (dx < -36) onSwipeLeft?.();
     },
     onTouchCancel: () => {
       startRef.current = null;
@@ -237,13 +241,13 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       return;
     }
 
-    if (action.type === 'swipeBack') {
-      if (!isCovered) onClose();
+    // The reader's swipes over the scrolling page, reported as they go (documentHtml.ts).
+    if (action.type === 'swipeDrag' && action.swipe) {
+      if (!isCovered) readerSwipes.drag(action.swipe, action.distance ?? 0);
       return;
     }
-
-    if (action.type === 'openSelector') {
-      if (!isCovered) setSelectorOpen(true);
+    if (action.type === 'swipeEnd' && action.swipe) {
+      readerSwipes.release(action.swipe, isCovered ? 0 : action.distance ?? 0, action.velocity ?? 0);
       return;
     }
   };
@@ -347,25 +351,10 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     return sectionPills[0]?.section.id ?? null;
   }, [sections, isAntiphonary, currentSectionId, currentTune, sectionPills]);
 
-  // Capture-phase gesture handler for the two screen-edge swipes: left-edge
-  // right-swipe closes this modal; right-edge left-swipe opens the content
-  // selector. Using onMoveShouldSetPanResponderCapture (not the plain non-
-  // capture variant) is essential — in slideshow mode, NavigationOverlay
-  // inside SlideshowContainer also uses capture, and descendant capture fires
-  // AFTER ancestor capture, so SafeAreaView wins the gesture before
-  // NavigationOverlay can steal it. Disabled entirely while nestedModal is open
-  // so swiping only dismisses the topmost level, not both at once.
-  // A swipe that starts in the side inset of a landscape phone is read by
+  // The swipes are disabled entirely while anything covers this document, so
+  // a swipe only takes the topmost level away, not both at once. A swipe that
+  // starts in the side inset of a landscape phone is read by
   // useInsetEdgeSwipe instead -- never by both.
-  //
-  // Where a swipe started is worked out from where the finger is when the
-  // swipe is taken, and kept for its release. gestureState.x0 is only filled
-  // in once a responder has been granted -- while these handlers decide
-  // whether to take the swipe it is still 0 -- and granting resets dx, so
-  // neither says where the finger first went down afterwards either. Every
-  // swipe had looked like it began at the left edge and none at the right:
-  // in slideshow mode, with no page underneath to catch it instead, the
-  // content list could never be swiped open.
   //
   // The pill bar is a dead zone for both: a swipe along it scrolls the pills,
   // however near an edge it starts. Every touch clears the mark on its way
@@ -374,37 +363,28 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const touchOnPillBarRef = useRef(false);
   const insetEdgeSwipe = useInsetEdgeSwipe(!isCovered, onClose, () => setSelectorOpen(true), () => touchOnPillBarRef.current);
   const { startsInInset } = insetEdgeSwipe;
-  const swipeTakenFromXRef = useRef(0);
-  const swipeGesturePanResponder = useMemo(() => {
-    // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
-    return PanResponder.create({
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        const startX = swipeStartX(gestureState);
-        if (isCovered || isStylusGestureEvent(_) || startsInInset(startX) || touchOnPillBarRef.current) return false;
-        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (!isHorizontal) return false;
-        // Only from the very edge: a swipe across the page turns it, or does nothing.
-        const edge = swipeEdge(startX, screenWidth);
-        const isCloseSwipe = edge === 'left' && gestureState.dx > 12;
-        const isSelectorSwipe = edge === 'right' && gestureState.dx < -12;
-        if (isCloseSwipe || isSelectorSwipe) swipeTakenFromXRef.current = startX;
-        return isCloseSwipe || isSelectorSwipe;
-      },
-      onPanResponderRelease: (event, gestureState) => {
-        if (isCovered || isStylusGestureEvent(event)) return;
-        const takenFromX = swipeTakenFromXRef.current;
-        const travelled = gestureState.moveX - takenFromX;
-        const edge = swipeEdge(takenFromX, screenWidth);
-        if (edge === 'left' && travelled > 60) {
-          onClose();
-          return;
-        }
-        if (edge === 'right' && travelled < -36) {
-          setSelectorOpen(true);
-        }
-      },
-    });
-  }, [onClose, isCovered, screenWidth, startsInInset]);
+  // The reader's two swipes, from anywhere on the page and following the
+  // finger (hooks/useReaderSwipes.ts): to the right the subdocument slides
+  // away, the document it was opened from in view beneath it, and closes; to
+  // the left the contents come in.
+  const [selectorOpenFrom, setSelectorOpenFrom] = useState(0);
+  const panelLayout = useReaderPanelLayout();
+  const readerSwipes = useReaderSwipes({
+    enabled: isMobileDocument && !isCovered,
+    exitsByDrag: true,
+    contentsWidth: panelLayout.width,
+    onExit: onClose,
+    onOpenContents: (from) => {
+      setSelectorOpenFrom(from);
+      setSelectorOpen(true);
+    },
+    ignores: (startX) => touchOnPillBarRef.current || startsInInset(startX),
+  });
+  // Shown again, it opens where it belongs, not where it was swiped away to.
+  const { resetPage } = readerSwipes;
+  useLayoutEffect(() => {
+    if (visible) resetPage();
+  }, [visible, resetPage]);
 
   // Calendar and Settings open over this modal rather than as screens of
   // their own, so they don't get the navigator's swipe-back. The same
@@ -442,6 +422,9 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   return (
     <Modal
       animationType="slide"
+      // Over the document it was opened from, which stays in view beneath
+      // while a swipe takes this one away.
+      transparent
       visible={visible}
       onRequestClose={onClose}
       supportedOrientations={modalOrientations}
@@ -452,12 +435,13 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       statusBarTranslucent
       navigationBarTranslucent
     >
+      <Animated.View style={[styles.swipedPage, readerSwipes.pageStyle]}>
       <SafeAreaView
         // Same split as ServiceDocument: on web the bar below supplies the top
         // inset itself, while the app has no bar and must inset for the notch.
         edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
         style={[styles.screen, { backgroundColor: documentTheme.colors.page }]}
-        {...(isMobileDocument ? swipeGesturePanResponder.panHandlers : {})}
+        {...(isMobileDocument ? readerSwipes.panHandlers : {})}
         {...(isMobileDocument ? insetEdgeSwipe.handlers : {})}
         // The capture phase every native view registers (BaseViewConfig);
         // React Native's types leave it out.
@@ -470,9 +454,9 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         {/* A subdocument opens on top of a document the reader is already in,
             so on the app it gets no controls at all -- same as the document
             underneath it (see ServiceDocument.tsx). Both of their actions
-            already have native gestures in swipeGesturePanResponder below:
-            swipe in from the left edge to close, in from the right to open
-            ContentSelectorDrawer. A browser has neither gesture, so its
+            are swipes from anywhere on the page (readerSwipes above): to the
+            right to close, to the left to open ContentSelectorDrawer. A
+            browser has neither gesture, so its
             controls float over the page (rendered below); where pills or a
             slideshow start the page, this is their room above them. */}
         {!isMobileDocument && !controlsOverText ? <View style={{ height: floatingLayout.contentTop }} /> : null}
@@ -526,6 +510,11 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             </View>
             <ContentSelectorDrawer
               visible={selectorOpen}
+              openFrom={selectorOpenFrom}
+              onShown={() => {
+                readerSwipes.contentsShown();
+                setSelectorOpenFrom(0);
+              }}
               sections={sections}
               currentSectionId={currentSectionId}
               onClose={() => setSelectorOpen(false)}
@@ -603,7 +592,10 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
         />
         {/* The Book Settings sheet, the same way and for the same reason. */}
         <BookSettingsSheet inDocument visible={overlayScreen === 'settings'} onClose={() => setOverlayScreen(null)} />
+        {/* The contents coming in under a finger, until the panel is up over them. */}
+        {readerSwipes.sheetShown ? <ReaderPanelSheet progress={readerSwipes.contentsIn} theme={documentTheme} /> : null}
       </SafeAreaView>
+      </Animated.View>
     </Modal>
   );
 }
@@ -636,6 +628,7 @@ export function AntiphonaryModal({
 }
 
 const styles = StyleSheet.create({
+  swipedPage: { flex: 1 },
   screen: { flex: 1, backgroundColor: COLORS.black },
   overlayFrame: { flex: 1, backgroundColor: COLORS.black },
   documentFrame: { flex: 1, position: 'relative' },

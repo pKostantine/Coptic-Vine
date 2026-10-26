@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Href, Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { PanResponder, type PanResponderGestureState, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import DocumentPillBar from '../ui/DocumentPillBar';
@@ -13,6 +13,7 @@ import DocumentStatusBar from '../ui/DocumentStatusBar';
 import InterpretationPicker from '../ui/InterpretationPicker';
 import { INTERPRETATION_CHOOSER_SECTION_ID, INTERPRETATION_CHOOSER_TITLE, withInterpretationChoices } from '../../../utils/kiahkInterpretations';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
+import { ReaderPanelSheet, useReaderPanelLayout } from '../ui/ReaderPanel';
 import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
 import LoadFailure from '../ui/LoadFailure';
 import LoadingScreen from '../ui/LoadingScreen';
@@ -52,8 +53,7 @@ import {
 } from '../../../utils/sectionRestore';
 import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
-import { isStylusGestureEvent } from '../../../utils/isStylusGestureEvent';
-import { swipeEdge, swipeStartX } from '../../../utils/edgeSwipe';
+import { useReaderSwipes } from '../../../hooks/useReaderSwipes';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
 import {
   getSermonPlannerReferences,
@@ -912,19 +912,19 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       return;
     }
 
-    if (action.type === 'openSelector') {
-      if (!isCoveredByModal) setSelectorOpen(true);
+    // The reader's swipes over the scrolling page, reported as they go (documentHtml.ts).
+    if (action.type === 'swipeDrag' && action.swipe) {
+      if (!isCoveredByModal) readerSwipes.drag(action.swipe, action.distance ?? 0);
+      return;
+    }
+    if (action.type === 'swipeEnd' && action.swipe) {
+      readerSwipes.release(action.swipe, isCoveredByModal ? 0 : action.distance ?? 0, action.velocity ?? 0);
       return;
     }
 
     if (action.type === 'openInterpretations') {
       setSelectorOpen(false);
       setInterpretationsOpen(true);
-      return;
-    }
-
-    if (action.type === 'swipeBack') {
-      if (!isCoveredByModal) leaveDocument();
       return;
     }
 
@@ -1033,55 +1033,50 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // either is open, a swipe on it neither opens the contents nor leaves.
   const isCoveredByModal = Boolean(subdocumentModal) || Boolean(antiphonaryModal) || selectorOpen || settingsOpen || calendarOpen || interpretationsOpen;
 
-  // Where the swipe this screen took began: decided while it is being taken,
-  // kept for its release (see swipeStartX).
-  const swipeTakenFromXRef = useRef(0);
-  // The Antiphonary's pill bar is a dead zone for the edge swipes: a swipe
-  // along it scrolls the pills (see DocumentModal.tsx).
+  // The Antiphonary's pill bar is a dead zone for the swipes: a swipe along
+  // it scrolls the pills (see DocumentModal.tsx).
   const touchOnPillBarRef = useRef(false);
-  const gesturePanResponder = useMemo(
-    () => {
-      // Only a swipe from the edge goes back or opens the contents
-      // (utils/edgeSwipe.ts); one across the page turns it, or does nothing.
-      const shouldHandleEdgeSwipe = (event: unknown, gestureState: PanResponderGestureState) => {
-        if (isCoveredByModal || isStylusGestureEvent(event) || pencilGestureActiveRef.current || touchOnPillBarRef.current) return false;
-        const startX = swipeStartX(gestureState);
-        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        const handles = swipeEdge(startX, screenWidth) !== null && isHorizontal && Math.abs(gestureState.dx) > 18;
-        if (handles) swipeTakenFromXRef.current = startX;
-        return handles;
-      };
-
-      return PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (event, gestureState) => shouldHandleEdgeSwipe(event, gestureState),
-        onMoveShouldSetPanResponder: (event, gestureState) => shouldHandleEdgeSwipe(event, gestureState),
-        onPanResponderRelease: (event, gestureState) => {
-          if (isCoveredByModal || isStylusGestureEvent(event) || pencilGestureActiveRef.current) return;
-          const takenFromX = swipeTakenFromXRef.current;
-          const travelled = gestureState.moveX - takenFromX;
-          const edge = swipeEdge(takenFromX, screenWidth);
-          if (edge === 'right' && travelled <= -36) {
-            setSelectorOpen(true);
-            return;
-          }
-          if (edge === 'left' && travelled > 60) {
-            leaveDocument();
-          }
-        },
-      });
+  // The reader's two swipes, from anywhere on the screen, following the
+  // finger (hooks/useReaderSwipes.ts). To the right it leaves: on iOS by the
+  // system's own back swipe, which shows the page beneath as it goes, and is
+  // on only while nothing covers the document -- over a subdocument it would
+  // take the document out from under it -- and never in the Sermon Planner,
+  // where a pencil's strokes across the page highlight. Elsewhere the page
+  // slides away with the finger, then goes without a second slide.
+  const nativeBackSwipe = Platform.OS === 'ios' && !isSermonPlanner;
+  const [leavingBySwipe, setLeavingBySwipe] = useState(false);
+  const [selectorOpenFrom, setSelectorOpenFrom] = useState(0);
+  const panelLayout = useReaderPanelLayout();
+  const readerSwipes = useReaderSwipes({
+    enabled: isMobileDocument && !isCoveredByModal,
+    exitsByDrag: !nativeBackSwipe,
+    contentsWidth: panelLayout.width,
+    onExit: () => setLeavingBySwipe(true),
+    onOpenContents: (from) => {
+      setSelectorOpenFrom(isSermonPlanner ? 0 : from);
+      setSelectorOpen(true);
     },
-    [screenWidth, isCoveredByModal, leaveDocument],
-  );
+    ignores: () => pencilGestureActiveRef.current || touchOnPillBarRef.current,
+  });
+  // A frame after the page has slid away, so the screen is told first to go
+  // without its own slide.
+  useEffect(() => {
+    if (!leavingBySwipe) return;
+    const frame = requestAnimationFrame(() => leaveDocument());
+    return () => cancelAnimationFrame(frame);
+  }, [leavingBySwipe, leaveDocument]);
 
   // The controls float over the text itself only where the document scrolls
   // straight up under them.
   const controlsOverText = !isMobileDocument && !preferences.slideshowMode && !showDateBar && !isAntiphonary;
 
   return (
+    // The whole page, as it slides away under a swipe to the right.
+    <Animated.View style={[styles.swipedPage, readerSwipes.pageStyle]}>
     <SafeAreaView
       edges={Platform.OS === 'web' ? ['left', 'right', 'bottom'] : undefined}
       style={[styles.safeArea, { backgroundColor: documentTheme.colors.page }]}
-      {...(isMobileDocument ? gesturePanResponder.panHandlers : {})}
+      {...(isMobileDocument ? readerSwipes.panHandlers : {})}
       // The capture phase every native view registers (BaseViewConfig);
       // React Native's types leave it out.
       {...({
@@ -1090,14 +1085,19 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         },
       } as object)}
     >
-      {/* The native stack's own default edge-swipe-to-go-back gesture isn't
-          scoped to whether a subdocument modal is currently covering this
-          screen — swiping the left edge would pop this whole document out
-          from underneath an open subdocument instead of just closing it.
-          This screen already implements its own equivalent gesture above
-          (gesturePanResponder), so the native one is both redundant and the
-          source of that bug — disabled here in favor of it. */}
-      <Stack.Screen options={{ gestureEnabled: false }} />
+      {/* iOS's own back swipe, from anywhere on the page (fullScreenGestureEnabled),
+          is the way out there (nativeBackSwipe, above). It isn't scoped to
+          what covers this screen, so it is off while anything does: over an
+          open subdocument it would pop this whole document out from under
+          it. Left by a swipe of its own, the page has already slid away, so
+          the screen goes without a slide of its own. */}
+      <Stack.Screen
+        options={{
+          gestureEnabled: nativeBackSwipe && !isCoveredByModal,
+          fullScreenGestureEnabled: true,
+          ...(leavingBySwipe ? { animation: 'none' as const } : null),
+        }}
+      />
       {/* The page runs up under the status bar; on a light one its clock and battery turn dark. */}
       <DocumentStatusBar theme={documentTheme} />
       <Head>
@@ -1177,6 +1177,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             initialColors={documentInitialColors(documentTheme, ornamentSeason)}
             topContentInset={controlsOverText ? floatingLayout.contentTop : 0}
             onHeadpieceInViewChange={setHeadpieceInView}
+            swipeExitsInPage={!nativeBackSwipe}
           />
           </View>
           {isSermonPlanner ? (
@@ -1210,6 +1211,11 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           ) : (
           <ContentSelectorDrawer
             visible={selectorOpen}
+            openFrom={selectorOpenFrom}
+            onShown={() => {
+              readerSwipes.contentsShown();
+              setSelectorOpenFrom(0);
+            }}
             sections={readySections}
             currentSectionId={currentSectionId}
             onClose={() => setSelectorOpen(false)}
@@ -1293,11 +1299,15 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       <CalendarSheet inline visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={() => navigateAway('/season-selector')} />
       <BookSettingsSheet inDocument visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <InterpretationPicker inline visible={interpretationsOpen} onClose={() => setInterpretationsOpen(false)} />
+      {/* The contents coming in under a finger, until the panel is up over them. */}
+      {readerSwipes.sheetShown && !isSermonPlanner ? <ReaderPanelSheet progress={readerSwipes.contentsIn} theme={documentTheme} /> : null}
     </SafeAreaView>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  swipedPage: { flex: 1, backgroundColor: COLORS.black },
   safeArea: { flex: 1, backgroundColor: COLORS.black },
   documentFrame: { flex: 1, position: 'relative' },
 });

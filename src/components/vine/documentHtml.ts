@@ -6,6 +6,7 @@ import type {
   SermonHighlightColor,
 } from '../../types/sermonPlanner';
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
+import { READER_SWIPE_SLOP } from '../../utils/readerSwipe';
 import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGap } from './documentPresentationMetrics';
@@ -154,6 +155,10 @@ export interface DocumentAction {
   height?: number;
   /** "headpieceInView" only: whether the headpiece the document opens with still shows below the floating controls. */
   inView?: boolean;
+  /** "swipeDrag" and "swipeEnd": which of the reader's swipes (utils/readerSwipe.ts), how far along its way, and as it ends, the finger's speed its way (px per ms). */
+  swipe?: 'exit' | 'contents';
+  distance?: number;
+  velocity?: number;
 }
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, french: false, coptic: true, arabic: true };
@@ -218,6 +223,7 @@ export function buildDocumentHtml(
     topContentInset = 0,
     sermonPlannerMode = false,
     nativeSwipeNavigation = false,
+    swipeExitsInPage = true,
     theme = NIGHT_DOCUMENT_THEME,
     ornamentColor = theme.colors.accent,
     initialColors = { vine: theme.colors.accent, letter: ornamentColor },
@@ -249,8 +255,10 @@ export function buildDocumentHtml(
     topContentInset?: number;
     /** Adds persistent range highlighting and Pencil-aware annotation controls. */
     sermonPlannerMode?: boolean;
-    /** Native touch edge navigation only; no swipe-to-exit on any website. */
+    /** The reader's swipes, reported to the app as they go: on a phone or tablet only, never on a website. */
     nativeSwipeNavigation?: boolean;
+    /** With them, whether a swipe to the right is the page's to report: not where the platform's own back swipe leaves (iOS's). */
+    swipeExitsInPage?: boolean;
     /** The page the document is read on — see constants/documentThemes.ts. Night, the page the services were always read on, unless told otherwise. */
     theme?: DocumentTheme;
     /** The colour the document's ornaments are drawn in (documentOrnamentColor): the season's on Night and Paper, the page's own ink on the others. */
@@ -1158,66 +1166,84 @@ export function buildDocumentHtml(
       })();
       (function () {
         if (!${JSON.stringify(nativeSwipeNavigation)}) return;
-        var startX = null, startY = null, fired = false, lastPostAt = 0;
-        // A swipe to the left from anywhere in the right half opens the contents (utils/edgeSwipe.ts).
-        function getSelectorEdge() {
-          return window.innerWidth / 2;
-        }
+        // The reader's two swipes, from anywhere on the page (utils/readerSwipe.ts):
+        // to the right it leaves, to the left the contents come in. The page
+        // keeps a swipe's touches to itself, so it reports the swipe as it
+        // goes -- 'swipeDrag' at most once a frame, 'swipeEnd' as the finger
+        // lifts -- and the app moves the page or the contents with it
+        // (hooks/useReaderSwipes.ts). Where the platform's own back swipe
+        // leaves instead (iOS's), a swipe to the right is left to it.
+        var exitsHere = ${JSON.stringify(swipeExitsInPage)};
+        var SLOP = ${READER_SWIPE_SLOP}, SIDEWAYS = 1.2;
+        var start = null, swipe = null, fromDx = 0, distance = 0, samples = [], frame = 0;
         function preventEvent(event) {
           if (event && event.cancelable && event.preventDefault) event.preventDefault();
         }
-        function postEdgeAction(type) {
-          var now = Date.now();
-          if (now - lastPostAt < 350) return;
-          lastPostAt = now;
-          postAction(type);
+        function penActive() { return window.__sermonPencilActive || window.__sermonPenPointerActive; }
+        function sendDrag() {
+          frame = 0;
+          if (swipe) postAction('swipeDrag', { swipe: swipe, distance: distance });
         }
-        function onStart(x, y) { startX = x; startY = y; fired = false; }
+        function finish(velocity) {
+          if (frame) { cancelAnimationFrame(frame); frame = 0; }
+          if (swipe) postAction('swipeEnd', { swipe: swipe, distance: distance, velocity: velocity });
+          start = null; swipe = null; samples = [];
+        }
+        // The finger's speed over its last tenth of a second, in px per ms, the swipe's way.
+        function velocityNow() {
+          if (samples.length < 2) return 0;
+          var first = samples[0], last = samples[samples.length - 1];
+          var ms = last.t - first.t;
+          if (ms <= 0) return 0;
+          var v = (last.x - first.x) / ms;
+          return swipe === 'exit' ? v : -v;
+        }
+        function onStart(x, y) {
+          start = { x: x, y: y }; swipe = null; fromDx = 0; distance = 0;
+          samples = [{ x: x, t: Date.now() }];
+        }
         function onMove(x, y, event) {
-          if (window.__sermonPencilActive || window.__sermonPenPointerActive) { onCancel(); return; }
-          if (startX === null || fired) return;
-          var dx = x - startX, dy = y - startY;
-          var absDx = Math.abs(dx), absDy = Math.abs(dy);
-          var selectorEdge = getSelectorEdge();
-          var startedInLeftEdge = startX < 56;
-          var startedInRightEdge = startX > window.innerWidth - selectorEdge;
-          if (absDx > 12 && absDx > absDy * 1.2) preventEvent(event);
-          if (absDy >= absDx * 0.6) return;
-          if (startedInLeftEdge && dx > 60) {
-            fired = true;
-            preventEvent(event);
-            postEdgeAction('swipeBack');
-            return;
+          if (!start) return;
+          if (penActive()) { finish(0); return; }
+          var dx = x - start.x, dy = y - start.y;
+          var now = Date.now();
+          samples.push({ x: x, t: now });
+          while (samples.length > 2 && now - samples[0].t > 100) samples.shift();
+          if (!swipe) {
+            if (Math.abs(dx) < SLOP || Math.abs(dx) < Math.abs(dy) * SIDEWAYS) {
+              // Plainly up or down the page: a scroll, never a swipe.
+              if (Math.abs(dy) >= SLOP) start = null;
+              return;
+            }
+            if (dx > 0 && !exitsHere) { start = null; return; }
+            swipe = dx > 0 ? 'exit' : 'contents';
+            fromDx = dx;
           }
-          if (startedInRightEdge && dx < -36) {
-            fired = true;
-            preventEvent(event);
-            postEdgeAction('openSelector');
-          }
-        }
-        function onEnd(x, y, event) {
-          onMove(x, y, event);
-          onCancel();
-        }
-        function onCancel() { startX = startY = null; }
-        function isEdgeStart(x) {
-          var selectorEdge = getSelectorEdge();
-          return x < 56 || x > window.innerWidth - selectorEdge;
+          preventEvent(event);
+          distance = swipe === 'exit' ? dx - fromDx : fromDx - dx;
+          if (!frame) frame = requestAnimationFrame(sendDrag);
         }
         document.addEventListener('pointerdown', function (e) {
-          if (e.pointerType === 'pen') { window.__sermonPenPointerActive = true; onCancel(); return; }
-          if (isEdgeStart(e.clientX)) onStart(e.clientX, e.clientY);
+          if (e.pointerType === 'pen') { window.__sermonPenPointerActive = true; if (start) finish(0); }
         });
-        document.addEventListener('pointermove', function (e) { if (e.pointerType !== 'pen' && !window.__sermonPencilActive) onMove(e.clientX, e.clientY, e); });
-        document.addEventListener('pointerup', function (e) {
-          if (e.pointerType === 'pen') { window.__sermonPenPointerActive = false; onCancel(); return; }
-          onEnd(e.clientX, e.clientY);
-        });
-        document.addEventListener('pointercancel', function () { window.__sermonPenPointerActive = false; onCancel(); });
-        document.addEventListener('touchstart', function (e) { var t = e.touches[0]; if (t && t.touchType !== 'stylus' && !window.__sermonPenPointerActive && !window.__sermonPencilActive && isEdgeStart(t.clientX)) onStart(t.clientX, t.clientY); }, { passive: true });
-        document.addEventListener('touchmove', function (e) { var t = e.touches[0]; if (t && t.touchType !== 'stylus' && !window.__sermonPenPointerActive && !window.__sermonPencilActive) onMove(t.clientX, t.clientY, e); }, { passive: false });
-        document.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; onEnd(t.clientX, t.clientY, e); }, { passive: false });
-        document.addEventListener('touchcancel', onCancel);
+        document.addEventListener('pointerup', function (e) { if (e.pointerType === 'pen') window.__sermonPenPointerActive = false; });
+        document.addEventListener('pointercancel', function () { window.__sermonPenPointerActive = false; });
+        document.addEventListener('touchstart', function (e) {
+          var t = e.touches[0];
+          if (e.touches.length > 1) { if (start) finish(0); return; }
+          if (t && t.touchType !== 'stylus' && !penActive()) onStart(t.clientX, t.clientY);
+        }, { passive: true });
+        document.addEventListener('touchmove', function (e) {
+          var t = e.touches[0];
+          if (t && t.touchType !== 'stylus') onMove(t.clientX, t.clientY, e);
+        }, { passive: false });
+        document.addEventListener('touchend', function (e) {
+          var t = e.changedTouches[0];
+          if (t && start) onMove(t.clientX, t.clientY, e);
+          if (swipe) { preventEvent(e); finish(velocityNow()); }
+          start = null;
+        }, { passive: false });
+        document.addEventListener('touchcancel', function () { if (swipe) finish(0); start = null; });
       })();
       ${sermonPlannerMode ? sermonPlannerScript() : ''}
     </script>

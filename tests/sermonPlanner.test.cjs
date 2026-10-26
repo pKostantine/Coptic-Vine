@@ -321,8 +321,8 @@ test('Web documents and Bible never attach app swipe-exit gestures', () => {
   const bibleHtml = fs.readFileSync('src/components/vine/bibleDocumentHtml.ts', 'utf8');
   assert.match(html, /if \(!\$\{JSON\.stringify\(nativeSwipeNavigation\)\}\) return;/);
   assert.match(nativeView, /nativeSwipeNavigation: true/);
-  assert.match(service, /isMobileDocument \? gesturePanResponder\.panHandlers/);
-  assert.match(modal, /isMobileDocument \? swipeGesturePanResponder\.panHandlers/);
+  assert.match(service, /isMobileDocument \? readerSwipes\.panHandlers/);
+  assert.match(modal, /isMobileDocument \? readerSwipes\.panHandlers/);
   assert.doesNotMatch(modal, /pointerup', onUp/);
   assert.match(bible, /Platform\.OS !== 'web' \? gesturePanResponder\.panHandlers/);
   assert.match(bibleHtml, /nativeSwipeNavigation/);

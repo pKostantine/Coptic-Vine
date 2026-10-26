@@ -301,10 +301,11 @@ test('a subdocument (and its Settings/Calendar) can be swiped out from a landsca
   const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
   assert.match(modal, /function useInsetEdgeSwipe\(/);
   assert.match(modal, /onTouchStart: \(event: GestureResponderEvent\) => \{[\s\S]*?if \(!startsInInset\(pageX\)\) return;/);
-  assert.match(modal, /if \(start\.edge === 'left' && dx > 60\) onSwipeFromLeft\(\);/);
+  // Either way from either side, as from anywhere on the page: to the right it closes, to the left the contents open.
+  assert.match(modal, /if \(dx > 60\) onSwipeRight\(\);\n\s+else if \(dx < -36\) onSwipeLeft\?\.\(\);/);
   assert.match(modal, /isMobileDocument \? insetEdgeSwipe\.handlers/);
   assert.match(modal, /isMobileDocument \? overlayInsetEdgeSwipe\.handlers/);
-  assert.match(modal, /isStylusGestureEvent\(_\) \|\| startsInInset\(startX\) \|\| touchOnPillBarRef\.current\) return false;/);
+  assert.match(modal, /ignores: \(startX\) => touchOnPillBarRef\.current \|\| startsInInset\(startX\),/);
   // The pill bar is a dead zone for every edge swipe: the mark is cleared as each touch goes down, set by the bar.
   assert.match(modal, /onTouchStartCapture: \(\) => \{\s*touchOnPillBarRef\.current = false;/);
   assert.equal((modal.match(/\bonTouchStart=\{\(\) => \{\s*touchOnPillBarRef\.current = true;/g) || []).length, 2);
@@ -313,7 +314,7 @@ test('a subdocument (and its Settings/Calendar) can be swiped out from a landsca
   assert.match(modal, /useInsetEdgeSwipe\(!isCovered, onClose, \(\) => setSelectorOpen\(true\), \(\) => touchOnPillBarRef\.current\)/);
 });
 
-test('a swipe goes back only from the very edge and opens the contents from the right half, measured from where it began', () => {
+test("the Bible reader's swipe goes back only from the very edge and opens the verses from the right half, measured from where it began", () => {
   // gestureState.x0 is 0 until a responder is granted, and granting resets
   // dx; reading either made every swipe look like it began at the left edge.
   // A swipe to the right across a page must turn it back, never close the
@@ -336,15 +337,17 @@ test('a swipe goes back only from the very edge and opens the contents from the 
   for (const start of [40, 56, 120, 215]) assert.equal(swipeEdge(start, 430), null, `a swipe from ${start} is on the page`);
   assert.equal(swipeEdge(500, 1024), null);
 
-  for (const file of ['src/components/vine/screens/DocumentModal.tsx', 'src/components/vine/screens/ServiceDocument.tsx', 'src/app/bible/[bookKey]/[chapter].tsx']) {
-    const screen = fs.readFileSync(file, 'utf8');
-    assert.match(screen, /import \{ swipeEdge, swipeStartX \} from/, file);
-    assert.doesNotMatch(screen, /gestureState\.x0\s*[<>]|selectorEdgeWidth|< 56/, file);
-    assert.match(screen, /swipeTakenFromXRef\.current = startX;/, file);
-  }
+  const bible = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
+  assert.match(bible, /import \{ swipeEdge, swipeStartX \} from/);
+  assert.doesNotMatch(bible, /gestureState\.x0\s*[<>]|selectorEdgeWidth|< 56/);
+  assert.match(bible, /swipeTakenFromXRef\.current = startX;/);
+  // A subdocument's Seasons screen still closes from the edge.
   const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
-  assert.match(modal, /if \(edge === 'right' && travelled < -36\) \{\s*setSelectorOpen\(true\);/);
   assert.match(modal, /if \(isCloseSwipe\) overlaySwipeTakenFromXRef\.current = startX;/);
+  // The documents and subdocuments take their swipes from anywhere (readerSwipes.test.cjs).
+  for (const file of ['src/components/vine/screens/DocumentModal.tsx', 'src/components/vine/screens/ServiceDocument.tsx']) {
+    assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /swipeEdge\(startX, screenWidth\) !== null|const swipeGesturePanResponder|const gesturePanResponder/, file);
+  }
 });
 
 test('a document left opens again at the top; its place is kept only while it is open', () => {
