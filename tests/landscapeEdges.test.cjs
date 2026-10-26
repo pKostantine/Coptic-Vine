@@ -142,8 +142,15 @@ test('every full-screen modal draws to the edges on Android as on iOS, and pads 
 });
 
 test('headers and buttons keep below the status bar; tiles share the width inside the notch', () => {
-  const pages = ['learn/album/[id]', 'learn/cantors', 'learn/hymn/[id]', 'learn/lesson/[id]', 'learn/lesson-set/[id]', 'learn/playlist/[id]', 'learn/season/[id]', 'learn/seasons', 'music/playlist/[id]', 'music/release/[id]'];
+  const pages = ['learn/album/[id]', 'learn/hymn/[id]', 'learn/lesson/[id]', 'learn/lesson-set/[id]', 'learn/playlist/[id]', 'learn/season/[id]', 'music/playlist/[id]', 'music/release/[id]'];
   for (const page of pages) assert.match(read(`src/app/${page}.tsx`), /<SafeAreaView edges=\{\['top', 'left', 'right'\]\} style=\{styles\.safeArea\}>/, page);
+  // The design's sub-pages run their glow and tab bar to the edges; their round Back keeps below the status bar.
+  for (const page of ['learn/cantors', 'learn/seasons', 'bookmarks', 'synaxarium/index', 'canon/index']) {
+    const source = read(`src/app/${page}.tsx`);
+    assert.match(source, /<BleedPage background=\{<PageGlow kind="green"[^>]*\/>\} footer=\{<BottomTabBar active="\w+" \/>\}>/, page);
+    assert.match(source, /<SubPageHeader\b/, page);
+  }
+  assert.match(read('src/components/vine/ui/SubPageHeader.tsx'), /\{ paddingTop: insets\.top \+ 6 \}/);
   for (const page of ['music/artist/[id]', 'learn/cantor/[id]']) {
     assert.match(read(`src/app/${page}.tsx`), /styles\.pending, \{ paddingTop: 12 \+ insets\.top,/, page);
   }

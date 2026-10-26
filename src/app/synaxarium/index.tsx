@@ -1,4 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,20 +12,38 @@ import {
   Text,
   TextInput,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type StyleProp,
+  type TextStyle,
 } from 'react-native';
 
-import AppHeader from '@/components/vine/ui/AppHeader';
+import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
+import { PageGlow } from '@/components/vine/screens/BookPage';
+import BleedPage from '@/components/vine/ui/BleedPage';
+import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
 import LoadFailure from '@/components/vine/ui/LoadFailure';
-import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import BleedPage from '@/components/vine/ui/BleedPage';
-import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import SubPageHeader from '@/components/vine/ui/SubPageHeader';
+import { DAY_BLOCK_THEMES, getDayTheme, type DayBlockTheme } from '@/constants/seasonAppearance';
+import { COLORS, TYPOGRAPHY } from '@/constants/theme';
+import { useCalendar } from '@/context/CalendarContext';
 import { useLiturgicalClock } from '@/context/LiturgicalClockContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type SynaxariumYearRow } from '@/services/homeService';
+import { getDayOverview } from '@/utils/calendarService';
+import { formatCopticDayMonth, formatCopticMonthName, formatCopticYear, formatMonthDaySpan, toEasternArabicDigits } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
+import { splitSaintTitle } from '@/utils/saintTitles';
+import { useLayoutMode } from '@/utils/useLayoutMode';
 
-import { appLocale, tr } from '../../utils/appText';
+import { tr } from '../../utils/appText';
+
+const MAX_FONT_SCALE = 1.3;
+
+/** Where a saint's story is read: the Synaxarium in the Liturgy of the Word, for the saint's day. */
+const SYNAXARIUM_READING = '/liturgy/divine-liturgy/liturgy_of_the_word?sub=SYNAXARIUM';
+
 interface SynaxariumEntry {
   entryKey: string;
   entryOrder: number;
@@ -76,7 +95,7 @@ function groupRows(rows: SynaxariumYearRow[]): SynaxariumDay[] {
 function normalizeSearch(value: string): string {
   return value
     .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[.’'"]/g, '')
     .replace(/\bst\b/g, 'saint')
@@ -85,28 +104,55 @@ function normalizeSearch(value: string): string {
     .trim();
 }
 
-function formatGregorianDate(iso: string, locale: 'en' | 'ar'): string {
-  const [year, month, day] = iso.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(
-    locale === 'ar' ? 'ar-EG' : appLocale() === 'fr' ? 'fr-FR' : 'en-CA',
-    {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC',
-    },
+function addDaysIso(isoDate: string, days: number): Date {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date;
+}
+
+/** "October 25–26": a liturgical day runs from the evening before. */
+function daySpan(isoDate: string, arabic: boolean): string {
+  return formatMonthDaySpan(addDaysIso(isoDate, -1), addDaysIso(isoDate, 0), arabic);
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Text with the words searched for in gold (Coptic Vine design, "Synaxarium search"). */
+function Marked({ text, words, style }: { text: string; words: string[]; style: StyleProp<TextStyle> }) {
+  if (!words.length) return <Text style={style} maxFontSizeMultiplier={MAX_FONT_SCALE}>{text}</Text>;
+  const parts = text.split(new RegExp(`(${words.map(escapeRegExp).join('|')})`, 'gi'));
+  return (
+    <Text style={style} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+      {parts.map((part, index) => (index % 2 ? <Text key={index} style={styles.mark}>{part}</Text> : part))}
+    </Text>
   );
 }
 
+/**
+ * The Synaxarium (Coptic Vine design, "Synaxarium" and "Synaxarium search"),
+ * from Home's Commemorated Saints: the whole Coptic year, a card for each
+ * day under its Coptic date, today's in the season's colours, and the month
+ * being read above the list with a way to jump to another. A search lists
+ * the saints it finds across the year in calendar order, each beside its
+ * date, the words found in gold. A saint opens the day's Synaxarium as the
+ * Liturgy of the Word reads it.
+ */
 export default function SynaxariumBrowserScreen() {
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
   const didAutoScroll = useRef(false);
+  // Each day card's top in the list, and the first day of each month, for the month heading and its jumps.
+  const dayTops = useRef(new Map<string, number>());
   const { preferences } = useReadingPreferences();
+  const { effectiveDate, isLive, selectDate } = useCalendar();
   const locale: 'en' | 'ar' = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
+  // Only an English title is split into the saint and who they were.
+  const splitTitles = preferences.appLanguage === 'en';
+  const wide = useLayoutMode() !== 'phone';
 
   // This page is intentionally independent from the Books calendar picker.
   // Its today is the liturgical day, which begins the evening before
@@ -123,6 +169,11 @@ export default function SynaxariumBrowserScreen() {
   // Bumped by Retry on a failed load: a new value re-runs the load below.
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState('');
+  const [focused, setFocused] = useState(false);
+  // Today's card wears the season's colours, as the Books day block does.
+  const [todayTheme, setTodayTheme] = useState<DayBlockTheme>(DAY_BLOCK_THEMES.annual);
+  const [shownMonth, setShownMonth] = useState<number | null>(null);
+  const [choosingMonth, setChoosingMonth] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -145,24 +196,31 @@ export default function SynaxariumBrowserScreen() {
     return () => { active = false; };
   }, [yearIso, attempt]);
 
+  useEffect(() => {
+    let active = true;
+    getDayOverview(liveIso).then((overview) => {
+      if (active) setTodayTheme(getDayTheme(overview?.indicatorKey, overview?.activeKeys));
+    });
+    return () => { active = false; };
+  }, [liveIso]);
+
   const days = useMemo(() => groupRows(rows), [rows]);
   const normalizedQuery = useMemo(() => normalizeSearch(query), [query]);
+  // The words searched for as typed, to mark where they fall in a title.
+  const markedWords = useMemo(() => query.trim().split(/\s+/).filter((word) => word.length >= 2), [query]);
 
-  const visibleDays = useMemo(() => {
-    if (!normalizedQuery) return days;
-
-    return days
-      .map((day) => ({
-        ...day,
-        entries: day.entries.filter((entry) => {
-          const searchable = normalizeSearch(
-            [entry.titleEnglish, entry.titleArabic].filter(Boolean).join(' '),
-          );
-          return searchable.includes(normalizedQuery);
-        }),
-      }))
-      .filter((day) => day.entries.length > 0);
+  const results = useMemo(() => {
+    if (!normalizedQuery) return [];
+    return days.flatMap((day) => day.entries
+      .filter((entry) => normalizeSearch([entry.titleEnglish, entry.titleArabic].filter(Boolean).join(' ')).includes(normalizedQuery))
+      .map((entry) => ({ day, entry })));
   }, [days, normalizedQuery]);
+
+  const months = useMemo(() => {
+    const seen = new Map<number, SynaxariumDay>();
+    for (const day of days) if (!seen.has(day.copticMonth)) seen.set(day.copticMonth, day);
+    return [...seen.values()];
+  }, [days]);
 
   useEffect(() => {
     if (normalizedQuery) {
@@ -170,64 +228,133 @@ export default function SynaxariumBrowserScreen() {
     }
   }, [normalizedQuery]);
 
-  const yearNumber = days[0]?.copticYear;
+  const monthDay = months.find((day) => day.copticMonth === (shownMonth ?? days.find((candidate) => candidate.gregorianDate === focusIso)?.copticMonth)) ?? months[0];
+
+  /** The month heading follows the card at the top of the list. */
+  const followMonth = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const top = event.nativeEvent.contentOffset.y + 24;
+    let current: SynaxariumDay | undefined;
+    for (const day of days) {
+      const y = dayTops.current.get(day.gregorianDate);
+      if (y === undefined || y > top) break;
+      current = day;
+    }
+    if (current && current.copticMonth !== shownMonth) setShownMonth(current.copticMonth);
+  };
+
+  const jumpToMonth = (month: SynaxariumDay) => {
+    setChoosingMonth(false);
+    setShownMonth(month.copticMonth);
+    const y = dayTops.current.get(month.gregorianDate);
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+  };
+
+  // A saint's story, read for its own day: the Books move to it, as choosing a season does.
+  const openReading = (isoDate: string) => {
+    if (!(isLive && effectiveDate.toISOString().slice(0, 10) === isoDate)) selectDate(new Date(`${isoDate}T00:00:00Z`));
+    router.push(SYNAXARIUM_READING as never);
+  };
+
+  const entryTitle = (entry: SynaxariumEntry) => {
+    const title = isArabic ? entry.titleArabic || entry.titleEnglish || '' : entry.titleEnglish || entry.titleArabic || '';
+    return splitTitles ? splitSaintTitle(title) : { main: title, detail: null };
+  };
+
+  const copticMonth = (monthName: string) => formatCopticMonthName(monthName, isArabic);
+  const searching = Boolean(normalizedQuery);
 
   return (
-    <BleedPage header={(
-      <AppHeader
-        title={{ english: 'Synaxarium', arabic: 'السنكسار', french: 'Synaxaire' }}
-        canGoBack
-        onBack={() => goBack(router, '/')}
-        visibleLanguages={{ english: !isArabic, arabic: isArabic }}
-      />
-    )}>
+    <BleedPage background={<PageGlow kind="green" tall={wide} />} footer={<BottomTabBar active="home" />}>
       <Head><title>Synaxarium — Coptic Vine</title></Head>
+      <SubPageHeader
+        title={tr('Synaxarium', 'Synaxaire', 'السنكسار')}
+        arabic={isArabic}
+        onBack={() => goBack(router, '/')}
+        backLabel={tr('Back', 'Retour', 'رجوع')}
+      />
 
-
-      <View style={styles.searchArea}>
-        <View style={styles.searchBox}>
-          <Icon name="search-outline" size={19} color={COLORS.muted} />
+      <View style={styles.column}>
+        <View style={[styles.searchBox, (focused || query) && styles.searchBoxActive]}>
+          <Icon name="search" size={18} color={COLORS.muted} />
           <TextInput
             ref={inputRef}
             accessibilityLabel={tr('Search Synaxarium', 'Rechercher dans le Synaxaire', 'بحث في السنكسار')}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={(text) => {
+              setQuery(text);
+              // A search takes the place of the month list.
+              if (text) setChoosingMonth(false);
+            }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder={tr('Search saints and events', 'Rechercher des saints et des événements', 'ابحث عن قديس أو حدث')}
-            placeholderTextColor="rgba(201,211,220,0.55)"
+            placeholderTextColor="rgba(205, 216, 203, 0.6)"
             autoCapitalize="none"
             autoCorrect={false}
-            clearButtonMode={Platform.OS === 'ios' ? 'while-editing' : 'never'}
             selectionColor={COLORS.gold}
-            style={[
-              styles.searchInput,
-              Platform.OS === 'web' && styles.searchInputWeb,
-              isArabic && styles.arabic,
-            ]}
+            style={[styles.searchInput, Platform.OS === 'web' && styles.searchInputWeb, isArabic && styles.arabic]}
           />
-          {query && Platform.OS !== 'ios' ? (
+          {query ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={tr('Clear search', 'Effacer la recherche', 'مسح البحث')}
+              hitSlop={8}
               onPress={() => {
                 setQuery('');
                 inputRef.current?.focus();
               }}
-              style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+              style={({ pressed }) => pressed && styles.pressed}
             >
-              <Icon name="close" size={14} color={COLORS.muted} />
+              <Icon name="close-circle" size={18} color={COLORS.muted} />
             </Pressable>
           ) : null}
         </View>
 
-        <Text style={[styles.searchHint, isArabic && styles.arabic]}>
-          {normalizedQuery
-            ? tr(
-                `${visibleDays.length} matching day${visibleDays.length === 1 ? '' : 's'}`,
-                `${visibleDays.length} jour${visibleDays.length === 1 ? '' : 's'} correspondant${visibleDays.length === 1 ? '' : 's'}`,
-                `${visibleDays.length} يوم مطابق`,
-              )
-            : tr(`Coptic Year ${yearNumber ?? ''}`, `Année copte ${yearNumber ?? ''}`, `السنة القبطية ${yearNumber ?? ''}`)}
-        </Text>
+        {searching ? (
+          <Text style={[styles.resultCount, isArabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {isArabic
+              ? `${toEasternArabicDigits(results.length)} نتيجة`
+              : tr(`${results.length} result${results.length === 1 ? '' : 's'}`, `${results.length} résultat${results.length === 1 ? '' : 's'}`, '')}
+          </Text>
+        ) : monthDay ? (
+          <View style={styles.monthRow}>
+            <Text style={[styles.monthName, isArabic && styles.arabic]} accessibilityRole="header" maxFontSizeMultiplier={MAX_FONT_SCALE}>
+              {copticMonth(monthDay.copticMonthName)}
+              <Text style={styles.monthYear}>{'  '}{formatCopticYear(monthDay.copticYear, isArabic)}</Text>
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={tr('Go to a month', 'Aller à un mois', 'انتقل إلى شهر')}
+              accessibilityState={{ expanded: choosingMonth }}
+              hitSlop={6}
+              onPress={() => setChoosingMonth((open) => !open)}
+              style={({ pressed }) => [styles.roundButton, choosingMonth && styles.roundButtonOn, pressed && styles.pressed]}
+            >
+              <Icon name="calendar-outline" size={19} color={COLORS.gold} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {choosingMonth && !searching ? (
+          <View style={styles.months}>
+            {months.map((month) => {
+              const current = month.copticMonth === monthDay?.copticMonth;
+              return (
+                <Pressable
+                  key={month.copticMonth}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: current }}
+                  onPress={() => jumpToMonth(month)}
+                  style={({ pressed }) => [styles.monthChip, current && styles.monthChipOn, pressed && styles.pressed]}
+                >
+                  <Text style={[styles.monthChipText, current && styles.monthChipTextOn, isArabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                    {copticMonth(month.copticMonthName)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
 
       {loading ? (
@@ -239,73 +366,126 @@ export default function SynaxariumBrowserScreen() {
         </View>
       ) : error ? (
         <LoadFailure error={error} onRetry={() => setAttempt((count) => count + 1)} />
-      ) : visibleDays.length === 0 ? (
+      ) : searching && results.length === 0 ? (
         <View style={styles.centerState}>
           <Icon name="search-outline" size={30} color={COLORS.goldBright} />
-          <Text style={[styles.errorTitle, isArabic && styles.arabicCentered]}>
+          <Text style={[styles.stateTitle, isArabic && styles.arabicCentered]}>
             {tr('No results', 'Aucun résultat', 'لا توجد نتائج')}
           </Text>
           <Text style={[styles.stateText, isArabic && styles.arabicCentered]}>
             {tr('Try another name or spelling.', 'Essayez un autre nom ou une autre orthographe.', 'جرّب اسماً آخر أو صيغة مختلفة.')}
           </Text>
         </View>
+      ) : searching ? (
+        // Keyed apart from the days' list: in the same place, the results would otherwise open at its scroll.
+        <NowPlayingAwareScrollView key="results" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <View style={[styles.list, styles.resultList]}>
+            {results.map(({ day, entry }) => {
+              const isToday = day.gregorianDate === liveIso;
+              const { main, detail } = entryTitle(entry);
+              const date = formatCopticDayMonth(day.copticMonthName, day.copticDay, isArabic);
+              return (
+                <Pressable
+                  key={entry.entryKey}
+                  accessibilityRole="button"
+                  accessibilityLabel={[date, main, detail].filter(Boolean).join(', ')}
+                  onPress={() => openReading(day.gregorianDate)}
+                  style={({ pressed }) => [styles.result, pressed && styles.pressed]}
+                >
+                  <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+                  <View style={[styles.dateChip, isToday && styles.dateChipToday]}>
+                    <Text style={[styles.dateChipMonth, day.copticMonthName.length > 7 && styles.dateChipMonthLong, isToday && styles.dateChipTextToday, isArabic && styles.arabicTight]} numberOfLines={1} maxFontSizeMultiplier={1.15}>
+                      {isArabic ? copticMonth(day.copticMonthName) : day.copticMonthName.toUpperCase()}
+                    </Text>
+                    <Text style={[styles.dateChipDay, isToday && styles.dateChipTextToday]} maxFontSizeMultiplier={1.15}>
+                      {isArabic ? toEasternArabicDigits(day.copticDay) : day.copticDay}
+                    </Text>
+                  </View>
+                  <View style={styles.entryText}>
+                    <Marked text={main} words={markedWords} style={[styles.resultTitle, isArabic && styles.arabic]} />
+                    {detail ? <Marked text={detail} words={markedWords} style={[styles.entryDetail, isArabic && styles.arabic]} /> : null}
+                  </View>
+                  <View>
+                    <Icon name="chevron-forward" size={18} color={COLORS.gold} />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </NowPlayingAwareScrollView>
       ) : (
         <NowPlayingAwareScrollView
+          key="days"
           ref={scrollRef}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, styles.list]}
+          onScroll={followMonth}
+          scrollEventThrottle={32}
         >
-          {visibleDays.map((day) => {
+          {days.map((day) => {
             const isToday = day.gregorianDate === liveIso;
+            const ink = isToday ? todayTheme : null;
             return (
               <View
                 key={day.gregorianDate}
                 onLayout={(event) => {
-                  if (day.gregorianDate !== focusIso || normalizedQuery || didAutoScroll.current) return;
-                  didAutoScroll.current = true;
                   const y = event.nativeEvent.layout.y;
+                  dayTops.current.set(day.gregorianDate, y);
+                  if (day.gregorianDate !== focusIso || didAutoScroll.current) return;
+                  didAutoScroll.current = true;
                   setTimeout(() => {
-                    scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: false });
+                    scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: false });
                   }, 0);
                 }}
                 style={[styles.dayCard, isToday && styles.dayCardToday]}
               >
+                {ink ? (
+                  <LinearGradient colors={[ink.from, ink.to]} locations={[0, ink.toAt]} start={{ x: 0.33, y: 0 }} end={{ x: 0.67, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
+                ) : (
+                  <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+                )}
                 <View style={styles.dayHeader}>
                   <View style={styles.dayHeaderText}>
-                    <View style={styles.dayTitleRow}>
-                      <Text style={[styles.dayTitle, isArabic && styles.arabic]}>
-                        {formatGregorianDate(day.gregorianDate, locale)}
-                      </Text>
-                      {isToday && !normalizedQuery ? (
-                        <View style={styles.todayBadge}>
-                          <Text style={[styles.todayBadgeText, isArabic && styles.arabic]}>
-                            {tr('Today', 'Aujourd’hui', 'اليوم')}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text style={[styles.copticDate, isArabic && styles.arabic]}>
-                      {day.copticMonthName} {day.copticDay}
+                    <Text style={[styles.dayTitle, ink && { color: ink.text }, isArabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                      {formatCopticDayMonth(day.copticMonthName, day.copticDay, isArabic)}
+                    </Text>
+                    <Text style={[styles.daySpan, ink && { color: ink.muted }, isArabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                      {daySpan(day.gregorianDate, isArabic)}
                     </Text>
                   </View>
+                  {isToday ? (
+                    <View style={styles.todayChip}>
+                      <Text style={[styles.todayChipText, isArabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                        {isArabic ? 'اليوم' : tr('Today', 'Aujourd’hui', '').toUpperCase()}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {day.entries.length ? (
                   <View style={styles.entries}>
-                    {day.entries.map((entry) => (
-                      <View key={entry.entryKey} style={styles.entryRow}>
-                        <View style={styles.entryDot} />
-                        <Text style={[styles.entryText, isArabic && styles.arabic]}>
-                          {isArabic
-                            ? entry.titleArabic || entry.titleEnglish
-                            : entry.titleEnglish || entry.titleArabic}
-                        </Text>
-                      </View>
-                    ))}
+                    {day.entries.map((entry) => {
+                      const { main, detail } = entryTitle(entry);
+                      return (
+                        <Pressable
+                          key={entry.entryKey}
+                          accessibilityRole="button"
+                          accessibilityLabel={detail ? `${main}, ${detail}` : main}
+                          onPress={() => openReading(day.gregorianDate)}
+                          style={({ pressed }) => [styles.entry, ink?.key === 'resurrection' && styles.entryOnLight, pressed && styles.pressed]}
+                        >
+                          <View style={styles.entryText}>
+                            <Text style={[styles.entryTitle, ink && { color: ink.text }, isArabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{main}</Text>
+                            {detail ? <Text style={[styles.entryDetail, ink && { color: ink.muted }, isArabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text> : null}
+                          </View>
+                          <Icon name="chevron-forward" size={18} color={COLORS.gold} />
+                        </Pressable>
+                      );
+                    })}
                   </View>
                 ) : (
-                  <Text style={[styles.noEntries, isArabic && styles.arabic]}>
+                  <Text style={[styles.noEntries, ink && { color: ink.muted }, isArabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
                     {tr('No events listed.', 'Aucun événement.', 'لا توجد أحداث مدرجة.')}
                   </Text>
                 )}
@@ -319,151 +499,96 @@ export default function SynaxariumBrowserScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.black },
-  searchArea: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: 10,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.black,
-  },
+  column: { alignSelf: 'center', maxWidth: 672, paddingHorizontal: 16, width: '100%' },
   searchBox: {
-    height: 44,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderColor: 'transparent',
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.goldLine,
-    backgroundColor: 'rgba(255,255,255,0.075)',
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: 10,
+    height: 46,
+    paddingHorizontal: 13,
   },
+  searchBoxActive: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: COLORS.gold },
   searchInput: {
-    flex: 1,
-    minWidth: 0,
-    height: 42,
-    paddingVertical: 0,
-    borderWidth: 0,
     backgroundColor: 'transparent',
+    borderWidth: 0,
     color: COLORS.white,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 16,
-  },
-  searchInputWeb: {
-    outlineStyle: 'none',
-    outlineWidth: 0,
-    boxShadow: 'none',
-  } as any,
-  clearButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.09)',
-  },
-  searchHint: {
-    color: COLORS.muted,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 11,
-    marginTop: 7,
-    marginHorizontal: 2,
-  },
-  content: {
-    width: '100%',
-    maxWidth: 880,
-    alignSelf: 'center',
-    padding: SPACING.md,
-    paddingBottom: SPACING.xl * 2,
-    gap: 12,
-  },
-  dayCard: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADII.lg,
-    backgroundColor: COLORS.greenDeep,
-    padding: SPACING.lg,
-  },
-  dayCardToday: {
-    borderColor: COLORS.goldLine,
-    backgroundColor: '#08213B',
-  },
-  dayHeader: { flexDirection: 'row', alignItems: 'center' },
-  dayHeaderText: { flex: 1, minWidth: 0 },
-  dayTitleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  dayTitle: {
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  copticDate: {
-    color: COLORS.goldBright,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 3,
-  },
-  todayBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: RADII.pill,
-    borderWidth: 1,
-    borderColor: COLORS.goldLine,
-    backgroundColor: COLORS.goldSoft,
-  },
-  todayBadgeText: {
-    color: COLORS.goldBright,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  entries: { gap: 10, marginTop: SPACING.md },
-  entryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  entryDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: COLORS.gold,
-    marginTop: 8,
-  },
-  entryText: {
     flex: 1,
-    color: COLORS.white,
     fontFamily: TYPOGRAPHY.body,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15.5,
+    height: 42,
+    minWidth: 0,
+    paddingVertical: 0,
   },
-  noEntries: {
-    color: COLORS.muted,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 13,
-    marginTop: SPACING.md,
-  },
-  centerState: {
-    flex: 1,
+  searchInputWeb: { boxShadow: 'none', outlineStyle: 'none', outlineWidth: 0 } as object,
+  resultCount: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, paddingBottom: 10, paddingTop: 14 },
+  monthRow: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingBottom: 10, paddingTop: 16 },
+  monthName: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.title, fontSize: 20, fontWeight: '700' },
+  monthYear: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '400' },
+  roundButton: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  roundButtonOn: { backgroundColor: COLORS.goldSoft },
+  months: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 12 },
+  monthChip: { backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 7 },
+  monthChipOn: { backgroundColor: COLORS.gold },
+  monthChipText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '600' },
+  monthChipTextOn: { color: COLORS.greenDeep },
+  content: { alignSelf: 'center', maxWidth: 672, paddingBottom: 32, paddingHorizontal: 16, width: '100%' },
+  list: { gap: 10 },
+  resultList: { paddingTop: 0 },
+  dayCard: { borderRadius: 22, overflow: 'hidden', padding: 16 },
+  dayCardToday: { boxShadow: '0px 10px 22px rgba(0, 0, 0, 0.3)' },
+  dayHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 10 },
+  dayHeaderText: { flex: 1, gap: 4, minWidth: 0 },
+  dayTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 24, fontWeight: '700', lineHeight: 26.4 },
+  daySpan: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5 },
+  todayChip: { alignItems: 'center', backgroundColor: COLORS.gold, borderRadius: 99, height: 24, justifyContent: 'center', paddingHorizontal: 10 },
+  todayChipText: { color: COLORS.greenDeep, fontFamily: TYPOGRAPHY.body, fontSize: 11, fontWeight: '800', letterSpacing: 0.88 },
+  entries: { gap: 6, marginTop: 12 },
+  entry: {
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.xl,
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 11,
+    paddingLeft: 14,
+    paddingRight: 12,
+    paddingTop: 11,
   },
-  errorTitle: {
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.title,
-    fontSize: 20,
-    fontWeight: '800',
-    marginTop: 10,
-    textAlign: 'center',
+  // The Holy Fifty Days' white block: its saints on a pale card.
+  entryOnLight: { backgroundColor: 'rgba(255, 255, 255, 0.55)' },
+  entryText: { flex: 1, gap: 2, minWidth: 0 },
+  entryTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '500', lineHeight: 20.9 },
+  entryDetail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13 },
+  noEntries: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 12 },
+  result: {
+    alignItems: 'center',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 14,
+    overflow: 'hidden',
+    paddingBottom: 12,
+    paddingLeft: 12,
+    paddingRight: 14,
+    paddingTop: 12,
   },
-  stateText: {
-    color: COLORS.muted,
-    fontFamily: TYPOGRAPHY.body,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  pressed: { opacity: 0.68, transform: [{ scale: 0.96 }] },
+  resultTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 15.5, fontWeight: '600', lineHeight: 20.9 },
+  mark: { color: COLORS.gold },
+  // A little wider than the design's 56 so Paremhotep's name fits.
+  dateChip: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.32)', borderRadius: 14, gap: 4, height: 60, justifyContent: 'center', width: 64 },
+  dateChipToday: { backgroundColor: COLORS.gold },
+  dateChipMonth: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
+  dateChipMonthLong: { fontSize: 8, letterSpacing: 0.2 },
+  dateChipDay: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 23, fontWeight: '700', lineHeight: 23 },
+  dateChipTextToday: { color: COLORS.greenDeep },
+  centerState: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 32 },
+  stateTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 20, fontWeight: '800', marginTop: 10, textAlign: 'center' },
+  stateText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, lineHeight: 20, marginTop: 8, textAlign: 'center' },
+  pressed: { opacity: 0.68 },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
+  arabicTight: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
 });

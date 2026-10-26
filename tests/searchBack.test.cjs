@@ -34,11 +34,14 @@ test('every search route is one of the pages checked here', () => {
 });
 
 test('the Bible search and the Synaxarium search head their pages with a Back', () => {
-  for (const [file, fallback] of [['src/app/bible/search.tsx', '/bible'], ['src/app/synaxarium/index.tsx', '/']]) {
-    const source = read(file);
-    assert.match(source, /<AppHeader[\s\S]*?\bcanGoBack\b/, file);
-    assert.match(source, new RegExp(`onBack=\\{\\(\\) => goBack\\(router, '${fallback.replace('/', '\\/')}'\\)\\}`), file);
-  }
+  const backTo = (fallback) => new RegExp(`onBack=\\{\\(\\) => goBack\\(router, '${fallback.replace('/', '\\/')}'\\)\\}`);
+  const bible = read('src/app/bible/search.tsx');
+  assert.match(bible, /<AppHeader[\s\S]*?\bcanGoBack\b/);
+  assert.match(bible, backTo('/bible'));
+  // The Synaxarium heads its page as the design's other sub-pages do: the round gold Back, then its title.
+  const synaxarium = read('src/app/synaxarium/index.tsx');
+  assert.match(synaxarium, /<SubPageHeader\b[\s\S]*?onBack=\{\(\) => goBack\(router, '\/'\)\}[\s\S]*?backLabel=\{tr\('Back', 'Retour', 'رجوع'\)\}/);
+  assert.match(read('src/components/vine/ui/SubPageHeader.tsx'), /<Pressable accessibilityRole="button" accessibilityLabel=\{backLabel\}[^\n]*onPress=\{onBack\}[^\n]*\n\s*<Icon name="chevron-back"/);
   // The header draws that Back on a phone, an iPad and the web alike, named in the App Language.
   for (const file of ['src/components/vine/ui/AppHeader.tsx', 'src/components/vine/ui/AppHeader.web.tsx']) {
     const source = read(file);
