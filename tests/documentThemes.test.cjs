@@ -231,6 +231,7 @@ function loadDocumentBuilder() {
     './readerChromeFade': readerChromeFade(),
     '../../utils/versePresentation': loadFile('src/utils/versePresentation.js'),
     '../../utils/verseRubric': loadFile('src/utils/verseRubric.js'),
+    '../../utils/readerSwipe': loadFile('src/utils/readerSwipe.ts'),
   };
   // The drop caps' markup, from the same leaf modules.
   local['./openingHtml'] = loadFile('src/components/vine/openingHtml.ts', (name) => local[name] || require(name));

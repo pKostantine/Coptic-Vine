@@ -124,6 +124,13 @@ test('rows before where the reader is are past, the one they are in is current, 
   assert.deepEqual(rowPlaces(['a', 'b'], 'z'), { a: 'ahead', b: 'ahead' });
 });
 
+test('a passed row is dimmed, but never the choice of interpretations, a button that works from the list', () => {
+  const contents = fs.readFileSync('src/components/vine/ui/ContentSelectorDrawer.tsx', 'utf8');
+  assert.match(contents, /const isChoice = Boolean\(section\.isInterpretationChooserButton\);/);
+  assert.match(contents, /const isPast = places\[section\.id\] === 'past' && !isHere && !isChoice;/);
+  assert.ok(contents.indexOf('const isChoice =') < contents.indexOf('const isPast ='));
+});
+
 test('the buttons to the next service that close the list become its Up next', () => {
   const rows = (...kinds) => kinds.map((kind, index) => ({ id: `${kind}${index}`, isHyperlinkButton: kind === 'link' }));
   assert.deepEqual([...trailingHyperlinkIds(rows('row', 'link', 'row', 'link', 'link'))], ['link4', 'link3']);

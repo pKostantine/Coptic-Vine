@@ -283,10 +283,15 @@ slides before one does not remount it.
 `NavigationSurface` maps input to page turns (`slideshowLayout.js`):
 
 - Tap: left half previous, right half next, in the surface's own bounds.
-- Swipe: 36 px horizontally (`SLIDESHOW_SWIPE_ACTIVATION_DISTANCE`); a
-  swipe left that starts in the right half of the surface opens the content
-  selector instead (`utils/edgeSwipe.ts`; on the phone the document's own
-  edge swipes decide it, by the same rule).
+- Swipe, in a browser: 36 px horizontally (`SLIDESHOW_SWIPE_ACTIVATION_DISTANCE`);
+  a swipe left that starts in the right half of the surface opens the
+  content selector instead.
+- On a phone or a tablet a swipe never turns a slide (`swipesTurnSlides`
+  is false there). It is the reader's, from anywhere on the screen and
+  following the finger (`hooks/useReaderSwipes.ts`, `utils/readerSwipe.ts`):
+  to the right the document or subdocument is left (on iOS by the system's
+  own back swipe, `fullScreenGestureEnabled`), to the left the contents
+  come in. A tap on either half turns the slide.
 - Keys: →, ↓, PageDown, Space, Enter next; ←, ↑, PageUp, Backspace
   previous; Home, End. A focused button keeps only Space and Enter
   (`isKeyKeptByFocusedControl`); typed-into fields and arrow-key widgets

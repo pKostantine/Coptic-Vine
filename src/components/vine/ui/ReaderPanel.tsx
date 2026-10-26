@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -34,6 +34,27 @@ interface ReaderPanelProps {
   children: (layout: ReaderPanelLayout) => ReactNode;
   /** Pinned under the list, over a hairline: the Bishop present switch. */
   footer?: ReactNode;
+  /**
+   * The share of the panel already in view as it opens: brought in so far by
+   * a finger (ReaderPanelSheet), it carries on from there rather than from
+   * off the edge.
+   */
+  openFrom?: number;
+  /** Once the panel is up on the screen. */
+  onShown?: () => void;
+}
+
+/** The panel's size for this screen (readerPanelLayout), as the panel and its sheet both take it. */
+export function useReaderPanelLayout(): ReaderPanelLayout {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  return readerPanelLayout({
+    width,
+    height,
+    native: Platform.OS !== 'web',
+    mobileWebBreakpoint: MOBILE_WEB_BREAKPOINT,
+    rightInset: insets.right,
+  });
 }
 
 /**
@@ -59,17 +80,13 @@ export default function ReaderPanel({
   top,
   children,
   footer,
+  openFrom = 0,
+  onShown,
 }: ReaderPanelProps) {
   const modalOrientations = useModalOrientations();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const layout = readerPanelLayout({
-    width,
-    height,
-    native: Platform.OS !== 'web',
-    mobileWebBreakpoint: MOBILE_WEB_BREAKPOINT,
-    rightInset: insets.right,
-  });
+  const layout = useReaderPanelLayout();
   const styles = useMemo(() => createStyles(theme, layout.compact), [theme, layout.compact]);
   const colors = useMemo(() => readerPanelColors(theme), [theme]);
 
@@ -81,11 +98,21 @@ export default function ReaderPanel({
 
   const [slide] = useState(() => new Animated.Value(1));
   const reduced = useReducedMotion();
+  // Read as the panel opens; a change while it is open moves nothing.
+  const openFromRef = useRef(openFrom);
   useEffect(() => {
+    openFromRef.current = openFrom;
+  });
+  // Before the frame is drawn, so a panel brought in by a finger is never
+  // seen off the edge first.
+  useLayoutEffect(() => {
     if (!mounted) return;
+    const from = visible ? Math.min(Math.max(openFromRef.current || 0, 0), 1) : 0;
+    if (from > 0) slide.setValue(1 - from);
     Animated.timing(slide, {
       toValue: visible ? 0 : 1,
-      duration: motionDuration(220, reduced),
+      // The rest of the way, at the pace of the whole.
+      duration: motionDuration(from > 0 ? Math.max(90, Math.round(220 * (1 - from))) : 220, reduced),
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -102,6 +129,7 @@ export default function ReaderPanel({
       animationType="none"
       visible={mounted}
       onRequestClose={onClose}
+      onShow={onShown}
       supportedOrientations={modalOrientations}
       // Edge to edge on Android too, as on iOS: it pads itself clear of the bars and the notch.
       statusBarTranslucent
@@ -167,11 +195,44 @@ export default function ReaderPanel({
   );
 }
 
+/**
+ * The sheet the panel comes in on while a finger brings it from the right
+ * (hooks/useReaderSwipes.ts): drawn on the page itself, for the panel's Modal
+ * can't follow a swipe that began beneath it. It is the panel's size, colour
+ * and shadow over the same dimming, `progress` (0 to 1) of it in view; the
+ * panel opens from there over it (openFrom), and the sheet is taken down
+ * once that is up (onShown).
+ */
+export function ReaderPanelSheet({ progress, theme }: { progress: Animated.Value; theme: DocumentTheme }) {
+  const insets = useSafeAreaInsets();
+  const layout = useReaderPanelLayout();
+  const styles = useMemo(() => createStyles(theme, layout.compact), [theme, layout.compact]);
+  const colors = useMemo(() => readerPanelColors(theme), [theme]);
+  return (
+    // Clipped: parked past the right edge, the sheet would otherwise widen
+    // whatever it is drawn in (a browser would pan the page under the finger).
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.overlay, styles.sheetClip]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim, opacity: progress }]} />
+      <Animated.View
+        style={[
+          styles.panel,
+          {
+            width: layout.width,
+            marginTop: layout.belowStatusBar ? insets.top : 0,
+            transform: [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [layout.width + 24, 0] }) }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
 function createStyles(theme: DocumentTheme, compact: boolean) {
   const colors = readerPanelColors(theme);
   const side = compact ? 18 : 20;
   return StyleSheet.create({
     overlay: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
+    sheetClip: { overflow: 'hidden' },
     backdrop: { flex: 1 },
     panel: {
       backgroundColor: colors.panel,
