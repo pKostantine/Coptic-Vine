@@ -68,3 +68,41 @@ test('a season the calendar has no day for is read from its name, a Holy Fifty D
   // A slug that names something on every object is not taken for a calendar day.
   assert.equal(learningSeasonLook({ slug: 'constructor', title: 'Constructor' }).theme, 'annual');
 });
+
+const icons = load('src/constants/seasonIcons.ts');
+
+test('each Learn season wears an icon from the design, the sets their own and a feast its set\'s', () => {
+  const expected = {
+    'annual-psalmody': 'psalmody',
+    'raising-of-incense': 'incense',
+    liturgy: 'liturgy',
+    'joyful-29': 'joyful',
+    nayrouz: 'nayrouz',
+    'feast-of-the-cross': 'cross',
+    'nativity-fast-kiahk': 'kiahk',
+    nativity: 'nativity',
+    'nativity-paramoun': 'nativity',
+    theophany: 'theophany',
+    'jonahs-fast': 'jonah',
+    lent: 'lent',
+    'palm-sunday': 'palm',
+    'holy-week': 'holyweek',
+    resurrection: 'holy50',
+    'apostles-fast-and-feast': 'apostles',
+    'st-mary-fast-and-feast': 'marian',
+    // Not drawn: the budded cross.
+    'entry-into-egypt': 'cross',
+    other: 'cross',
+  };
+  for (const [slug, icon] of Object.entries(expected)) assert.equal(icons.seasonIconFor(slug), icon, slug);
+  for (const [slug] of SEASONS) assert.ok(icons.SEASON_ICONS[icons.seasonIconFor(slug)], slug);
+  assert.equal(icons.seasonIconFor('constructor'), 'cross', 'a slug that names something on every object is not an icon');
+});
+
+test('the icons are 24 × 24 drawings in currentColor, with no ids to clash when a page repeats them', () => {
+  for (const [key, xml] of Object.entries(icons.SEASON_ICONS)) {
+    assert.match(xml, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 24 24"/, key);
+    assert.match(xml, /currentColor/, key);
+    assert.doesNotMatch(xml, /\bid="/, key);
+  }
+});
