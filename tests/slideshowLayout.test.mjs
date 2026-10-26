@@ -105,6 +105,28 @@ test("responsive padding never creates a budget taller than the viewport", () =>
   });
 });
 
+test("a slide keeps no margin of its own, so a verse as tall as the screen allows stays whole", () => {
+  // Each verse keeps 8px above and below itself; the slide adds nothing to it.
+  assert.deepEqual(getSlidePadding(351), { bottom: 0, top: 0 });
+  assert.equal(getSlideContentBudget(351), 349);
+  // A phone on its side at 36px, under the Doxologies' pills (a slide 351px
+  // tall): seven English lines and five Coptic, 7 x 47 + 16 = 345px, stay on
+  // one slide rather than turn over 5 + 2.
+  const item = verseItem({ verse: { english: "That we may win the promises", coptic: "ⲟⲩⲟϩ ⲛ̀ⲧⲉⲛϣⲁϣⲛⲓ", type: "text" } });
+  const metric = {
+    english: { lines: metricLines("English", 7).map((line, index) => ({ ...line, text: index ? line.text : "English1" })) },
+    coptic: { lines: metricLines("ⲕⲟⲡⲧ", 5).map((line, index) => ({ ...line, text: index ? line.text : "ⲕⲟⲡⲧ1" })) },
+  };
+  const languages = { english: true, french: false, coptic: true, arabic: false };
+  const slides = paginateItems([item], { [item.id]: 345 }, { [item.id]: metric }, getSlideContentBudget(351), 36, languages, 814);
+  assert.equal(slides.length, 1);
+  assert.equal(slides[0].length, 1);
+  assert.deepEqual(slides[0][0].slideshowLineCounts, { english: 7, coptic: 5 });
+  // With the 16px it used to keep above and below, the same slide took only five of the lines.
+  const before = paginateItems([item], { [item.id]: 345 }, { [item.id]: metric }, 351 - 32 - 2, 36, languages, 814);
+  assert.deepEqual(before.map((slide) => slide[0].slideshowLineCounts.english), [5, 2]);
+});
+
 test("overlay insets never change slideshow padding or page formation", () => {
   [320, 568, 900].forEach((height) => {
     const withoutOverlay = getSlidePadding(height);
