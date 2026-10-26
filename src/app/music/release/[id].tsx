@@ -18,6 +18,7 @@ import { useMusicPlayer, type MusicQueueItem } from '@/context/MusicPlayerContex
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import { musicReleaseDownloadRequest } from '@/services/offlineDownloadRequests';
+import { isOneTrackRelease, isTracksOwnHolder, trackHolders } from '@/components/music/trackDownload';
 import type { MusicConsumerRelease, PublishedTrackLyricsPayload } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
 import { publicShareUrl, publicUrl } from '@/utils/publicUrl';
@@ -68,6 +69,9 @@ export default function MusicReleaseScreen() {
     () => release ? musicReleaseDownloadRequest(release, locale) : null,
     [locale, release],
   );
+  const singleTrackId = release && tracks.length === 1 && isOneTrackRelease(release, tracks[0].id) ? tracks[0].id : null;
+  const singleHolders = useMemo(() => (singleTrackId ? trackHolders(singleTrackId) : undefined), [singleTrackId]);
+  const singleIsOwnHolder = useMemo(() => (singleTrackId ? isTracksOwnHolder(singleTrackId) : undefined), [singleTrackId]);
 
   useEffect(() => {
     if (!releaseId) return;
@@ -235,6 +239,10 @@ export default function MusicReleaseScreen() {
                   packageKey={downloadRequest.packageKey}
                   request={prepareReleaseDownload}
                   isArabic={isArabic}
+                  // A single of one track is that track's download (trackDownload.ts):
+                  // saved from either, it shows saved on both.
+                  holders={singleTrackId ? singleHolders : undefined}
+                  isOwnHolder={singleTrackId ? singleIsOwnHolder : undefined}
                 />
               ) : null}
             </View>

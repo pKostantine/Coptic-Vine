@@ -10,7 +10,7 @@ import { SheetRow } from '@/components/playback/ActionSheetFrame';
 import ActionsSheet, { ActionRow, ActionsMenuTrigger } from '@/components/playback/ActionsSheet';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
-import { musicService } from '@/services/musicService';
+import { isTracksOwnHolder, trackDownloadRequest, trackHolders } from '@/components/music/trackDownload';
 import { musicTrackDownloadRequest } from '@/services/offlineDownloadRequests';
 import { musicTrackArtists } from '@/utils/musicCredits';
 import { publicShareUrl } from '@/utils/publicUrl';
@@ -84,21 +84,12 @@ export default function MusicTrackActionsMenu({
     if (href !== pathname) router.push(href);
   };
 
-  const prepareDownload = useCallback(async () => {
-    let lyrics = null;
-    try {
-      lyrics = await musicService.getLyrics(item.track.id, locale);
-    } catch {
-      // Lyrics are useful offline metadata, but the audio download can proceed without them.
-    }
-    return musicTrackDownloadRequest({
-      track: item.track,
-      locale,
-      releaseTitle: item.releaseTitle,
-      coverAsset: item.coverAsset,
-      lyrics,
-    });
-  }, [item.coverAsset, item.releaseTitle, item.track, locale]);
+  // The track is downloaded once, whatever saved it (trackDownload.ts): the
+  // menu shows the download holding it, and one not yet held is made as its
+  // single's when the single is this track alone.
+  const prepareDownload = useCallback(() => trackDownloadRequest(item, locale), [item, locale]);
+  const holders = useMemo(() => trackHolders(item.track.id), [item.track.id]);
+  const isOwnHolder = useMemo(() => isTracksOwnHolder(item.track.id), [item.track.id]);
 
   const shareTrack = async () => {
     close();
@@ -182,6 +173,8 @@ export default function MusicTrackActionsMenu({
               <MusicDownloadButton
                 packageKey={downloadRequest.packageKey}
                 request={prepareDownload}
+                holders={holders}
+                isOwnHolder={isOwnHolder}
                 menuRow
                 onAction={close}
               />

@@ -330,6 +330,7 @@ test('transactions take turns, with foreign keys on and the write lock taken bef
   };
   const { getOfflineDatabase, updateOfflineFile } = loadTypeScriptModule('src/services/offlineDatabase.ts', {
     'expo-sqlite': { openDatabaseAsync: async () => fakeDb },
+    '@/utils/downloadHolders': loadTypeScriptModule('src/utils/downloadHolders.ts'),
   });
   const db = await getOfflineDatabase();
   assert.match(mainExec[0], /PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;/);
@@ -439,13 +440,19 @@ function loadDownloadManager() {
         files.set(resource.fileKey, row ? { ...row, status: row.status === 'complete' ? 'complete' : 'queued' } : {
           file_key: resource.fileKey, remote_uri: resource.remoteUri, local_uri: null, role: resource.role,
           file_size_bytes: resource.fileSizeBytes, total_bytes: resource.fileSizeBytes, status: 'queued', bytes_written: 0, resume_json: null, error: null,
+          playable_kind: resource.playableKind ?? null, playable_id: resource.playableId ?? null,
         });
       }
       packageFiles.set(request.packageKey, request.resources.map((resource) => resource.fileKey));
     },
-    removeOfflinePackage: async (key) => { packages.delete(key); return []; },
+    removeOfflinePackage: async (key) => { packages.delete(key); packageFiles.delete(key); return []; },
     findPlayableLocalUri: async () => null,
     isEntityDownloaded: async () => false,
+    getOfflineFile: async (fileKey) => (files.has(fileKey) ? { ...files.get(fileKey) } : null),
+    findPlayableHolders: async (kind, id) => [...packageFiles.entries()]
+      .filter(([key, keys]) => packages.has(key) && keys.some((fileKey) => files.get(fileKey)?.playable_kind === kind && files.get(fileKey)?.playable_id === id))
+      .map(([key, keys]) => ({ packageKey: key, entityType: requests.get(key).entityType, entityId: requests.get(key).entityId, title: requests.get(key).title, status: packages.get(key).status, mediaCount: keys.filter((fileKey) => files.get(fileKey)?.role === 'media').length })),
+    findEntityDownloads: async () => [],
   };
   const { downloadManager } = loadTypeScriptModule('src/services/downloadManager.ts', {
     'expo-file-system': { Directory: FakeDirectory, DownloadTask: FakeTask, File: FakeFile, Paths: { document: 'documents' } },
@@ -519,6 +526,54 @@ test('pausing pauses every transfer in flight and keeps each one\'s own resume p
   }
   assert.equal(packages.get(key).status, 'complete');
   assert.ok([...files.values()].every((row) => row.status === 'complete'));
+});
+
+/** A music download of `tracks`, each a track's own media file, shared by every download holding it. */
+function musicRequest(packageKey, entityType, tracks) {
+  return {
+    packageKey, domain: 'music', entityType, entityId: packageKey.split(':')[1], locale: 'en', title: packageKey, snapshots: [],
+    resources: tracks.map((trackId) => ({
+      fileKey: `media:music_track:${trackId}:asset-${trackId}`, remoteUri: `https://example.test/${trackId}.mp3`,
+      role: 'media', fileSizeBytes: 100, checksum: null, extension: 'mp3', playableKind: 'music_track', playableId: trackId,
+    })),
+  };
+}
+
+test('a track two downloads hold is fetched once: the second waits on the first, then has it too', async () => {
+  const { downloadManager, tasks, packages } = loadDownloadManager();
+  await downloadManager.enqueue(musicRequest('music_release:album-1:en', 'music_release', ['t1', 't2']));
+  await downloadManager.enqueue(musicRequest('music_playlist:mix:en', 'music_playlist', ['t2', 't3']));
+  await settle();
+  // t1 and t2 for the album, t3 for the playlist: t2 is not fetched twice.
+  assert.deepEqual(tasks.map((task) => task.url).sort(), ['https://example.test/t1.mp3', 'https://example.test/t2.mp3', 'https://example.test/t3.mp3']);
+  for (let guard = 0; guard < 10 && tasks.some((task) => task.state === 'active'); guard += 1) {
+    for (const task of tasks.filter((item) => item.state === 'active')) task.finish(100);
+    await settle();
+  }
+  assert.equal(tasks.length, 3, 'nothing fetched again');
+  assert.equal(packages.get('music_release:album-1:en').status, 'complete');
+  assert.equal(packages.get('music_playlist:mix:en').status, 'complete');
+  // And a track already saved is never fetched again by a later download.
+  await downloadManager.enqueue(musicRequest('music_track:t1:en', 'music_track', ['t1']));
+  await settle();
+  assert.equal(tasks.length, 3);
+  assert.equal(packages.get('music_track:t1:en').status, 'complete');
+});
+
+test('a track downloaded on its own before its release becomes the release\'s once the release is saved', async () => {
+  const { downloadManager, tasks, packages } = loadDownloadManager();
+  await downloadManager.enqueue(musicRequest('music_track:t1:en', 'music_track', ['t1']));
+  await settle();
+  tasks[0].finish(100);
+  await settle();
+  assert.equal(packages.get('music_track:t1:en').status, 'complete');
+  await downloadManager.enqueue(musicRequest('music_release:album-1:en', 'music_release', ['t1', 't2']));
+  await settle();
+  assert.deepEqual(tasks.slice(1).map((task) => task.url), ['https://example.test/t2.mp3'], 'only the track not yet saved is fetched');
+  tasks[1].finish(100);
+  await settle();
+  assert.equal(packages.get('music_release:album-1:en').status, 'complete');
+  assert.equal(packages.has('music_track:t1:en'), false, 'the track is listed once, in its release');
 });
 
 test('a transfer that fails is tried twice more, a moment apart, before its package fails', async (t) => {

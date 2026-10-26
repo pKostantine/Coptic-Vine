@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 import type {
   OfflineDownloadEntityType,
+  OfflineDownloadHolder,
   OfflineDownloadProgress,
   OfflineDownloadRequest,
   OfflineDownloadStatus,
@@ -9,6 +10,7 @@ import type {
   OfflineSnapshotEntityType,
 } from '@/types/offlineDownloads';
 import type { PlaybackEntityKind } from '@/types/playback';
+import { orderHolders } from '@/utils/downloadHolders';
 
 const DATABASE_NAME = 'chc-offline.db';
 const DATABASE_VERSION = 2;
@@ -578,6 +580,72 @@ export async function isEntityDownloaded(
     entityId,
   );
   return (row?.count ?? 0) > 0;
+}
+
+/**
+ * The downloads holding a playable's media file, whatever state each is in,
+ * the one to show first (utils/downloadHolders.ts): a track's own, its
+ * release's, a playlist's, Liked Songs'.
+ */
+export async function findPlayableHolders(
+  playableKind: PlaybackEntityKind,
+  playableId: string,
+): Promise<OfflineDownloadHolder[]> {
+  const db = await getOfflineDatabase();
+  const rows = await db.getAllAsync<{ package_key: string; entity_type: OfflineDownloadEntityType; entity_id: string; title: string; status: OfflineDownloadStatus; media_count: number }>(
+    `SELECT DISTINCT p.package_key, p.entity_type, p.entity_id, p.title, p.status, p.updated_at,
+            (SELECT COUNT(*) FROM offline_package_files mpf JOIN offline_files mf ON mf.file_key = mpf.file_key
+              WHERE mpf.package_key = p.package_key AND mf.role = 'media') AS media_count
+       FROM offline_files f
+       JOIN offline_package_files pf ON pf.file_key = f.file_key
+       JOIN offline_packages p ON p.package_key = pf.package_key
+      WHERE f.playable_kind = ?
+        AND f.playable_id = ?
+        AND f.role = 'media'
+      ORDER BY p.updated_at DESC`,
+    playableKind,
+    playableId,
+  );
+  return orderHolders(rows.map((row) => ({
+    packageKey: row.package_key,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    title: row.title,
+    status: row.status,
+    mediaCount: row.media_count,
+  })));
+}
+
+/** Every download of one item, in whatever App Language it was made, the one to show first. */
+export async function findEntityDownloads(
+  entityType: OfflineDownloadEntityType,
+  entityId: string,
+): Promise<OfflineDownloadHolder[]> {
+  const db = await getOfflineDatabase();
+  const rows = await db.getAllAsync<{ package_key: string; entity_type: OfflineDownloadEntityType; entity_id: string; title: string; status: OfflineDownloadStatus; media_count: number }>(
+    `SELECT p.package_key, p.entity_type, p.entity_id, p.title, p.status,
+            (SELECT COUNT(*) FROM offline_package_files mpf JOIN offline_files mf ON mf.file_key = mpf.file_key
+              WHERE mpf.package_key = p.package_key AND mf.role = 'media') AS media_count
+       FROM offline_packages p
+      WHERE p.entity_type = ? AND p.entity_id = ?
+      ORDER BY p.updated_at DESC`,
+    entityType,
+    entityId,
+  );
+  return orderHolders(rows.map((row) => ({
+    packageKey: row.package_key,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    title: row.title,
+    status: row.status,
+    mediaCount: row.media_count,
+  })));
+}
+
+/** One file's row as it is now, wherever its downloads have got to. */
+export async function getOfflineFile(fileKey: string): Promise<OfflineFileRow | null> {
+  const db = await getOfflineDatabase();
+  return db.getFirstAsync<OfflineFileRow>('SELECT * FROM offline_files WHERE file_key = ?', fileKey);
 }
 
 export async function findPlayableLocalUri(

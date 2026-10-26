@@ -1,6 +1,6 @@
 import { Directory, DownloadTask, File, Paths, type DownloadPauseState, type DownloadProgress, type DownloadTaskOptions } from 'expo-file-system';
 
-import { findPlayableLocalUri, getDownloadProgress, getPackageFiles, getStoredDownloadRequest, isEntityDownloaded, refreshPackageProgress, removeOfflinePackage, saveDownloadRequest, setPackageProgress, setPackageState, updateOfflineFile, type OfflineFileRow } from '@/services/offlineDatabase';
+import { findEntityDownloads, findPlayableHolders, findPlayableLocalUri, getDownloadProgress, getOfflineFile, getPackageFiles, getStoredDownloadRequest, isEntityDownloaded, refreshPackageProgress, removeOfflinePackage, saveDownloadRequest, setPackageProgress, setPackageState, updateOfflineFile, type OfflineFileRow } from '@/services/offlineDatabase';
 import { assertDownloadNetworkAllowed } from '@/services/downloadPreferences';
 import { cleanupIncompleteDownloads, getDownloadStorageSummary, isDownloadRequestStale, listDownloads, removeAllDownloadRecords, validateDownloadedFiles } from '@/services/downloadStorageManager';
 import type { OfflineDownloadManager, OfflineDownloadProgress, OfflineDownloadRequest, OfflineDownloadResource } from '@/types/offlineDownloads';
@@ -85,6 +85,12 @@ class NativeDownloadManager implements OfflineDownloadManager {
   private listeners = new Set<() => void>(); private revision = 0;
   /** The pass under way for each package. */
   private runs = new Map<string, PackageRun>();
+  /**
+   * Each file being fetched, whichever download is fetching it: a track
+   * several downloads hold (its album, a playlist) is one file, fetched
+   * once. Another download needing it meanwhile waits for it.
+   */
+  private fileTransfers = new Map<string, Promise<void>>();
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   getRevision = (): number => this.revision;
   private emit(): void { this.revision += 1; for (const listener of this.listeners) listener(); }
@@ -130,6 +136,8 @@ class NativeDownloadManager implements OfflineDownloadManager {
   listDownloads() { return listDownloads(); }
   getProgress(packageKey: string): Promise<OfflineDownloadProgress | null> { return getDownloadProgress(packageKey); }
   isDownloaded(entityType: OfflineDownloadRequest['entityType'], entityId: string): Promise<boolean> { return isEntityDownloaded(entityType, entityId); }
+  holdersOf(playableKind: PlaybackEntityKind, playableId: string) { return findPlayableHolders(playableKind, playableId); }
+  downloadsOf(entityType: OfflineDownloadRequest['entityType'], entityId: string) { return findEntityDownloads(entityType, entityId); }
   async resolvePlaybackUri(playableKind: PlaybackEntityKind, playableId: string, remoteUri?: string | null): Promise<string | null> { const localUri = await findPlayableLocalUri(playableKind, playableId); return localUri && isUsableLocalFile(localUri) ? localUri : remoteUri?.trim() || null; }
 
   private startWorker(packageKey: string): void {
@@ -171,12 +179,56 @@ class NativeDownloadManager implements OfflineDownloadManager {
     try {
       await forEachLimited(waiting, FILE_CONCURRENCY, async (row) => {
         const resource = resources.get(row.file_key); if (!resource) throw new Error(`Missing resource metadata for ${row.file_key}.`);
-        if (row.status === 'complete') await updateOfflineFile(row.file_key, { localUri: null, status: 'queued', bytesWritten: 0, resumeJson: null });
-        await this.downloadFileWithRetries(run, row, resource, sessionTypeFor(request, resource));
+        await this.fetchFileOnce(run, row, resource, sessionTypeFor(request, resource));
       }, () => run.stopped);
     } finally { await run.report.stop(); }
     if (run.stopped) return;
     await setPackageState(packageKey, 'complete'); await refreshPackageProgress(packageKey); this.emit();
+    if (request.entityType === 'music_release') await this.absorbTrackDownloads(request);
+  }
+  /**
+   * A release saved whole holds each of its tracks, so a track downloaded on
+   * its own before is now the release's: its own download goes (its file
+   * stays, held by the release), and the release is all that is listed.
+   */
+  private async absorbTrackDownloads(request: OfflineDownloadRequest): Promise<void> {
+    const trackIds = new Set(request.resources.filter((resource) => resource.role === 'media' && resource.playableKind === 'music_track' && resource.playableId).map((resource) => resource.playableId as string));
+    for (const trackId of trackIds) {
+      for (const holder of await findPlayableHolders('music_track', trackId)) {
+        if (holder.packageKey !== request.packageKey && holder.entityType === 'music_track' && holder.entityId === trackId) await this.remove(holder.packageKey);
+      }
+    }
+  }
+  /**
+   * Fetches a file this download needs, once on the device whatever holds
+   * it: while another download is fetching it, this one waits; then, the
+   * file claimed before anything else can look, it is read afresh, and one
+   * another download has saved meanwhile is counted, not fetched again.
+   */
+  private async fetchFileOnce(run: PackageRun, row: OfflineFileRow, resource: OfflineDownloadResource, sessionType: NonNullable<DownloadTaskOptions['sessionType']>): Promise<void> {
+    const fileKey = row.file_key;
+    for (let elsewhere = this.fileTransfers.get(fileKey); elsewhere; elsewhere = this.fileTransfers.get(fileKey)) {
+      await elsewhere;
+      if (run.stopped) return;
+    }
+    // Nothing between the look above and this claim: no other download can
+    // take the file up in between.
+    let release = () => {};
+    const claim = new Promise<void>((resolve) => { release = resolve; });
+    this.fileTransfers.set(fileKey, claim);
+    try {
+      const current = (await getOfflineFile(fileKey)) ?? row;
+      if (current.status === 'complete' && isUsableLocalFile(current.local_uri, current.file_size_bytes)) {
+        run.sizes.set(fileKey, current.file_size_bytes ?? current.bytes_written); run.bytes.set(fileKey, current.bytes_written); run.complete.add(fileKey); run.report.request();
+        return;
+      }
+      if (run.stopped) return;
+      if (current.status === 'complete') await updateOfflineFile(fileKey, { localUri: null, status: 'queued', bytesWritten: 0, resumeJson: null });
+      await this.downloadFileWithRetries(run, current.status === 'complete' ? { ...current, status: 'queued', local_uri: null, bytes_written: 0, resume_json: null } : current, resource, sessionType);
+    } finally {
+      if (this.fileTransfers.get(fileKey) === claim) this.fileTransfers.delete(fileKey);
+      release();
+    }
   }
   private async downloadFileWithRetries(run: PackageRun, row: OfflineFileRow, resource: OfflineDownloadResource, sessionType: NonNullable<DownloadTaskOptions['sessionType']>): Promise<void> {
     for (let attempt = 0; ; attempt += 1) {

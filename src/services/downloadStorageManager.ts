@@ -40,10 +40,13 @@ export async function listDownloads(): Promise<OfflineDownloadProgress[]> {
 export async function getDownloadStorageSummary(): Promise<OfflineStorageSummary> {
   const db = await getOfflineDatabase();
   const packages = await listDownloads();
+  // Each file once: a track saved by its album and by a playlist is one file on the device.
   const sizes = await db.getAllAsync<{ domain: 'music' | 'learning' | 'books'; bytes: number }>(
-    `SELECT p.domain, COALESCE(SUM(f.bytes_written), 0) AS bytes FROM offline_files f
-       JOIN offline_package_files pf ON pf.file_key = f.file_key JOIN offline_packages p ON p.package_key = pf.package_key
-      WHERE f.status = 'complete' GROUP BY p.domain`,
+    `SELECT domain, COALESCE(SUM(bytes_written), 0) AS bytes FROM (
+       SELECT DISTINCT f.file_key, p.domain, f.bytes_written FROM offline_files f
+         JOIN offline_package_files pf ON pf.file_key = f.file_key JOIN offline_packages p ON p.package_key = pf.package_key
+        WHERE f.status = 'complete'
+     ) GROUP BY domain`,
   );
   const musicBytes = sizes.find((row) => row.domain === 'music')?.bytes ?? 0;
   const learningBytes = sizes.find((row) => row.domain === 'learning')?.bytes ?? 0;
