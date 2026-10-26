@@ -28,6 +28,7 @@ import { agpeyaHourAt } from '@/utils/agpeyaHours';
 import { LECTIONARY_ROUTE_IDS, LECTIONARY_SERVICES, lectionaryHref, readingLinesFor, withPropheciesAsOneLine } from '@/utils/lectionaryOutline';
 import { readingsServiceAt } from '@/utils/liturgicalDay';
 import { getServiceReadingCitations, type LectionaryService, type ReadingCitation } from '@/utils/readingsService';
+import { splitSaintTitle } from '@/utils/saintTitles';
 import { canonDayProgress, canonTaskRoute } from '@/utils/spiritualCanon';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
@@ -41,17 +42,6 @@ function addUtcDays(date: Date, days: number): Date {
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
-}
-
-/**
- * "The Departure of Pope Athanasius the Second, the Twenty-Eighth Patriarch…"
- * reads as the saint, then who he was: the design sets the second part on its
- * own line, smaller. Only an English title with such a clause is split.
- */
-function splitSaintTitle(title: string): { main: string; detail: string | null } {
-  const match = /^(.+?), the (.+)$/.exec(title);
-  if (!match) return { main: title, detail: null };
-  return { main: match[1], detail: match[2].charAt(0).toUpperCase() + match[2].slice(1) };
 }
 
 /** How Home is laid out (Coptic Vine design, "Home v2"). */
