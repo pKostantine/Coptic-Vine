@@ -262,6 +262,7 @@ function SeasonRows({ now, comingUp, timings, available, gutter, wide, arabic, o
               <View key={season.id} style={{ width: tileWidth }}>
                 <LearningSeasonTile
                   title={season.title}
+                  slug={season.slug}
                   look={learningSeasonLook(season)}
                   kind={kind}
                   countdown={kind === 'upcoming' && timing?.next ? inDaysText(timing.next.days, arabic, true) : undefined}

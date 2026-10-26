@@ -5,6 +5,7 @@ import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import SeasonIcon from '@/components/learning/SeasonIcon';
 import { seasonCountdownText } from '@/components/learning/seasonTimingText';
 import { useLearningSeasonSchedule } from '@/components/learning/useLearningSeasonSchedule';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -29,10 +30,10 @@ const MAX_FONT_SCALE = 1.3;
 
 /**
  * Every season to learn, in the Church year's fixed order (Coptic Vine
- * design, "Seasons"): numbered in the season's colours, Now on the seasons
- * that hold the liturgical day, and each dated season's Coptic start and day
- * count. The order never changes with the date; only the Now chips and the
- * counts do.
+ * design, "Seasons"): each one's icon on a roundel in its colours, Now on
+ * the seasons that hold the liturgical day, and each dated season's Coptic
+ * start and day count. The order never changes with the date; only the Now
+ * chips and the counts do.
  */
 export default function LearningSeasonsScreen() {
   const router = useRouter();
@@ -83,10 +84,9 @@ export default function LearningSeasonsScreen() {
             <ActivityIndicator color={COLORS.gold} style={styles.loader} />
           ) : (
             <View style={styles.list}>
-              {seasons.map((season, index) => (
+              {seasons.map((season) => (
                 <SeasonRow
                   key={season.id}
-                  number={index + 1}
                   season={season}
                   timing={schedule.timings.get(season.slug)}
                   arabic={arabic}
@@ -101,8 +101,7 @@ export default function LearningSeasonsScreen() {
   );
 }
 
-function SeasonRow({ number, season, timing, arabic, onPress }: {
-  number: number;
+function SeasonRow({ season, timing, arabic, onPress }: {
   season: LearningSeasonSummary;
   timing: LearningSeasonTiming | undefined;
   arabic: boolean;
@@ -121,7 +120,10 @@ function SeasonRow({ number, season, timing, arabic, onPress }: {
       <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <View style={styles.disc}>
         <LinearGradient colors={[look.from, look.to]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
-        <Text style={[styles.number, look.light && styles.numberDark]} maxFontSizeMultiplier={1}>{String(number).padStart(2, '0')}</Text>
+        {/* In a view of its own: on the web a bare drawing paints beneath the roundel's gradient. */}
+        <View>
+          <SeasonIcon slug={season.slug} size={24} color={look.light ? COLORS.greenDeep : COLORS.white} />
+        </View>
       </View>
       <View style={styles.text}>
         <Text style={[styles.title, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{season.title}</Text>
@@ -169,9 +171,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: 46,
   },
-  number: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 16, fontWeight: '700' },
-  // The Holy Fifty Days' pale disc.
-  numberDark: { color: COLORS.greenDeep },
   text: { flex: 1, gap: 4, minWidth: 0 },
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700', lineHeight: 20.4 },
   countdown: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13 },
