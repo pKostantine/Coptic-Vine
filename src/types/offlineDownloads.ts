@@ -20,6 +20,12 @@ export interface OfflineDownloadProgress {
   packageKey: string; domain: OfflineDownloadDomain; entityType: OfflineDownloadEntityType; entityId: string; title: string;
   status: OfflineDownloadStatus; progress: number; bytesWritten: number; totalBytes: number | null; error: string | null; updatedAt: string;
 }
+/** A download that holds an item's file (utils/downloadHolders.ts): saved, on its way, paused or stopped. */
+export interface OfflineDownloadHolder {
+  packageKey: string; entityType: OfflineDownloadEntityType; entityId: string; title: string; status: OfflineDownloadStatus;
+  /** How many tracks or recordings it holds: a release of one track is that track's own download. */
+  mediaCount: number;
+}
 export interface OfflineStorageSummary {
   packageCount: number; completeCount: number; failedCount: number; totalBytes: number; musicBytes: number; learningBytes: number; bookBytes: number;
 }
@@ -41,6 +47,10 @@ export interface OfflineDownloadManager {
   listDownloads(): Promise<OfflineDownloadProgress[]>;
   getProgress(packageKey: string): Promise<OfflineDownloadProgress | null>;
   isDownloaded(entityType: OfflineDownloadEntityType, entityId: string): Promise<boolean>;
+  /** Every download holding a playable's media file, the one to show first (utils/downloadHolders.ts). */
+  holdersOf(playableKind: PlaybackEntityKind, playableId: string): Promise<OfflineDownloadHolder[]>;
+  /** Every download of one item, in whatever App Language it was made, the one to show first. */
+  downloadsOf(entityType: OfflineDownloadEntityType, entityId: string): Promise<OfflineDownloadHolder[]>;
   resolvePlaybackUri(playableKind: PlaybackEntityKind, playableId: string, remoteUri?: string | null): Promise<string | null>;
   subscribe(listener: () => void): () => void;
   getRevision(): number;

@@ -1,5 +1,5 @@
 import OfflineDownloadButton from '@/components/offline/OfflineDownloadButton';
-import type { OfflineDownloadRequest } from '@/types/offlineDownloads';
+import type { OfflineDownloadHolder, OfflineDownloadRequest } from '@/types/offlineDownloads';
 
 export default function MusicDownloadButton({
   packageKey,
@@ -9,6 +9,8 @@ export default function MusicDownloadButton({
   compact = false,
   menuRow = false,
   onAction,
+  holders,
+  isOwnHolder,
 }: {
   packageKey: string;
   request: OfflineDownloadRequest | (() => Promise<OfflineDownloadRequest>);
@@ -17,6 +19,9 @@ export default function MusicDownloadButton({
   compact?: boolean;
   menuRow?: boolean;
   onAction?: () => void;
+  /** The downloads already holding it (OfflineDownloadButton's holders): for a track, and a single. */
+  holders?: () => Promise<OfflineDownloadHolder[]>;
+  isOwnHolder?: (holder: OfflineDownloadHolder) => boolean;
 }) {
   return (
     <OfflineDownloadButton
@@ -28,6 +33,8 @@ export default function MusicDownloadButton({
       compact={compact}
       menuRow={menuRow}
       onAction={onAction}
+      holders={holders}
+      isOwnHolder={isOwnHolder}
     />
   );
 }

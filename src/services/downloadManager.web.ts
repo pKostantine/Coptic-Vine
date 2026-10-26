@@ -1,4 +1,4 @@
-import type { OfflineDownloadManager, OfflineDownloadProgress, OfflineDownloadRequest, OfflineIntegrityResult, OfflineStorageSummary } from '@/types/offlineDownloads';
+import type { OfflineDownloadHolder, OfflineDownloadManager, OfflineDownloadProgress, OfflineDownloadRequest, OfflineIntegrityResult, OfflineStorageSummary } from '@/types/offlineDownloads';
 import type { PlaybackEntityKind } from '@/types/playback';
 
 class WebDownloadManager implements OfflineDownloadManager {
@@ -21,6 +21,8 @@ class WebDownloadManager implements OfflineDownloadManager {
   listDownloads(): Promise<OfflineDownloadProgress[]> { return Promise.resolve([]); }
   getProgress(_packageKey: string): Promise<OfflineDownloadProgress | null> { return Promise.resolve(null); }
   isDownloaded(_entityType: OfflineDownloadRequest['entityType'], _entityId: string): Promise<boolean> { return Promise.resolve(false); }
+  holdersOf(_playableKind: PlaybackEntityKind, _playableId: string): Promise<OfflineDownloadHolder[]> { return Promise.resolve([]); }
+  downloadsOf(_entityType: OfflineDownloadRequest['entityType'], _entityId: string): Promise<OfflineDownloadHolder[]> { return Promise.resolve([]); }
   resolvePlaybackUri(_playableKind: PlaybackEntityKind, _playableId: string, remoteUri?: string | null): Promise<string | null> { return Promise.resolve(remoteUri?.trim() || null); }
 }
 export const downloadManager: OfflineDownloadManager = new WebDownloadManager();
