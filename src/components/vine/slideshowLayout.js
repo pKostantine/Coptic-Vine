@@ -82,12 +82,21 @@ export function getVerseVerticalPadding(item = {}) {
 
 export function getSpeakerRowHeight(item = {}, fontSize = 18, visibleLanguages = {}) {
   if (item.suppressSpeakerLabel || !item.hasSpeakerLabel) return 0;
-  if (!visibleLanguages.english && !visibleLanguages.french && !visibleLanguages.arabic) return 0;
   return Math.max(
     visibleLanguages.english ? getSlideshowLanguageLineHeight('english', item, fontSize) : 0,
     visibleLanguages.french ? getSlideshowLanguageLineHeight('french', item, fontSize) : 0,
+    showsCopticSpeakerLabel(item, visibleLanguages) ? getSlideshowLanguageLineHeight('coptic', item, fontSize) : 0,
     visibleLanguages.arabic ? getSlideshowLanguageLineHeight('arabic', item, fontSize) : 0,
   );
+}
+
+// Coptic is labelled wherever VerseBlock gives it a column; a Coptic line
+// standing alone spans the row below the other columns' labels instead.
+function showsCopticSpeakerLabel(item, visibleLanguages) {
+  const verse = item.verse || {};
+  if (copticStandsAlone(verse)) return false;
+  return Boolean(verse.slideshowLanguageKeys?.includes("coptic")) ||
+    getVisibleVerseLanguages(item, visibleLanguages).includes("coptic");
 }
 
 function getLanguagePrefixHeight(language, item, fontSize) {

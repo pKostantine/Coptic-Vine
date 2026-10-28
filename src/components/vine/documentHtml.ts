@@ -163,19 +163,19 @@ export interface DocumentAction {
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, french: false, coptic: true, arabic: true };
 
-// A non-breaking space, not an empty string: the Coptic column gets a blank
-// placeholder label so its text still starts on the same line as the
-// English/Arabic columns' label+<br/>+text layout, keeping all three columns
-// vertically aligned.
+// A non-breaking space, not an empty string: Refrain has no Coptic label, so
+// its Coptic column gets a blank placeholder one instead, and its text still
+// starts on the same line as the English/Arabic columns' label+<br/>+text
+// layout, keeping all three columns vertically aligned.
 const BLANK_COPTIC_LABEL = ' ';
 
 // Each label's colour is the page's, set by class in the stylesheet (see buildDocumentHtml).
 const RUBRIC: Record<string, { english: string; french: string; arabic: string; coptic: string; class: string }> = {
-  priest: { english: 'Priest:', french: 'Le prêtre :', arabic: 'الكاهن:', coptic: BLANK_COPTIC_LABEL, class: 'priest' },
-  bishop: { english: 'Bishop:', french: 'L’évêque :', arabic: 'الأسقف:', coptic: BLANK_COPTIC_LABEL, class: 'bishop' },
-  deacon: { english: 'Deacon:', french: 'Le diacre :', arabic: 'الشماس:', coptic: BLANK_COPTIC_LABEL, class: 'deacon' },
-  reader: { english: 'Reader:', french: 'Le lecteur :', arabic: 'القارئ:', coptic: BLANK_COPTIC_LABEL, class: 'reader' },
-  people: { english: 'People:', french: 'L’assemblée :', arabic: 'الشعب:', coptic: BLANK_COPTIC_LABEL, class: 'people' },
+  priest: { english: 'Priest:', french: 'Le prêtre :', arabic: 'الكاهن:', coptic: 'ⲡⲓⲟⲩⲏⲃ:', class: 'priest' },
+  bishop: { english: 'Bishop:', french: 'L’évêque :', arabic: 'الأسقف:', coptic: 'ⲡⲓⲉⲡⲓⲥⲕⲟⲡⲟⲥ:', class: 'bishop' },
+  deacon: { english: 'Deacon:', french: 'Le diacre :', arabic: 'الشماس:', coptic: 'ⲡⲓⲇⲓⲁⲕⲱⲛ:', class: 'deacon' },
+  reader: { english: 'Reader:', french: 'Le lecteur :', arabic: 'القارئ:', coptic: 'ⲡⲓⲁⲛⲁⲅⲛⲱⲥⲧⲏⲥ:', class: 'reader' },
+  people: { english: 'People:', french: 'L’assemblée :', arabic: 'الشعب:', coptic: 'ⲡⲓⲗⲁⲟⲥ:', class: 'people' },
   refrain: { english: 'Refrain:', french: 'Refrain :', arabic: 'قرار:', coptic: BLANK_COPTIC_LABEL, class: 'refrain' },
 };
 
@@ -1615,15 +1615,14 @@ function renderVerse(
     // e.g. the Orthodox Creed's Recited Prayer verses lose their Coptic
     // column individually while its one Chanted Prayer verse keeps all three.
     // That "keep it if there's a speaker label" exception only makes sense
-    // for English/Arabic, where the label is real, distinguishing text.
-    // RUBRIC's coptic field is always a non-empty BLANK_COPTIC_LABEL filler
-    // (pure vertical-alignment spacing for when Coptic *is* shown alongside
-    // it) — never a reason on its own to keep the column, or every verse
-    // with a speaker label but no actual Coptic text in the DB (common in
-    // e.g. gospel_rite's Reader-labeled verses) would reserve a blank
-    // column. So Coptic collapses whenever it's hidden by the toggle above
-    // OR simply has no text, full stop; English/Arabic keep the older
-    // label-justifies-the-column behavior.
+    // for English/Arabic. A Coptic label (or Refrain's BLANK_COPTIC_LABEL
+    // filler) is never a reason on its own to keep the column, or every
+    // verse with a speaker label but no actual Coptic text in the DB
+    // (common in e.g. gospel_rite's Reader-labeled verses) would reserve a
+    // column holding nothing but "ⲡⲓⲁⲛⲁⲅⲛⲱⲥⲧⲏⲥ:". So Coptic collapses
+    // whenever it's hidden by the toggle above OR simply has no text, full
+    // stop; English/Arabic keep the older label-justifies-the-column
+    // behavior.
   ].filter((language) => {
     if (language.key === 'coptic') {
       if (copticHiddenByToggle) return false;
@@ -1670,10 +1669,8 @@ function renderVerse(
           : verse.bibleVerseNumber
       : '';
     const centered = language.key === 'coptic' ? isCopticCentered : isCentered;
-    // A Coptic speaker label is always BLANK_COPTIC_LABEL — pure spacing, so
-    // the Coptic starts on the same line as the text beside it. Spanning the
-    // row it has already been placed below that line, so the filler would
-    // only open a blank gap above it.
+    // A Coptic line spanning the row sits below the other columns' labels
+    // already, so its own label would only repeat theirs above it.
     const speakerLabel = spansRow ? '' : language.speakerLabel;
     const verseId = `${section.id}::v${index}`;
     const cellInitial = language.key === 'coptic' ? initial : null;
