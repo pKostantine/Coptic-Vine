@@ -240,3 +240,48 @@ test('the sermon notes drawer opens from off the right edge every time, as the s
   assert.match(drawer, /if \(finished && !visible\) setMounted\(false\);/);
   assert.match(drawer, /style=\{\[styles\.overlay, \{ minWidth: screenWidth \}\]\}/);
 });
+
+test('the Contents fold St Basil\'s seven short litanies under their heading, through the Litany of the Oblations', () => {
+  const { gatherUnderDividers, isDividerSection } = load('src/utils/sectionDividers.ts');
+  const section = (id, hymnKey, titled = true) => ({ id, hymnKey, titled });
+  const speaks = (entry) => entry.titled;
+  const basil = [
+    section('epiclesisStBasil-61', 'epiclesisStBasil'),
+    section('sevenShortLitanies-62', 'sevenShortLitanies'),
+    section('litanyOfPeaceStBasil-63', 'litanyOfPeaceStBasil'),
+    section('litanyOfTheFathersStBasil-64', 'litanyOfTheFathersStBasil'),
+    section('litanyOfTheSeasonOfAir-71', 'litanyOfTheSeasonOfAir'),
+    section('combinedLitanyForTheThreeSeasons-72', 'combinedLitanyForTheThreeSeasons'),
+    section('litanyOfTheOblationsStBasil-73', 'litanyOfTheOblationsStBasil'),
+    // What the last litany splices in, and where it resumes, are still part of it.
+    section('litanyOfTheOblationsStBasil-73-inline-x', 'x'),
+    section('litanyOfTheOblationsStBasil-73-cont1', 'litanyOfTheOblationsStBasil', false),
+    section('commemorationOfTheSaintsStBasil-74', 'commemorationOfTheSaintsStBasil'),
+  ];
+  assert.ok(isDividerSection(basil[1]));
+  const owners = gatherUnderDividers(basil, speaks);
+  assert.deepEqual([...owners.keys()], basil.slice(2, 9).map((entry) => entry.id));
+  assert.ok([...owners.values()].every((owner) => owner === 'sevenShortLitanies-62'));
+
+  // Without its last litany it holds nothing, rather than the rest of the service.
+  assert.equal(gatherUnderDividers(basil.filter((entry) => !entry.hymnKey.startsWith('litanyOfTheOblations')), speaks).size, 0);
+});
+
+test('the Contents still fold the Agpeya hours by their openings', () => {
+  const { gatherUnderDividers, isDividerSection } = load('src/utils/sectionDividers.ts');
+  const section = (id, titled = true) => ({ id, hymnKey: id, titled });
+  const lamb = [
+    section('introductionThirdHour'),
+    section('agpeyaPsalm19'),
+    section('introductionSixthHour'),
+    section('agpeyaPsalm53'),
+    section('introductionToTheCreed', false),
+    section('theOrthodoxCreed'),
+  ];
+  const owners = gatherUnderDividers(lamb, (entry) => entry.titled);
+  assert.deepEqual(Object.fromEntries(owners), { agpeyaPsalm19: 'introductionThirdHour', agpeyaPsalm53: 'introductionSixthHour' });
+  // Untitled, as in the Agpeya's own book, an opening gathers nothing.
+  assert.equal(gatherUnderDividers(lamb, () => false).size, 0);
+  assert.ok(!isDividerSection({ id: 'x', hymnKey: 'introductionOfEveryHour' }));
+  assert.ok(!isDividerSection({ id: 'x', hymnKey: 'introductionToTheCreed' }));
+});
