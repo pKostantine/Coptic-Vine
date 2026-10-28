@@ -9,7 +9,6 @@ import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection } from '../documentHtml';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import Icon from './Icon';
-import { VineRule } from './Ornaments';
 import ReaderPanel, { type ReaderPanelAction } from './ReaderPanel';
 import {
   pickRowText,
@@ -361,11 +360,12 @@ export default function ContentSelectorDrawer({
             // document is -- it changes what this service shows rather than
             // being a place in it.
             const isChoice = Boolean(section.isInterpretationChooserButton);
-            // A heading (sectionDividers.ts) is set as the book pages set a
-            // section's name: in the title face, the vine run out beside it,
-            // with the hymns it gathers on a card below. It marks where one
-            // part of the service ends and the next begins, so it reads as a
-            // heading rather than as one more hymn between them.
+            // A heading (sectionDividers.ts) is a gold eyebrow with its fold's
+            // chevron at the far edge, and the hymns it gathers hang off a
+            // solid gold rail below it, as a season's days do in the season
+            // selector. It marks where one part of the service ends and the
+            // next begins, so it reads as a heading rather than as one more
+            // hymn between them.
             const isDivider = isDividerSection(section);
             const isHere = section.id === highlightedSectionId;
             // What has been read is dimmed, but not the choice of
@@ -389,7 +389,7 @@ export default function ContentSelectorDrawer({
                   !isDivider && isSubdocument && styles.rowSubdocument,
                   !isDivider && isHyperlink && styles.rowHyperlink,
                   !isDivider && isChoice && styles.rowChoice,
-                  !isDivider && isHere && styles.rowHere,
+                  isHere && styles.rowHere,
                   isPast && styles.rowPast,
                   pressed && !isHere && styles.rowPressed,
                 ]}
@@ -414,23 +414,13 @@ export default function ContentSelectorDrawer({
               >
                 {isDivider ? (
                   <>
-                    <Text
-                      style={[
-                        styles.headingTitle,
-                        layout.compact && styles.headingTitleCompact,
-                        pickedTitle.arabic && styles.headingTitleArabic,
-                        isHere && styles.headingTitleHere,
-                      ]}
-                      accessibilityRole="header"
-                      numberOfLines={2}
-                    >
+                    <Text style={[styles.headingLabel, pickedTitle.arabic && styles.headingLabelArabic]} accessibilityRole="header" numberOfLines={2}>
                       {pickedTitle.text}
                     </Text>
-                    <VineRule height={layout.compact ? 13 : 15} />
                     {/* Folded, it says how much it holds. */}
                     {isFolded ? <Text style={styles.headingCount}>{gatheredCounts.get(section.id)}</Text> : null}
                     {foldableDividerId ? (
-                      <Icon name={isFolded ? 'chevron-forward' : 'chevron-down'} size={16} color={panelColors.here} />
+                      <Icon name={isFolded ? 'chevron-forward' : 'chevron-down'} size={15} color={panelColors.here} />
                     ) : null}
                   </>
                 ) : (
@@ -464,7 +454,7 @@ export default function ContentSelectorDrawer({
           return (
             <ScrollView ref={scrollViewRef} style={styles.list} contentContainerStyle={[styles.listContent, layout.compact && styles.listContentCompact]} keyboardShouldPersistTaps="handled">
               {searching && !visibleListable.length ? <Text style={styles.noMatches}>{text.noMatches}</Text> : null}
-              {/* A heading's hymns share one card under it (not while
+              {/* A heading's hymns hang off one rail under it (not while
                   searching: matches are listed flat). */}
               {groupUnderHeadings(visibleListable, (section) => (searching || upNextIds.has(section.id) ? undefined : dividerOwners.get(section.id))).map((entry) => (
                 entry.headingId ? (
@@ -567,27 +557,28 @@ function createStyles(theme: DocumentTheme) {
     // A reading's citation, after its name: smaller, in the body face, muted.
     citation: { color: panel.faint, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontStyle: 'normal', fontWeight: '400' },
     citationArabic: { fontFamily: TYPOGRAPHY.arabic },
-    // A heading: its name lines up with the rows' names below it.
-    headingItem: { marginTop: 14, minHeight: 0, paddingBottom: 4, paddingTop: 6 },
+    // A heading: its eyebrow lines up with the rows' names, the chevron at the far edge.
+    headingItem: { marginTop: 16, minHeight: 0, paddingBottom: 6, paddingTop: 6 },
     headingItemCompact: { marginTop: 10 },
-    // Folded, it keeps the room its card took, so what follows reads as the
-    // service again rather than as the heading's own.
-    headingItemFolded: { marginBottom: 10 },
-    headingTitle: {
-      color: panel.ink,
-      flexShrink: 1,
-      fontFamily: TYPOGRAPHY.title,
-      fontSize: 18,
+    // Folded, it keeps a little room, so what follows reads as the service
+    // again rather than as the heading's own.
+    headingItemFolded: { marginBottom: 6 },
+    // The design system's eyebrow, in gold (as the panel's own, ReaderPanel.tsx).
+    headingLabel: {
+      color: panel.here,
+      flex: 1,
+      fontFamily: TYPOGRAPHY.body,
+      fontSize: 11.5,
       fontWeight: '700',
-      lineHeight: 23,
-      maxWidth: '78%',
+      letterSpacing: 1.76,
+      textTransform: 'uppercase',
     },
-    headingTitleCompact: { fontSize: 16, lineHeight: 21 },
-    headingTitleArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
-    headingTitleHere: { color: panel.here },
-    headingCount: { color: panel.quiet, fontFamily: TYPOGRAPHY.body, fontSize: 13 },
-    // What a heading gathers, on one card of the page's wash.
-    group: { backgroundColor: panel.washSoft, borderRadius: 16, gap: 2, marginBottom: 6, paddingVertical: 4 },
+    // Arabic has no capitals and no letter spacing.
+    headingLabelArabic: { fontFamily: TYPOGRAPHY.arabic, fontSize: 13, letterSpacing: 0, textAlign: 'left', textTransform: 'none', writingDirection: 'rtl' },
+    headingCount: { color: panel.quiet, fontFamily: TYPOGRAPHY.body, fontSize: 12.5 },
+    // What a heading gathers hangs off one solid 2px gold rail under its
+    // eyebrow, as a season's days do (SeasonSelectorScreen.tsx).
+    group: { borderLeftColor: panel.here, borderLeftWidth: 2, gap: 2, marginBottom: 8, marginLeft: 14, paddingLeft: 4 },
     upNext: {
       alignItems: 'center',
       backgroundColor: panel.next,

@@ -286,14 +286,16 @@ test('the Contents still fold the Agpeya hours by their openings', () => {
   assert.ok(!isDividerSection({ id: 'x', hymnKey: 'introductionToTheCreed' }));
 });
 
-test('a Contents heading is set as the book pages set a section, its hymns on one card under it', () => {
+test('a Contents heading is a gold eyebrow, its hymns hanging off one rail under it', () => {
   const drawer = fs.readFileSync('src/components/vine/ui/ContentSelectorDrawer.tsx', 'utf8');
-  // The title face beside the vine, then how many it hides once folded and the fold's chevron.
-  assert.match(drawer, /styles\.headingTitle,[\s\S]*?<VineRule height=\{layout\.compact \? 13 : 15\} \/>[\s\S]*?isFolded \? <Text style=\{styles\.headingCount\}>\{gatheredCounts\.get\(section\.id\)\}<\/Text>/);
-  // One card for each run under a heading, flat while searching; no rail beside each row.
+  // The eyebrow, then how many it hides once folded, then the chevron at the far edge.
+  assert.match(drawer, /<Text style=\{\[styles\.headingLabel,[\s\S]*?isFolded \? <Text style=\{styles\.headingCount\}>\{gatheredCounts\.get\(section\.id\)\}<\/Text>[\s\S]*?chevron-forward' : 'chevron-down'/);
+  assert.match(drawer, /headingLabel: \{\s+color: panel\.here,[\s\S]*?fontWeight: '700',\s+letterSpacing: 1\.76,\s+textTransform: 'uppercase',/);
+  // One rail for each run under a heading (one View, so it never breaks between rows), flat while searching.
   assert.match(drawer, /groupUnderHeadings\(visibleListable, \(section\) => \(searching \|\| upNextIds\.has\(section\.id\) \? undefined : dividerOwners\.get\(section\.id\)\)\)/);
   assert.match(drawer, /<View key=\{`group-\$\{entry\.headingId\}`\} style=\{styles\.group\} onLayout=\{recordGroupLayout\(entry\.headingId\)\}>/);
-  assert.doesNotMatch(drawer, /nestedSegment|borderLeftWidth/);
-  // A row on a card is placed by the card's y plus its own.
+  assert.match(drawer, /group: \{ borderLeftColor: panel\.here, borderLeftWidth: 2,/);
+  assert.doesNotMatch(drawer, /nestedSegment|VineRule|backgroundColor: panel\.washSoft, borderRadius: 16/);
+  // A row on the rail is placed by the group's y plus its own.
   assert.match(drawer, /scrollTo\(\{ y: Math\.max\(groupY \+ y - 12, 0\), animated: false \}\)/);
 });
