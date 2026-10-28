@@ -1188,6 +1188,17 @@ const SCHEMAS_WITHOUT_HYMN_TITLES = new Set([
 // and since they moved out of public it is the only place they are.
 const HYMN_KEY_FALLBACK_SCHEMAS = ["public", "liturgy", "psalmody", "agpeya", "veneration", "doxologies", "litanies"];
 
+// Every schema with a hymn_texts table (workers/content-api/schema/content-tables.json).
+// An inline hymn key is found in any of them (findInlineHymn): the content
+// database refuses an inline_hymn_key that is no hymn's key in one of them
+// (workers/content-api/migrations/0034_inline_hymn_keys.sql).
+const HYMN_TEXT_SCHEMAS = [
+  "public", "liturgy", "psalmody", "agpeya", "veneration", "doxologies", "litanies",
+  "aspasmos", "canons", "fractions", "gospel_responses", "gospel_rite", "holy_week",
+  "hymn_of_the_intercessions", "praxis_response", "procession_of_the_cross", "readings",
+  "seasonal_liturgy_hymns", "verses_of_the_cymbals",
+];
+
 // A document read from an installed offline book resolves its hymn keys only
 // from resources installed on the device. Its book's dependency graph
 // (bookDependencyRegistry.ts) already declares every schema its content
@@ -1396,7 +1407,7 @@ export function assembleServiceSections(rawRows) {
 
     if (isSubdoc || isHyperlink) continue;
 
-    if (row.inline_hymn_key && isInlineLineItem(row.line_item_type)) {
+    if (row.inline_hymn_key) {
       sectionMap.get(key).verses.push({
         type: "inlinePlaceholder",
         inlineHymnKey: row.inline_hymn_key,
@@ -1456,10 +1467,6 @@ export function assembleServiceSections(rawRows) {
   }
 
   return sections;
-}
-
-function isInlineLineItem(itemType) {
-  return ["Inline", "Subdocument", "Hyperlink"].includes(normalizeText(itemType));
 }
 
 /**
@@ -2568,8 +2575,28 @@ function applyCopticCaseToReadingVerses(verses) {
 // Every column, for drop_cap, as SERVICE_TEXT_FIELDS.
 const INLINE_TEXT_FIELDS = "*";
 
+/**
+ * What `read` finds for an inline hymn key first: in the calling schema and
+ * the shared pools, in order (getHymnKeyLookupSchemas), and failing those in
+ * every other schema with hymn_texts, so a key is understood wherever its
+ * hymn lives. Those last are read together, and only for a key nothing
+ * nearer has; a book installed on the device may not hold them, so they are
+ * asked of the server, and failing (offline) count as not having the key
+ * rather than failing the whole document.
+ */
+async function findInlineHymn(schema, read) {
+  const near = await getHymnKeyLookupSchemas(schema);
+  for (const lookupSchema of near) {
+    const found = await read(lookupSchema);
+    if (found) return found;
+  }
+  const rest = HYMN_TEXT_SCHEMAS.filter((lookupSchema) => !near.includes(lookupSchema));
+  const found = await Promise.all(rest.map((lookupSchema) => read(lookupSchema).catch(() => null)));
+  return found.find(Boolean) || null;
+}
+
 async function fetchInlineHymnVerses(schema, hymnKey) {
-  for (const lookupSchema of await getHymnKeyLookupSchemas(schema)) {
+  const rows = await findInlineHymn(schema, async (lookupSchema) => {
     const { data, error } = await supabase
       .schema(lookupSchema)
       .from("hymn_texts")
@@ -2577,10 +2604,9 @@ async function fetchInlineHymnVerses(schema, hymnKey) {
       .eq("hymn_key", hymnKey)
       .order("line_order", { ascending: true });
     if (error) throw createReadableSupabaseError(error, `${lookupSchema}.hymn_texts`);
-    if (data?.length) return data;
-  }
-
-  return [];
+    return data?.length ? data : null;
+  });
+  return rows || [];
 }
 
 /**
@@ -2644,14 +2670,17 @@ async function resolveInlineHymnVerses(
     const rowVisibility = combineBishopVisibility(outerVisibility, evaluateBishopAwareVisibility(row.condition, flags));
     if (!rowVisibility.visible) continue;
 
-    if (row.inline_hymn_key && isInlineLineItem(row.item_type)) {
-      if (isReadingSentinel(row.inline_hymn_key) && isoDate) {
+    // As at the top level (assembleServiceSections), the key alone makes the
+    // line a call, whatever its item_type says.
+    const inlineHymnKey = normalizeText(row.inline_hymn_key);
+    if (inlineHymnKey) {
+      if (isReadingSentinel(inlineHymnKey) && isoDate) {
         const spliced = await resolveReadingSentinelSplice(
-          row.inline_hymn_key,
+          inlineHymnKey,
           isoDate,
           row.inline_hymn_title_shown,
           row.inline_hymn_minimization,
-          `${hymnKey}-${row.line_order}-${row.inline_hymn_key}`,
+          `${hymnKey}-${row.line_order}-${inlineHymnKey}`,
           flags,
         );
         if (spliced?.kind === "section") {
@@ -2667,10 +2696,10 @@ async function resolveInlineHymnVerses(
       // producing shape, which doesn't fit this splice's "just a flat verse
       // list" contract — no real data currently nests one this deep, so
       // it's left unresolved (silently dropped) rather than guessed at.
-      if (!resolveWholeTableInlineTarget(row.inline_hymn_key)) {
+      if (!resolveWholeTableInlineTarget(inlineHymnKey)) {
         const nested = await resolveInlineHymnVerses(
           schema,
-          row.inline_hymn_key,
+          inlineHymnKey,
           isoDate,
           flags,
           rowVisibility,
@@ -2718,8 +2747,8 @@ const INLINE_TITLE_FIELDS = "hymn_key, title_english, title_arabic, title_french
 
 /** Whether an inline-spliced hymn should be treated as its own hymn (own title, own alternation, restarted person-type indicators) hinges entirely on whether it has a row in hymn_titles — same schema search order as fetchInlineHymnVerses. Returns null if no title row exists anywhere. */
 async function fetchInlineHymnTitle(schema, hymnKey) {
-  for (const lookupSchema of await getHymnKeyLookupSchemas(schema)) {
-    if (SCHEMAS_WITHOUT_HYMN_TITLES.has(lookupSchema)) continue;
+  return findInlineHymn(schema, async (lookupSchema) => {
+    if (SCHEMAS_WITHOUT_HYMN_TITLES.has(lookupSchema)) return null;
     const { data, error } = await supabase
       .schema(lookupSchema)
       .from("hymn_titles")
@@ -2727,10 +2756,8 @@ async function fetchInlineHymnTitle(schema, hymnKey) {
       .eq("hymn_key", hymnKey)
       .maybeSingle();
     if (error) throw createReadableSupabaseError(error, `${lookupSchema}.hymn_titles`);
-    if (data) return data;
-  }
-
-  return null;
+    return data || null;
+  });
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
