@@ -7207,6 +7207,51 @@
    "hasPrimaryKey": true,
    "parents": [],
    "validators": []
+  },
+  {
+   "schema": "liturgy",
+   "table": "commemoration_of_the_saints_hymns",
+   "public": true,
+   "columns": [
+    {
+     "name": "item_order",
+     "kind": "numeric",
+     "pgType": "numeric",
+     "notNull": true
+    },
+    {
+     "name": "hymn_key",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "condition",
+     "kind": "text",
+     "pgType": "text",
+     "notNull": false
+    },
+    {
+     "name": "minimization",
+     "kind": "text",
+     "pgType": "\"Minimization\"",
+     "notNull": false
+    },
+    {
+     "name": "item_type",
+     "kind": "text",
+     "pgType": "\"Item Type\"",
+     "notNull": false
+    }
+   ],
+   "dropped": [],
+   "rowKey": [
+    "item_order"
+   ],
+   "hasPrimaryKey": true,
+   "parents": [],
+   "validators": [],
+   "addedInD1": "0035_commemoration_of_the_saints_hymns.sql"
   }
  ],
  "views": [

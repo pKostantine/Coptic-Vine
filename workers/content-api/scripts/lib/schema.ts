@@ -5,13 +5,16 @@ export type { ColumnKind, TableInfo } from '../gen-schema.ts';
 
 /**
  * The copied tables as Supabase has them: these scripts read and compare its
- * frozen copy, which hasn't got the columns D1 has gained since the cutover
- * (addedInD1), so they leave those out. A reload leaves them at their default.
+ * frozen copy, which hasn't got the tables or columns D1 has gained since the
+ * cutover (addedInD1), so they leave those out. A reload leaves the columns at
+ * their default.
  */
 const d1Schema: ContentSchema = JSON.parse(readFileSync(new URL('../../schema/content-tables.json', import.meta.url), 'utf8'));
 export const contentSchema: ContentSchema = {
   ...d1Schema,
-  tables: d1Schema.tables.map((table) => ({ ...table, columns: table.columns.filter((column) => !column.addedInD1) })),
+  tables: d1Schema.tables
+    .filter((table) => !table.addedInD1)
+    .map((table) => ({ ...table, columns: table.columns.filter((column) => !column.addedInD1) })),
 };
 
 export const qualified = (table: { schema: string; table: string }) => `${table.schema}/${table.table}`;
