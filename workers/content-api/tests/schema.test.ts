@@ -71,10 +71,6 @@ test('a line can only call a hymn that exists, in any hymn_texts table (migratio
   db.exec(`INSERT INTO "liturgy.hymn_texts" ("line_id", "hymn_key", "english") VALUES (4, 'throughTheIntercessions', 'A line')`);
   assert.throws(() => db.exec(`UPDATE "liturgy.hymn_texts" SET "inline_hymn_key" = 'tenousht' WHERE "line_id" = 2`), refused);
   db.exec(`UPDATE "liturgy.hymn_texts" SET "english" = 'A line of its own' WHERE "line_id" = 2`);
-
-  // Each hymn once, where it is.
-  assert.deepEqual(db.prepare(`SELECT * FROM "public.hymn_keys" ORDER BY "schema_name"`).all().map((row) => ({ ...row })), [
-    { schema_name: 'liturgy', hymn_key: 'throughTheIntercessions' },
-    { schema_name: 'public', hymn_key: 'tenouosht' },
-  ]);
+  // D1 refuses a compound SELECT of many terms (a UNION of the 19 tables was).
+  assert.doesNotMatch(read('migrations/0034_inline_hymn_keys.sql').replace(/^--.*$/gm, ''), /\bUNION\b/i);
 });
