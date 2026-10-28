@@ -74,3 +74,59 @@ test('a line can only call a hymn that exists, in any hymn_texts table (migratio
   // D1 refuses a compound SELECT of many terms (a UNION of the 19 tables was).
   assert.doesNotMatch(read('migrations/0034_inline_hymn_keys.sql').replace(/^--.*$/gm, ''), /\bUNION\b/i);
 });
+
+test('St Basil\'s hymns after the commemoration move into their own table, opened as a subdocument (migrations/0035)', () => {
+  const migration = read('migrations/0035_commemoration_of_the_saints_hymns.sql');
+  const fresh = () => {
+    const db = new DatabaseSync(':memory:');
+    for (const file of ['0001_content_schema.sql', '0002_bible_search.sql', '0003_content_revision.sql']) db.exec(read(`migrations/${file}`));
+    return db;
+  };
+  const basilRows = (db: DatabaseSync) => db.prepare(`SELECT * FROM "liturgy.liturgy_of_st_basil" ORDER BY "item_order"`).all().map((row) => ({ ...row }));
+  const moved: [number, string, string | null][] = [[79, 'evshes', null], [80, 'departedPatriarchs', null], [81, 'pinishtiMinor', 'PalmSunday'], [81.1, 'kePandonTon', null], [82, 'pinishtiMajor', null]];
+  const seed = (db: DatabaseSync, rows: [number, string, string | null][]) => {
+    const insert = db.prepare(`INSERT INTO "liturgy.liturgy_of_st_basil" ("item_order", "hymn_key", "condition", "minimization") VALUES (?, ?, ?, ?)`);
+    for (const [order, key, condition] of [[78, 'shortBlessingStBasil', null], ...rows, [83, 'postCommemoration', 'StBasilLiturgy']] as [number, string, string | null][]) {
+      insert.run(order, key, condition, order === 83 ? null : 'Minimized');
+    }
+  };
+
+  const db = fresh();
+  seed(db, moved);
+  db.exec(migration);
+  assert.deepEqual(basilRows(db).map((row) => [row.item_order, row.hymn_key, row.item_type]), [
+    [78, 'shortBlessingStBasil', null],
+    [79, 'COMMEMORATION_OF_THE_SAINTS_HYMNS', 'Subdocument'],
+    [83, 'postCommemoration', null],
+  ]);
+  // In their order, each with its condition and minimization.
+  assert.deepEqual(db.prepare(`SELECT * FROM "liturgy.commemoration_of_the_saints_hymns" ORDER BY "item_order"`).all().map((row) => ({ ...row })), [
+    { item_order: 1, hymn_key: 'evshes', condition: null, minimization: 'Minimized', item_type: null },
+    { item_order: 2, hymn_key: 'departedPatriarchs', condition: null, minimization: 'Minimized', item_type: null },
+    { item_order: 3, hymn_key: 'pinishtiMinor', condition: 'PalmSunday', minimization: 'Minimized', item_type: null },
+    { item_order: 4, hymn_key: 'kePandonTon', condition: null, minimization: 'Minimized', item_type: null },
+    { item_order: 5, hymn_key: 'pinishtiMajor', condition: null, minimization: 'Minimized', item_type: null },
+  ]);
+  assert.equal((db.prepare(`SELECT "title_english" FROM "liturgy.hymn_titles" WHERE "hymn_key" = 'COMMEMORATION_OF_THE_SAINTS_HYMNS'`).get() as { title_english: string }).title_english, 'Commemoration of the Saints Hymns');
+  // An edit to it moves the revision and marks it for the offline books.
+  const revision = () => (db.prepare(`SELECT "revision" FROM "offline_content.revision"`).get() as { revision: number }).revision;
+  const before = revision();
+  db.exec(`UPDATE "liturgy.commemoration_of_the_saints_hymns" SET "minimization" = 'Minimizable' WHERE "item_order" = 1`);
+  assert.equal(revision(), before + 1);
+  assert.ok(db.prepare(`SELECT 1 FROM "offline_content.content_changes" WHERE "table_name" = 'commemoration_of_the_saints_hymns'`).get());
+
+  // If St Basil has changed, nothing moves: the file fails, and D1 rolls it back.
+  const changed = fresh();
+  seed(changed, moved.filter(([, key]) => key !== 'kePandonTon'));
+  const unchanged = basilRows(changed);
+  changed.exec('BEGIN');
+  assert.throws(() => changed.exec(migration), /CHECK constraint failed/);
+  changed.exec('ROLLBACK');
+  assert.deepEqual(basilRows(changed), unchanged);
+
+  // Listed for the Worker and the offline books, not for Supabase's import, and its triggers are its own.
+  const listed = JSON.parse(read('schema/content-tables.json')).tables.find((table: { table: string }) => table.table === 'commemoration_of_the_saints_hymns');
+  assert.equal(listed.addedInD1, '0035_commemoration_of_the_saints_hymns.sql');
+  assert.ok(!contentSchema.tables.some((table) => table.table === 'commemoration_of_the_saints_hymns'));
+  assert.ok(!read('migrations/0003_content_revision.sql').includes('commemoration_of_the_saints_hymns'));
+});

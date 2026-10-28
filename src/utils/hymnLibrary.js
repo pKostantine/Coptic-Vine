@@ -38,6 +38,9 @@ export const SUBDOCUMENT_MAP = {
   // Extracted order-table blocks that are spliced back into their parent
   // services through all-caps Inline sentinels.
   LITURGY_AGPEYA: { schema: "liturgy", table: "liturgy_agpeya" },
+  // St Basil's hymns after the commemoration of the departed (Evshes, the
+  // Departed Patriarchs, the Pinishti, Ke Pandon Ton), opened as a subdocument.
+  COMMEMORATION_OF_THE_SAINTS_HYMNS: { schema: "liturgy", table: "commemoration_of_the_saints_hymns" },
   PSALIES_SAINTS: { schema: "psalmody", table: "psalies_saints" },
   PSALIES_SEASONAL: { schema: "psalmody", table: "psalies_seasonal" },
   PSALIES_DAILY: { schema: "psalmody", table: "psalies_daily" },

@@ -47,6 +47,8 @@ export type TableInfo = {
   parents: string[];
   /** Postgres triggers that validate rows; import.ts runs the same checks. */
   validators: string[];
+  /** The migration that created a table D1 has gained since the cutover (D1_TABLES). */
+  addedInD1?: string;
 };
 
 export type ContentSchema = {
@@ -209,8 +211,40 @@ export function generate(catalog: PgCatalog): { migration: string; schema: Conte
     viewInfo.push({ schema: view.schema, table: view.table, public: view.anonReadable, columns: view.columns.map((column) => column.name) });
   }
 
-  return { migration: out.join('\n'), schema: { tables: info, views: viewInfo, enums: catalog.enums } };
+  return { migration: out.join('\n'), schema: { tables: [...info, ...D1_TABLES], views: viewInfo, enums: catalog.enums } };
 }
+
+/** An order table's columns, as every order table in the catalog has them. */
+const ORDER_TABLE_COLUMNS: TableInfo['columns'] = [
+  { name: 'item_order', kind: 'numeric', pgType: 'numeric', notNull: true },
+  { name: 'hymn_key', kind: 'text', pgType: 'text', notNull: false },
+  { name: 'condition', kind: 'text', pgType: 'text', notNull: false },
+  { name: 'minimization', kind: 'text', pgType: '"Minimization"', notNull: false },
+  { name: 'item_type', kind: 'text', pgType: '"Item Type"', notNull: false },
+];
+
+/**
+ * Tables D1 has gained since the cutover, each created by its own migration
+ * along with its revision triggers (0003 has only the catalog's). They are
+ * listed for the Worker and the offline books, but Supabase's frozen copy
+ * hasn't got them, so import and verify leave them out (scripts/lib/schema.ts).
+ */
+const D1_TABLES: TableInfo[] = [
+  // St Basil's hymns after the commemoration of the departed, opened from it
+  // as the COMMEMORATION_OF_THE_SAINTS_HYMNS subdocument.
+  {
+    schema: 'liturgy',
+    table: 'commemoration_of_the_saints_hymns',
+    public: true,
+    columns: ORDER_TABLE_COLUMNS,
+    dropped: [],
+    rowKey: ['item_order'],
+    hasPrimaryKey: true,
+    parents: [],
+    validators: [],
+    addedInD1: '0035_commemoration_of_the_saints_hymns.sql',
+  },
+];
 
 /** Tables that exist only in D1 and also count as content: the Bible search index. */
 const D1_CONTENT_TABLES: [string, string][] = [['bible', 'verse_search']];
@@ -257,7 +291,10 @@ export function generateRevisionMigration(schema: ContentSchema): string {
     ') STRICT;',
     '',
   ];
-  const tables: [string, string][] = [...schema.tables.map((table): [string, string] => [table.schema, table.table]), ...D1_CONTENT_TABLES];
+  const tables: [string, string][] = [
+    ...schema.tables.filter((table) => !table.addedInD1).map((table): [string, string] => [table.schema, table.table]),
+    ...D1_CONTENT_TABLES,
+  ];
   for (const [schemaName, tableName] of tables) {
     for (const event of ['insert', 'update', 'delete']) {
       out.push(
