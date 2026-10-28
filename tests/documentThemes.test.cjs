@@ -367,3 +367,27 @@ test('Book Settings offers the page picker first under Display: one radio per pa
   // Every dark page's swatch carries the hairline that keeps it from sinking into the green sheet.
   assert.match(source, /theme\.dark && styles\.swatchEdge/);
 });
+
+test('the Coptic column names its speaker in Coptic, and only beside Coptic text', () => {
+  const build = loadDocumentBuilder();
+  const options = { copticFontDataUri: 'data:font/ttf;base64,AA==', fontSize: 18 };
+  const coptic = (type, extra = {}) => verse('Line', { type, coptic: 'ⲁⲙⲏⲛ', ...extra });
+  const html = build([{ id: 'roles', title: { english: 'Roles', arabic: '' }, verses: [
+    coptic('priest'), coptic('deacon'), coptic('reader'), coptic('people'), coptic('bishopOrPriest'), coptic('refrain'),
+  ] }], { ...options, bishopPresent: true });
+  const copticLabels = [...html.matchAll(/<p class="verse-text coptic[^"]*"[^>]*><span class="speaker-label (\w+)">([^<]*)<\/span><br\/>/g)]
+    .map(([, role, label]) => [role, label]);
+  assert.deepEqual(copticLabels, [
+    ['priest', 'ⲡⲓⲟⲩⲏⲃ:'],
+    ['deacon', 'ⲡⲓⲇⲓⲁⲕⲱⲛ:'],
+    ['reader', 'ⲡⲓⲁⲛⲁⲅⲛⲱⲥⲧⲏⲥ:'],
+    ['people', 'ⲡⲓⲗⲁⲟⲥ:'],
+    ['bishop', 'ⲡⲓⲉⲡⲓⲥⲕⲟⲡⲟⲥ:'],
+    // Refrain has no Coptic word: its label is a blank line, keeping the columns level.
+    ['refrain', ' '],
+  ]);
+  // A label alone does not open a Coptic column.
+  const bare = build([{ id: 'r', title: { english: 'R', arabic: '' }, verses: [verse('Reading', { type: 'reader' })] }], options);
+  assert.doesNotMatch(bare, /class="verse-text coptic/);
+  assert.match(bare, /<span class="speaker-label reader">Reader:<\/span>/);
+});

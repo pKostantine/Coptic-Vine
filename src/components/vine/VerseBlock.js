@@ -210,6 +210,7 @@ export default function VerseBlock({
     },
     {
       key: "coptic",
+      speakerLabel: suppressSpeakerLabel ? "" : getSpeakerLabel(rubricType, "coptic", bishopPresent),
       text: initial && !verse.slideshowForcedLines?.coptic ? copticRest : copticText,
       initial,
       openingWord: initial?.opensWord && startsParagraph("coptic") ? { style: { color: initialLetterColor }, baselineShift: 0 } : null,
@@ -439,7 +440,8 @@ export default function VerseBlock({
                     color: getSpeakerColor(rubricType, bishopPresent, theme),
                     fontFamily: language.fontFamily,
                     fontSize: language.fontSize,
-                    fontStyle: bodyFontStyle,
+                    // Coptic in italic is its own face, drawn upright (as in renderLanguageCell).
+                    fontStyle: language.key === "coptic" ? "normal" : bodyFontStyle,
                     fontWeight: bodyFontWeight,
                     lineHeight: language.lineHeight,
                     textAlign: getSafeTextAlign(language),
@@ -921,6 +923,16 @@ function getSpeakerLabel(type, language, bishopPresent) {
       people: "L’assemblée :",
       priest: "Le prêtre :",
       reader: "Le lecteur :",
+    }[role] || "";
+  }
+
+  if (language === "coptic") {
+    return {
+      bishop: "ⲡⲓⲉⲡⲓⲥⲕⲟⲡⲟⲥ:",
+      deacon: "ⲡⲓⲇⲓⲁⲕⲱⲛ:",
+      people: "ⲡⲓⲗⲁⲟⲥ:",
+      priest: "ⲡⲓⲟⲩⲏⲃ:",
+      reader: "ⲡⲓⲁⲛⲁⲅⲛⲱⲥⲧⲏⲥ:",
     }[role] || "";
   }
 

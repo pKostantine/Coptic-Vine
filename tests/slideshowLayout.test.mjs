@@ -1247,3 +1247,26 @@ test("a measured verse is paginated by no less than its lines, whatever its row 
   const container = fs.readFileSync(new URL("../src/components/vine/SlideshowContainer.js", import.meta.url), "utf8");
   assert.match(container, /getPaginationItemHeight\(item, measuredHeights\[item\.id\], measuredLanguageHeights\[item\.id\], fontSize, visibleLanguages\) \?\?\s+estimateItemHeight\(/);
 });
+
+test("a Coptic speaker label is a line of the verse wherever Coptic has a column of its own", () => {
+  const fontSize = 30;
+  const copticOnly = { coptic: true, copticRecitedPrayers: true };
+  const labelLine = getSlideshowLanguageLineHeight("coptic", {}, fontSize);
+  const heightOf = (overrides, visibleLanguages = copticOnly) =>
+    getVerseLineSegmentHeight({ item: verseItem({ slideshowLineCounts: { coptic: 2 }, ...overrides }) }, fontSize, visibleLanguages);
+  const copticVerse = { ...verseItem().verse, english: "", arabic: "" };
+
+  // Shown alone, the Coptic column still names who says it.
+  assert.equal(heightOf({ hasSpeakerLabel: true, verse: copticVerse }) - heightOf({ verse: copticVerse }), labelLine);
+  // A decoration-only page keeps the column, so the label too.
+  const decoration = { ...copticVerse, coptic: "", slideshowLanguageKeys: ["coptic"] };
+  assert.equal(heightOf({ hasSpeakerLabel: true, verse: decoration }) - heightOf({ verse: decoration }), labelLine);
+  // A Coptic line standing alone spans the row, unlabelled.
+  const standing = { ...copticVerse, invincibleCoptic: true };
+  assert.equal(heightOf({ hasSpeakerLabel: true, verse: standing }), heightOf({ verse: standing }));
+  // Beside English and Arabic, the row is as tall as their labels already make it.
+  assert.equal(
+    heightOf({ hasSpeakerLabel: true }, ALL_LANGUAGES) - heightOf({}, ALL_LANGUAGES),
+    getSlideshowLanguageLineHeight("arabic", {}, fontSize),
+  );
+});
