@@ -732,3 +732,47 @@ test('a change in the database reaches the books: rebuilt when their tables chan
   assert.match(bootstrap, /const UPDATE_CHECK_INTERVAL_MS = 10 \* 60 \* 1000;/);
   assert.ok(bootstrap.indexOf('checkForUpdates(false)') < bootstrap.indexOf("if (!isWifi(network.type)) return;"), 'the check comes before the Wi-Fi gate');
 });
+
+function inlineHymnLookup(nearSchemas) {
+  const reader = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
+  const cut = (start, end) => reader.slice(reader.indexOf(start), reader.indexOf(end, reader.indexOf(start)));
+  return new Function(
+    'getHymnKeyLookupSchemas',
+    `${cut('const HYMN_TEXT_SCHEMAS = [', '\n\n')}\n${cut('async function findInlineHymn(', '\nasync function fetchInlineHymnVerses(')}\nreturn { HYMN_TEXT_SCHEMAS, findInlineHymn };`,
+  )(async () => nearSchemas);
+}
+
+test('an inline hymn key is understood in whatever schema its hymn lives', async () => {
+  const { HYMN_TEXT_SCHEMAS, findInlineHymn } = inlineHymnLookup(['agpeya', 'public']);
+  // Every hymn_texts table the content API serves, which the database's
+  // guard on inline_hymn_key (migrations/0034) also searches.
+  const served = JSON.parse(fs.readFileSync('workers/content-api/schema/content-tables.json', 'utf8')).tables
+    .filter((table) => table.table === 'hymn_texts').map((table) => table.schema);
+  assert.deepEqual([...HYMN_TEXT_SCHEMAS].sort(), served.sort());
+
+  const asked = [];
+  const holding = (hymns) => async (schema) => {
+    asked.push(schema);
+    if (schema === 'readings') throw new Error('Network request failed');
+    return hymns[schema] || null;
+  };
+  // The nearest first, and only that.
+  assert.equal(await findInlineHymn('agpeya', holding({ public: 'public tenouosht', liturgy: 'liturgy tenouosht' })), 'public tenouosht');
+  assert.deepEqual(asked, ['agpeya', 'public']);
+  // A hymn in a book the device hasn't installed, or one no shared pool holds.
+  assert.equal(await findInlineHymn('agpeya', holding({ fractions: 'a fraction' })), 'a fraction');
+  // Offline, those count as not having it: the document still opens.
+  assert.equal(await findInlineHymn('agpeya', holding({})), null);
+  // A failing read of the book itself still fails, as before.
+  await assert.rejects(findInlineHymn('agpeya', async () => { throw new Error('agpeya unreadable'); }), /agpeya unreadable/);
+});
+
+test('a line with an inline hymn key calls that hymn, whatever its item_type says', () => {
+  const reader = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
+  assert.doesNotMatch(reader, /isInlineLineItem/);
+  assert.match(reader, /if \(row\.inline_hymn_key\) \{\n\s+sectionMap\.get\(key\)\.verses\.push\(\{\n\s+type: "inlinePlaceholder"/);
+  assert.match(reader, /const inlineHymnKey = normalizeText\(row\.inline_hymn_key\);\n\s+if \(inlineHymnKey\) \{/);
+  for (const fetcher of ['fetchInlineHymnVerses', 'fetchInlineHymnTitle']) {
+    assert.match(reader, new RegExp(`async function ${fetcher}\\(schema, hymnKey\\) \\{\\n[^\\n]*findInlineHymn\\(schema,`), fetcher);
+  }
+});

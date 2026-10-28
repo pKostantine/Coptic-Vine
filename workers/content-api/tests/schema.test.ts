@@ -45,3 +45,36 @@ test('every hymn_texts table gains drop_cap in migrations/0032, 0 unless set to 
   // Supabase's frozen copy hasn't got it, so import and verify leave it out.
   assert.ok(!contentSchema.tables.some((table) => table.columns.some((column) => column.name === 'drop_cap')));
 });
+
+test('a line can only call a hymn that exists, in any hymn_texts table (migrations/0034)', () => {
+  const { schema } = generate(JSON.parse(read('schema/pg-catalog.json')));
+  const hymnTexts = schema.tables.filter((table) => table.table === 'hymn_texts').map((table) => table.schema);
+  const db = new DatabaseSync(':memory:');
+  for (const migration of ['0001_content_schema.sql', '0002_bible_search.sql', '0003_content_revision.sql', '0032_drop_cap.sql', '0034_inline_hymn_keys.sql']) {
+    db.exec(read(`migrations/${migration}`));
+  }
+  const guards = (db.prepare(`SELECT "name" FROM sqlite_master WHERE "type" = 'trigger' AND "name" LIKE '%inline_hymn_key%'`).all() as { name: string }[])
+    .map((row) => row.name).sort();
+  assert.deepEqual(guards, hymnTexts.flatMap((name) => [`${name}.hymn_texts_inline_hymn_key_insert`, `${name}.hymn_texts_inline_hymn_key_update`]).sort());
+
+  db.exec(`INSERT INTO "public.hymn_titles" ("hymn_key") VALUES ('tenouosht')`);
+  db.exec(`INSERT INTO "public.hymn_texts" ("line_id", "hymn_key") VALUES (1, 'tenouosht')`);
+  db.exec(`INSERT INTO "liturgy.hymn_titles" ("hymn_key") VALUES ('throughTheIntercessions')`);
+  const line = (lineId: number, key: string) =>
+    db.exec(`INSERT INTO "liturgy.hymn_texts" ("line_id", "hymn_key", "item_type", "inline_hymn_key") VALUES (${lineId}, 'throughTheIntercessions', 'Inline', '${key}')`);
+  const refused = /inline_hymn_key is no hymn_key in any hymn_texts table/;
+  assert.throws(() => line(2, 'tenousht'), refused);
+  assert.throws(() => line(2, 'tenouosht '), refused);
+  line(2, 'tenouosht');
+  // The readings and whole tables the reader resolves itself.
+  line(3, 'LITURGY_GOSPEL_WITH_COPTIC');
+  db.exec(`INSERT INTO "liturgy.hymn_texts" ("line_id", "hymn_key", "english") VALUES (4, 'throughTheIntercessions', 'A line')`);
+  assert.throws(() => db.exec(`UPDATE "liturgy.hymn_texts" SET "inline_hymn_key" = 'tenousht' WHERE "line_id" = 2`), refused);
+  db.exec(`UPDATE "liturgy.hymn_texts" SET "english" = 'A line of its own' WHERE "line_id" = 2`);
+
+  // Each hymn once, where it is.
+  assert.deepEqual(db.prepare(`SELECT * FROM "public.hymn_keys" ORDER BY "schema_name"`).all().map((row) => ({ ...row })), [
+    { schema_name: 'liturgy', hymn_key: 'throughTheIntercessions' },
+    { schema_name: 'public', hymn_key: 'tenouosht' },
+  ]);
+});
