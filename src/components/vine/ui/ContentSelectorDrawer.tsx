@@ -9,6 +9,7 @@ import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { DocumentSection } from '../documentHtml';
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import Icon from './Icon';
+import { VineRule } from './Ornaments';
 import ReaderPanel, { type ReaderPanelAction } from './ReaderPanel';
 import {
   pickRowText,
@@ -147,17 +148,18 @@ export default function ContentSelectorDrawer({
   const toggleDividerFold = (dividerId: string) =>
     setFoldedDividerIds((current) => ({ ...current, [dividerId]: !current[dividerId] }));
 
-  // Headings worth a fold control: one that gathers nothing listable has
-  // nothing to hide, which is what the last heading in a document can come to
-  // once conditions have had their say. Computed over `listable`, not the
-  // folded view, or a heading would lose its control the moment it was used.
-  const foldableDividerIds = useMemo(() => {
-    const foldable = new Set<string>();
+  // How many listed hymns each heading gathers, which a folded heading shows.
+  // Only a heading here has a fold control: one that gathers nothing listable
+  // has nothing to hide, which is what the last heading in a document can
+  // come to once conditions have had their say. Computed over `listable`, not
+  // the folded view, or a heading would lose its control the moment it was used.
+  const gatheredCounts = useMemo(() => {
+    const counts = new Map<string, number>();
     for (const section of listable) {
       const ownerId = dividerOwners.get(section.id);
-      if (ownerId) foldable.add(ownerId);
+      if (ownerId) counts.set(ownerId, (counts.get(ownerId) ?? 0) + 1);
     }
-    return foldable;
+    return counts;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- listable is rebuilt from props on every render
   }, [sections, dividerOwners, displaySilentPrayers, bishopPresent, copticGospelRite]);
 
@@ -209,17 +211,27 @@ export default function ContentSelectorDrawer({
   );
 
   const scrollViewRef = useRef<ScrollView>(null);
+  // Each row's y: in the list, or for a row gathered under a heading, in its
+  // group's card, whose own y is kept by heading id.
   const [itemLayouts, setItemLayouts] = useState<Record<string, number>>({});
+  const [groupLayouts, setGroupLayouts] = useState<Record<string, number>>({});
 
   // Keep the panel scrolled to wherever the user currently is in the
   // document — on open, and any time that position changes while the panel
   // is already open (e.g. it was left open while swiping through slides).
   useEffect(() => {
     if (!visible || !highlightedSectionId || searching) return;
+    const ownerId = dividerOwners.get(highlightedSectionId);
+    const groupY = ownerId ? groupLayouts[ownerId] : 0;
     const y = itemLayouts[highlightedSectionId];
-    if (y === undefined) return;
-    scrollViewRef.current?.scrollTo({ y: Math.max(y - 12, 0), animated: false });
-  }, [visible, highlightedSectionId, itemLayouts, searching]);
+    if (y === undefined || groupY === undefined) return;
+    scrollViewRef.current?.scrollTo({ y: Math.max(groupY + y - 12, 0), animated: false });
+  }, [visible, highlightedSectionId, itemLayouts, groupLayouts, dividerOwners, searching]);
+
+  const recordGroupLayout = (headingId: string) => (event: LayoutChangeEvent) => {
+    const y = event.nativeEvent.layout.y;
+    setGroupLayouts((current) => (current[headingId] === y ? current : { ...current, [headingId]: y }));
+  };
 
   const documentTitle = pickRowText(title ?? null, appLanguage);
 
@@ -299,10 +311,8 @@ export default function ContentSelectorDrawer({
         </Pressable>
       ) : undefined}
     >
-      {(layout) => (
-        <ScrollView ref={scrollViewRef} style={styles.list} contentContainerStyle={[styles.listContent, layout.compact && styles.listContentCompact]} keyboardShouldPersistTaps="handled">
-          {searching && !visibleListable.length ? <Text style={styles.noMatches}>{text.noMatches}</Text> : null}
-          {visibleListable.map((section, listIndex) => {
+      {(layout) => {
+          const renderRow = (section: DocumentSection) => {
             const recordLayout = (event: LayoutChangeEvent) => {
               const y = event.nativeEvent.layout.y;
               setItemLayouts((current) => (current[section.id] === y ? current : { ...current, [section.id]: y }));
@@ -351,23 +361,18 @@ export default function ContentSelectorDrawer({
             // document is -- it changes what this service shows rather than
             // being a place in it.
             const isChoice = Boolean(section.isInterpretationChooserButton);
-            // An hour opening renders as a rule across the list: it marks
-            // where one part of the service ends and the next begins, so it
-            // should read as a seam rather than as one more hymn sitting
-            // between them. Still tappable — jumping to the top of an hour is
-            // exactly what someone scanning for one wants.
+            // A heading (sectionDividers.ts) is set as the book pages set a
+            // section's name: in the title face, the vine run out beside it,
+            // with the hymns it gathers on a card below. It marks where one
+            // part of the service ends and the next begins, so it reads as a
+            // heading rather than as one more hymn between them.
             const isDivider = isDividerSection(section);
-            // Sits under the divider above it (not while searching: matches
-            // are listed flat). The rule that brackets the group is drawn by
-            // the wrapper below, not by the row.
-            const isNested = !searching && dividerOwners.has(section.id);
-            const isLastNested = isNested && !dividerOwners.has(visibleListable[listIndex + 1]?.id ?? '');
             const isHere = section.id === highlightedSectionId;
             // What has been read is dimmed, but not the choice of
             // interpretations: it is a button that works from here whatever
             // has been read, as the Up next cards are, and never dim.
             const isPast = places[section.id] === 'past' && !isHere && !isChoice;
-            const foldableDividerId = !searching && isDivider && foldableDividerIds.has(section.id) ? section.id : null;
+            const foldableDividerId = !searching && isDivider && gatheredCounts.has(section.id) ? section.id : null;
             const isFolded = Boolean(foldableDividerId && foldedDividerIds[foldableDividerId]);
 
             const row = (
@@ -378,7 +383,9 @@ export default function ContentSelectorDrawer({
                 style={({ pressed }) => [
                   styles.row,
                   layout.compact && styles.rowCompact,
-                  isDivider && styles.dividerItem,
+                  isDivider && styles.headingItem,
+                  isDivider && layout.compact && styles.headingItemCompact,
+                  isFolded && styles.headingItemFolded,
                   !isDivider && isSubdocument && styles.rowSubdocument,
                   !isDivider && isHyperlink && styles.rowHyperlink,
                   !isDivider && isChoice && styles.rowChoice,
@@ -386,10 +393,7 @@ export default function ContentSelectorDrawer({
                   isPast && styles.rowPast,
                   pressed && !isHere && styles.rowPressed,
                 ]}
-                // A nested row's own y is measured inside its wrapper, so the
-                // wrapper reports position instead — itemLayouts feeds
-                // scrollTo, which needs an offset within the ScrollView.
-                onLayout={isNested ? undefined : recordLayout}
+                onLayout={recordLayout}
                 accessibilityLabel={
                   foldableDividerId
                     ? `${isFolded ? 'Show' : 'Hide'} the hymns under ${parts.title.english || parts.title.arabic}`
@@ -409,16 +413,26 @@ export default function ContentSelectorDrawer({
                 }}
               >
                 {isDivider ? (
-                  <View style={styles.dividerRow}>
-                    <View style={styles.dividerRule} />
-                    <View style={styles.dividerLabelGroup}>
-                      <Text style={[styles.dividerLabel, pickedTitle.arabic && styles.dividerLabelArabic]}>{pickedTitle.text}</Text>
-                      {foldableDividerId ? (
-                        <Icon name={isFolded ? 'chevron-forward' : 'chevron-down'} size={14} color={theme.colors.accent} />
-                      ) : null}
-                    </View>
-                    <View style={styles.dividerRule} />
-                  </View>
+                  <>
+                    <Text
+                      style={[
+                        styles.headingTitle,
+                        layout.compact && styles.headingTitleCompact,
+                        pickedTitle.arabic && styles.headingTitleArabic,
+                        isHere && styles.headingTitleHere,
+                      ]}
+                      accessibilityRole="header"
+                      numberOfLines={2}
+                    >
+                      {pickedTitle.text}
+                    </Text>
+                    <VineRule height={layout.compact ? 13 : 15} />
+                    {/* Folded, it says how much it holds. */}
+                    {isFolded ? <Text style={styles.headingCount}>{gatheredCounts.get(section.id)}</Text> : null}
+                    {foldableDividerId ? (
+                      <Icon name={isFolded ? 'chevron-forward' : 'chevron-down'} size={16} color={panelColors.here} />
+                    ) : null}
+                  </>
                 ) : (
                   <Text
                     style={[
@@ -444,24 +458,38 @@ export default function ContentSelectorDrawer({
               </Pressable>
             );
 
-            if (!isNested) return row;
+            return row;
+          };
 
-            // One segment of the rule bracketing the group. The gap below the
-            // row is this wrapper's padding rather than the row's margin, so
-            // the border runs through it and consecutive segments meet — one
-            // unbroken line down the group instead of a dash beside each row.
-            // The last segment drops that padding so the line stops with the
-            // group rather than trailing past it.
-            return (
-              <View key={section.id} style={[styles.nestedSegment, isLastNested && styles.nestedSegmentLast]} onLayout={recordLayout}>
-                {row}
-              </View>
-            );
-          })}
-        </ScrollView>
-      )}
+          return (
+            <ScrollView ref={scrollViewRef} style={styles.list} contentContainerStyle={[styles.listContent, layout.compact && styles.listContentCompact]} keyboardShouldPersistTaps="handled">
+              {searching && !visibleListable.length ? <Text style={styles.noMatches}>{text.noMatches}</Text> : null}
+              {/* A heading's hymns share one card under it (not while
+                  searching: matches are listed flat). */}
+              {groupUnderHeadings(visibleListable, (section) => (searching || upNextIds.has(section.id) ? undefined : dividerOwners.get(section.id))).map((entry) => (
+                entry.headingId ? (
+                  <View key={`group-${entry.headingId}`} style={styles.group} onLayout={recordGroupLayout(entry.headingId)}>
+                    {entry.sections.map(renderRow)}
+                  </View>
+                ) : renderRow(entry.sections[0])
+              ))}
+            </ScrollView>
+          );
+        }}
     </ReaderPanel>
   );
+}
+
+/** The list in runs: the rows one heading gathers together, for their card, and every other row alone. */
+function groupUnderHeadings(sections: DocumentSection[], headingOf: (section: DocumentSection) => string | undefined) {
+  const entries: { headingId?: string; sections: DocumentSection[] }[] = [];
+  for (const section of sections) {
+    const headingId = headingOf(section);
+    const last = entries[entries.length - 1];
+    if (headingId && last?.headingId === headingId) last.sections.push(section);
+    else entries.push({ headingId, sections: [section] });
+  }
+  return entries;
 }
 
 /**
@@ -539,41 +567,27 @@ function createStyles(theme: DocumentTheme) {
     // A reading's citation, after its name: smaller, in the body face, muted.
     citation: { color: panel.faint, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontStyle: 'normal', fontWeight: '400' },
     citationArabic: { fontFamily: TYPOGRAPHY.arabic },
-    nestedSegment: {
-      borderLeftColor: colors.accentLine,
-      borderLeftWidth: 2,
-      marginLeft: 10,
-      paddingBottom: 2,
-      paddingLeft: 8,
+    // A heading: its name lines up with the rows' names below it.
+    headingItem: { marginTop: 14, minHeight: 0, paddingBottom: 4, paddingTop: 6 },
+    headingItemCompact: { marginTop: 10 },
+    // Folded, it keeps the room its card took, so what follows reads as the
+    // service again rather than as the heading's own.
+    headingItemFolded: { marginBottom: 10 },
+    headingTitle: {
+      color: panel.ink,
+      flexShrink: 1,
+      fontFamily: TYPOGRAPHY.title,
+      fontSize: 18,
+      fontWeight: '700',
+      lineHeight: 23,
+      maxWidth: '78%',
     },
-    // The group's rail ends flush with its final row.
-    nestedSegmentLast: { marginBottom: 2, paddingBottom: 0 },
-    dividerItem: {
-      backgroundColor: 'transparent',
-      borderWidth: 0,
-      marginTop: 10,
-      minHeight: 0,
-      paddingHorizontal: 0,
-      paddingVertical: 6,
-    },
-    dividerRow: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 8 },
-    dividerRule: { backgroundColor: colors.accentLine, flex: 1, height: 1 },
-    dividerLabelGroup: { alignItems: 'center', flexDirection: 'row', gap: 4 },
-    dividerLabel: {
-      color: colors.accent,
-      fontFamily: TYPOGRAPHY.body,
-      fontSize: 11,
-      fontWeight: '800',
-      letterSpacing: 1.3,
-      textTransform: 'uppercase',
-    },
-    dividerLabelArabic: {
-      fontFamily: TYPOGRAPHY.arabic,
-      fontSize: 14,
-      letterSpacing: 0,
-      // Arabic has no upper case for textTransform to reach.
-      textTransform: 'none',
-    },
+    headingTitleCompact: { fontSize: 16, lineHeight: 21 },
+    headingTitleArabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+    headingTitleHere: { color: panel.here },
+    headingCount: { color: panel.quiet, fontFamily: TYPOGRAPHY.body, fontSize: 13 },
+    // What a heading gathers, on one card of the page's wash.
+    group: { backgroundColor: panel.washSoft, borderRadius: 16, gap: 2, marginBottom: 6, paddingVertical: 4 },
     upNext: {
       alignItems: 'center',
       backgroundColor: panel.next,

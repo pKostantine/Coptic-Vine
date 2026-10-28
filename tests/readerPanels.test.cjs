@@ -285,3 +285,15 @@ test('the Contents still fold the Agpeya hours by their openings', () => {
   assert.ok(!isDividerSection({ id: 'x', hymnKey: 'introductionOfEveryHour' }));
   assert.ok(!isDividerSection({ id: 'x', hymnKey: 'introductionToTheCreed' }));
 });
+
+test('a Contents heading is set as the book pages set a section, its hymns on one card under it', () => {
+  const drawer = fs.readFileSync('src/components/vine/ui/ContentSelectorDrawer.tsx', 'utf8');
+  // The title face beside the vine, then how many it hides once folded and the fold's chevron.
+  assert.match(drawer, /styles\.headingTitle,[\s\S]*?<VineRule height=\{layout\.compact \? 13 : 15\} \/>[\s\S]*?isFolded \? <Text style=\{styles\.headingCount\}>\{gatheredCounts\.get\(section\.id\)\}<\/Text>/);
+  // One card for each run under a heading, flat while searching; no rail beside each row.
+  assert.match(drawer, /groupUnderHeadings\(visibleListable, \(section\) => \(searching \|\| upNextIds\.has\(section\.id\) \? undefined : dividerOwners\.get\(section\.id\)\)\)/);
+  assert.match(drawer, /<View key=\{`group-\$\{entry\.headingId\}`\} style=\{styles\.group\} onLayout=\{recordGroupLayout\(entry\.headingId\)\}>/);
+  assert.doesNotMatch(drawer, /nestedSegment|borderLeftWidth/);
+  // A row on a card is placed by the card's y plus its own.
+  assert.match(drawer, /scrollTo\(\{ y: Math\.max\(groupY \+ y - 12, 0\), animated: false \}\)/);
+});
