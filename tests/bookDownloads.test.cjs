@@ -776,3 +776,11 @@ test('a line with an inline hymn key calls that hymn, whatever its item_type say
     assert.match(reader, new RegExp(`async function ${fetcher}\\(schema, hymnKey\\) \\{\\n[^\\n]*findInlineHymn\\(schema,`), fetcher);
   }
 });
+
+test('a hymn called at two lines of one hymn is two sections, each with its own id', () => {
+  const reader = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
+  // The reader keeps collapse and place by id: St Basil's commemoration calls
+  // owohNaiNemStBasil twice, and both copies opened and closed together.
+  assert.match(reader, /const inlineId = `\$\{section\.id\}-inline-\$\{verse\.inlineHymnKey\}\$\{calls > 1 \? `-\$\{calls\}` : ""\}`;/);
+  assert.doesNotMatch(reader, /`\$\{section\.id\}-inline-\$\{verse\.inlineHymnKey\}(?!\$\{calls)/, 'every inline section id goes through inlineId');
+});
