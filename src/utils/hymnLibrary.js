@@ -2232,6 +2232,8 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
     // readings ("Coptic Psalm" around FIRST_LITURGY_PSALM_WITH_COPTIC) — that
     // title naming its reading (titleWithCitation).
     let firstChunkTitle = section.title;
+    // How many times each hymn has been called in so far (see inlineId).
+    const inlineCalls = new Map();
 
     const flushVerses = () => {
       if (!verses.length && pushedAnything) {
@@ -2256,6 +2258,13 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
 
       if (verse.type === "inlinePlaceholder") {
         if (depth >= 3) continue;
+        // A hymn can call the same hymn at more than one line
+        // (commemorationOfTheSaintsStBasil calls owohNaiNemStBasil twice).
+        // Each call is a section of its own, and the reader keeps a section's
+        // collapse and its place by id, so the second and later get "-2", "-3".
+        const calls = (inlineCalls.get(verse.inlineHymnKey) || 0) + 1;
+        inlineCalls.set(verse.inlineHymnKey, calls);
+        const inlineId = `${section.id}-inline-${verse.inlineHymnKey}${calls > 1 ? `-${calls}` : ""}`;
 
         // A reading-resolution sentinel embedded mid-verse (e.g. gospel_rite's
         // "gospel"/"copticPsalm" hymns splicing in VESPERS_GOSPEL_WITH_COPTIC)
@@ -2280,7 +2289,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
             isoDate,
             ownSection,
             ownSection ? verse.inlineHymnMinimization : null,
-            `${section.id}-inline-${verse.inlineHymnKey}`,
+            inlineId,
             flags,
           );
           if (spliced?.kind === "section") {
@@ -2302,7 +2311,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         if (wholeTableTarget) {
           flushVerses();
           const nestedSections = await hydrateWholeTableInlineNested(verse.inlineHymnKey, wholeTableTarget, flags, depth + 1, isoDate);
-          const toggleSection = buildGospelRiteToggleSection(verse.inlineHymnKey, `${section.id}-inline-${verse.inlineHymnKey}`);
+          const toggleSection = buildGospelRiteToggleSection(verse.inlineHymnKey, inlineId);
           // Same calling-schema-gives-the-title principle as the top-level
           // Inline placeholder above, just sourced from this line's own
           // inline_hymn_title_shown/inline_hymn_minimization (the type-2
@@ -2312,7 +2321,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
             Boolean(verse.inlineHymnTitleShown) &&
             Boolean(inlineSentinelTitle?.title_english || inlineSentinelTitle?.title_arabic);
           const callingRow = {
-            id: `${section.id}-inline-${verse.inlineHymnKey}`,
+            id: inlineId,
             title: hasOwnSentinelTitle
               ? { english: inlineSentinelTitle.title_english || "", arabic: inlineSentinelTitle.title_arabic || "", french: inlineSentinelTitle.title_french || "" }
               : { english: "", arabic: "" },
@@ -2384,7 +2393,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           });
           hydrated.push(
             applyCopticCaseToSection({
-              id: `${section.id}-inline-${verse.inlineHymnKey}`,
+              id: inlineId,
               hymn_key: verse.inlineHymnKey,
               title: { english: inlineTitle.title_english || "", arabic: inlineTitle.title_arabic || "", french: inlineTitle.title_french || "" },
               titlePrayerType: inlineTitlePrayerType,
@@ -2438,7 +2447,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
             } else {
               hydrated.push(
                 applyCopticCaseToSection({
-                  id: `${section.id}-inline-${verse.inlineHymnKey}-wrap${wrapIndex++}`,
+                  id: `${inlineId}-wrap${wrapIndex++}`,
                   title: { english: "", arabic: "" },
                   verses: seg.verses,
                   alternateEvery: null,
