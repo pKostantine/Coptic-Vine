@@ -60,6 +60,7 @@ export function getSectionSelectorTitle(section: DocumentSection): { english: st
 }
 
 function resolveSectionSelectorTitle(section: DocumentSection): { english: string; arabic: string; french?: string } {
+  if (section.selectorTitle) return section.selectorTitle;
   const readingReference = section.verses.find((verse) => verse.type === 'readingReference');
   const baseTitle = getReadingReferenceSelectorBaseTitle(section);
   if (baseTitle) {

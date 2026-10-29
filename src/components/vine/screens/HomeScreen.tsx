@@ -29,6 +29,7 @@ import { LECTIONARY_ROUTE_IDS, LECTIONARY_SERVICES, lectionaryHref, readingLines
 import { readingsServiceAt } from '@/utils/liturgicalDay';
 import { getServiceReadingCitations, type LectionaryService, type ReadingCitation } from '@/utils/readingsService';
 import { splitSaintTitle } from '@/utils/saintTitles';
+import { synaxariumEntryHref } from '@/utils/synaxariumEntryDocument';
 import { canonDayProgress, canonTaskRoute } from '@/utils/spiritualCanon';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 
@@ -398,7 +399,7 @@ export default function HomeScreen() {
             return tile(
               event.entryKey,
               title,
-              () => router.push(`/synaxarium?day=${isoDate(synaxDate)}` as never),
+              () => router.push(synaxariumEntryHref(event.entryKey, isoDate(synaxDate)) as never),
               <>
                 <Text style={[styles.saintName, arabic && styles.arabic]}>{main}</Text>
                 {detail ? <Text style={styles.saintDetail}>{detail}</Text> : null}

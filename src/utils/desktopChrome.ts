@@ -25,7 +25,8 @@ const BOOK_SUBPAGE_ROOTS: ReadonlySet<string> = new Set<string>([
  * instead.
  */
 export function keepsWholeWindow(segments: string[]): boolean {
-  if (segments.some((segment) => segment === '[serviceId]' || segment === '[chapter]' || segment === '[hourId]' || segment === 'now-playing')) {
+  // A saint's Synaxarium entry ([entryKey]) is read in the reader too.
+  if (segments.some((segment) => segment === '[serviceId]' || segment === '[chapter]' || segment === '[hourId]' || segment === '[entryKey]' || segment === 'now-playing')) {
     return true;
   }
   return BOOK_SUBPAGE_ROOTS.has(segments[0] ?? '');

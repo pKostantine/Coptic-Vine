@@ -45,6 +45,8 @@ test('the reader and the full players keep the whole window', () => {
   assert.ok(keepsWholeWindow(['liturgy', 'raising-of-incense', '[serviceId]']));
   assert.ok(keepsWholeWindow(['bible', '[bookKey]', '[chapter]']));
   assert.ok(keepsWholeWindow(['holy-week', '[dayId]', '[hourId]']));
+  assert.ok(keepsWholeWindow(['synaxarium', '[entryKey]']), "a saint's Synaxarium entry is read in the reader");
+  assert.equal(keepsWholeWindow(['synaxarium']), false, 'the Synaxarium itself keeps its sidebar');
   assert.ok(keepsWholeWindow(['music', 'now-playing']));
 });
 

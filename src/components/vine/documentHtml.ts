@@ -98,6 +98,8 @@ export interface DocumentSection {
   nonCopticGospelRiteOnly?: boolean;
   /** Dressed with an ornament (constants/documentOrnaments.ts): its title set inside a headpiece, or, with no title, the Medallion that closes a service. */
   ornament?: DocumentOrnament;
+  /** What the Contents call it, where that isn't a title it shows: a saint's Synaxarium entry, named in the headpiece over it (utils/synaxariumEntryDocument.ts). */
+  selectorTitle?: DocumentTitle;
 }
 
 export interface DocumentTitle {
