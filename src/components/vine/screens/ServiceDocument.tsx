@@ -23,6 +23,7 @@ import {
   type AntiphonaryGroup, type AntiphonaryTune,
 } from '../antiphonaryNavigation';
 import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../DocumentWebView';
+import type { DocumentTitle } from '../documentHtml';
 import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { BookSettingsSheet } from './SettingsScreen';
 import { documentInitialColors, documentOrnamentColor } from '../../../constants/documentOrnaments';
@@ -87,6 +88,14 @@ interface ServiceDocumentProps {
    * the same Date between renders; a new one hydrates the document again.
    */
   conditionDate?: Date;
+  /**
+   * The document from somewhere other than a service table, with the name it
+   * opens on in place of `title`: a saint's Synaxarium entry
+   * (app/synaxarium/[entryKey].tsx). Read for conditionDate, or the
+   * calendar's day. Keep it the same function between renders. Such a
+   * document has no bookmark: a bookmark opens a document from its book.
+   */
+  loadDocument?: (date: Date) => Promise<{ title: DocumentTitle; sections: DocumentSection[] }>;
 }
 
 /** Appends a hyperlink button to the next service, labelled with that service's own name, after a hydrated document. The same section shape hymnLibrary builds for an order row whose item_type is Hyperlink. */
@@ -135,7 +144,7 @@ interface AntiphonaryModalTarget {
  * native swipe-back gesture of its own to conflict with. The swipe gestures
  * are native-only: web always uses the visible header and never swipe-exits.
  */
-export default function ServiceDocument({ schema, table, title, arabic, french, extraContext, entryId, backHref, appendHyperlinkKey, ornamentSeason: fixedOrnamentSeason, conditionDate }: ServiceDocumentProps) {
+export default function ServiceDocument({ schema, table, title, arabic, french, extraContext, entryId, backHref, appendHyperlinkKey, ornamentSeason: fixedOrnamentSeason, conditionDate, loadDocument }: ServiceDocumentProps) {
   const router = useRouter();
   const { user } = useAuth();
   const {
@@ -244,6 +253,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   );
 
   const [hydratedSections, setHydratedSections] = useState<DocumentSection[] | null>(null);
+  // The name a document read by loadDocument opens on, once read; until then, and for any other, the menu's.
+  const [loadedTitle, setLoadedTitle] = useState<DocumentTitle | null>(null);
+  const documentTitle = useMemo(() => loadedTitle ?? { english: title, arabic, french }, [loadedTitle, title, arabic, french]);
   // The document as the reader has chosen it: the Kiahk Theotokias'
   // interpretations they did not choose taken out, and the button to choose
   // them set in (utils/kiahkInterpretations.ts). A choice made here changes
@@ -426,6 +438,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   }, [restoreSettingsSignature, readerFocused, sections, documentPositionKey]);
 
   const bookmarked = isBookmarked(bookmarkId);
+  // A document read by loadDocument is in no book's menu, so a bookmark could open nothing.
+  const bookmarkable = !loadDocument;
   const sermonReferences = useMemo(
     () => isSermonPlanner && readySections ? getSermonPlannerReferences(readySections) : [],
     [isSermonPlanner, readySections],
@@ -490,18 +504,25 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         .then((overview) => getDayThemeKey(overview?.indicatorKey, overview?.activeKeys))
         .catch(() => null);
 
+    // A document read by loadDocument brings the name it opens on; a service's is its menu's.
+    let ownTitle: DocumentTitle | null = null;
     Promise.all([
-      epistleFlagsPromise.then((epistleFlags) => {
-        // Explicit Book Settings choices (including Monastery) take priority
-        // over entry-point context, so no route can silently override the toggle.
-        const flags = { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext, ...userConditionFlags };
-        const hydrated = hydrateSupabaseServiceHymn(schema, table, effectiveDate, flags, weekdayConditionDate);
-        // A day of its own (Holy Week's) that an old downloaded calendar no
-        // longer reaches, read offline: the calendar's day, rather than nothing.
-        return conditionDate
-          ? hydrated.catch(() => hydrateSupabaseServiceHymn(schema, table, calendarEffectiveDate, flags, undefined))
-          : hydrated;
-      }),
+      loadDocument
+        ? loadDocument(effectiveDate).then((loaded) => {
+          ownTitle = loaded.title;
+          return loaded.sections;
+        })
+        : epistleFlagsPromise.then((epistleFlags) => {
+          // Explicit Book Settings choices (including Monastery) take priority
+          // over entry-point context, so no route can silently override the toggle.
+          const flags = { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...extraContext, ...userConditionFlags };
+          const hydrated = hydrateSupabaseServiceHymn(schema, table, effectiveDate, flags, weekdayConditionDate);
+          // A day of its own (Holy Week's) that an old downloaded calendar no
+          // longer reaches, read offline: the calendar's day, rather than nothing.
+          return conditionDate
+            ? hydrated.catch(() => hydrateSupabaseServiceHymn(schema, table, calendarEffectiveDate, flags, undefined))
+            : hydrated;
+        }),
       seasonPromise,
     ])
       .then(([result, season]) => {
@@ -509,7 +530,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           const hydrated = withAppendedHyperlink(result as DocumentSection[], appendHyperlinkKey);
           // A service opens on its own name and closes on the Medallion; the
           // Sermon Planner is a working page, not a service, and stays bare.
-          const newSections = isSermonPlanner ? hydrated : withDocumentOrnaments(hydrated, { english: title, arabic, french });
+          const newSections = isSermonPlanner ? hydrated : withDocumentOrnaments(hydrated, ownTitle ?? { english: title, arabic, french });
+          setLoadedTitle(ownTitle);
           setOrnamentSeason(season);
           setHydratedSections(newSections);
           setLoadedConditionsKey(conditionsKey);
@@ -572,7 +594,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     return () => {
       cancelled = true;
     };
-  }, [schema, table, title, arabic, french, isSermonPlanner, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, openAtHymnKey, documentPositionKey, conditionDate, calendarEffectiveDate]);
+  }, [schema, table, title, arabic, french, isSermonPlanner, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, openAtHymnKey, documentPositionKey, conditionDate, calendarEffectiveDate, loadDocument]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle
@@ -1101,7 +1123,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       {/* The page runs up under the status bar; on a light one its clock and battery turn dark. */}
       <DocumentStatusBar theme={documentTheme} />
       <Head>
-        <title>{`Coptic Vine ${title}`}</title>
+        <title>{`Coptic Vine ${documentTitle.english}`}</title>
       </Head>
       {/* The floating controls' room, where the page doesn't run up under them:
           a date bar, the Antiphonary's pills or a slideshow start below them. */}
@@ -1222,8 +1244,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             onSelectSection={(id) => jumpToSection(id)}
             onOpenHyperlink={(hyperlinkKey) => openHyperlink(hyperlinkKey, { fromSelector: true })}
             onOpenInterpretations={() => setInterpretationsOpen(true)}
-            bookmarked={bookmarked}
-            onToggleBookmark={() => toggleBookmark(bookmarkId)}
+            bookmarked={bookmarkable ? bookmarked : undefined}
+            onToggleBookmark={bookmarkable ? () => toggleBookmark(bookmarkId) : undefined}
             onOpenCalendar={openCalendar}
             onOpenSettings={openSettings}
             bishopPresent={preferences.bishopPresent}
@@ -1241,7 +1263,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             copticGospelRite={copticGospelRite}
             appLanguage={preferences.appLanguage}
             theme={documentTheme}
-            title={{ english: title, arabic, french }}
+            title={documentTitle}
           />
           )}
         </>
@@ -1263,7 +1285,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           backAccessibilityLabel="Leave document"
           // At the top of a service its headpiece carries the title; the pill
           // fades in once that has scrolled away.
-          title={{ english: title, arabic, french }}
+          title={documentTitle}
           titleVisible={!controlsOverText || !headpieceInView}
           actions={[
             ...(shouldShowFullscreen && screenWidth >= MOBILE_WEB_BREAKPOINT

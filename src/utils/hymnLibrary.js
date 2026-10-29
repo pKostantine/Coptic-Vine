@@ -751,6 +751,25 @@ async function resolveSynaxariumSections(isoDate) {
   return sections;
 }
 
+/**
+ * One saint's commemoration from the day's Synaxarium, read as a document of
+ * its own (app/synaxarium/[entryKey].tsx): its title, and its paragraphs read
+ * as the Liturgy of the Word reads them, opening on the first -- with no
+ * reader named, this being no service. Null when the day has no such entry;
+ * rejects when the day can't be read.
+ */
+export async function resolveSynaxariumEntry(isoDate, entryKey) {
+  const dayData = await getSynaxariumForDate(isoDate);
+  const entry = (dayData?.entries || []).find((candidate) => candidate.entry_key === entryKey);
+  if (!entry) return null;
+  return {
+    title: { english: entry.title_english || "", arabic: entry.title_arabic || "" },
+    verses: openOnFirstVerse((entry.paragraphs || [])
+      .filter((p) => (p.english || "").trim() || (p.arabic || "").trim())
+      .map((p) => synaxariumVerse({ english: p.english || "", arabic: p.arabic ?? null }, null))),
+  };
+}
+
 /** The Sermon Planner needs only the commemorations, not the Synaxarium date or priest's introduction. */
 function omitSynaxariumPreamble(sections) {
   return sections.filter(({ id }) => id !== "synaxarium-intro" && !id.startsWith("synaxarium-date-"));

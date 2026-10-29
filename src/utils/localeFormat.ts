@@ -133,15 +133,28 @@ export function formatDayMonthRange(start: Date, end: Date, isArabic: boolean) {
  * "October 18–19", "October 31 – November 1" / "18–19 octobre" / "١٨–١٩ أكتوبر".
  */
 export function formatMonthDaySpan(start: Date, end: Date, isArabic: boolean) {
-  const digits = (value: number) => (isArabic ? toEasternArabicDigits(value) : String(value));
+  return formatMonthDaySpanIn(start, end, formatLanguage(isArabic));
+}
+
+/** The languages the formats below are written in. */
+export type FormatLanguage = 'en' | 'fr' | 'ar';
+
+/** The language the helpers taking only an Arabic flag write in: Arabic, or the App Language's French or English. */
+function formatLanguage(isArabic: boolean): FormatLanguage {
+  return isArabic ? 'ar' : isFrench(false) ? 'fr' : 'en';
+}
+
+/** formatMonthDaySpan in a language of its own, whatever the App Language: a line given in every language at once. */
+export function formatMonthDaySpanIn(start: Date, end: Date, language: FormatLanguage) {
+  const digits = (value: number) => (language === 'ar' ? toEasternArabicDigits(value) : String(value));
   const sameMonth = start.getUTCMonth() === end.getUTCMonth();
-  if (!isArabic && !isFrench(isArabic)) {
+  if (language === 'en') {
     const month = (date: Date) => GREGORIAN_MONTHS_EN[date.getUTCMonth()];
     return sameMonth
       ? `${month(start)} ${start.getUTCDate()}–${end.getUTCDate()}`
       : `${month(start)} ${start.getUTCDate()} – ${month(end)} ${end.getUTCDate()}`;
   }
-  const months = isArabic ? GREGORIAN_MONTHS_AR : GREGORIAN_MONTHS_FR;
+  const months = language === 'ar' ? GREGORIAN_MONTHS_AR : GREGORIAN_MONTHS_FR;
   return sameMonth
     ? `${digits(start.getUTCDate())}–${digits(end.getUTCDate())} ${months[end.getUTCMonth()]}`
     : `${digits(start.getUTCDate())} ${months[start.getUTCMonth()]} – ${digits(end.getUTCDate())} ${months[end.getUTCMonth()]}`;
@@ -149,8 +162,13 @@ export function formatMonthDaySpan(start: Date, end: Date, isArabic: boolean) {
 
 /** A Coptic day and month: "Thoout 20" / "20 Thoout" / "٢٠ توت". */
 export function formatCopticDayMonth(monthName: string, day: number, isArabic: boolean) {
-  if (isArabic) return `${toEasternArabicDigits(day)} ${formatCopticMonthName(monthName, true)}`;
-  if (isFrench(isArabic)) return `${day} ${monthName}`;
+  return formatCopticDayMonthIn(monthName, day, formatLanguage(isArabic));
+}
+
+/** formatCopticDayMonth in a language of its own, whatever the App Language. */
+export function formatCopticDayMonthIn(monthName: string, day: number, language: FormatLanguage) {
+  if (language === 'ar') return `${toEasternArabicDigits(day)} ${formatCopticMonthName(monthName, true)}`;
+  if (language === 'fr') return `${day} ${monthName}`;
   return `${monthName} ${day}`;
 }
 

@@ -344,8 +344,8 @@ test('the loader marks the lines that open, hymn_texts.drop_cap and each reading
   assert.match(casing, /return \{ \.\.\.verse, coptic: verse\.dropCap \? uppercaseFirstCopticChar\(coptic\) : coptic \};/);
   assert.doesNotMatch(casing, /title/);
   assert.doesNotMatch(library, /skipHymnCapitalization/);
-  // Every reading opens on its first verse, Coptic or not: the Bible's, a Pascha Psalm read from its hymn, each commemoration of the Synaxarium.
-  assert.equal((library.match(/openOnFirstVerse\(/g) || []).length, 5);
+  // Every reading opens on its first verse, Coptic or not: the Bible's, a Pascha Psalm read from its hymn, each commemoration of the Synaxarium, and a saint's read on its own.
+  assert.equal((library.match(/openOnFirstVerse\(/g) || []).length, 6);
   assert.match(library, /return openOnFirstVerse\(applyCopticCaseToReadingVerses\(\[/);
   assert.match(library, /return \{ verses: openOnFirstVerse\(applyCopticCaseToReadingVerses\(hymnVerses\)\), citation \};/);
   assert.match(library, /const verses = openOnFirstVerse\(\(entry\.paragraphs \|\| \[\]\)\.map/);
