@@ -61,3 +61,65 @@ export function contentsSwipeProgress(distance: number, panelWidth: number): num
   if (!(panelWidth > 0) || !(distance > 0)) return 0;
   return Math.min(distance / panelWidth, 1);
 }
+
+/**
+ * Where a swipe is reported from: the app's own touches (the capture-phase
+ * responder), or the scrolling page's script, which keeps its touches to
+ * itself and reports the swipe in messages (documentHtml.ts).
+ */
+export type ReaderSwipeSource = 'touch' | 'page';
+
+/** The page's hold on a swipe lapses once it has said nothing for this long, should the finger's lift never reach it. */
+const PAGE_HOLD_LAPSES_MS = 300;
+
+/** For this long after the app's own touches let a swipe go, the page's reports are that same swipe arriving late. */
+const PAGE_ECHO_MS = 500;
+
+export interface ReaderSwipeArbiter {
+  /** Whether `source` may move the swipe now: it holds it, or takes it, nobody else holding it. */
+  take(source: ReaderSwipeSource): boolean;
+  /** Whether `source` letting the swipe go counts: it was its to let go. The swipe is nobody's after. */
+  letGo(source: ReaderSwipeSource): boolean;
+  /** Nobody's, and no late report held against the page. */
+  reset(): void;
+}
+
+/**
+ * One swipe, one source. Over the scrolling page the app's touches and the
+ * page's script can both see the same swipe, and each moving the page in
+ * turn, each letting it go in turn, they fought over it: let go by the one,
+ * it slid away, and the other's last report, arriving after, pulled it back
+ * or sent it again. Whichever takes a swipe first has it until it lets go;
+ * the other is not heard until then, nor the page for a moment after the
+ * app's touches let go, its reports of that swipe still arriving.
+ */
+export function createReaderSwipeArbiter(now: () => number = Date.now): ReaderSwipeArbiter {
+  let holder: ReaderSwipeSource | null = null;
+  let pageLastHeardAt = -Infinity;
+  let touchLetGoAt = -Infinity;
+  const take = (source: ReaderSwipeSource) => {
+    const time = now();
+    if (holder === 'page' && time - pageLastHeardAt > PAGE_HOLD_LAPSES_MS) holder = null;
+    if (source === 'page') {
+      if (holder === 'touch' || time - touchLetGoAt < PAGE_ECHO_MS) return false;
+      pageLastHeardAt = time;
+    }
+    if (holder && holder !== source) return false;
+    holder = source;
+    return true;
+  };
+  return {
+    take,
+    letGo(source) {
+      if (!take(source)) return false;
+      holder = null;
+      if (source === 'touch') touchLetGoAt = now();
+      return true;
+    },
+    reset() {
+      holder = null;
+      pageLastHeardAt = -Infinity;
+      touchLetGoAt = -Infinity;
+    },
+  };
+}

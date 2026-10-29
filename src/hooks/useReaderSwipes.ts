@@ -4,10 +4,12 @@ import { Animated, Easing, PanResponder, useWindowDimensions } from 'react-nativ
 import { isStylusGestureEvent } from '../utils/isStylusGestureEvent';
 import {
   contentsSwipeProgress,
+  createReaderSwipeArbiter,
   readerSwipeFinishMs,
   readerSwipeFor,
   readerSwipeGoesThrough,
   type ReaderSwipe,
+  type ReaderSwipeSource,
 } from '../utils/readerSwipe';
 import { motionDuration, useReducedMotion } from '../utils/useReducedMotion';
 
@@ -40,7 +42,11 @@ interface ReaderSwipesOptions {
  * nothing on the page (a slide, a button, a list) competes for them, while a
  * tap or a scroll still lands where it was aimed. The page's own script
  * reports the same swipes over the scrolling page (documentHtml.ts), which
- * keeps the touches to itself: `drag` and `release` take those.
+ * keeps the touches to itself: `drag` and `release` take those. Where both
+ * see one swipe, it is whichever took it first's (createReaderSwipeArbiter).
+ *
+ * Once the page is on its way out, nothing brings it back: it goes, and
+ * `onExit` is called once, until `resetPage` shows it again.
  */
 export function useReaderSwipes(options: ReaderSwipesOptions) {
   const { width } = useWindowDimensions();
@@ -57,8 +63,13 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
   const [contentsIn] = useState(() => new Animated.Value(0));
   const [sheetShown, setSheetShown] = useState(false);
   const sheetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [arbiter] = useState(createReaderSwipeArbiter);
+  // The page is on its way out: 'going' as it slides, 'gone' once onExit is called.
+  const leavingRef = useRef<'going' | 'gone' | null>(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (sheetTimerRef.current) clearTimeout(sheetTimerRef.current);
+    if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
   }, []);
 
   /** The panel is up over the sheet: the sheet goes. */
@@ -72,12 +83,50 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
 
   /** The page back where it belongs, for a reader shown again (a subdocument). */
   const resetPage = useCallback(() => {
+    if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+    exitTimerRef.current = null;
+    leavingRef.current = null;
+    arbiter.reset();
     pageOffset.stopAnimation();
     pageOffset.setValue(0);
+  }, [arbiter, pageOffset]);
+
+  /**
+   * The page slides the rest of the way out, in `ms`, and onExit is called
+   * once it is out -- or, should the slide never say it has finished, a
+   * moment after it should have.
+   */
+  const slideAway = useCallback((ms: number) => {
+    const current = optionsRef.current;
+    leavingRef.current = 'going';
+    const exit = () => {
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = null;
+      if (leavingRef.current !== 'going') return;
+      leavingRef.current = 'gone';
+      optionsRef.current.onExit();
+    };
+    const duration = motionDuration(ms, current.reducedMotion);
+    Animated.timing(pageOffset, {
+      toValue: current.width,
+      duration,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(exit);
+    if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+    exitTimerRef.current = setTimeout(exit, duration + 250);
   }, [pageOffset]);
 
+  /** The page goes as a swipe through would take it, with no finger: a close asked for some other way. */
+  const leave = useCallback(() => {
+    if (leavingRef.current) return;
+    arbiter.reset();
+    slideAway(readerSwipeFinishMs(optionsRef.current.width, optionsRef.current.width, 0));
+  }, [arbiter, slideAway]);
+
   /** A swipe `distance` along its way: the page, or the sheet, follows. */
-  const drag = useCallback((swipe: ReaderSwipe, distance: number) => {
+  const drag = useCallback((swipe: ReaderSwipe, distance: number, source: ReaderSwipeSource = 'page') => {
+    if (leavingRef.current || !arbiter.take(source)) return;
     if (swipe === 'exit') {
       pageOffset.stopAnimation();
       pageOffset.setValue(Math.max(distance, 0));
@@ -86,10 +135,11 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
     contentsIn.stopAnimation();
     contentsIn.setValue(contentsSwipeProgress(distance, optionsRef.current.contentsWidth));
     setSheetShown(true);
-  }, [contentsIn, pageOffset]);
+  }, [arbiter, contentsIn, pageOffset]);
 
   /** The finger lifts `distance` along, moving at `velocity` (px per ms) its way: through, or back. */
-  const release = useCallback((swipe: ReaderSwipe, distance: number, velocity: number) => {
+  const release = useCallback((swipe: ReaderSwipe, distance: number, velocity: number, source: ReaderSwipeSource = 'page') => {
+    if (leavingRef.current || !arbiter.letGo(source)) return;
     const current = optionsRef.current;
     const ease = (value: Animated.Value, toValue: number, ms: number) =>
       Animated.timing(value, {
@@ -102,9 +152,7 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
     if (swipe === 'exit') {
       const span = current.width;
       if (readerSwipeGoesThrough(distance, span, velocity)) {
-        ease(pageOffset, span, readerSwipeFinishMs(span - distance, span, velocity)).start(({ finished }) => {
-          if (finished) optionsRef.current.onExit();
-        });
+        slideAway(readerSwipeFinishMs(span - distance, span, velocity));
       } else {
         ease(pageOffset, 0, readerSwipeFinishMs(Math.max(distance, 0), span, 0)).start();
       }
@@ -124,7 +172,7 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
     ease(contentsIn, 0, readerSwipeFinishMs(progress * span, span, 0)).start(({ finished }) => {
       if (finished) setSheetShown(false);
     });
-  }, [contentsIn, contentsShown, pageOffset]);
+  }, [arbiter, contentsIn, contentsShown, pageOffset, slideAway]);
 
   // Which swipe the responder took, and how far across the finger was when it did.
   const takenRef = useRef<{ swipe: ReaderSwipe; fromDx: number } | null>(null);
@@ -140,26 +188,33 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
         if (current.ignores?.(gestureState.moveX - gestureState.dx)) return false;
         const swipe = readerSwipeFor(gestureState.dx, gestureState.dy);
         if (!swipe || (swipe === 'exit' && !current.exitsByDrag)) return false;
+        // Not while the page is going, nor while the page's script has this swipe.
+        if (leavingRef.current || !arbiter.take('touch')) return false;
         takenRef.current = { swipe, fromDx: gestureState.dx };
         return true;
       },
       onPanResponderTerminationRequest: () => false,
+      // Not granted after all: the swipe is nobody's.
+      onPanResponderReject: () => {
+        if (takenRef.current) arbiter.letGo('touch');
+        takenRef.current = null;
+      },
       onPanResponderMove: (_, gestureState) => {
         const taken = takenRef.current;
-        if (taken) drag(taken.swipe, along(taken, gestureState.dx));
+        if (taken) drag(taken.swipe, along(taken, gestureState.dx), 'touch');
       },
       onPanResponderRelease: (_, gestureState) => {
         const taken = takenRef.current;
         takenRef.current = null;
-        if (taken) release(taken.swipe, along(taken, gestureState.dx), taken.swipe === 'exit' ? gestureState.vx : -gestureState.vx);
+        if (taken) release(taken.swipe, along(taken, gestureState.dx), taken.swipe === 'exit' ? gestureState.vx : -gestureState.vx, 'touch');
       },
       onPanResponderTerminate: () => {
         const taken = takenRef.current;
         takenRef.current = null;
-        if (taken) release(taken.swipe, 0, 0);
+        if (taken) release(taken.swipe, 0, 0, 'touch');
       },
     });
-  }, [drag, release]);
+  }, [arbiter, drag, release]);
 
   return {
     panHandlers: responder.panHandlers,
@@ -171,6 +226,7 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
     sheetShown,
     contentsShown,
     resetPage,
+    leave,
     drag,
     release,
   };

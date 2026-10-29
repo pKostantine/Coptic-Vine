@@ -94,14 +94,8 @@ function getPillLabel(section: DocumentSection, includeReadingReference: boolean
  * as well, rather than a dialog's own margin beside the page.
  */
 function useInsetEdgeSwipe(enabled: boolean, onSwipeRight: () => void, onSwipeLeft?: () => void, ignoresTouch?: () => boolean) {
-  const { left: leftInset, right: rightInset } = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
   const startRef = useRef<{ x: number; y: number } | null>(null);
-
-  const startsInInset = useCallback(
-    (x: number) => (leftInset > 0 && x < leftInset) || (rightInset > 0 && x > screenWidth - rightInset),
-    [leftInset, rightInset, screenWidth],
-  );
+  const startsInInset = useStartsInInset();
   const touchPoint = (event: GestureResponderEvent) => event.nativeEvent.changedTouches?.[0] ?? event.nativeEvent;
 
   const handlers = {
@@ -130,6 +124,16 @@ function useInsetEdgeSwipe(enabled: boolean, onSwipeRight: () => void, onSwipeLe
     },
   };
   return { handlers, startsInInset };
+}
+
+/** Whether a touch going down `x` across the screen is in the side safe-area inset (useInsetEdgeSwipe's). */
+function useStartsInInset() {
+  const { left: leftInset, right: rightInset } = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  return useCallback(
+    (x: number) => (leftInset > 0 && x < leftInset) || (rightInset > 0 && x > screenWidth - rightInset),
+    [leftInset, rightInset, screenWidth],
+  );
 }
 
 /**
@@ -361,19 +365,49 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   // down (onTouchStartCapture on the SafeAreaView), and the bar sets it again
   // when the touch lands on it, before the swipe can be taken.
   const touchOnPillBarRef = useRef(false);
-  const insetEdgeSwipe = useInsetEdgeSwipe(!isCovered, onClose, () => setSelectorOpen(true), () => touchOnPillBarRef.current);
-  const { startsInInset } = insetEdgeSwipe;
+  const startsInInset = useStartsInInset();
+
+  // Closed only once it is up. iOS ignores a dismissal asked for while the
+  // Modal is still coming up, and it then stays on the screen, nothing on it
+  // -- the page has slid away -- and over every touch: the app froze. A close
+  // asked for before then waits for it, and never for long.
+  const shownRef = useRef(false);
+  const closeWhenShownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeNow = useCallback(() => {
+    if (closeWhenShownRef.current) clearTimeout(closeWhenShownRef.current);
+    closeWhenShownRef.current = null;
+    onClose();
+  }, [onClose]);
+  const closeOnceShown = useCallback(() => {
+    if (shownRef.current) closeNow();
+    else if (!closeWhenShownRef.current) closeWhenShownRef.current = setTimeout(closeNow, 1000);
+  }, [closeNow]);
+  const handleShow = () => {
+    shownRef.current = true;
+    if (closeWhenShownRef.current) closeNow();
+  };
+  useEffect(() => {
+    if (visible) return;
+    shownRef.current = false;
+    if (closeWhenShownRef.current) clearTimeout(closeWhenShownRef.current);
+    closeWhenShownRef.current = null;
+  }, [visible]);
+  useEffect(() => () => {
+    if (closeWhenShownRef.current) clearTimeout(closeWhenShownRef.current);
+  }, []);
+
   // The reader's two swipes, from anywhere on the page and following the
   // finger (hooks/useReaderSwipes.ts): to the right the subdocument slides
   // away, the document it was opened from in view beneath it, and closes; to
-  // the left the contents come in.
+  // the left the contents come in. Closed any other way -- Android's back,
+  // the browser's back button -- it slides away the same.
   const [selectorOpenFrom, setSelectorOpenFrom] = useState(0);
   const panelLayout = useReaderPanelLayout();
   const readerSwipes = useReaderSwipes({
     enabled: isMobileDocument && !isCovered,
     exitsByDrag: true,
     contentsWidth: panelLayout.width,
-    onExit: onClose,
+    onExit: closeOnceShown,
     onOpenContents: (from) => {
       setSelectorOpenFrom(from);
       setSelectorOpen(true);
@@ -385,6 +419,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   useLayoutEffect(() => {
     if (visible) resetPage();
   }, [visible, resetPage]);
+  const insetEdgeSwipe = useInsetEdgeSwipe(!isCovered, readerSwipes.leave, () => setSelectorOpen(true), () => touchOnPillBarRef.current);
 
   // Calendar and Settings open over this modal rather than as screens of
   // their own, so they don't get the navigator's swipe-back. The same
@@ -421,12 +456,17 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
 
   return (
     <Modal
-      animationType="slide"
+      // It comes up with a slide, and goes with none of its own: by then the
+      // page has slid away, and the Modal sliding down after it, over the
+      // page beneath, was a second animation where nothing showed.
+      animationType={visible ? 'slide' : 'none'}
       // Over the document it was opened from, which stays in view beneath
       // while a swipe takes this one away.
       transparent
       visible={visible}
-      onRequestClose={onClose}
+      onShow={handleShow}
+      onDismiss={resetPage}
+      onRequestClose={readerSwipes.leave}
       supportedOrientations={modalOrientations}
       // The page runs to every edge of the screen, the notch's strip
       // included, on Android as on iOS: there a Modal is a dialog that kept
@@ -537,7 +577,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
             theme={documentTheme}
             reader="service"
             layout={floatingLayout}
-            onBack={onClose}
+            onBack={readerSwipes.leave}
             backAccessibilityLabel="Close subdocument"
             title={title || ''}
             titleVisible={!controlsOverText || !headpieceInView}

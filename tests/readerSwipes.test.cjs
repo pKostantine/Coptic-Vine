@@ -199,9 +199,9 @@ test('the documents and subdocuments take both swipes from anywhere, following t
 
   const modal = read('src/components/vine/screens/DocumentModal.tsx');
   assert.match(modal, /exitsByDrag: true,/);
-  assert.match(modal, /onExit: onClose,/);
+  assert.match(modal, /onExit: closeOnceShown,/);
   // Over the document it was opened from, which shows beneath as it is swiped away.
-  assert.match(modal, /animationType="slide"\n\s+\/\/ [^\n]*\n\s+\/\/ [^\n]*\n\s+transparent/);
+  assert.match(modal, /animationType=\{visible \? 'slide' : 'none'\}\n\s+\/\/ [^\n]*\n\s+\/\/ [^\n]*\n\s+transparent/);
   assert.match(modal, /if \(visible\) resetPage\(\);/);
 
   for (const [name, screen] of [['document', service], ['subdocument', modal]]) {
@@ -217,6 +217,69 @@ test('the documents and subdocuments take both swipes from anywhere, following t
   assert.match(surface, /swipesTurnSlides=\{Platform\.OS === 'web'\}/);
   const slideshow = read('src/components/vine/SlideshowContainer.js');
   assert.match(slideshow, /if \(!swipesTurnSlides \|\| isStylusGestureEvent\(event\)/);
+});
+
+test('one swipe has one source: whichever takes it first, the app or the page, until it lets go', () => {
+  let time = 0;
+  const arbiter = swipes.createReaderSwipeArbiter(() => time);
+  // The app's touches take it: the page's reports of the same swipe aren't heard.
+  assert.equal(arbiter.take('touch'), true);
+  assert.equal(arbiter.take('page'), false);
+  assert.equal(arbiter.letGo('page'), false, "the page can't let go a swipe it never had");
+  time = 120;
+  assert.equal(arbiter.letGo('touch'), true);
+  // Its last reports, arriving after the finger lifted, are still that swipe: not heard.
+  time = 200;
+  assert.equal(arbiter.take('page'), false);
+  assert.equal(arbiter.letGo('page'), false);
+  // A while after, the page's next swipe is its own.
+  time = 700;
+  assert.equal(arbiter.take('page'), true);
+  assert.equal(arbiter.take('touch'), false, 'the page has this one');
+  time = 760;
+  assert.equal(arbiter.letGo('page'), true);
+  assert.equal(arbiter.take('touch'), true, 'nobody holds it once let go');
+  arbiter.letGo('touch');
+
+  // A flick the page reports only as it ends is let go in one.
+  time = 2000;
+  assert.equal(arbiter.letGo('page'), true);
+
+  // The page's hold lapses once it falls silent, should its finger's lift never reach the app.
+  time = 3000;
+  assert.equal(arbiter.take('page'), true);
+  time = 3200;
+  assert.equal(arbiter.take('touch'), false);
+  time = 3400;
+  assert.equal(arbiter.take('touch'), true);
+  arbiter.reset();
+  assert.equal(arbiter.take('page'), true, 'reset, no late report is held against the page');
+});
+
+test('a subdocument swiped away goes once, when it is up, with no slide of its own after', () => {
+  const hook = read('src/hooks/useReaderSwipes.ts');
+  // Both sources go through the one arbiter; nothing moves the page once it is going.
+  assert.match(hook, /if \(leavingRef\.current \|\| !arbiter\.take\(source\)\) return;/);
+  assert.match(hook, /if \(leavingRef\.current \|\| !arbiter\.letGo\(source\)\) return;/);
+  assert.match(hook, /if \(leavingRef\.current \|\| !arbiter\.take\('touch'\)\) return false;/);
+  assert.match(hook, /drag\(taken\.swipe, along\(taken, gestureState\.dx\), 'touch'\)/);
+  assert.match(hook, /release\(taken\.swipe, 0, 0, 'touch'\)/);
+  // Once it is going it goes, onExit called once, even should the slide never say it finished.
+  assert.match(hook, /if \(leavingRef\.current !== 'going'\) return;\s+leavingRef\.current = 'gone';\s+optionsRef\.current\.onExit\(\);/);
+  assert.match(hook, /\}\)\.start\(exit\);/);
+  assert.match(hook, /exitTimerRef\.current = setTimeout\(exit, duration \+ 250\);/);
+  assert.match(hook, /const resetPage = useCallback\(\(\) => \{[\s\S]*?leavingRef\.current = null;\s+arbiter\.reset\(\);/);
+
+  const modal = read('src/components/vine/screens/DocumentModal.tsx');
+  // Closed only once the Modal is up, and never waiting long for it.
+  assert.match(modal, /if \(shownRef\.current\) closeNow\(\);\s+else if \(!closeWhenShownRef\.current\) closeWhenShownRef\.current = setTimeout\(closeNow, 1000\);/);
+  assert.match(modal, /onShow=\{handleShow\}/);
+  assert.match(modal, /onDismiss=\{resetPage\}/);
+  // Any other way out slides it away the same.
+  assert.match(modal, /onRequestClose=\{readerSwipes\.leave\}/);
+  assert.match(modal, /onBack=\{readerSwipes\.leave\}/);
+  assert.match(modal, /useInsetEdgeSwipe\(!isCovered, readerSwipes\.leave,/);
+  assert.doesNotMatch(modal, /onRequestClose=\{onClose\}|onBack=\{onClose\}|onExit: onClose/);
 });
 
 test('the contents come in under the finger on a sheet of the panel, and the panel carries on from it', () => {
