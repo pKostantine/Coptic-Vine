@@ -311,7 +311,8 @@ test('a subdocument (and its Settings/Calendar) can be swiped out from a landsca
   assert.equal((modal.match(/\bonTouchStart=\{\(\) => \{\s*touchOnPillBarRef\.current = true;/g) || []).length, 2);
   // And so is the hidden now-playing bar's button, which drags along the foot of the page.
   assert.match(modal, /onButtonTouchStart=\{\(\) => \{\s*touchOnPillBarRef\.current = true;/);
-  assert.match(modal, /useInsetEdgeSwipe\(!isCovered, onClose, \(\) => setSelectorOpen\(true\), \(\) => touchOnPillBarRef\.current\)/);
+  // Out from the inset, it slides away as a swipe takes it (useReaderSwipes' leave).
+  assert.match(modal, /useInsetEdgeSwipe\(!isCovered, readerSwipes\.leave, \(\) => setSelectorOpen\(true\), \(\) => touchOnPillBarRef\.current\)/);
 });
 
 test("the Bible reader's swipe goes back only from the very edge and opens the verses from the right half, measured from where it began", () => {
