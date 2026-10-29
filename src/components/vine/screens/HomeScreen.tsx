@@ -413,6 +413,25 @@ export default function HomeScreen() {
     </View>
   );
 
+  // Temporary, for the beta: where testers report what they find, and see
+  // everything reported (app/feedback.tsx).
+  const feedbackCard = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={tr('Beta Feedback. Report an issue, and see everything reported.', 'Retours sur la bêta. Signalez un problème et voyez tout ce qui a été signalé.', 'ملاحظات النسخة التجريبية. أبلغ عن مشكلة، وشاهد كل ما أُبلغ عنه.')}
+      onPress={() => router.push('/feedback' as never)}
+      style={({ pressed }) => [styles.card, styles.feedbackCard, pressed && styles.pressed]}
+    >
+      {cardFill}
+      <View style={styles.feedbackMark}><Icon name="construct-outline" size={20} color={COLORS.gold} /></View>
+      <View style={styles.feedbackText}>
+        <Text style={[styles.saintName, styles.feedbackTitle, arabic && styles.arabic]}>{tr('Beta Feedback', 'Retours sur la bêta', 'ملاحظات النسخة التجريبية')}</Text>
+        <Text style={[styles.saintDetail, arabic && styles.arabic]}>{tr('Report an issue, and see everything reported', 'Signalez un problème et voyez tout ce qui a été signalé', 'أبلغ عن مشكلة، وشاهد كل ما أُبلغ عنه')}</Text>
+      </View>
+      <View><Icon name="chevron-forward" size={18} color={COLORS.gold} /></View>
+    </Pressable>
+  );
+
   // The page runs to both edges; its content keeps clear of the notch.
   const sidePadding = useSidePadding(layout === 'landscape' ? 16 : wide ? 36 : 16);
 
@@ -429,6 +448,7 @@ export default function HomeScreen() {
           {canonCard}
           {readingsCard}
           {synaxCard}
+          {feedbackCard}
         </NowPlayingAwareScrollView>
       </View>
     );
@@ -443,6 +463,7 @@ export default function HomeScreen() {
         <View style={styles.column}>
           {readingsCard}
           {synaxCard}
+          {feedbackCard}
         </View>
       </View>
     ) : layout === 'grid' ? (
@@ -456,6 +477,7 @@ export default function HomeScreen() {
           <View style={styles.column}>
             {readingsCard}
             {synaxCard}
+            {feedbackCard}
           </View>
         </View>
       </>
@@ -466,6 +488,7 @@ export default function HomeScreen() {
         {canonCard}
         {readingsCard}
         {synaxCard}
+        {feedbackCard}
       </View>
     );
     page = (
@@ -598,6 +621,19 @@ const styles = StyleSheet.create({
   canonGlory: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.title, fontSize: 15, fontStyle: 'italic', paddingTop: 8, textAlign: 'center' },
   empty: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 14, paddingVertical: 10 },
   pressed: { opacity: 0.7 },
+  feedbackCard: { alignItems: 'center', flexDirection: 'row', gap: 14, paddingVertical: 14 },
+  feedbackMark: {
+    alignItems: 'center',
+    backgroundColor: COLORS.goldSoft,
+    borderColor: COLORS.goldLine,
+    borderRadius: 19,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  feedbackText: { flex: 1, minWidth: 0 },
+  feedbackTitle: { fontWeight: '700' },
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
   arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicTight: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },

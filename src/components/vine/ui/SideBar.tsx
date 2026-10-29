@@ -32,7 +32,8 @@ function isHovered(state: PressableStateCallbackType): boolean {
 
 /** Which section a page belongs to, for the item the sidebar marks. */
 export function sectionForPath(pathname: string): AppSection {
-  if (pathname === '/' || pathname.startsWith('/synaxarium')) return 'home';
+  // The Synaxarium and Beta Feedback are reached from Home's cards.
+  if (pathname === '/' || pathname.startsWith('/synaxarium') || pathname.startsWith('/feedback')) return 'home';
   if (pathname.startsWith('/music')) return 'music';
   if (pathname.startsWith('/learn')) return 'learn';
   if (['/account', '/settings', '/app-settings', '/downloads'].some((root) => pathname.startsWith(root))) return 'account';

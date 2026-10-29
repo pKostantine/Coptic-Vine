@@ -711,6 +711,15 @@ function AppSettingsSection({ gutter, compact = false, wide = false }: { gutter:
             onPress={() => router.push('/downloads')}
           />
         ) : null}
+        {/* Temporary, for the beta: where testers report what they find (app/feedback.tsx). */}
+        <SettingsRow
+          icon="construct-outline"
+          label={tr('Beta feedback', 'Retours sur la bêta', 'ملاحظات النسخة التجريبية')}
+          description={tr('Report an issue, and see everything reported', 'Signalez un problème et voyez tout ce qui a été signalé', 'أبلغ عن مشكلة، وشاهد كل ما أُبلغ عنه')}
+          arabic={arabic}
+          compact={compact}
+          onPress={() => router.push('/feedback' as never)}
+        />
       </View>
       <BookSettingsSheet visible={bookSettingsOpen} onClose={() => setBookSettingsOpen(false)} />
     </>
