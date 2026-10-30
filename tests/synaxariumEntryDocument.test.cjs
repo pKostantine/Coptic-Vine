@@ -93,8 +93,12 @@ test("Home's saints open their own documents, read in the reader for their day",
 
   const home = read('src/components/vine/screens/HomeScreen.tsx');
   assert.match(home, /\(\) => router\.push\(synaxariumEntryHref\(event\.entryKey, isoDate\(synaxDate\)\) as never\),/);
-  // The search still opens the Synaxarium itself.
+  // The search still opens the Synaxarium itself, where each saint opens the same document: from its day's card, and from a search.
   assert.match(home, /'search-outline', \(\) => router\.push\('\/synaxarium'\)\)/);
+  const synaxarium = read('src/app/synaxarium/index.tsx');
+  assert.match(synaxarium, /const openEntry = \(entryKey: string, isoDate: string\) => router\.push\(synaxariumEntryHref\(entryKey, isoDate\) as never\);/);
+  assert.equal((synaxarium.match(/onPress=\{\(\) => openEntry\(entry\.entryKey, day\.gregorianDate\)\}/g) || []).length, 2);
+  assert.doesNotMatch(synaxarium, /liturgy_of_the_word\?sub=SYNAXARIUM|selectDate\(/, "nor the Liturgy of the Word's, nor does it move the Books' day");
 
   const route = read('src/app/synaxarium/[entryKey].tsx');
   assert.match(route, /<ServiceDocument\s/);
@@ -118,4 +122,30 @@ test("Home's saints open their own documents, read in the reader for their day",
   const library = read('src/utils/hymnLibrary.js');
   assert.match(library, /export async function resolveSynaxariumEntry\(isoDate, entryKey\) \{\s+const dayData = await getSynaxariumForDate\(isoDate\);/);
   assert.match(library, /verses: openOnFirstVerse\(\(entry\.paragraphs \|\| \[\]\)[\s\S]*?synaxariumVerse\(\{ english: p\.english \|\| "", arabic: p\.arabic \?\? null \}, null\)\)\),/);
+});
+
+test("a saint's long name shrinks to fit its headpiece, on a slide and on the page; a service's keeps the frame's size", () => {
+  const { fitHeadpieceTitle, headpieceTitleLines, HEADPIECE_MIN_SCALE, HEADPIECE_LINE_HEIGHT } = loadFile('src/utils/headpieceFit.ts');
+  // The stepped headpiece's open space on a phone held upright, as measured in the reader.
+  const phone = { width: 188, height: 62 };
+  assert.deepEqual(fitHeadpieceTitle('Liturgy of the Word', phone, 16), { fontSize: 16, lines: 2 });
+  const milius = 'The Departure of Pope Milius (Milio), the Third Patriarch of the See of St. Mark';
+  const fitted = fitHeadpieceTitle(milius, phone, 16);
+  assert.ok(fitted.fontSize < 16 && fitted.fontSize >= 16 * HEADPIECE_MIN_SCALE, `shrinks, not past its floor (${fitted.fontSize})`);
+  assert.ok(fitted.lines * fitted.fontSize * HEADPIECE_LINE_HEIGHT <= phone.height, 'and fits the box');
+  assert.equal(headpieceTitleLines(milius, phone.width, fitted.fontSize), fitted.lines);
+  // Never smaller than its floor, however long.
+  assert.equal(fitHeadpieceTitle(milius.repeat(4), phone, 16).fontSize, 16 * HEADPIECE_MIN_SCALE);
+  // A word to a line at least.
+  assert.equal(headpieceTitleLines('Supercalifragilistic', 10, 16), 1);
+
+  // The slide sizes it before it is drawn; the page measures it as drawn, by the same floor.
+  const ornaments = read('src/components/vine/ui/DocumentOrnaments.tsx');
+  assert.match(ornaments, /const fit = fitHeadpieceTitle\(text, box, Math\.max\(frame\.minFontSize, \(width \* frame\.fontSize\) \/ 100\), arabic\);/);
+  assert.match(ornaments, /numberOfLines=\{lines\}/);
+  assert.doesNotMatch(ornaments, /numberOfLines=\{3\}/);
+  const page = read('src/components/vine/documentHtml.ts');
+  assert.match(page, new RegExp(`var MIN_SCALE = ${HEADPIECE_MIN_SCALE}; // headpieceFit\\.ts's HEADPIECE_MIN_SCALE`));
+  assert.match(page, /while \(room > 0 && title\.offsetHeight > room && size > floor\) \{/);
+  assert.match(page, /if \(document\.fonts && document\.fonts\.ready\) document\.fonts\.ready\.then\(fit\);/);
 });

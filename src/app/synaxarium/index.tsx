@@ -27,7 +27,6 @@ import LoadFailure from '@/components/vine/ui/LoadFailure';
 import SubPageHeader from '@/components/vine/ui/SubPageHeader';
 import { DAY_BLOCK_THEMES, getDayTheme, type DayBlockTheme } from '@/constants/seasonAppearance';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
-import { useCalendar } from '@/context/CalendarContext';
 import { useLiturgicalClock } from '@/context/LiturgicalClockContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { homeService, type SynaxariumYearRow } from '@/services/homeService';
@@ -35,14 +34,12 @@ import { getDayOverview } from '@/utils/calendarService';
 import { formatCopticDayMonth, formatCopticMonthName, formatCopticYear, formatMonthDaySpan, toEasternArabicDigits } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 import { splitSaintTitle } from '@/utils/saintTitles';
+import { synaxariumEntryHref } from '@/utils/synaxariumEntryDocument';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 import { tr } from '../../utils/appText';
 
 const MAX_FONT_SCALE = 1.3;
-
-/** Where a saint's story is read: the Synaxarium in the Liturgy of the Word, for the saint's day. */
-const SYNAXARIUM_READING = '/liturgy/divine-liturgy/liturgy_of_the_word?sub=SYNAXARIUM';
 
 interface SynaxariumEntry {
   entryKey: string;
@@ -136,8 +133,8 @@ function Marked({ text, words, style }: { text: string; words: string[]; style: 
  * day under its Coptic date, today's in the season's colours, and the month
  * being read above the list with a way to jump to another. A search lists
  * the saints it finds across the year in calendar order, each beside its
- * date, the words found in gold. A saint opens the day's Synaxarium as the
- * Liturgy of the Word reads it.
+ * date, the words found in gold. A saint opens its own entry as a document,
+ * as Home's saints do (utils/synaxariumEntryDocument.ts).
  */
 export default function SynaxariumBrowserScreen() {
   const router = useRouter();
@@ -147,7 +144,6 @@ export default function SynaxariumBrowserScreen() {
   // Each day card's top in the list, and the first day of each month, for the month heading and its jumps.
   const dayTops = useRef(new Map<string, number>());
   const { preferences } = useReadingPreferences();
-  const { effectiveDate, isLive, selectDate } = useCalendar();
   const locale: 'en' | 'ar' = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
   // Only an English title is split into the saint and who they were.
@@ -249,11 +245,9 @@ export default function SynaxariumBrowserScreen() {
     if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
   };
 
-  // A saint's story, read for its own day: the Books move to it, as choosing a season does.
-  const openReading = (isoDate: string) => {
-    if (!(isLive && effectiveDate.toISOString().slice(0, 10) === isoDate)) selectDate(new Date(`${isoDate}T00:00:00Z`));
-    router.push(SYNAXARIUM_READING as never);
-  };
+  // A saint's story, as a document of its own, read for its own day
+  // (app/synaxarium/[entryKey].tsx), as Home's saints open: the Books' day stays where it was.
+  const openEntry = (entryKey: string, isoDate: string) => router.push(synaxariumEntryHref(entryKey, isoDate) as never);
 
   const entryTitle = (entry: SynaxariumEntry) => {
     const title = isArabic ? entry.titleArabic || entry.titleEnglish || '' : entry.titleEnglish || entry.titleArabic || '';
@@ -389,7 +383,7 @@ export default function SynaxariumBrowserScreen() {
                   key={entry.entryKey}
                   accessibilityRole="button"
                   accessibilityLabel={[date, main, detail].filter(Boolean).join(', ')}
-                  onPress={() => openReading(day.gregorianDate)}
+                  onPress={() => openEntry(entry.entryKey, day.gregorianDate)}
                   style={({ pressed }) => [styles.result, pressed && styles.pressed]}
                 >
                   <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
@@ -472,7 +466,7 @@ export default function SynaxariumBrowserScreen() {
                           key={entry.entryKey}
                           accessibilityRole="button"
                           accessibilityLabel={detail ? `${main}, ${detail}` : main}
-                          onPress={() => openReading(day.gregorianDate)}
+                          onPress={() => openEntry(entry.entryKey, day.gregorianDate)}
                           style={({ pressed }) => [styles.entry, ink?.key === 'resurrection' && styles.entryOnLight, pressed && styles.pressed]}
                         >
                           <View style={styles.entryText}>
