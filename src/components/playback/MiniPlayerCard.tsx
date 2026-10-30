@@ -4,6 +4,7 @@ import { ActivityIndicator, Animated, PanResponder, Platform, Pressable, StyleSh
 import PlayerIcon, { type PlayerIconName } from '@/components/playback/PlayerIcon';
 import Icon from '@/components/vine/ui/Icon';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
+import { usePlaybackClock } from '@/context/PlaybackContext';
 import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 
 /** How far the card must be swiped to skip. */
@@ -21,15 +22,14 @@ interface MiniPlayerCardProps {
   onToggleLike?: () => void;
   playing: boolean;
   buffering: boolean;
-  /** 0–1 */
-  progress: number;
   accentColor: string;
   onOpen: () => void;
   onTogglePlayback: () => void;
   onNext: () => void;
   /** Swiped to the right: the track before. */
   onPrevious?: () => void;
-  onHide?: () => void;
+  /** Hides the bar: `swipedAway` when it was pulled down out of sight, and needs no fading out. */
+  onHide?: (swipedAway?: boolean) => void;
   nextLabel: string;
   /** One more round button before the like: a video lesson's switch to its sound alone, or back to its picture. */
   extraButton?: { icon: PlayerIconName; label: string; onPress: () => void } | null;
@@ -50,7 +50,6 @@ export default function MiniPlayerCard({
   onToggleLike,
   playing,
   buffering,
-  progress,
   accentColor,
   onOpen,
   onTogglePlayback,
@@ -60,7 +59,6 @@ export default function MiniPlayerCard({
   nextLabel,
   extraButton,
 }: MiniPlayerCardProps) {
-  const clamped = Math.max(0, Math.min(1, progress));
   const reduced = useReducedMotion();
 
   // Swiped sideways the card follows the finger: to the left it skips to the
@@ -108,11 +106,10 @@ export default function MiniPlayerCard({
         const { next, previous, hide, reduced: still } = skip.current;
         if (axis.current === 'down') {
           if (!hide || (gesture.dy < HIDE_DISTANCE && gesture.vy < 0.5)) { settle(); return; }
-          // Down and out of sight, then hidden; the card is back in place for
-          // when the bar is shown again.
+          // Down and out of sight, then hidden. Left where it went: put back
+          // first, it would show again for a frame before the bar lets it go.
           Animated.timing(drop, { toValue: 140, duration: motionDuration(140, still), useNativeDriver: Platform.OS !== 'web' }).start(() => {
-            hide();
-            drop.setValue(0);
+            hide(true);
           });
           return;
         }
@@ -229,11 +226,22 @@ export default function MiniPlayerCard({
         </View>
 
         <View pointerEvents="none" style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${clamped * 100}%`, backgroundColor: accentColor }]} />
+          <ProgressFill color={accentColor} />
         </View>
       </Animated.View>
     </View>
   );
+}
+
+/**
+ * The line along the card's foot, as far as playback has come: it reads the
+ * clock itself, so only this line is drawn again at each tick, not the card.
+ */
+function ProgressFill({ color }: { color: string }) {
+  const progress = usePlaybackClock(({ currentTimeMs, durationMs }) => (
+    durationMs > 0 ? Math.round(Math.max(0, Math.min(1, currentTimeMs / durationMs)) * 1000) / 1000 : 0
+  ));
+  return <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: color }]} />;
 }
 
 const styles = StyleSheet.create({

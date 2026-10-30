@@ -29,7 +29,7 @@ interface MusicPlayerContextValue {
   currentItem: MusicQueueItem | null;
   playing: boolean;
   buffering: boolean;
-  currentTimeMs: number;
+  /** Where it is, the moment it changes, comes from usePlaybackClock (context/PlaybackContext.tsx). */
   durationMs: number;
   repeatMode: PlaybackRepeatMode;
   shuffleEnabled: boolean;
@@ -213,7 +213,6 @@ export function useMusicPlayer(): MusicPlayerContextValue {
     currentItem,
     playing: currentItem ? playback.playing : false,
     buffering: currentItem ? playback.buffering || playback.loadingSource : false,
-    currentTimeMs: currentItem ? playback.currentTimeMs : 0,
     durationMs: currentItem ? playback.durationMs : 0,
     repeatMode: playback.repeatMode,
     shuffleEnabled: playback.shuffleEnabled,

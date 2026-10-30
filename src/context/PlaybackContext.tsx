@@ -12,6 +12,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
@@ -78,7 +79,7 @@ export interface PlaybackContextValue {
   playing: boolean;
   buffering: boolean;
   loadingSource: boolean;
-  currentTimeMs: number;
+  /** Where playback is, the moment it changes, comes from usePlaybackClock instead. */
   durationMs: number;
   repeatMode: PlaybackRepeatMode;
   shuffleEnabled: boolean;
@@ -152,6 +153,43 @@ export interface PlaybackContextValue {
 }
 
 const PlaybackContext = createContext<PlaybackContextValue | null>(null);
+
+/** Where playback is in the current entry. */
+export interface PlaybackClock {
+  currentTimeMs: number;
+  durationMs: number;
+}
+
+/**
+ * The clock moves eight times a second while anything plays, so it is kept
+ * out of PlaybackContext: there, every page that reads the player (a whole
+ * album, the Learn library) was drawn again at each tick. Only what shows the
+ * clock -- the seek bar, the bar's progress line, the lyric that is sung --
+ * subscribes to it, and each only for the part it shows.
+ */
+export interface PlaybackClockStore {
+  get: () => PlaybackClock;
+  subscribe: (listener: () => void) => () => void;
+}
+
+const PlaybackClockContext = createContext<PlaybackClockStore | null>(null);
+
+function createPlaybackClockStore(): PlaybackClockStore & { publish: (clock: PlaybackClock) => void } {
+  let clock: PlaybackClock = { currentTimeMs: 0, durationMs: 0 };
+  const listeners = new Set<() => void>();
+  return {
+    get: () => clock,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    publish: (next) => {
+      if (next.currentTimeMs === clock.currentTimeMs && next.durationMs === clock.durationMs) return;
+      clock = next;
+      listeners.forEach((listener) => listener());
+    },
+  };
+}
 
 async function resolveAudioUri(entry: PlaybackQueueEntry): Promise<string | null> {
   const localUri = entry.playable.source.localUri?.trim() || null;
@@ -430,6 +468,11 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     ? videoStatusEvent.status === 'loading' || videoSwitching
     : Boolean(status.isBuffering);
 
+  const [clock] = useState(createPlaybackClockStore);
+  useEffect(() => {
+    clock.publish({ currentTimeMs, durationMs });
+  }, [clock, currentTimeMs, durationMs]);
+
   // The rendition the rules call for right now (utils/lessonPlayback.ts).
   const network = Network.useNetworkState();
   const onCellular = network.type === Network.NetworkStateType.CELLULAR;
@@ -665,7 +708,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     resumeOnGesture.current = false;
     // It never loaded (the network, a file gone): play tries it again, from where it was.
     if (playbackError && currentIndex >= 0) {
-      void loadEntry(queue, currentIndex, true, currentTimeMs);
+      void loadEntry(queue, currentIndex, true, clock.get().currentTimeMs);
       return;
     }
     if (activeEngine === 'video') {
@@ -682,7 +725,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     // status still says false, and pressing pause then would restart playback.
     if (playing) player.pause();
     else player.play();
-  }, [activeEngine, currentIndex, currentItem, currentTimeMs, loadEntry, playbackError, player, playing, queue]);
+  }, [activeEngine, clock, currentIndex, currentItem, loadEntry, playbackError, player, playing, queue]);
 
   const seekToMs = useCallback(async (positionMs: number) => {
     const knownDurationMs = Math.max(durationMs, currentItem?.playable.durationMs ?? 0);
@@ -714,7 +757,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
   const previous = useCallback(() => {
     if (!queue.length || currentIndex < 0) return;
-    if (currentTimeMs > 4000) {
+    if (clock.get().currentTimeMs > 4000) {
       seekToStart();
       return;
     }
@@ -724,7 +767,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       return;
     }
     void loadEntry(queue, previousIndex, true);
-  }, [currentIndex, currentTimeMs, loadEntry, queue, repeatMode, seekToStart]);
+  }, [clock, currentIndex, loadEntry, queue, repeatMode, seekToStart]);
 
   const selectQueueIndex = useCallback((index: number) => {
     if (index < 0 || index >= queue.length) return;
@@ -1183,7 +1226,6 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     playing,
     buffering,
     loadingSource,
-    currentTimeMs,
     durationMs,
     repeatMode,
     shuffleEnabled,
@@ -1233,7 +1275,6 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     currentHasVideo,
     currentIndex,
     currentItem,
-    currentTimeMs,
     cycleRepeatMode,
     durationMs,
     expectVideoSurface,
@@ -1267,11 +1308,32 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     volume,
   ]);
 
-  return <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>;
+  return (
+    <PlaybackClockContext.Provider value={clock}>
+      <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>
+    </PlaybackClockContext.Provider>
+  );
 }
 
 export function usePlayback(): PlaybackContextValue {
   const value = useContext(PlaybackContext);
   if (!value) throw new Error('usePlayback must be used inside PlaybackProvider.');
   return value;
+}
+
+/** The clock itself, for reading at the moment it is needed (a press) rather than drawing it. */
+export function usePlaybackClockStore(): PlaybackClockStore {
+  const store = useContext(PlaybackClockContext);
+  if (!store) throw new Error('usePlaybackClockStore must be used inside PlaybackProvider.');
+  return store;
+}
+
+/**
+ * What a component shows of the clock: it is drawn again only when that
+ * changes -- the line being sung, say, rather than each tick. The pick must
+ * be a plain value (a number, a string, null), never a new object.
+ */
+export function usePlaybackClock<T>(select: (clock: PlaybackClock) => T): T {
+  const store = usePlaybackClockStore();
+  return useSyncExternalStore(store.subscribe, () => select(store.get()), () => select(store.get()));
 }

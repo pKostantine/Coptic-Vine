@@ -24,12 +24,14 @@ test('liturgical slideshow pagination is independent of Now Playing geometry', (
 
 test('collapsed Now Playing control cannot create a full-width slideshow mask', () => {
   const overlay = fs.readFileSync('src/components/playback/GlobalNowPlayingOverlay.tsx', 'utf8');
-  const collapsedStart = overlay.indexOf('if (isCollapsed)');
+  const collapsedStart = overlay.indexOf('const button = buttonMounted ? (');
   const collapsedEnd = overlay.indexOf('\n  return (', collapsedStart);
   const collapsedBranch = overlay.slice(collapsedStart, collapsedEnd);
   const container = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
 
-  assert.match(collapsedBranch, /pointerEvents="box-none"/);
+  assert.ok(collapsedStart >= 0);
+  // Its own box passes touches through; while the card is out, so does the button fading away.
+  assert.match(collapsedBranch, /pointerEvents=\{isCollapsed \? 'box-none' : 'none'\}/);
   assert.match(overlay, /const BUTTON_SIZE = 42;/);
   assert.match(collapsedBranch, /width: BUTTON_SIZE,\s*height: BUTTON_SIZE,/);
   assert.match(collapsedBranch, /backgroundColor:\s*'transparent'/);

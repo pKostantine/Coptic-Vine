@@ -29,10 +29,13 @@ test('pulled down, the mini player hides as its Hide button does; a short pull s
   assert.match(card, /const HIDE_DISTANCE = 36;/);
   assert.match(card, /const down = \(gesture: \{ dx: number; dy: number \}\) => Boolean\(skip\.current\.hide\) && gesture\.dy > 10 && gesture\.dy > Math\.abs\(gesture\.dx\) \* 1\.2;/);
   assert.match(card, /if \(!hide \|\| \(gesture\.dy < HIDE_DISTANCE && gesture\.vy < 0\.5\)\) \{ settle\(\); return; \}/);
-  assert.match(card, /hide\(\);\n\s+drop\.setValue\(0\);/);
+  // Gone out of sight, it hides at once, and is left there rather than shown again for a frame.
+  assert.match(card, /\.start\(\(\) => \{\n\s+hide\(true\);\n\s+\}\);/);
+  assert.doesNotMatch(card, /drop\.setValue\(0\)/);
   assert.match(card, /transform: \[\{ translateX: offset \}, \{ translateY: drop \}\]/);
   const overlay = fs.readFileSync('src/components/playback/GlobalNowPlayingOverlay.tsx', 'utf8');
-  assert.match(overlay, /onHide=\{\(\) => setIsCollapsed\(true\)\}/);
+  assert.match(overlay, /onHide=\{hideBar\}/);
+  assert.match(overlay, /const hideBar = \(swipedAway = false\) => \{\n\s+setIsCollapsed\(true\);\n\s+if \(swipedAway\) setCardMounted\(false\);/);
 });
 
 test('the hidden bar\'s button drags to either bottom corner and stays there', () => {
@@ -41,7 +44,8 @@ test('the hidden bar\'s button drags to either bottom corner and stays there', (
   assert.match(overlay, /onMoveShouldSetPanResponderCapture: \(_, gesture\) => Math\.abs\(gesture\.dx\) > DRAG_SLOP && Math\.abs\(gesture\.dx\) > Math\.abs\(gesture\.dy\)/);
   assert.match(overlay, /: \(at < travel \/ 2 \? 'left' : 'right'\);/);
   assert.match(overlay, /else setNowPlayingButtonSide\(next\);/);
-  assert.match(overlay, /translateX: Animated\.add\(sideOffset, dragOffset\)/);
+  assert.match(overlay, /buttonX: Animated\.add\(sideOffset, dragOffset\)/);
+  assert.match(overlay, /\{ translateX: motion\.buttonX \}/);
   // A screen reader moves it with an action instead.
   assert.match(overlay, /if \(event\.nativeEvent\.actionName === 'move'\) setNowPlayingButtonSide\(otherSide\);/);
   // A device choice, kept with the other preferences; anything unknown is the right corner.

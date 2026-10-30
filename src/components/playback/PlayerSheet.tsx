@@ -83,7 +83,9 @@ export default function PlayerSheet({
   const reduced = useReducedMotion();
   useEffect(() => {
     if (!mounted) return;
-    drag.setValue(0);
+    // Closed from wherever a pull let it go: put back first, it jumped up to
+    // fully open before going down.
+    if (visible) drag.setValue(0);
     const animation = Animated.timing(progress, {
       toValue: visible ? 1 : 0,
       duration: motionDuration(visible ? 260 : 200, reduced),

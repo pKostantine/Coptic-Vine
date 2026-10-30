@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, PanResponder, Platform, useWindowDimensions } from 'react-native';
 
-import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
+import { motionDuration, releaseDuration, useReducedMotion } from '@/utils/useReducedMotion';
 
 const CLOSE_DISTANCE = 90;
 const CLOSE_VELOCITY = 1;
@@ -32,10 +32,14 @@ export function usePullDownToClose(onClose: () => void) {
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dy <= CLOSE_DISTANCE && gesture.vy <= CLOSE_VELOCITY) { settle(); return; }
         const { onClose: close, height: screenHeight, reduced: still } = latest.current;
-        Animated.timing(drag, { toValue: screenHeight, duration: motionDuration(200, still), easing: Easing.in(Easing.cubic), useNativeDriver }).start(() => {
-          drag.setValue(0);
-          close();
-        });
+        // On down out of sight at the finger's speed, then closed. Left
+        // there: put back first, it would show again for a frame.
+        Animated.timing(drag, {
+          toValue: screenHeight,
+          duration: motionDuration(releaseDuration(screenHeight - gesture.dy, gesture.vy), still),
+          easing: Easing.out(Easing.quad),
+          useNativeDriver,
+        }).start(() => close());
       },
       onPanResponderTerminate: settle,
     });

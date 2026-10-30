@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     Alert,
     Animated,
@@ -45,13 +45,14 @@ import PlayerVolume from '@/components/playback/PlayerVolume';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
+import { usePlaybackClock } from '@/context/PlaybackContext';
 import { useAuth } from '@/context/AuthContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { PublishedLyricSet } from '@/types/musicConsumer';
 import { goBack } from '@/utils/navigation';
 import { PLAYER_VOLUME_ADJUSTABLE } from '@/utils/playerVolume';
-import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
+import { motionDuration, releaseDuration, useReducedMotion } from '@/utils/useReducedMotion';
 import { useArtworkPalette } from '@/utils/useArtworkPalette';
 
 import { tr } from '../../utils/appText';
@@ -83,7 +84,6 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     currentIndex,
     playing,
     buffering,
-    currentTimeMs,
     durationMs,
     togglePlayback,
     next,
@@ -144,15 +144,14 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     },
     onPanResponderRelease: (_event, gesture: PanResponderGestureState) => {
       if (gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY) {
+        // On down out of sight at the finger's speed, then closed. Left
+        // there: put back first, it would show again for a frame.
         Animated.timing(dismissDrag, {
           toValue: dismiss.current.height,
-          duration: motionDuration(200, dismiss.current.reduced),
-          easing: Easing.in(Easing.cubic),
+          duration: motionDuration(releaseDuration(dismiss.current.height - gesture.dy, gesture.vy), dismiss.current.reduced),
+          easing: Easing.out(Easing.quad),
           useNativeDriver: USE_NATIVE_DRIVER,
-        }).start(() => {
-          dismissDrag.setValue(0);
-          dismiss.current.close();
-        });
+        }).start(() => dismiss.current.close());
         return;
       }
       Animated.spring(dismissDrag, { toValue: 0, useNativeDriver: USE_NATIVE_DRIVER, bounciness: 4 }).start();
@@ -210,7 +209,8 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
   }, [currentItem?.track.id, preferences.appLanguage, user?.id]);
 
   const selectedSet = lyricSets.find((set) => set.id === selectedLyricSetId) ?? null;
-  const activeLineId = useMemo(() => {
+  // Drawn again only when the line being sung changes, not at every tick.
+  const activeLineId = usePlaybackClock(({ currentTimeMs }) => {
     if (!selectedSet) return null;
     const active = selectedSet.lines.find((line, index) => {
       if (line.startMs == null) return false;
@@ -219,7 +219,7 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       return currentTimeMs >= line.startMs && currentTimeMs < effectiveEnd;
     });
     return active?.id ?? null;
-  }, [currentTimeMs, selectedSet]);
+  });
 
   const toggleTrackLike = async (trackId: string) => {
     if (likeBusy) return;
@@ -336,7 +336,6 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
     seek: (dense) => (
       <SeekBar
         key={currentItem.track.id}
-        positionMs={currentTimeMs}
         durationMs={effectiveDurationMs}
         onSeek={(positionMs) => void seekToMs(positionMs)}
         dense={dense}
@@ -475,7 +474,6 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
         subtitle={performerLine}
         isArabic={isArabic}
         {...lyricsProps}
-        positionMs={currentTimeMs}
         durationMs={effectiveDurationMs}
         onSeek={(positionMs) => void seekToMs(positionMs)}
         playing={playing}

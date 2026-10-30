@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -39,6 +39,7 @@ import PlayerVolume from '@/components/playback/PlayerVolume';
 import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { type LearningQueueItem, useLearningPlayer } from '@/context/LearningPlayerContext';
+import { usePlaybackClock, usePlaybackClockStore } from '@/context/PlaybackContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { learningService } from '@/services/learningService';
 import type { PublishedLyricSet } from '@/types/musicConsumer';
@@ -89,7 +90,6 @@ export default function LearningNowPlayingScreen({
     currentIndex,
     playing,
     buffering,
-    currentTimeMs,
     durationMs,
     repeatMode,
     shuffleEnabled,
@@ -165,7 +165,8 @@ export default function LearningNowPlayingScreen({
   }, [currentItemId, locale]);
 
   const selectedSet = lyricSets.find((set) => set.id === selectedLyricSetId) ?? null;
-  const activeLineId = useMemo(() => {
+  // Drawn again only when the line being sung changes, not at every tick.
+  const activeLineId = usePlaybackClock(({ currentTimeMs }) => {
     if (!selectedSet || selectedSet.syncPrecision === 'unsynced') return null;
     return selectedSet.lines.find((line, index) => {
       if (line.startMs == null) return false;
@@ -173,7 +174,8 @@ export default function LearningNowPlayingScreen({
       const effectiveEnd = line.endMs ?? nextStart ?? Number.POSITIVE_INFINITY;
       return currentTimeMs >= line.startMs && currentTimeMs < effectiveEnd;
     })?.id ?? null;
-  }, [currentTimeMs, selectedSet]);
+  });
+  const clock = usePlaybackClockStore();
 
   const toggleLike = async (item: LearningQueueItem) => {
     if (likeBusy) return;
@@ -240,7 +242,7 @@ export default function LearningNowPlayingScreen({
   const lyricsPanelShown = kind === 'desktop' && !noLyrics && !lyricsPanelHidden;
   const queuePanelShown = wide && !queuePanelHidden;
   const stepBy = (deltaMs: number) => {
-    const target = currentTimeMs + deltaMs;
+    const target = clock.get().currentTimeMs + deltaMs;
     void player.seekToMs(Math.max(0, effectiveDuration > 0 ? Math.min(target, effectiveDuration) : target));
   };
 
@@ -303,7 +305,6 @@ export default function LearningNowPlayingScreen({
     seek: (dense) => (
       <SeekBar
         key={currentItem.id}
-        positionMs={currentTimeMs}
         durationMs={effectiveDuration}
         onSeek={(position) => void player.seekToMs(position)}
         dense={dense}
@@ -440,7 +441,6 @@ export default function LearningNowPlayingScreen({
         subtitle={currentItem.cantorName}
         isArabic={isArabic}
         {...lyricsProps}
-        positionMs={currentTimeMs}
         durationMs={effectiveDuration}
         onSeek={(position) => void player.seekToMs(position)}
         playing={playing}

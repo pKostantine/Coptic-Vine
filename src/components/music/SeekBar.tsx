@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
+import { usePlaybackClock } from '@/context/PlaybackContext';
 
 export function formatPlaybackTime(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -24,7 +25,6 @@ export function formatPlaybackTime(ms: number): string {
 }
 
 interface SeekBarProps {
-  positionMs: number;
   durationMs: number;
   onSeek: (positionMs: number) => void | Promise<void>;
   accentColor?: string;
@@ -55,15 +55,17 @@ const THUMB_SIZE = 13;
  *   expo-audio reports that it has reached the seek. That removes the
  *   old "snap back, then jump forward" effect.
  * - Move updates are coalesced to one render per animation frame.
+ * - It reads the playback clock itself, so only the bar is drawn again at
+ *   each tick, never the player around it.
  */
 export default function SeekBar({
-  positionMs,
   durationMs,
   onSeek,
   accentColor = COLORS.gold,
   dense = false,
   center,
 }: SeekBarProps) {
+  const positionMs = usePlaybackClock((clock) => clock.currentTimeMs);
   const [scrubRatio, setScrubRatio] = useState<number | null>(null);
   const [optimisticSeekMs, setOptimisticSeekMs] = useState<number | null>(null);
   const [hovered, setHovered] = useState(false);

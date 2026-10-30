@@ -24,6 +24,7 @@ import { musicService } from '@/services/musicService';
 import { formatMusicTrackPerformers } from '@/utils/musicCredits';
 import { motionDuration, useReducedMotion } from '@/utils/useReducedMotion';
 import MiniPlayerCard from './MiniPlayerCard';
+import { useOverlayTransition } from './useOverlayTransition';
 
 import { tr } from '../../utils/appText';
 // Same small gap whether the bar floats over a tab bar or the page edge.
@@ -81,7 +82,7 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
   const { user } = useAuth();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { reportBarSlot } = useVideoStage();
   // Hidden or shown is one app-wide choice, not each bar's own: a subdocument
   // mounts a bar of its own, and it must open the way the reader left it.
@@ -143,14 +144,47 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
     return () => animation.stop();
   }, [liftAnimation, reduced, targetLift]);
 
+  // Hidden or shown, the card and the round button cross: each stays drawn
+  // while it fades out, and is let go once the other has come in.
+  const [cardMounted, setCardMounted] = useState(!isCollapsed);
+  const [buttonMounted, setButtonMounted] = useState(isCollapsed);
+  if (isCollapsed && !buttonMounted) setButtonMounted(true);
+  if (!isCollapsed && !cardMounted) setCardMounted(true);
   useEffect(() => {
-    Animated.timing(collapseAnimation, {
+    const animation = Animated.timing(collapseAnimation, {
       toValue: isCollapsed ? 1 : 0,
       duration: motionDuration(220, reduced),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start();
+    });
+    animation.start(({ finished }) => {
+      if (!finished) return;
+      if (isCollapsed) setCardMounted(false);
+      else setButtonMounted(false);
+    });
+    return () => animation.stop();
   }, [collapseAnimation, isCollapsed, reduced]);
+  // Pulled down out of sight, the card has already gone: it isn't faded out again.
+  const hideBar = (swipedAway = false) => {
+    setIsCollapsed(true);
+    if (swipedAway) setCardMounted(false);
+  };
+
+  // The full player rises over the page from the bar, and goes back down into
+  // it: kept drawn through its way down, over the bar it uncovers.
+  const fullPlayer = useOverlayTransition(isPopupOpen && allowDisplay, { duration: 320 });
+  // Each opening is a player of its own: opened again on its way down after
+  // a pull, the one going would rise still pulled out of sight.
+  const [playerKey, setPlayerKey] = useState(0);
+  const [openSeen, setOpenSeen] = useState(isPopupOpen);
+  if (openSeen !== isPopupOpen) {
+    setOpenSeen(isPopupOpen);
+    if (isPopupOpen) setPlayerKey((key) => key + 1);
+  }
+  const fullPlayerOffset = useMemo(
+    () => fullPlayer.progress.interpolate({ inputRange: [0, 1], outputRange: [windowHeight, 0] }),
+    [fullPlayer.progress, windowHeight],
+  );
 
   // The hidden bar's button rests in either bottom corner, dragged there along
   // the foot of the page. Where it sits is its corner's offset along that row
@@ -162,6 +196,19 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
   const cornerOffset = side === 'left' ? 0 : travel;
   const [sideOffset] = useState(() => new Animated.Value(0));
   const [dragOffset] = useState(() => new Animated.Value(0));
+  // Made once, not at each render: new nodes would be attached to the native
+  // driver afresh every time the bar is drawn.
+  const motion = useMemo(() => {
+    const lift = Animated.multiply(liftAnimation, -1);
+    return {
+      buttonX: Animated.add(sideOffset, dragOffset),
+      buttonY: lift,
+      buttonScale: collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [0.8, 0.96] }),
+      buttonOpacity: collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, 0.92] }),
+      cardY: Animated.add(lift, collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, 20] })),
+      cardOpacity: collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+    };
+  }, [collapseAnimation, dragOffset, liftAnimation, sideOffset]);
   const lastSideRef = useRef(side);
   useEffect(() => {
     // Moved to the other corner, it glides there; a turn of the device, or
@@ -209,10 +256,12 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
   // gets the whole window. Reported per overlay and cleared on unmount, the
   // same way the inset is, because a subdocument can mount one of its own over
   // the app's.
+  // It comes back once the player has gone down, not under it on its way.
+  const playerShown = allowDisplay && (isPopupOpen || fullPlayer.mounted);
   useEffect(() => {
-    reportNowPlayingExpanded(overlayId, isPopupOpen && allowDisplay);
+    reportNowPlayingExpanded(overlayId, playerShown);
     return () => reportNowPlayingExpanded(overlayId, false);
-  }, [allowDisplay, isPopupOpen, overlayId, reportNowPlayingExpanded]);
+  }, [overlayId, playerShown, reportNowPlayingExpanded]);
 
   // Out, the bar's thumbnail will show a lesson's picture: the engine fetches
   // a new lesson's picture the first time (utils/lessonPlayback.ts).
@@ -311,23 +360,20 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
     return null;
   }
 
-  if (isPopupOpen && isMusic) {
-    return (
-      <MusicNowPlayingScreen
-        embedded
-        onClose={() => setIsPopupOpen(false)}
-      />
-    );
-  }
+  const playerScreen = fullPlayer.mounted && (isMusic || learning.currentItem) ? (
+    <Animated.View
+      pointerEvents={isPopupOpen ? 'box-none' : 'none'}
+      style={[styles.fullPlayer, { transform: [{ translateY: fullPlayerOffset }] }]}
+    >
+      {isMusic ? (
+        <MusicNowPlayingScreen key={playerKey} embedded onClose={() => setIsPopupOpen(false)} />
+      ) : (
+        <LearningNowPlayingScreen key={playerKey} embedded onClose={() => setIsPopupOpen(false)} />
+      )}
+    </Animated.View>
+  ) : null;
 
-  if (isPopupOpen && learning.currentItem) {
-    return (
-      <LearningNowPlayingScreen
-        embedded
-        onClose={() => setIsPopupOpen(false)}
-      />
-    );
-  }
+  if (isPopupOpen) return playerScreen;
 
   // Everything opens the full player, a lesson's picture with it.
   const onOpen = () => setIsPopupOpen(true);
@@ -389,141 +435,137 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
   const likeFits = !videoLesson || windowWidth >= ROOM_FOR_LIKE_AND_MODE;
 
   const overlayBottom = insets.bottom + FLOATING_GAP;
-  const lift = Animated.multiply(liftAnimation, -1);
+  const otherSide = side === 'left' ? 'right' : 'left';
 
-  const collapsedScale = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] });
-  const collapsedOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0.92] });
-  const cardTranslate = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, 20] });
-  const cardOpacity = collapseAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-
-  if (isCollapsed) {
-    const otherSide = side === 'left' ? 'right' : 'left';
-    return (
-      <>
-        {/* The foot of the page the button travels along, clear of the notch
-            and the rounded corners on a phone on its side. No height, so it
-            covers nothing: the button stays its own small box. */}
-        <View
-          pointerEvents="none"
-          onLayout={(event) => setRowWidth(Math.round(event.nativeEvent.layout.width))}
-          style={{ position: 'absolute', left: 18 + insets.left, right: 18 + insets.right, bottom: 0, height: 0 }}
-        />
-        <Animated.View
-          testID="global-now-playing-collapsed"
-          pointerEvents="box-none"
-          style={{
-            position: 'absolute',
-            left: 18 + insets.left,
-            bottom: overlayBottom,
-            width: BUTTON_SIZE,
-            height: BUTTON_SIZE,
-            backgroundColor: 'transparent',
-            // Shown once the foot is measured, so it never flashes in the wrong corner.
-            opacity: rowWidth > 0 ? collapsedOpacity : 0,
-            transform: [{ translateX: Animated.add(sideOffset, dragOffset) }, { translateY: lift }, { scale: collapsedScale }],
-            zIndex: 40,
-            elevation: 40,
-          }}
-        >
-          <View {...buttonDrag.panHandlers} onTouchStart={onButtonTouchStart}>
-              <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Show now playing"
-              accessibilityHint={tr('Drag to move it to the other corner', 'Faites glisser pour le placer dans l’autre coin', 'اسحبه لنقله إلى الزاوية الأخرى')}
-              accessibilityActions={[{
-                name: 'move',
-                label: otherSide === 'left'
-                  ? tr('Move to the left corner', 'Placer dans le coin gauche', 'انقله إلى الزاوية اليسرى')
-                  : tr('Move to the right corner', 'Placer dans le coin droit', 'انقله إلى الزاوية اليمنى'),
-              }]}
-              onAccessibilityAction={(event) => {
-                if (event.nativeEvent.actionName === 'move') setNowPlayingButtonSide(otherSide);
-              }}
-              onPress={() => setIsCollapsed(false)}
-              style={[styles.collapsedButton, { backgroundColor: buttonColor }]}
-            >
-              <Icon name="chevron-down" size={18} color={buttonIconColor} style={{ transform: [{ rotate: '180deg' }] }} />
-            </Pressable>
-          </View>
-        </Animated.View>
-      </>
-    );
-  }
+  const button = buttonMounted ? (
+    <>
+      {/* The foot of the page the button travels along, clear of the notch
+          and the rounded corners on a phone on its side. No height, so it
+          covers nothing: the button stays its own small box. */}
+      <View
+        pointerEvents="none"
+        onLayout={(event) => setRowWidth(Math.round(event.nativeEvent.layout.width))}
+        style={{ position: 'absolute', left: 18 + insets.left, right: 18 + insets.right, bottom: 0, height: 0 }}
+      />
+      <Animated.View
+        testID="global-now-playing-collapsed"
+        pointerEvents={isCollapsed ? 'box-none' : 'none'}
+        style={{
+          position: 'absolute',
+          left: 18 + insets.left,
+          bottom: overlayBottom,
+          width: BUTTON_SIZE,
+          height: BUTTON_SIZE,
+          backgroundColor: 'transparent',
+          // Shown once the foot is measured, so it never flashes in the wrong corner.
+          opacity: rowWidth > 0 ? motion.buttonOpacity : 0,
+          transform: [{ translateX: motion.buttonX }, { translateY: motion.buttonY }, { scale: motion.buttonScale }],
+          zIndex: 40,
+          elevation: 40,
+        }}
+      >
+        <View {...buttonDrag.panHandlers} onTouchStart={onButtonTouchStart}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Show now playing"
+            accessibilityHint={tr('Drag to move it to the other corner', 'Faites glisser pour le placer dans l’autre coin', 'اسحبه لنقله إلى الزاوية الأخرى')}
+            accessibilityActions={[{
+              name: 'move',
+              label: otherSide === 'left'
+                ? tr('Move to the left corner', 'Placer dans le coin gauche', 'انقله إلى الزاوية اليسرى')
+                : tr('Move to the right corner', 'Placer dans le coin droit', 'انقله إلى الزاوية اليمنى'),
+            }]}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === 'move') setNowPlayingButtonSide(otherSide);
+            }}
+            onPress={() => setIsCollapsed(false)}
+            style={[styles.collapsedButton, { backgroundColor: buttonColor }]}
+          >
+            <Icon name="chevron-down" size={18} color={buttonIconColor} style={{ transform: [{ rotate: '180deg' }] }} />
+          </Pressable>
+        </View>
+      </Animated.View>
+    </>
+  ) : null;
 
   return (
-    <Animated.View
-      pointerEvents="box-none"
-      onLayout={(event) => {
-        const height = Math.max(0, Math.round(event.nativeEvent.layout.height));
-        if (height > 0) setExpandedHeight(height);
-      }}
-      style={{
-        position: 'absolute',
-        // Clear of the notch and the rounded corners on a phone on its side.
-        left: 12 + insets.left,
-        right: 12 + insets.right,
-        bottom: overlayBottom,
-        zIndex: 40,
-        elevation: 40,
-        opacity: cardOpacity,
-        transform: [{ translateY: Animated.add(lift, cardTranslate) }],
-      }}
-    >
-      <MiniPlayerCard
-        artwork={artwork}
-        title={title}
-        titleSuffix={titleSuffix}
-        subtitle={subtitle}
-        liked={miniLiked}
-        likeBusy={miniLikeBusy}
-        extraButton={modeButton}
-        onToggleLike={likeFits && (musicTrackId || learningItemId) ? async () => {
-          if (miniLikeBusy) return;
-          if (!libraryAuthenticated) {
-            Alert.alert(
-              tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
-              preferences.appLanguage === 'ar'
-                ? 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الأغاني المعجبة.'
-                : `Sign in to your Coptic Vine account to save ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
-            );
-            return;
-          }
-          setMiniLikeBusy(true);
-          try {
-            const nextLiked = !miniLiked;
-            if (isMusic && musicTrackId) {
-              await musicService.setLiked(musicTrackId, nextLiked);
-            } else if (learningItemId) {
-              await learningService.setItemLiked(learningItemKind, learningItemId, nextLiked);
-            }
-            setMiniLiked(nextLiked);
-          } catch (cause) {
-            Alert.alert(
-              tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
-              cause instanceof Error ? cause.message : `Unable to update ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
-            );
-          } finally {
-            setMiniLikeBusy(false);
-          }
-        } : undefined}
-        playing={isMusic ? music.playing : learning.playing}
-        buffering={isMusic ? music.buffering : learning.buffering}
-        progress={isMusic
-          ? (music.durationMs > 0 ? music.currentTimeMs / music.durationMs : 0)
-          : (learning.durationMs > 0 ? learning.currentTimeMs / learning.durationMs : 0)}
-        accentColor={accentColor}
-        onOpen={onOpen}
-        onTogglePlayback={onTogglePlayback}
-        onNext={onNext}
-        onPrevious={onPrevious}
-        onHide={() => setIsCollapsed(true)}
-        nextLabel={isMusic ? 'Next track' : 'Next lesson'}
-      />
-    </Animated.View>
+    <>
+      {button}
+      {cardMounted ? (
+        <Animated.View
+          pointerEvents={isCollapsed ? 'none' : 'box-none'}
+          onLayout={(event) => {
+            const height = Math.max(0, Math.round(event.nativeEvent.layout.height));
+            if (height > 0) setExpandedHeight(height);
+          }}
+          style={{
+            position: 'absolute',
+            // Clear of the notch and the rounded corners on a phone on its side.
+            left: 12 + insets.left,
+            right: 12 + insets.right,
+            bottom: overlayBottom,
+            zIndex: 40,
+            elevation: 40,
+            opacity: motion.cardOpacity,
+            transform: [{ translateY: motion.cardY }],
+          }}
+        >
+          <MiniPlayerCard
+            artwork={artwork}
+            title={title}
+            titleSuffix={titleSuffix}
+            subtitle={subtitle}
+            liked={miniLiked}
+            likeBusy={miniLikeBusy}
+            extraButton={modeButton}
+            onToggleLike={likeFits && (musicTrackId || learningItemId) ? async () => {
+              if (miniLikeBusy) return;
+              if (!libraryAuthenticated) {
+                Alert.alert(
+                  tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
+                  preferences.appLanguage === 'ar'
+                    ? 'سجّل الدخول إلى حساب كوبتك فاين لحفظ الأغاني المعجبة.'
+                    : `Sign in to your Coptic Vine account to save ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
+                );
+                return;
+              }
+              setMiniLikeBusy(true);
+              try {
+                const nextLiked = !miniLiked;
+                if (isMusic && musicTrackId) {
+                  await musicService.setLiked(musicTrackId, nextLiked);
+                } else if (learningItemId) {
+                  await learningService.setItemLiked(learningItemKind, learningItemId, nextLiked);
+                }
+                setMiniLiked(nextLiked);
+              } catch (cause) {
+                Alert.alert(
+                  tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
+                  cause instanceof Error ? cause.message : `Unable to update ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,
+                );
+              } finally {
+                setMiniLikeBusy(false);
+              }
+            } : undefined}
+            playing={isMusic ? music.playing : learning.playing}
+            buffering={isMusic ? music.buffering : learning.buffering}
+            accentColor={accentColor}
+            onOpen={onOpen}
+            onTogglePlayback={onTogglePlayback}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            onHide={hideBar}
+            nextLabel={isMusic ? 'Next track' : 'Next lesson'}
+          />
+        </Animated.View>
+      ) : null}
+      {playerScreen}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  fullPlayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90, elevation: 90 },
   miniVideo: { width: MINI_VIDEO.width, height: MINI_VIDEO.height, borderRadius: 8 },
   container: {
     position: 'absolute',
