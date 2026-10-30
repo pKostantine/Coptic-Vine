@@ -79,7 +79,7 @@ test('content is read from the content Worker, on a client with no session and n
 test('contentDataClient sends table reads and RPCs it cannot answer offline to the content source', async () => {
   const contentApi = fakeClient('content', { data: [{ hymn_key: 'x' }], error: null });
   const { contentDataClient } = loadModule(source('services/contentDataClient.ts'), {
-    '@/services/bookContentDatabase': { hasLocalSchema: async () => false, readLocalRpc: async () => ({ found: false }), readLocalTable: async () => null },
+    '@/services/bookContentDatabase': { hasLocalSchema: async () => false, readLocalRpc: async () => ({ found: false }), readLocalTable: async () => null, readLocalRowsWhere: async () => null, isLocalTableKept: () => false, isLocalTableOversized: () => false },
     '@/services/contentSource': { contentApi },
   });
   const rows = await contentDataClient.schema('liturgy').from('hymn_titles').select('hymn_key').eq('hymn_key', 'x');

@@ -165,3 +165,24 @@ test('a rail that scrolls sideways takes no Now Playing clearance', () => {
   const scroll = source('components/playback/NowPlayingAwareScroll.tsx');
   assert.equal((scroll.match(/props\.horizontal \? 0 : nowPlayingInset/g) || []).length, 2);
 });
+
+test('the first screen is drawn in the reader\'s own preferences, not the defaults and then again', () => {
+  const layout = source('app/_layout.tsx');
+  assert.match(layout, /const storedReading = readStoredReading\(\);/);
+  assert.match(layout, /settleWithin\(\[storedReading\], 1500, 'Reading preferences'\)/);
+  // The web draws without waiting for the Coptic faces, which the first screen doesn't use.
+  assert.match(layout, /const fontsReady = \(copticLoaded \|\| Platform\.OS === 'web'\) && readingLoaded;/);
+  const provider = source('context/ReadingPreferencesContext.tsx');
+  assert.match(provider, /useState<ReadingPreferences>\(\(\) => launch\?\.preferences \?\? DEFAULT_READING_PREFERENCES\)/);
+  // An account holding what the device has changes nothing, and only Account reads whether it is saved.
+  assert.match(provider, /if \(syncedSignature !== contentSignature\(preferencesRef\.current, bookmarksRef\.current\)\) \{/);
+  assert.match(provider, /<ContentSyncStatusContext\.Provider value=\{contentSyncStatus\}>/);
+  const valueStart = provider.indexOf('const value = useMemo<ReadingPreferencesContextValue>(');
+  assert.doesNotMatch(provider.slice(valueStart, provider.indexOf('setCurrentAppLanguage(preferences.appLanguage);', valueStart)), /contentSyncStatus/);
+  assert.match(source('app/account.tsx'), /const contentSyncStatus = useContentSyncStatus\(\);/);
+});
+
+test('the calendar is read into memory when JavaScript has a moment, a chunk at a time', () => {
+  assert.match(source('components/BookSyncBootstrap.tsx'), /idle = requestIdleCallback\(begin, \{ timeout: CALENDAR_WARM_DELAY_MS \}\);/);
+  assert.match(source('services/bookContentDatabase.ts'), /if \(index\) await new Promise\(\(resolve\) => setTimeout\(resolve, 0\)\);/);
+});

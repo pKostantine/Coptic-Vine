@@ -18,7 +18,7 @@ import SegmentNav from '@/components/vine/ui/SegmentNav';
 import TabHeader from '@/components/vine/ui/TabHeader';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { useContentSyncStatus, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { pickAndUploadProfileAvatar, removeProfileAvatar } from '@/services/profileAvatarService';
 import { authMessage } from '@/utils/authMessages';
 import { useSidePadding } from '@/utils/useSidePadding';
@@ -642,7 +642,8 @@ function AppSettingsSection({ gutter, compact = false, wide = false }: { gutter:
   const { user } = useAuth();
   // A sheet over Account, as everywhere: Book Settings are never a page.
   const [bookSettingsOpen, setBookSettingsOpen] = useState(false);
-  const { preferences, setAppLanguage, contentSyncStatus } = useReadingPreferences();
+  const { preferences, setAppLanguage } = useReadingPreferences();
+  const contentSyncStatus = useContentSyncStatus();
   const arabic = preferences.appLanguage === 'ar';
   const sync = !user
     ? { label: tr('On this device', 'Sur cet appareil', 'على هذا الجهاز'), icon: 'person-circle-outline' as const, color: COLORS.muted }

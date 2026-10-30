@@ -19,10 +19,18 @@ export default function BookSyncBootstrap() {
     // With the calendar installed, read it into memory once launch has
     // settled, so the season selector and the calendar open without waiting
     // for it. Off the launch path, and nothing at all without the calendar.
+    // Begun when JavaScript next has a moment to spare, not in the middle of
+    // whatever the reader is doing two seconds in.
+    let idle: number | null = null;
     const warm = setTimeout(() => {
-      warmCalendar().catch(() => {});
+      const begin = () => { warmCalendar().catch(() => {}); };
+      if (typeof requestIdleCallback === 'function') idle = requestIdleCallback(begin, { timeout: CALENDAR_WARM_DELAY_MS });
+      else begin();
     }, CALENDAR_WARM_DELAY_MS);
-    return () => clearTimeout(warm);
+    return () => {
+      clearTimeout(warm);
+      if (idle != null && typeof cancelIdleCallback === 'function') cancelIdleCallback(idle);
+    };
   }, []);
 
   useEffect(() => {

@@ -32,7 +32,6 @@ export type ContentSyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 interface ReadingPreferencesContextValue {
   preferences: ReadingPreferences;
   ready: boolean;
-  contentSyncStatus: ContentSyncStatus;
   toggleLanguage: (key: keyof VisibleLanguages) => void;
   setBibleVisibleLanguages: (updater: SetStateAction<BibleVisibleLanguages>) => void;
   toggleSermonPlannerLanguage: (key: keyof SermonPlannerVisibleLanguages) => void;
@@ -75,6 +74,12 @@ interface ReadingPreferencesContextValue {
 }
 
 const ReadingPreferencesContext = createContext<ReadingPreferencesContextValue | null>(null);
+/**
+ * Whether the reader's content preferences are saved to their account: read
+ * by Account alone, and kept apart from the preferences themselves, whose
+ * every reader was drawn again each time it changed (twice at every save).
+ */
+const ContentSyncStatusContext = createContext<ContentSyncStatus>('local');
 
 function normalizeBookmarks(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -87,12 +92,38 @@ function contentSignature(preferences: ReadingPreferences, bookmarks: string[]) 
   return JSON.stringify([syncedReadingPreferences(preferences), normalizeBookmarks(bookmarks)]);
 }
 
+interface StoredReading {
+  preferences: ReadingPreferences;
+  bookmarks: string[];
+}
+
+let launchRead: Promise<void> | null = null;
+let launchStored: StoredReading | null = null;
+
+/**
+ * The reader's stored preferences and bookmarks, read once as the app opens:
+ * the root layout starts this beside the fonts and keeps the splash up for
+ * it, so the first screen is drawn in the reader's own language, theme and
+ * orientation rather than in the defaults and then all over again. Only the
+ * first provider starts from it; one mounted later (the web's rebuilt root)
+ * reads storage afresh, for whatever has been saved since.
+ */
+export function readStoredReading(): Promise<void> {
+  if (!launchRead) {
+    launchRead = Promise.all([loadReadingPreferences(), loadBookmarks()]).then(([preferences, bookmarks]) => {
+      launchStored = { preferences, bookmarks };
+    });
+  }
+  return launchRead;
+}
+
 export function ReadingPreferencesProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const userId = user?.id ?? null;
-  const [preferences, setPreferences] = useState<ReadingPreferences>(DEFAULT_READING_PREFERENCES);
-  const [bookmarks, setBookmarks] = useState<string[]>([]);
-  const [ready, setReady] = useState(false);
+  const [launch] = useState(() => launchStored);
+  const [preferences, setPreferences] = useState<ReadingPreferences>(() => launch?.preferences ?? DEFAULT_READING_PREFERENCES);
+  const [bookmarks, setBookmarks] = useState<string[]>(() => (launch ? normalizeBookmarks(launch.bookmarks) : []));
+  const [ready, setReady] = useState(launch != null);
   const [contentSyncStatus, setContentSyncStatus] = useState<ContentSyncStatus>('local');
   const [syncedUserId, setSyncedUserId] = useState<string | null>(null);
   const preferencesRef = useRef(preferences);
@@ -118,6 +149,8 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
   }, [bookmarks]);
 
   useEffect(() => {
+    launchStored = null;
+    if (launch) return undefined;
     let cancelled = false;
     Promise.all([loadReadingPreferences(), loadBookmarks()]).then(([storedPreferences, storedBookmarks]) => {
       if (cancelled) return;
@@ -128,7 +161,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [launch]);
 
   useEffect(() => {
     if (ready) saveReadingPreferences(preferences);
@@ -177,11 +210,16 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
         if (cloud.exists) {
           const nextPreferences = applySyncedReadingPreferences(preferencesRef.current, cloud.preferences);
           const nextBookmarks = normalizeBookmarks(cloud.bookmarks);
-          preferencesRef.current = nextPreferences;
-          bookmarksRef.current = nextBookmarks;
-          setPreferences(nextPreferences);
-          setBookmarks(nextBookmarks);
           syncedSignature = contentSignature(nextPreferences, nextBookmarks);
+          // The account holding what this device already has (most launches)
+          // changes nothing: new objects of the same values drew every
+          // reader of the preferences again, documents and all.
+          if (syncedSignature !== contentSignature(preferencesRef.current, bookmarksRef.current)) {
+            preferencesRef.current = nextPreferences;
+            bookmarksRef.current = nextBookmarks;
+            setPreferences(nextPreferences);
+            setBookmarks(nextBookmarks);
+          }
         } else {
           const initialPreferences = preferencesRef.current;
           const initialBookmarks = bookmarksRef.current;
@@ -400,7 +438,6 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     () => ({
       preferences,
       ready,
-      contentSyncStatus,
       toggleLanguage,
       setBibleVisibleLanguages,
       toggleSermonPlannerLanguage,
@@ -434,7 +471,6 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     [
       preferences,
       ready,
-      contentSyncStatus,
       toggleLanguage,
       setBibleVisibleLanguages,
       toggleSermonPlannerLanguage,
@@ -471,7 +507,15 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
   // it here, as the provider renders, means everything below renders in the
   // new language on the same pass rather than after the save effect.
   setCurrentAppLanguage(preferences.appLanguage);
-  return <ReadingPreferencesContext.Provider value={value}>{children}</ReadingPreferencesContext.Provider>;
+  return (
+    <ContentSyncStatusContext.Provider value={contentSyncStatus}>
+      <ReadingPreferencesContext.Provider value={value}>{children}</ReadingPreferencesContext.Provider>
+    </ContentSyncStatusContext.Provider>
+  );
+}
+
+export function useContentSyncStatus(): ContentSyncStatus {
+  return useContext(ContentSyncStatusContext);
 }
 
 export function useReadingPreferences() {
