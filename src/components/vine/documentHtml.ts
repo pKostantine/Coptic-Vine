@@ -1138,6 +1138,33 @@ export function buildDocumentHtml(
         pageScroller.addEventListener('scroll', scheduleReport, { passive: true });
         scheduleReport();
       })();
+      // A headpiece's title shrinks until it fits the frame's open space: a
+      // service's name fits at the frame's own size, a saint's long one ran
+      // out over the frame (utils/headpieceFit.ts). Measured as drawn, again
+      // as the page resizes and once the fonts are in.
+      (function () {
+        var MIN_SCALE = 0.6; // headpieceFit.ts's HEADPIECE_MIN_SCALE
+        function fit() {
+          var boxes = document.querySelectorAll('.headpiece-text');
+          for (var i = 0; i < boxes.length; i += 1) {
+            var box = boxes[i];
+            var title = box.querySelector('.headpiece-title');
+            if (!title) continue;
+            if (title.dataset.ownStyle === undefined) title.dataset.ownStyle = title.getAttribute('style') || '';
+            title.setAttribute('style', title.dataset.ownStyle);
+            var room = box.clientHeight;
+            var size = parseFloat(getComputedStyle(title).fontSize);
+            var floor = size * MIN_SCALE;
+            while (room > 0 && title.offsetHeight > room && size > floor) {
+              size = Math.max(size - 0.5, floor);
+              title.style.fontSize = size + 'px';
+            }
+          }
+        }
+        fit();
+        window.addEventListener('resize', fit);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+      })();
       // Under floating controls: whether the headpiece the document opens
       // with still shows its title below them. It carries the service's
       // title, so the controls' title pill shows only once it has scrolled

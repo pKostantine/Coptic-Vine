@@ -4,6 +4,7 @@ import { SvgXml } from 'react-native-svg';
 
 import { HEADPIECES, MEDALLION, type HeadpieceOrnament } from '../../../constants/documentOrnaments';
 import type { OrnamentArt } from '../../../constants/ornamentArt';
+import { fitHeadpieceTitle, HEADPIECE_LINE_HEIGHT, HEADPIECE_MIN_SCALE } from '../../../utils/headpieceFit';
 
 function ornamentXml(art: OrnamentArt, color: string): string {
   // Drawn in currentColor; set to the colour here rather than through
@@ -38,8 +39,14 @@ export const Headpiece = memo(function Headpiece({ kind, availableWidth, color, 
   const frame = HEADPIECES[kind];
   const { width, height } = headpieceSize(kind, availableWidth);
   const xml = useMemo(() => ornamentXml(frame.art, color), [frame.art, color]);
-  const fontSize = Math.max(frame.minFontSize, (width * frame.fontSize) / 100);
   const { left, right, top, bottom } = frame.text;
+  // Sized to fit before it is drawn (utils/headpieceFit.ts), the same on every
+  // platform: a browser does nothing with adjustsFontSizeToFit, and cut a long
+  // name short; the phones' own shrinking stays, should the estimate be short.
+  const box = { width: (width * (100 - left - right)) / 100, height: (height * (100 - top - bottom)) / 100 };
+  const fit = fitHeadpieceTitle(text, box, Math.max(frame.minFontSize, (width * frame.fontSize) / 100), arabic);
+  const fontSize = fit.fontSize;
+  const lines = Math.max(fit.lines, Math.floor(box.height / (fontSize * HEADPIECE_LINE_HEIGHT)), 1);
   return (
     <View style={{ height, width }} accessibilityRole="header" accessibilityLabel={text}>
       <SvgXml xml={xml} width={width} height={height} />
@@ -47,12 +54,12 @@ export const Headpiece = memo(function Headpiece({ kind, availableWidth, color, 
         <Text
           selectable={false}
           adjustsFontSizeToFit
-          minimumFontScale={0.6}
-          numberOfLines={3}
+          minimumFontScale={HEADPIECE_MIN_SCALE}
+          numberOfLines={lines}
           style={[
             styles.title,
             arabic && styles.titleArabic,
-            { color, fontSize, letterSpacing: arabic ? 0 : fontSize * 0.05, lineHeight: Math.round(fontSize * 1.12) },
+            { color, fontSize, letterSpacing: arabic ? 0 : fontSize * 0.05, lineHeight: Math.round(fontSize * HEADPIECE_LINE_HEIGHT) },
           ]}
         >
           {arabic ? text : text.toLocaleUpperCase()}
