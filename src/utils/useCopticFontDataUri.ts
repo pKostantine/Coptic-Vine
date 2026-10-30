@@ -8,6 +8,34 @@ const copticFontModule = require('../../assets/fonts/CopticVine-Regular-v4.1.ttf
 const copticItalicFontModule = require('../../assets/fonts/CopticVine-Italic-v4.1.ttf');
 
 const cachedDataUris = new Map<unknown, string>();
+const loadingDataUris = new Map<unknown, Promise<string | null>>();
+
+/** The font as a data: URI, read once a session; reads under way are shared. */
+function loadFontDataUri(fontModule: unknown): Promise<string | null> {
+  const cached = cachedDataUris.get(fontModule);
+  if (cached) return Promise.resolve(cached);
+  const loading = loadingDataUris.get(fontModule);
+  if (loading) return loading;
+  const read = (async () => {
+    const asset = Asset.fromModule(fontModule as number);
+    await asset.downloadAsync();
+    if (!asset.localUri) return null;
+    const uri = Platform.OS === 'web' ? await readAsDataUriWeb(asset.localUri) : await readAsDataUriNative(asset.localUri);
+    if (uri) cachedDataUris.set(fontModule, uri);
+    return uri;
+  })().catch(() => null).finally(() => loadingDataUris.delete(fontModule));
+  loadingDataUris.set(fontModule, read);
+  return read;
+}
+
+/**
+ * Reads both faces ahead of the first document, once the app has opened:
+ * that document then draws without waiting on them (useCopticFontDataUri).
+ */
+export function preloadCopticFonts(): void {
+  void loadFontDataUri(copticFontModule);
+  void loadFontDataUri(copticItalicFontModule);
+}
 
 /**
  * Loads a bundled font and returns it as a base64 data: URI so it can be
@@ -24,19 +52,9 @@ function useFontDataUri(fontModule: unknown) {
   useEffect(() => {
     if (cachedDataUris.has(fontModule)) return;
     let cancelled = false;
-
-    (async () => {
-      const asset = Asset.fromModule(fontModule as number);
-      await asset.downloadAsync();
-      if (!asset.localUri) return;
-
-      const uri = Platform.OS === 'web' ? await readAsDataUriWeb(asset.localUri) : await readAsDataUriNative(asset.localUri);
-      if (!uri) return;
-
-      cachedDataUris.set(fontModule, uri);
-      if (!cancelled) setDataUri(uri);
-    })();
-
+    void loadFontDataUri(fontModule).then((uri) => {
+      if (uri && !cancelled) setDataUri(uri);
+    });
     return () => {
       cancelled = true;
     };

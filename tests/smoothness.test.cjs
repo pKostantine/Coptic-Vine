@@ -254,3 +254,12 @@ test('the canon\'s days land together, and the launch reads the book manifest on
   assert.match(source('services/bookDownloadManager.ts'), /const manifest = await this\.fetchManifest\(manual\);/);
   assert.match(source('components/BookSyncBootstrap.tsx'), /syncing = true;\n\s+const network = await Network\.getNetworkStateAsync\(\)\.catch\(\(\) => null\);/);
 });
+
+test('a document draws without waiting on fold choices or faces already read', () => {
+  const surface = source('components/vine/DocumentSurface.tsx');
+  assert.match(surface, /const \[rememberedCollapse\] = useState\(\(\) => peekCollapsedSectionStates\(collapseMemoryScope\)\);/);
+  assert.match(surface, /if \(rememberedScope\.current === collapseMemoryScope\) return undefined;/);
+  assert.match(source('utils/useCopticFontDataUri.ts'), /const loading = loadingDataUris\.get\(fontModule\);\n\s+if \(loading\) return loading;/);
+  const layout = source('app/_layout.tsx');
+  assert.match(layout, /preloadCopticFonts\(\);\n\s+preloadCollapsedSectionStates\(\);/);
+});

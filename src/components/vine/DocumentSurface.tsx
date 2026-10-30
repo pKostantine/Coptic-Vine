@@ -7,7 +7,7 @@ import { pickDocumentTitle, withRememberedCollapse, type DocumentTitle } from '.
 import { documentInitialColors, documentOrnamentColor, type InitialColors } from '../../constants/documentOrnaments';
 import { getDocumentTheme, slideshowThemeFor } from '../../constants/documentThemes';
 import { useBottomChrome } from '../../context/BottomChromeContext';
-import { loadCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
+import { loadCollapsedSectionStates, peekCollapsedSectionStates, saveCollapsedSectionState } from '../../utils/collapseStateStorage';
 import { fontScaleToPx, ReadingPreferences } from '../../utils/preferencesStorage';
 import type { DocumentRestoreRequest } from '../../utils/sectionRestore';
 import type { SermonHighlight } from '../../types/sermonPlanner';
@@ -182,11 +182,17 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     // section.id already includes hymn_key + item_order. Combining it with
     // collapseMemoryScope keeps repeated hymns separate both within one
     // document and across Vespers/Matins/Liturgy or nested subdocuments.
-    const [collapsedSectionIds, setCollapsedSectionIds] = useState<Record<string, boolean>>({});
-    const collapsedSectionIdsRef = useRef<Record<string, boolean>>({});
-    const [loadedCollapseScope, setLoadedCollapseScope] = useState<string | null>(null);
+    // Drawn at once from the choices already read this session, rather than
+    // after a frame of spinner while they are read again.
+    const [rememberedCollapse] = useState(() => peekCollapsedSectionStates(collapseMemoryScope));
+    const [collapsedSectionIds, setCollapsedSectionIds] = useState<Record<string, boolean>>(() => rememberedCollapse ?? {});
+    const collapsedSectionIdsRef = useRef<Record<string, boolean>>(collapsedSectionIds);
+    const [loadedCollapseScope, setLoadedCollapseScope] = useState<string | null>(() => (rememberedCollapse ? collapseMemoryScope : null));
+    const rememberedScope = useRef<string | null>(loadedCollapseScope);
 
     useEffect(() => {
+      if (rememberedScope.current === collapseMemoryScope) return undefined;
+      rememberedScope.current = null;
       let cancelled = false;
       loadCollapsedSectionStates(collapseMemoryScope).then((storedStates) => {
         if (cancelled) return;
