@@ -1,8 +1,10 @@
 import { createContext, useEffect, useRef, useState } from 'react';
 import {
-  Animated, PanResponder, type NativeScrollEvent, type NativeSyntheticEvent, type PanResponderCallbacks,
+  Animated, Easing, PanResponder, type NativeScrollEvent, type NativeSyntheticEvent, type PanResponderCallbacks,
   type PanResponderGestureState,
 } from 'react-native';
+
+import { getReducedMotion, motionDuration, releaseDuration } from '../../../utils/useReducedMotion';
 
 const DRAG_TO_CLOSE = 80;
 
@@ -40,13 +42,19 @@ function isPullDown(gesture: PanResponderGestureState) {
  * `scrollLocked`. A sheet whose content scrolls itself (a web view) takes the
  * grab handle alone, since there is no telling where that content has
  * scrolled to.
+ *
+ * Let go far or fast enough, the sheet carries on down `travel` points (out
+ * of sight) at the finger's own speed as it is told to close, rather than
+ * waiting where the finger left it for the page to draw itself again.
  */
-export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onClose: () => void) {
-  // The handlers outlive renders; they read the latest onClose from here.
+export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onClose: () => void, travel = 0) {
+  // The handlers outlive renders; they read the latest onClose and travel from here.
   const onCloseRef = useRef(onClose);
+  const travelRef = useRef(travel);
   useEffect(() => {
     onCloseRef.current = onClose;
-  }, [onClose]);
+    travelRef.current = travel;
+  }, [onClose, travel]);
 
   // A sheet opens with its content at the top.
   const scrollTopRef = useRef(0);
@@ -101,8 +109,18 @@ export function useSheetDragToClose(visible: boolean, drag: Animated.Value, onCl
       onPanResponderRelease: (_, gesture) => {
         const pulled = distance(gesture);
         settle();
-        if (pulled > DRAG_TO_CLOSE || (pulled > 0 && gesture.vy > 1.2)) onCloseRef.current();
-        else springBack();
+        if (pulled > DRAG_TO_CLOSE || (pulled > 0 && gesture.vy > 1.2)) {
+          const distanceLeft = travelRef.current - pulled;
+          if (distanceLeft > 0) {
+            Animated.timing(drag, {
+              toValue: travelRef.current,
+              duration: motionDuration(releaseDuration(distanceLeft, gesture.vy), getReducedMotion()),
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }).start();
+          }
+          onCloseRef.current();
+        } else springBack();
       },
       onPanResponderTerminate: () => {
         settle();

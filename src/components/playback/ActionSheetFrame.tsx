@@ -113,7 +113,7 @@ export default function ActionSheetFrame({ visible, onClose, closeLabel, childre
     return () => animation.stop();
   }, [drag, mounted, progress, reduced, swipe, visible]);
 
-  const sheetDrag = useSheetDragToClose(visible, drag, onClose);
+  const sheetDrag = useSheetDragToClose(visible, drag, onClose, height);
 
   // The side panel goes back the way it came: a swipe toward the right edge.
   const onCloseRef = useRef(onClose);

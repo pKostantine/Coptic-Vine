@@ -1,0 +1,81 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const test = require('node:test');
+
+const source = (file) => fs.readFileSync(`src/${file}`, 'utf8');
+
+test('the playback clock is kept out of the player context, so pages that read the player are not drawn at each tick', () => {
+  const playback = source('context/PlaybackContext.tsx');
+  const valueStart = playback.indexOf('const value = useMemo<PlaybackContextValue>(() => ({');
+  const value = playback.slice(valueStart, playback.indexOf('}), [', valueStart));
+  assert.doesNotMatch(value, /currentTimeMs/);
+  assert.match(playback, /clock\.publish\(\{ currentTimeMs, durationMs \}\);/);
+  assert.match(playback, /useSyncExternalStore\(store\.subscribe, \(\) => select\(store\.get\(\)\)/);
+  for (const file of ['context/MusicPlayerContext.tsx', 'context/LearningPlayerContext.tsx']) {
+    assert.doesNotMatch(source(file), /currentTimeMs: currentItem \? playback\.currentTimeMs/, file);
+  }
+  // What shows the clock reads it itself: the seek bar, the bar's line, the lyric being sung.
+  assert.match(source('components/music/SeekBar.tsx'), /const positionMs = usePlaybackClock\(\(clock\) => clock\.currentTimeMs\);/);
+  assert.match(source('components/playback/MiniPlayerCard.tsx'), /function ProgressFill\(\{ color \}: \{ color: string \}\) \{\n\s+const progress = usePlaybackClock\(/);
+  assert.match(source('components/music/MusicNowPlayingScreen.tsx'), /const activeLineId = usePlaybackClock\(\(\{ currentTimeMs \}\) => \{/);
+});
+
+test('the full player rises from the bar and goes back down into it', () => {
+  const overlay = source('components/playback/GlobalNowPlayingOverlay.tsx');
+  assert.match(overlay, /const fullPlayer = useOverlayTransition\(isPopupOpen && allowDisplay, \{ duration: 320 \}\);/);
+  assert.match(overlay, /outputRange: \[windowHeight, 0\]/);
+  // Drawn through its way down, over the bar it uncovers, and touched by nothing then.
+  assert.match(overlay, /pointerEvents=\{isPopupOpen \? 'box-none' : 'none'\}/);
+  assert.match(overlay, /\{playerScreen\}\n\s+<\/>/);
+  // Opened again on its way down after a pull, a fresh player rises, not the one still pulled out of sight.
+  assert.match(overlay, /<MusicNowPlayingScreen key=\{playerKey\}/);
+  // A pulled player goes on down at the finger's speed and is never put back for a frame.
+  const music = source('components/music/MusicNowPlayingScreen.tsx');
+  assert.match(music, /\.start\(\(\) => dismiss\.current\.close\(\)\);/);
+  assert.doesNotMatch(music, /dismissDrag\.setValue\(0\);\n\s+dismiss\.current\.close\(\);/);
+  const pull = source('components/playback/usePullDownToClose.ts');
+  assert.match(pull, /\.start\(\(\) => close\(\)\);/);
+});
+
+test('hidden or shown, the bar\'s card and round button cross-fade', () => {
+  const overlay = source('components/playback/GlobalNowPlayingOverlay.tsx');
+  assert.match(overlay, /if \(isCollapsed && !buttonMounted\) setButtonMounted\(true\);/);
+  assert.match(overlay, /if \(!isCollapsed && !cardMounted\) setCardMounted\(true\);/);
+  assert.match(overlay, /if \(isCollapsed\) setCardMounted\(false\);\n\s+else setButtonMounted\(false\);/);
+  assert.match(overlay, /buttonOpacity: collapseAnimation\.interpolate\(\{ inputRange: \[0, 1\], outputRange: \[0, 0\.92\] \}\)/);
+  assert.match(overlay, /\{cardMounted \? \(/);
+});
+
+test('a sheet closed after a pull goes down from where it was let go, not from fully open', () => {
+  const sheet = source('components/playback/PlayerSheet.tsx');
+  assert.match(sheet, /if \(visible\) drag\.setValue\(0\);/);
+  for (const file of ['components/vine/ui/SheetFrame.tsx', 'components/vine/ui/CalendarSheet.tsx']) {
+    const frame = source(file);
+    assert.match(frame, /toValue: 1, duration: motionDuration\(260, reduced\), easing: Easing\.out\(Easing\.cubic\)/, file);
+    assert.match(frame, /toValue: 0, duration: motionDuration\(200, reduced\), easing: Easing\.in\(Easing\.cubic\)/, file);
+  }
+});
+
+test('the week strip carries on at the pace it was thrown', () => {
+  const day = source('components/vine/ui/DayBlock.tsx');
+  assert.match(day, /duration: releaseDuration\(remaining, gesture\.vx\),\n\s+easing: Easing\.out\(Easing\.quad\),/);
+  const motion = source('utils/useReducedMotion.ts');
+  assert.match(motion, /export function releaseDuration\(remaining: number, velocity: number\): number/);
+});
+
+test('a day picked in the month on screen leaves the calendar grid as it is', () => {
+  const panel = source('components/vine/ui/CalendarPanel.tsx');
+  assert.match(panel, /setShownMonth\(\(current\) => \(current && current\.mode === next\.mode && current\.year === next\.year\n\s+&& current\.month === next\.month && current\.copticName === next\.copticName \? current : next\)\);/);
+});
+
+test('a removed bookmark\'s place closes up before the row is let go', () => {
+  const row = source('components/vine/ui/SwipeToRemove.tsx');
+  assert.match(row, /Animated\.timing\(height, \{ toValue: 0, duration: 180, easing: Easing\.out\(Easing\.cubic\), useNativeDriver: false \}\)\.start\(\(\) => removeRow\(\)\);/);
+  assert.match(row, /style=\{\[styles\.frame, style, closing && \{ height: closing \}\]\}/);
+});
+
+test('the contents panel stays where the reader scrolled it when a heading folds', () => {
+  const drawer = source('components/vine/ui/ContentSelectorDrawer.tsx');
+  assert.match(drawer, /if \(done && done\.id === highlightedSectionId && Date\.now\(\) - done\.at > SCROLL_SETTLE_MS\) return;/);
+  assert.match(drawer, /if \(!visible \|\| searching\) scrolledFor\.current = null;/);
+});
