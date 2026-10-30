@@ -40,28 +40,44 @@ export interface LiturgicalDay {
  * so the day block changes once, to the new day, rather than emptying and
  * filling again (and turning the Annual green for a moment between).
  */
+type CopticRead = { key: string; raw: string; value: CopticDate | null };
+type OverviewRead = { key: string; value: DayOverview | null };
+
+// The last day read, by any page: the Books page opened again (the tab bar
+// mounts it afresh each time) or the calendar's season chip starts from it,
+// rather than from the Annual green and a blank heading that then faded to
+// the season's colours on every visit.
+let lastCoptic: CopticRead | null = null;
+let lastOverview: OverviewRead | null = null;
+
 export function useLiturgicalDay(): LiturgicalDay {
   const { rawDate, effectiveDate } = useCalendar();
   // Subscribing re-renders this on an App Language change, so the chip's name follows it.
   useReadingPreferences();
   const isoDate = rawDate.toISOString().slice(0, 10);
   const riteIso = effectiveDate.toISOString().slice(0, 10);
-  const [coptic, setCoptic] = useState<{ key: string; raw: string; value: CopticDate | null } | null>(null);
-  const [overview, setOverview] = useState<{ key: string; value: DayOverview | null } | null>(null);
+  const [coptic, setCoptic] = useState<CopticRead | null>(() => lastCoptic);
+  const [overview, setOverview] = useState<OverviewRead | null>(() => lastOverview);
 
   useEffect(() => {
     let active = true;
-    getCopticDate(new Date(`${riteIso}T00:00:00Z`))
-      .then((value) => { if (active) setCoptic({ key: riteIso, raw: isoDate, value }); })
-      .catch(() => { if (active) setCoptic({ key: riteIso, raw: isoDate, value: null }); });
+    const settle = (value: CopticDate | null) => {
+      if (!active) return;
+      lastCoptic = { key: riteIso, raw: isoDate, value };
+      setCoptic(lastCoptic);
+    };
+    getCopticDate(new Date(`${riteIso}T00:00:00Z`)).then(settle, () => settle(null));
     return () => { active = false; };
   }, [riteIso, isoDate]);
 
   useEffect(() => {
     let active = true;
-    getDayOverview(riteIso)
-      .then((value) => { if (active) setOverview({ key: riteIso, value }); })
-      .catch(() => { if (active) setOverview({ key: riteIso, value: null }); });
+    const settle = (value: DayOverview | null) => {
+      if (!active) return;
+      lastOverview = { key: riteIso, value };
+      setOverview(lastOverview);
+    };
+    getDayOverview(riteIso).then(settle, () => settle(null));
     return () => { active = false; };
   }, [riteIso]);
 

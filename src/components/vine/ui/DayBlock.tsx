@@ -4,7 +4,7 @@ import { Animated, Easing, Platform, PanResponder, type PanResponderGestureState
 
 import { useCalendar } from '../../../context/CalendarContext';
 import { appText, tr } from '../../../utils/appText';
-import { getWeekStrip, type WeekStripDay } from '../../../utils/calendarService';
+import { getWeekStrip, peekWeekStrip, type WeekStripDay } from '../../../utils/calendarService';
 import { formatCopticDayMonth, formatDayMonthYearDate, toEasternArabicDigits } from '../../../utils/localeFormat';
 import { NEXT_SEASON_NAMES } from '../../../utils/nextSeason';
 import { motionDuration, releaseDuration, useReducedMotion } from '../../../utils/useReducedMotion';
@@ -76,7 +76,15 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
 
   // Each week is read once for all its days: choosing another day of it moves
   // only the gold pill.
-  const [weeks, setWeeks] = useState<Record<string, WeekStripDay[]>>({});
+  // Weeks read before this session (Books opened again) are drawn at once.
+  const [weeks, setWeeks] = useState<Record<string, WeekStripDay[]>>(() => {
+    const kept: Record<string, WeekStripDay[]> = {};
+    for (const start of weekStarts) {
+      const days = peekWeekStrip(start);
+      if (days) kept[start] = days;
+    }
+    return kept;
+  });
   useEffect(() => {
     let active = true;
     const starts = shownWeeks.split('|');
@@ -84,6 +92,8 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
       void getWeekStrip(start).then((days) => {
         if (!active) return;
         setWeeks((current) => {
+          // A week already on screen, and nothing to let go: the strip isn't drawn again for it.
+          if (current[start] === days && Object.keys(current).every((key) => starts.includes(key))) return current;
           const kept: Record<string, WeekStripDay[]> = {};
           for (const key of starts) if (current[key]) kept[key] = current[key];
           return { ...kept, [start]: days };

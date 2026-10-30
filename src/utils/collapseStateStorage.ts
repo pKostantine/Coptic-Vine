@@ -64,6 +64,19 @@ async function writeAllCollapseStates(states: CollapseStatesByDocument): Promise
   }
 }
 
+/**
+ * The same choices at once, when they have been read this session (null
+ * before): a document drawn from them needs no spinner while they are read.
+ */
+export function peekCollapsedSectionStates(documentKey: string): CollapseStatesBySection | null {
+  return cachedStates ? { ...(cachedStates[documentKey] || {}) } : null;
+}
+
+/** Reads the stored choices ahead of the first document, once the app has opened. */
+export function preloadCollapsedSectionStates(): void {
+  void loadAllCollapseStates();
+}
+
 /** Returns explicit user choices only; missing entries fall back to the hymn's database default. */
 export async function loadCollapsedSectionStates(documentKey: string): Promise<CollapseStatesBySection> {
   const states = await loadAllCollapseStates();

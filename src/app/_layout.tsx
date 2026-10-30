@@ -21,7 +21,9 @@ import { readStoredReading, ReadingPreferencesProvider, useReadingPreferences } 
 import { SpiritualCanonProvider } from '@/context/SpiritualCanonContext';
 import { VideoStageProvider } from '@/context/VideoStageContext';
 import { keepsWholeWindow } from '@/utils/desktopChrome';
+import { preloadCollapsedSectionStates } from '@/utils/collapseStateStorage';
 import { settleWithin } from '@/utils/settleWithin';
+import { preloadCopticFonts } from '@/utils/useCopticFontDataUri';
 import type { OrientationMode } from '@/utils/preferencesStorage';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
@@ -170,6 +172,23 @@ export default function RootLayout() {
     if (fontsReady) {
       SplashScreen.hideAsync();
     }
+  }, [fontsReady]);
+
+  // Once the app has opened and has a moment, what the first document needs
+  // is read ahead of it -- its faces, and the hymns folded in it -- so it
+  // draws without waiting on them.
+  useEffect(() => {
+    if (!fontsReady) return undefined;
+    const preload = () => {
+      preloadCopticFonts();
+      preloadCollapsedSectionStates();
+    };
+    if (typeof requestIdleCallback !== 'function') {
+      const timer = setTimeout(preload, 3000);
+      return () => clearTimeout(timer);
+    }
+    const idle = requestIdleCallback(preload, { timeout: 4000 });
+    return () => cancelIdleCallback(idle);
   }, [fontsReady]);
 
   if (!fontsReady) {

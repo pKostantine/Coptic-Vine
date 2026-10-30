@@ -480,7 +480,10 @@ class NativeBookDownloadManager implements BookDownloadManager {
 
   async checkForUpdates(manual = false): Promise<BookUpdateCheck> {
     await this.initialize();
-    const manifest = await this.fetchManifest(true);
+    // A check the reader asked for reads the manifest afresh; the automatic
+    // one at launch takes the one ensureCalendar has just read, rather than
+    // downloading and checking it a second time straight after.
+    const manifest = await this.fetchManifest(manual);
     const calendarActive = await getActiveResourceVersion('calendar');
     const calendar = Boolean(calendarActive) && calendarActive !== manifest.resources.calendar.version;
     const books = await listStoredBooks();

@@ -188,12 +188,14 @@ export default function MusicTrackDetailScreen() {
       );
       return;
     }
+    // Turned at once, and back if the change fails: it waited for the server.
+    const next = !liked;
+    setLiked(next);
     setLikeBusy(true);
     try {
-      const next = !liked;
       await musicService.setLiked(track.id, next);
-      setLiked(next);
     } catch (cause) {
+      setLiked(!next);
       Alert.alert(
         tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
         cause instanceof Error ? cause.message : 'Unable to update Liked Songs.',

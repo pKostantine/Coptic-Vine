@@ -175,7 +175,7 @@ export default function MiniPlayerCard({
               accessibilityLabel={liked ? 'Unlike track' : 'Like track'}
               disabled={likeBusy}
               hitSlop={6}
-              style={({ pressed }) => [styles.iconButton, pressed && styles.pressedButton, likeBusy && styles.disabledButton]}
+              style={({ pressed }) => [styles.iconButton, pressed && styles.pressedButton]}
               onPress={unlessSwiped(onToggleLike)}
             >
               <Icon name={liked ? 'heart' : 'heart-outline'} size={19} color={liked ? accentColor : COLORS.white} />
@@ -291,7 +291,6 @@ const styles = StyleSheet.create({
   playNudge: { marginLeft: 2 },
   iconButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   pressedButton: { opacity: 0.7, transform: [{ scale: 0.94 }] },
-  disabledButton: { opacity: 0.45 },
   progressTrack: {
     position: 'absolute',
     left: 12,

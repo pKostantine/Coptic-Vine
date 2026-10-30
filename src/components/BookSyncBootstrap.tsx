@@ -39,9 +39,14 @@ export default function BookSyncBootstrap() {
     let lastUpdateCheck = 0;
     const sync = async () => {
       if (!active || syncing) return;
-      const network = await Network.getNetworkStateAsync();
-      if (!active || network.isConnected === false || network.type === Network.NetworkStateType.NONE) return;
+      // Taken before the first wait: iOS reports the network the moment it is
+      // listened to, which began a second sync alongside the launch's own.
       syncing = true;
+      const network = await Network.getNetworkStateAsync().catch(() => null);
+      if (!active || !network || network.isConnected === false || network.type === Network.NetworkStateType.NONE) {
+        syncing = false;
+        return;
+      }
       try {
         // The liturgical calendar comes with the app: it is fetched on the
         // first connection of any kind, whatever the cellular choice, and

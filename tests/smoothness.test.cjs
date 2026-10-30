@@ -186,3 +186,86 @@ test('the calendar is read into memory when JavaScript has a moment, a chunk at 
   assert.match(source('components/BookSyncBootstrap.tsx'), /idle = requestIdleCallback\(begin, \{ timeout: CALENDAR_WARM_DELAY_MS \}\);/);
   assert.match(source('services/bookContentDatabase.ts'), /if \(index\) await new Promise\(\(resolve\) => setTimeout\(resolve, 0\)\);/);
 });
+
+test('Books, Home and the calendar opened again draw what they last read at once', () => {
+  const day = source('components/vine/ui/useLiturgicalDay.ts');
+  assert.match(day, /useState<CopticRead \| null>\(\(\) => lastCoptic\)/);
+  assert.match(day, /useState<OverviewRead \| null>\(\(\) => lastOverview\)/);
+  const home = source('components/vine/screens/HomeScreen.tsx');
+  assert.match(home, /useState<SynaxRead \| null>\(\(\) => lastSynax\)/);
+  assert.match(home, /useState<ReadingsRead \| null>\(\(\) => lastReadings\)/);
+  const calendar = source('utils/calendarService.ts');
+  assert.match(calendar, /return monthGrids\.get\(`g\$\{year\}-\$\{month\}`/);
+  assert.match(calendar, /return weekStrips\.get\(sunday, \(\) => readWeekStrip\(sunday\)\);/);
+  assert.match(calendar, /return feastSpans\.get\(`\$\{fromDate\}:\$\{toDate\}`/);
+  const panel = source('components/vine/ui/CalendarPanel.tsx');
+  assert.match(panel, /const \[days, setDays\] = useState<CalendarDay\[\] \| null>\(\(\) => openingGrid\?\.grid \?\? null\);/);
+  assert.match(panel, /if \(drawnAtOpening\.current\) \{\n\s+drawnAtOpening\.current = false;\n\s+return;/);
+  const strip = source('components/vine/ui/DayBlock.tsx');
+  assert.match(strip, /if \(current\[start\] === days && Object\.keys\(current\)\.every\(\(key\) => starts\.includes\(key\)\)\) return current;/);
+  assert.match(source('components/vine/screens/SeasonSelectorScreen.tsx'), /for \(const near of \[year - 1, year \+ 1\]\)/);
+});
+
+test('a search keeps its last results on screen, dimmed, until the next arrive', () => {
+  const search = source('components/search/SectionSearchScreen.tsx');
+  assert.match(search, /\{loading && !grouped\.length \? <ActivityIndicator/);
+  assert.match(search, /\{grouped\.length \? \(\n\s+<View style=\{loading && styles\.refreshing\}>/);
+});
+
+test('hearts turn at once, and back if the change fails', () => {
+  for (const file of ['app/music/release/[id].tsx', 'app/music/playlist/[id].tsx', 'components/music/MusicNowPlayingScreen.tsx', 'components/learning/LearningNowPlayingScreen.tsx']) {
+    const page = source(file);
+    assert.match(page, /turn\(!?\w+\);\n[\s\S]{0,80}try \{\n\s+await \w+Service\.set(Item)?Liked\(/, file);
+  }
+  assert.match(source('app/music/track/[id].tsx'), /setLiked\(next\);\n\s+setLikeBusy\(true\);\n\s+try \{\n\s+await musicService\.setLiked\(track\.id, next\);\n\s+\} catch \(cause\) \{\n\s+setLiked\(!next\);/);
+  assert.match(source('components/playback/GlobalNowPlayingOverlay.tsx'), /setMiniLiked\(nextLiked\);\n\s+setMiniLikeBusy\(true\);/);
+});
+
+test('a condition compiled once answers exactly as compiling it each time did', () => {
+  const ts = require('typescript');
+  const js = ts.transpileModule(fs.readFileSync('src/utils/conditionEngine.js', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, allowJs: true } }).outputText;
+  const mod = { exports: {} };
+  new Function('exports', 'require', 'module', js)(mod.exports, (id) => (id === './dateUtils' ? { toIsoDate: () => '' } : id === '../services/contentDataClient' ? { contentDataClient: {} } : require(id)), mod);
+  const { evaluateCondition } = mod.exports;
+  // The engine as it was: every atom written in as true or false, and the whole compiled per call.
+  const TOKEN_RE = /[A-Za-z0-9][A-Za-z0-9_.:]*/g;
+  const satisfied = (token, flags) => Boolean(flags[token]) || (token.indexOf(':') > 0 && Boolean(flags[token.slice(0, token.indexOf(':'))]));
+  const before = (condition, flags) => {
+    const trimmed = String(condition || '').trim();
+    if (!trimmed) return true;
+    const expr = trimmed.replace(TOKEN_RE, (token) => (satisfied(token, flags) ? 'true' : 'false'));
+    try { return Boolean(new Function(`"use strict"; return (${expr});`)()); } catch { return false; }
+  };
+  const atoms = ['Lent', 'Saturday', 'StMark', 'StMark:VOC', 'StMark:Psali1', 'Kiahk.5', '318AssembledAtNicea', 'BishopPresent', 'true', 'Paope.30'];
+  const shapes = ['A', '!A', 'A && B', 'A || B', '(A || B) && !C', '!(A && B) || C', 'A B', 'A(B)', 'A &&', '((A))', ''];
+  let seed = 7;
+  const random = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  for (let i = 0; i < 3000; i += 1) {
+    const condition = shapes[random(shapes.length)].replace(/[ABC]/g, () => atoms[random(atoms.length)]);
+    const flags = Object.fromEntries(atoms.filter(() => random(2)).map((atom) => [atom, true]));
+    assert.equal(evaluateCondition(condition, flags), before(condition, flags), `${condition} ${JSON.stringify(flags)}`);
+  }
+});
+
+test('the canon\'s days land together, and the launch reads the book manifest once', () => {
+  const canon = source('context/SpiritualCanonContext.tsx');
+  assert.match(canon, /void Promise\.allSettled\(wanted\.map\(\(day\) => readCanonCalendarDay\(day\)\)\)\.then\(\(results\) => \{/);
+  assert.match(canon, /if \(Object\.keys\(read\)\.length\) setCalendarDays\(\(current\) => \(\{ \.\.\.current, \.\.\.read \}\)\);/);
+  assert.match(source('services/bookDownloadManager.ts'), /const manifest = await this\.fetchManifest\(manual\);/);
+  assert.match(source('components/BookSyncBootstrap.tsx'), /syncing = true;\n\s+const network = await Network\.getNetworkStateAsync\(\)\.catch\(\(\) => null\);/);
+});
+
+test('a document draws without waiting on fold choices or faces already read', () => {
+  const surface = source('components/vine/DocumentSurface.tsx');
+  assert.match(surface, /const \[rememberedCollapse\] = useState\(\(\) => peekCollapsedSectionStates\(collapseMemoryScope\)\);/);
+  assert.match(surface, /if \(rememberedScope\.current === collapseMemoryScope\) return undefined;/);
+  assert.match(source('utils/useCopticFontDataUri.ts'), /const loading = loadingDataUris\.get\(fontModule\);\n\s+if \(loading\) return loading;/);
+  const layout = source('app/_layout.tsx');
+  assert.match(layout, /preloadCopticFonts\(\);\n\s+preloadCollapsedSectionStates\(\);/);
+});
+
+test('a queue row dragged follows the finger itself; the list is drawn again only as the slot under it changes', () => {
+  const queue = source('components/playback/PlaybackQueueList.tsx');
+  assert.match(queue, /liftedDy\.setValue\(kept\);\n\s+const target = slotUnder\(current\.from, kept\);\n\s+if \(target === current\.target\) return;/);
+  assert.match(queue, /\{ top, transform: \[\{ translateY: lifted \? liftedDy : translateY \}\] \}/);
+});

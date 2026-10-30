@@ -132,12 +132,14 @@ export default function MusicReleaseScreen() {
       return;
     }
 
+    // Turned at once, and back if the change fails: it waited for the server.
+    const nextLiked = !releaseLiked;
+    setReleaseLiked(nextLiked);
     setReleaseLikeBusy(true);
     try {
-      const nextLiked = !releaseLiked;
       await musicService.setReleaseLiked(release.id, nextLiked);
-      setReleaseLiked(nextLiked);
     } catch (cause) {
+      setReleaseLiked(!nextLiked);
       Alert.alert(
         tr('Liked Releases', 'Parutions aimées', 'الإصدارات المعجبة'),
         cause instanceof Error ? cause.message : 'Unable to update this release.',
@@ -156,15 +158,18 @@ export default function MusicReleaseScreen() {
       return;
     }
 
+    // Turned at once, and back if the change fails: it waited for the server.
     const liked = likedTrackIds.has(trackId);
+    const turn = (on: boolean) => setLikedTrackIds((current) => {
+      const next = new Set(current);
+      if (on) next.add(trackId); else next.delete(trackId);
+      return next;
+    });
+    turn(!liked);
     try {
       await musicService.setLiked(trackId, !liked);
-      setLikedTrackIds((current) => {
-        const next = new Set(current);
-        if (liked) next.delete(trackId); else next.add(trackId);
-        return next;
-      });
     } catch (cause) {
+      turn(liked);
       Alert.alert(tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'), cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
     }
   };
@@ -226,7 +231,7 @@ export default function MusicReleaseScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={releaseLiked ? 'Unlike release' : 'Like release'}
                 disabled={releaseLikeBusy}
-                style={[styles.actionButton, releaseLikeBusy && styles.disabledButton]}
+                style={styles.actionButton}
                 onPress={() => void handleToggleReleaseLike()}
               >
                 <Icon name={releaseLiked ? 'heart' : 'heart-outline'} size={19} color={releaseLiked ? COLORS.goldBright : COLORS.white} />
@@ -344,7 +349,6 @@ const styles = StyleSheet.create({
   playAllText: { color: COLORS.black, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '800' },
   actionButton: { minHeight: 46, paddingHorizontal: SPACING.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: RADII.pill, borderWidth: 1, borderColor: COLORS.goldLine, backgroundColor: COLORS.surface },
   actionButtonText: { color: COLORS.goldBright, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700' },
-  disabledButton: { opacity: 0.45 },
   trackList: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, borderRadius: RADII.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   trackListDesktop: { width: '94%', maxWidth: 1120, alignSelf: 'center', marginHorizontal: 0 },
   loader: { marginTop: SPACING.xl },

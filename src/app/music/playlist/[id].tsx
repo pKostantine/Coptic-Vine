@@ -95,15 +95,18 @@ export default function MusicPlaylistScreen() {
   };
 
   const toggleTrackLike = async (trackId: string) => {
+    // Turned at once, and back if the change fails: it waited for the server.
     const liked = likedTrackIds.has(trackId);
+    const turn = (on: boolean) => setLikedTrackIds((current) => {
+      const next = new Set(current);
+      if (on) next.add(trackId); else next.delete(trackId);
+      return next;
+    });
+    turn(!liked);
     try {
       await musicService.setLiked(trackId, !liked);
-      setLikedTrackIds((current) => {
-        const next = new Set(current);
-        if (liked) next.delete(trackId); else next.add(trackId);
-        return next;
-      });
     } catch (cause) {
+      turn(liked);
       Alert.alert(tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'), cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
     }
   };

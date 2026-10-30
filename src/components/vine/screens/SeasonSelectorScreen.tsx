@@ -180,12 +180,20 @@ export default function SeasonSelectorScreen({ onClose }: SeasonSelectorScreenPr
     const landed = () => {
       if (!cancelled) setLanded((count) => count + 1);
     };
-    if (!peekSeasonYear(year)) getSeasonYear(year).then(landed, () => {});
-    if (!peekCopticDatesOfYear(year)) {
-      getCopticDatesOfYear(year).then(landed, () => {
-        if (!cancelled) setUndatedYear(year);
-      });
-    }
+    // The years either side are read once this one is, so an arrow pressed
+    // next turns straight to its year rather than to a spinner.
+    const neighbours = () => {
+      if (cancelled) return;
+      for (const near of [year - 1, year + 1]) {
+        if (!peekSeasonYear(near)) getSeasonYear(near).catch(() => {});
+        if (!peekCopticDatesOfYear(near)) getCopticDatesOfYear(near).catch(() => {});
+      }
+    };
+    const season = peekSeasonYear(year) ? Promise.resolve() : getSeasonYear(year).then(landed);
+    const dates = peekCopticDatesOfYear(year) ? Promise.resolve() : getCopticDatesOfYear(year).then(landed, () => {
+      if (!cancelled) setUndatedYear(year);
+    });
+    Promise.all([season, dates]).then(neighbours, () => {});
     return () => {
       cancelled = true;
     };

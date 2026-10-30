@@ -201,17 +201,27 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
 
   // A day read in the last week is taken as read; the others are read once a
   // session (one that could not be read is tried again later).
+  // The days asked for together land together, in one change: as each day
+  // landed on its own, a month of them drew Home (and everything else that
+  // reads the canon) some thirty times over as the app opened.
   const ensureCalendarDays = useCallback((days: string[]) => {
     const now = Date.now();
-    for (const day of days) {
-      if (calendarRequested.current.has(day)) continue;
+    const wanted = days.filter((day) => {
+      if (calendarRequested.current.has(day)) return false;
       const cached = calendarDaysRef.current[day];
-      if (cached && now - Date.parse(cached.readAt) < CALENDAR_FRESH_MS) continue;
-      calendarRequested.current.add(day);
-      readCanonCalendarDay(day)
-        .then((read) => setCalendarDays((current) => ({ ...current, [day]: { ...read, readAt: new Date().toISOString() } })))
-        .catch(() => { calendarRequested.current.delete(day); });
-    }
+      return !(cached && now - Date.parse(cached.readAt) < CALENDAR_FRESH_MS);
+    });
+    if (!wanted.length) return;
+    for (const day of wanted) calendarRequested.current.add(day);
+    void Promise.allSettled(wanted.map((day) => readCanonCalendarDay(day))).then((results) => {
+      const readAt = new Date().toISOString();
+      const read: Record<string, CachedCanonCalendarDay> = {};
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') read[wanted[index]] = { ...result.value, readAt };
+        else calendarRequested.current.delete(wanted[index]);
+      });
+      if (Object.keys(read).length) setCalendarDays((current) => ({ ...current, ...read }));
+    });
   }, []);
   const calendar = useMemo<CanonCalendar>(() => ({ calendarDay: (day) => calendarDays[day] ?? null }), [calendarDays]);
 
