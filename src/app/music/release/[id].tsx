@@ -36,7 +36,8 @@ export default function MusicReleaseScreen() {
   const releaseId = Array.isArray(params.id) ? params.id[0] : params.id;
   const linkedTrackId = Array.isArray(params.track) ? params.track[0] : params.track;
   const desktop = width >= 900;
-  const [release, setRelease] = useState<MusicConsumerRelease | null>(null);
+  // A release read this session (played from its cover, opened before) is drawn at once, while it is read afresh.
+  const [release, setRelease] = useState<MusicConsumerRelease | null>(() => (releaseId ? musicService.peekRelease(releaseId, locale) : null));
   const [error, setError] = useState<string | null>(null);
   const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(new Set());
   const [releaseLiked, setReleaseLiked] = useState(false);
@@ -47,11 +48,12 @@ export default function MusicReleaseScreen() {
   useEffect(() => {
     if (!releaseId) return;
     let active = true;
-    setRelease(null);
+    const kept = musicService.peekRelease(releaseId, locale);
+    setRelease(kept);
     setError(null);
     musicService.getRelease(releaseId, locale)
       .then((payload) => { if (active) setRelease(payload); })
-      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Unable to load release.'); });
+      .catch((cause) => { if (active && !kept) setError(cause instanceof Error ? cause.message : 'Unable to load release.'); });
     return () => { active = false; };
   }, [locale, releaseId, user?.id]);
 

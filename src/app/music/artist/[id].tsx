@@ -78,11 +78,12 @@ export default function MusicArtistScreen() {
   // The page and the hero's glow run to both edges; the content keeps clear of the notch.
   const sidePadding = useSidePadding(0);
   const insets = useSafeAreaInsets();
-  const { play, isPlaying } = usePlayRelease(locale);
+  const { play, loadingId: loadingReleaseId, isPlaying } = usePlayRelease(locale);
   // Likes come from the listener's library, which also says whether they can follow.
   const likes = useReleaseLikes(locale);
   const libraryAuthenticated = likes.authenticated;
-  const [artist, setArtist] = useState<MusicConsumerArtist | null>(null);
+  // An artist read this session is drawn at once, while it is read afresh.
+  const [artist, setArtist] = useState<MusicConsumerArtist | null>(() => (artistId ? musicService.peekArtist(artistId, locale) : null));
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [followed, setFollowed] = useState(false);
@@ -95,13 +96,14 @@ export default function MusicArtistScreen() {
     let active = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- route changes reset the visible entity before async loading
     setError(null);
-    setArtist(null);
+    const kept = musicService.peekArtist(artistId, locale);
+    setArtist(kept);
     setShareArtwork(null);
     setShareArtworkLoaded(false);
     musicService.getArtist(artistId, locale)
       .then((payload) => { if (active) setArtist(payload); })
       .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load artist.');
+        if (active && !kept) setError(cause instanceof Error ? cause.message : 'Unable to load artist.');
       });
     return () => { active = false; };
   }, [artistId, locale, attempt]);
@@ -274,6 +276,7 @@ export default function MusicArtistScreen() {
                       onPress={() => router.push(`/music/release/${release.id}`)}
                       onPlay={() => play(release)}
                       playing={isPlaying(release.id)}
+                      loading={loadingReleaseId === release.id}
                       playLabel={`${isPlaying(release.id) ? tr('Pause', 'Pause', 'إيقاف مؤقت') : tr('Play', 'Lire', 'تشغيل')}: ${release.title}`}
                       liked={liked}
                       onToggleLike={() => likes.toggle(release.id)}

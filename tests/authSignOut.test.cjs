@@ -48,6 +48,7 @@ function signOutWith(signOutError) {
     '@/services/notificationService': { disableNativeNotificationDevice: async () => {} },
     '@/services/webPushService': { disableWebPushDevice: async () => {} },
     '@/utils/settleWithin': settleWithin,
+    '@/utils/sessionCache': load('src/utils/sessionCache.ts'),
   });
 
   let signOut;

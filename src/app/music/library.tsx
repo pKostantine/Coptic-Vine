@@ -82,22 +82,28 @@ export default function MusicLibraryScreen() {
   const { playQueue } = useMusicPlayer();
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const isArabic = locale === 'ar';
-  const [library, setLibrary] = useState<MusicLibraryPayload | null>(null);
+  // Drawn at once from the session's copy when the page is opened again, while it is read afresh.
+  const [library, setLibrary] = useState<MusicLibraryPayload | null>(() => musicService.peekLibrary(locale));
   const [downloadCount, setDownloadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !musicService.peekLibrary(locale));
   const [error, setError] = useState<string | null>(null);
 
   const loadLibrary = useCallback(async (_activeUserId?: string) => {
-    setLoading(true);
+    // No spinner over the session's copy, and a failed refresh leaves it there.
+    const kept = musicService.peekLibrary(locale);
+    setLoading(!kept);
     setError(null);
+    // The downloads on this device are counted at once, not after the network
+    // (and whether or not it answers).
+    if (Platform.OS !== 'web') {
+      void downloadManager.listDownloads()
+        .then((downloads) => setDownloadCount(downloads.filter((item) => item.domain === 'music').length))
+        .catch(() => {});
+    }
     try {
       setLibrary(await musicService.getLibrary(locale));
-      if (Platform.OS !== 'web') {
-        const downloads = await downloadManager.listDownloads();
-        setDownloadCount(downloads.filter((item) => item.domain === 'music').length);
-      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load your music library.');
+      if (!kept) setError(cause instanceof Error ? cause.message : 'Unable to load your music library.');
     } finally {
       setLoading(false);
     }

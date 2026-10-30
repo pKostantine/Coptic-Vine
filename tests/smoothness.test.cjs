@@ -115,3 +115,74 @@ test('the video player\'s clock ticks only while a lesson with a picture plays',
   assert.match(playback, /instance\.timeUpdateEventInterval = 0;/);
   assert.match(playback, /videoPlayerRef\.current\.timeUpdateEventInterval = activeEngine === 'video' \? 0\.25 : 0;/);
 });
+
+test('a page read this session draws at once when it opens again, and a change to the library forgets it', async () => {
+  const ts = require('typescript');
+  const js = ts.transpileModule(fs.readFileSync('src/utils/sessionCache.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const mod = { exports: {} };
+  new Function('exports', 'require', 'module', js)(mod.exports, require, mod);
+  const { createSessionCache, clearSessionCaches } = mod.exports;
+  const cache = createSessionCache();
+  let reads = 0;
+  let release;
+  const read = () => { reads += 1; return new Promise((resolve) => { release = resolve; }); };
+  assert.equal(cache.peek('en'), null);
+  // Two asking at once share one request.
+  const first = cache.load('en', read);
+  const second = cache.load('en', read);
+  assert.equal(reads, 1);
+  release('home');
+  assert.equal(await first, 'home');
+  assert.equal(await second, 'home');
+  assert.equal(cache.peek('en'), 'home');
+  // Read afresh behind the kept copy.
+  const again = cache.load('en', read);
+  assert.equal(reads, 2);
+  assert.equal(cache.peek('en'), 'home');
+  // A read that set out before a clear never brings back what was forgotten.
+  clearSessionCaches();
+  release('stale');
+  await again;
+  assert.equal(cache.peek('en'), null);
+
+  const music = source('services/musicService.ts');
+  for (const change of ['setLiked: changesLibrary(setTrackLiked)', 'setReleaseLiked: changesLibrary(setReleaseLiked)', 'setArtistFollowed: changesLibrary(setArtistFollowed)', 'addToPlaylist: changesLibrary(addTrackToMusicPlaylist)']) {
+    assert.ok(music.includes(change), change);
+  }
+  assert.match(source('context/AuthContext.tsx'), /if \(cachedFor !== userId\) \{\n\s+clearSessionCaches\(\);/);
+  assert.match(source('app/music/index.tsx'), /useState<MusicHomePayload \| null>\(\(\) => musicService\.peekHome\(locale\)\)/);
+  assert.match(source('app/learn/index.tsx'), /useState<LearningHomePayload \| null>\(\(\) => learningService\.peekHome\(locale\)\)/);
+});
+
+test('a downloaded album checks for an update once, not at every render of its page', () => {
+  const button = source('components/offline/OfflineDownloadButton.tsx');
+  assert.match(button, /if \(updateCheckedFor\.current === packageKey\) return;/);
+  assert.match(button, /\}, \[packageKey, prepare\]\);/);
+  assert.match(button, /const holding = await holdersRef\.current\(\);/);
+});
+
+test('a rail that scrolls sideways takes no Now Playing clearance', () => {
+  const scroll = source('components/playback/NowPlayingAwareScroll.tsx');
+  assert.equal((scroll.match(/props\.horizontal \? 0 : nowPlayingInset/g) || []).length, 2);
+});
+
+test('the first screen is drawn in the reader\'s own preferences, not the defaults and then again', () => {
+  const layout = source('app/_layout.tsx');
+  assert.match(layout, /const storedReading = readStoredReading\(\);/);
+  assert.match(layout, /settleWithin\(\[storedReading\], 1500, 'Reading preferences'\)/);
+  // The web draws without waiting for the Coptic faces, which the first screen doesn't use.
+  assert.match(layout, /const fontsReady = \(copticLoaded \|\| Platform\.OS === 'web'\) && readingLoaded;/);
+  const provider = source('context/ReadingPreferencesContext.tsx');
+  assert.match(provider, /useState<ReadingPreferences>\(\(\) => launch\?\.preferences \?\? DEFAULT_READING_PREFERENCES\)/);
+  // An account holding what the device has changes nothing, and only Account reads whether it is saved.
+  assert.match(provider, /if \(syncedSignature !== contentSignature\(preferencesRef\.current, bookmarksRef\.current\)\) \{/);
+  assert.match(provider, /<ContentSyncStatusContext\.Provider value=\{contentSyncStatus\}>/);
+  const valueStart = provider.indexOf('const value = useMemo<ReadingPreferencesContextValue>(');
+  assert.doesNotMatch(provider.slice(valueStart, provider.indexOf('setCurrentAppLanguage(preferences.appLanguage);', valueStart)), /contentSyncStatus/);
+  assert.match(source('app/account.tsx'), /const contentSyncStatus = useContentSyncStatus\(\);/);
+});
+
+test('the calendar is read into memory when JavaScript has a moment, a chunk at a time', () => {
+  assert.match(source('components/BookSyncBootstrap.tsx'), /idle = requestIdleCallback\(begin, \{ timeout: CALENDAR_WARM_DELAY_MS \}\);/);
+  assert.match(source('services/bookContentDatabase.ts'), /if \(index\) await new Promise\(\(resolve\) => setTimeout\(resolve, 0\)\);/);
+});

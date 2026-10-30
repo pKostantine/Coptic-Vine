@@ -8,6 +8,7 @@ import { disableNativeNotificationDevice } from '@/services/notificationService'
 import { disableWebPushDevice } from '@/services/webPushService';
 import type { AccountSession, AccountUser } from '@/types/account';
 import { settleWithin } from '@/utils/settleWithin';
+import { clearSessionCaches } from '@/utils/sessionCache';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -135,6 +136,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const user = session?.user ?? null;
+  // Whose library is whose changes with the account: what the session kept
+  // for the last one (utils/sessionCache.ts) goes before anything beneath
+  // reads again for the new one.
+  const userId = user?.id ?? null;
+  const [cachedFor, setCachedFor] = useState(userId);
+  if (cachedFor !== userId) {
+    clearSessionCaches();
+    setCachedFor(userId);
+  }
   const value = useMemo<AuthContextValue>(() => ({
     session,
     user,

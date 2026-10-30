@@ -1,4 +1,13 @@
-import { hasLocalSchema, readLocalRpc, readLocalTable } from '@/services/bookContentDatabase';
+import {
+  countLocalRows,
+  hasLocalSchema,
+  isLocalTableKept,
+  isLocalTableOversized,
+  type LocalEquality,
+  readLocalRowsWhere,
+  readLocalRpc,
+  readLocalTable,
+} from '@/services/bookContentDatabase';
 import { contentApi } from '@/services/contentSource';
 import type { api } from '@/utils/api';
 
@@ -129,13 +138,38 @@ class HybridQuery implements PromiseLike<QueryResult> {
     return query;
   }
 
+  /**
+   * The exact matches SQLite can pick out itself, for a table too big to
+   * keep, or for a single row looked up before its table has been read
+   * whole: those rows alone come across into JavaScript.
+   */
+  private sqliteEqualities(): LocalEquality[] | null {
+    const equalities = this.filters.flatMap((filter): LocalEquality[] => (
+      filter.kind === 'eq' && (typeof filter.value === 'string' || (typeof filter.value === 'number' && Number.isFinite(filter.value)))
+        ? [{ column: filter.column, value: filter.value }]
+        : []
+    ));
+    if (!equalities.length) return null;
+    if (isLocalTableOversized(this.schemaName, this.tableName)) return equalities;
+    if (this.singleMode !== 'none' && !isLocalTableKept(this.schemaName, this.tableName)) return equalities;
+    return null;
+  }
+
   private async execute(): Promise<QueryResult> {
-    const rows = await readLocalTable(this.schemaName, this.tableName);
-    if (rows === null) return this.online();
-    // The first column matched exactly narrows the rows through its index;
-    // every filter, that one included, is then tested on what's left.
-    const indexed = this.filters.find((filter) => filter.kind === 'eq' || filter.kind === 'in');
-    const candidates = indexed ? indexedRows(rows, indexed) : rows;
+    const equalities = this.sqliteEqualities();
+    let candidates: Record<string, unknown>[];
+    if (equalities) {
+      const matched = await readLocalRowsWhere(this.schemaName, this.tableName, equalities);
+      if (matched === null) return this.online();
+      candidates = matched;
+    } else {
+      const rows = await readLocalTable(this.schemaName, this.tableName);
+      if (rows === null) return this.online();
+      // The first column matched exactly narrows the rows through its index;
+      // every filter, that one included, is then tested on what's left.
+      const indexed = this.filters.find((filter) => filter.kind === 'eq' || filter.kind === 'in');
+      candidates = indexed ? indexedRows(rows, indexed) : rows;
+    }
     let filtered = candidates.filter((row) => this.filters.every((filter) => applyFilter(row, filter)));
     if (this.orderings.length) {
       const compare = (a: Record<string, unknown>, b: Record<string, unknown>) => {
@@ -193,11 +227,11 @@ async function localBibleRpc(functionName: string, args: Record<string, any>): P
     return { found: true, data: normalizedBooks.filter((book) => book.toggled !== false).sort((a, b) => Number(a.book_order) - Number(b.book_order)) };
   }
   if (functionName === 'get_bible_chapter_list') {
-    const verses = await readLocalTable('bible', 'verses') || [];
+    // Counted by SQLite: the whole Bible was read into JavaScript to count one book's verses.
     const counts = new Map<number, number>();
-    for (const verse of verses.filter((row) => row.book_key === args.p_book_key)) {
-      const chapter = Number(verse.chapter_number);
-      counts.set(chapter, (counts.get(chapter) || 0) + 1);
+    for (const { value, count } of await countLocalRows('bible', 'verses', 'chapter_number', [{ column: 'book_key', value: String(args.p_book_key) }])) {
+      const chapter = Number(value);
+      counts.set(chapter, (counts.get(chapter) || 0) + Number(count));
     }
     return { found: true, data: [...counts].sort(([a], [b]) => a - b).map(([chapter_number, verse_count]) => ({ chapter_number, verse_count })) };
   }

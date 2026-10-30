@@ -49,24 +49,31 @@ export default function LearningHomeScreen() {
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const arabic = locale === 'ar';
   const wide = layout !== 'phone';
-  const [home, setHome] = useState<LearningHomePayload | null>(null);
-  const [library, setLibrary] = useState<LearningItemLibraryPayload | null>(null);
+  // Drawn at once from the session's copies when the tab is opened again, while they are read afresh.
+  const [home, setHome] = useState<LearningHomePayload | null>(() => learningService.peekHome(locale));
+  const [library, setLibrary] = useState<LearningItemLibraryPayload | null>(() => learningService.peekItemLibrary(locale));
   const [error, setError] = useState<string | null>(null);
   // Bumped by Retry on a failed load: a new value re-runs the load below.
   const [attempt, setAttempt] = useState(0);
 
+  // The seasons and cantors show as soon as they come, without waiting for
+  // the listener's own My Learning, which only adds Continue Learning below
+  // them (and, failing, leaves that out rather than the whole page).
   useEffect(() => {
     let active = true;
-    Promise.all([learningService.getHome(locale), learningService.getItemLibrary(locale)])
-      .then(([homePayload, libraryPayload]) => {
+    learningService.getHome(locale)
+      .then((homePayload) => {
         if (!active) return;
         setError(null);
         setHome(homePayload);
-        setLibrary(libraryPayload);
       })
       .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load Learn & Study.');
+        // With the session's copy on screen, a failed refresh leaves it there.
+        if (active && !learningService.peekHome(locale)) setError(cause instanceof Error ? cause.message : 'Unable to load Learn & Study.');
       });
+    learningService.getItemLibrary(locale)
+      .then((libraryPayload) => { if (active) setLibrary(libraryPayload); })
+      .catch(() => {});
     return () => { active = false; };
   }, [locale, user?.id, attempt]);
 

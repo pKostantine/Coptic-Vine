@@ -2,8 +2,8 @@ import { useFonts as useLocalFonts } from 'expo-font';
 import { Stack, usePathname, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
-import { BackHandler, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { BackHandler, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
@@ -17,14 +17,19 @@ import { BottomChromeProvider, useBottomChrome } from '@/context/BottomChromeCon
 import { CalendarProvider } from '@/context/CalendarContext';
 import { LiturgicalClockProvider } from '@/context/LiturgicalClockContext';
 import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
-import { ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
+import { readStoredReading, ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { SpiritualCanonProvider } from '@/context/SpiritualCanonContext';
 import { VideoStageProvider } from '@/context/VideoStageContext';
 import { keepsWholeWindow } from '@/utils/desktopChrome';
+import { settleWithin } from '@/utils/settleWithin';
 import type { OrientationMode } from '@/utils/preferencesStorage';
 import { useLayoutMode } from '@/utils/useLayoutMode';
 
 SplashScreen.preventAutoHideAsync();
+// Read beside the fonts, and the splash stays up for both: the first screen
+// is drawn in the reader's own language, theme and orientation, not in the
+// defaults and then all over again (ReadingPreferencesContext).
+const storedReading = readStoredReading();
 
 /**
  * A page that throws while rendering is shown as a notice with a way back,
@@ -148,7 +153,18 @@ export default function RootLayout() {
     Athanasius: require('../../assets/fonts/CopticVine-Athanasius-v1.0.ttf'),
   });
 
-  const fontsReady = copticLoaded;
+  // Never held up for long by it: past a second and a half the app opens on
+  // the defaults and takes the reader's own as they come, as it always did.
+  const [readingLoaded, setReadingLoaded] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void settleWithin([storedReading], 1500, 'Reading preferences').then(() => { if (active) setReadingLoaded(true); });
+    return () => { active = false; };
+  }, []);
+  // The web doesn't wait for the Coptic faces (half a megabyte) before
+  // drawing anything: the first screen sets nothing in them, and they load
+  // behind it. On a phone they are on the device, under the splash.
+  const fontsReady = (copticLoaded || Platform.OS === 'web') && readingLoaded;
 
   useEffect(() => {
     if (fontsReady) {

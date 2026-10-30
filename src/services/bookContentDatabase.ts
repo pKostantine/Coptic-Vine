@@ -139,6 +139,15 @@ const KEPT_TABLES_BUDGET_CHARS = 24_000_000;
 
 /** Tables read, by `schema.table`, least recently used first. `chars` stays 0 until the load arrives. */
 const keptTables = new Map<string, { rows: Promise<LocalTable>; chars: number }>();
+/**
+ * Tables too big to keep: read whole, each query copied every row across
+ * into JavaScript and parsed it there, all to keep a chapter -- the Bible's
+ * 46 MB of verses at every chapter opened and every reading on Home. They
+ * are asked of SQLite instead (readLocalRowsWhere), which picks the rows out
+ * on its own thread. The Bible's verses are known before their first query;
+ * any other table joins them once a load shows it is over the limit.
+ */
+const oversizedTables = new Set<string>(['bible.verses']);
 let keptTableChars = 0;
 /** Whether each schema has installed rows, asked on every RPC the package doesn't hold. */
 const knownSchemas = new Map<string, Promise<boolean>>();
@@ -193,10 +202,14 @@ async function loadLocalTable(schema: string, table: string): Promise<{ rows: Lo
   if (!chunks.length) return { rows: (await hasLocalSchema(schema)) ? [] : null, chars: 0 };
   try {
     let chars = 0;
-    const parsed = chunks.map((chunk) => {
+    const parsed: Record<string, unknown>[][] = [];
+    for (const [index, chunk] of chunks.entries()) {
+      // A chunk at a time, with a turn for touches and animations between:
+      // the calendar's six chunks parsed at once held everything else up.
+      if (index) await new Promise((resolve) => setTimeout(resolve, 0));
       chars += chunk.rows_json.length;
-      return JSON.parse(chunk.rows_json) as Record<string, unknown>[];
-    });
+      parsed.push(JSON.parse(chunk.rows_json) as Record<string, unknown>[]);
+    }
     return { rows: parsed.length === 1 ? parsed[0] : ([] as Record<string, unknown>[]).concat(...parsed), chars };
   } catch {
     // One row that doesn't parse spoils its whole chunk: read the table row by
@@ -240,6 +253,7 @@ export function readLocalTable(schema: string, table: string): Promise<LocalTabl
     if (keptTables.get(key) !== entry) return;
     if (loaded.chars > MAX_KEPT_TABLE_CHARS) {
       keptTables.delete(key);
+      oversizedTables.add(key);
       return;
     }
     entry.chars = loaded.chars;
@@ -254,6 +268,74 @@ export function readLocalTable(schema: string, table: string): Promise<LocalTabl
     if (keptTables.get(key) === entry) keptTables.delete(key);
   });
   return entry.rows;
+}
+
+/** Whether a table is kept, or on its way to being kept, for the session. */
+export function isLocalTableKept(schema: string, table: string): boolean {
+  return keptTables.has(`${schema}.${table}`);
+}
+
+/** Whether a table is too big to keep, and is queried in SQLite instead. */
+export function isLocalTableOversized(schema: string, table: string): boolean {
+  return oversizedTables.has(`${schema}.${table}`);
+}
+
+/** A column a row must hold a value in, compared as text as the query client compares it (String(value)). */
+export interface LocalEquality {
+  column: string;
+  value: string | number;
+}
+
+function equalityClause(equalities: LocalEquality[]): { sql: string; args: string[] } {
+  return {
+    sql: equalities.map(() => ' AND CAST(json_extract(cr.row_json, ?) AS TEXT) = ?').join(''),
+    args: equalities.flatMap(({ column, value }) => [`$."${column.replace(/"/g, '')}"`, String(value)]),
+  };
+}
+
+/**
+ * Only the installed rows of a table that hold these values, in package
+ * order, picked out by SQLite on its own thread; null when the schema isn't
+ * installed. For a table too big to keep, or one looked up a row at a time
+ * before it has been read whole (the day's Coptic date as the app opens).
+ */
+export async function readLocalRowsWhere(schema: string, table: string, equalities: LocalEquality[]): Promise<LocalTable> {
+  const db = await getOfflineDatabase();
+  const where = equalityClause(equalities);
+  const rows = await db.getAllAsync<{ row_json: string }>(
+    `SELECT cr.row_json FROM content_rows cr
+       JOIN content_resources r ON r.resource_id = cr.resource_id AND r.active_version = cr.version
+      WHERE cr.schema_name = ? AND cr.table_name = ? AND r.state IN ('installed', 'update_available')${where.sql}
+      ORDER BY cr.chunk_id, cr.row_order`,
+    schema, table, ...where.args,
+  );
+  if (!rows.length) return (await hasLocalSchema(schema)) ? [] : null;
+  return rows.flatMap((row) => {
+    try { return [JSON.parse(row.row_json) as Record<string, unknown>]; }
+    catch { return []; }
+  });
+}
+
+/**
+ * How many installed rows of a table hold each value of `column`, among
+ * those holding the given values: a book's chapters and their verse counts,
+ * counted by SQLite rather than by reading the whole Bible into JavaScript.
+ */
+export async function countLocalRows(
+  schema: string,
+  table: string,
+  column: string,
+  equalities: LocalEquality[],
+): Promise<{ value: unknown; count: number }[]> {
+  const db = await getOfflineDatabase();
+  const where = equalityClause(equalities);
+  return db.getAllAsync<{ value: unknown; count: number }>(
+    `SELECT json_extract(cr.row_json, ?) AS value, COUNT(*) AS count FROM content_rows cr
+       JOIN content_resources r ON r.resource_id = cr.resource_id AND r.active_version = cr.version
+      WHERE cr.schema_name = ? AND cr.table_name = ? AND r.state IN ('installed', 'update_available')${where.sql}
+      GROUP BY value`,
+    `$."${column.replace(/"/g, '')}"`, schema, table, ...where.args,
+  );
 }
 
 export async function readLocalRpc(

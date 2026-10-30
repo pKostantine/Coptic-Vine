@@ -136,9 +136,9 @@ test('a load that failed is not kept, and a row that does not parse is left out 
 });
 
 /** contentDataClient over a fixed set of local rows and a stub server. */
-function loadClient({ tables = {}, installed = [], rpcResults = {}, server = {} }) {
+function loadClient({ tables = {}, installed = [], rpcResults = {}, server = {}, oversized = [] }) {
   const kept = new Map();
-  const calls = { online: [] };
+  const calls = { online: [], sqlite: [] };
   const bookContentDatabase = {
     readLocalTable: async (schema, table) => {
       const key = `${schema}.${table}`;
@@ -151,6 +151,24 @@ function loadClient({ tables = {}, installed = [], rpcResults = {}, server = {} 
       return key in rpcResults ? { found: true, data: rpcResults[key] } : { found: false, data: null };
     },
     hasLocalSchema: async (schema) => installed.includes(schema),
+    // As SQLite answers them (bookContentDatabase.ts): values compared as text.
+    isLocalTableKept: (schema, table) => kept.has(`${schema}.${table}`),
+    isLocalTableOversized: (schema, table) => oversized.includes(`${schema}.${table}`),
+    readLocalRowsWhere: async (schema, table, equalities) => {
+      calls.sqlite.push(`${schema}.${table}`);
+      if (!installed.includes(schema)) return null;
+      return (tables[`${schema}.${table}`] || [])
+        .filter((entry) => equalities.every(({ column, value }) => entry[column] != null && typeof entry[column] !== 'boolean' && String(entry[column]) === String(value)))
+        .map((entry) => JSON.parse(JSON.stringify(entry)));
+    },
+    countLocalRows: async (schema, table, column, equalities) => {
+      const counts = new Map();
+      for (const entry of tables[`${schema}.${table}`] || []) {
+        if (!equalities.every(({ column: name, value }) => String(entry[name]) === String(value))) continue;
+        counts.set(entry[column], (counts.get(entry[column]) || 0) + 1);
+      }
+      return [...counts].map(([value, count]) => ({ value, count }));
+    },
   };
   const supabase = {
     schema: (schema) => ({
@@ -280,4 +298,69 @@ test('the calendar keeps a date’s answer for the session, but never a failed o
   // Without the calendar on the device, warming it up fetches nothing.
   await calendar.warmCalendar();
   assert.equal(queries, 2);
+});
+
+/**
+ * bookContentDatabase over a real SQLite (node:sqlite), with the offline
+ * schema's two content tables: the queries it hands SQLite run as written.
+ */
+function realDatabase(rows, state = 'installed') {
+  const { DatabaseSync } = require('node:sqlite');
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(`
+    CREATE TABLE content_resources (resource_id TEXT PRIMARY KEY, active_version TEXT, state TEXT);
+    CREATE TABLE content_rows (resource_id TEXT, version TEXT, schema_name TEXT, table_name TEXT, chunk_id TEXT, row_order INTEGER, row_json TEXT);
+  `);
+  sqlite.prepare('INSERT INTO content_resources VALUES (?, ?, ?)').run('bible', 'v1', state);
+  const insert = sqlite.prepare('INSERT INTO content_rows VALUES (?, ?, ?, ?, ?, ?, ?)');
+  rows.forEach((entry, index) => insert.run('bible', 'v1', 'bible', 'verses', `c${Math.floor(index / 3)}`, index % 3, JSON.stringify(entry)));
+  insert.run('bible', 'v0', 'bible', 'verses', 'old', 0, JSON.stringify({ book_key: 'GEN', chapter_number: 1, verse_number: 99 }));
+  const db = {
+    async getAllAsync(sql, ...args) { return sqlite.prepare(sql).all(...args); },
+    async getFirstAsync(sql, ...args) { return sqlite.prepare(sql).get(...args) ?? null; },
+  };
+  return loadModule('src/services/bookContentDatabase.ts', { '@/services/offlineDatabase': { getOfflineDatabase: async () => db } });
+}
+
+test('SQLite picks out a chapter of a table too big to keep, matching as the client does, in package order', async () => {
+  const database = realDatabase([
+    { book_key: 'GEN', chapter_number: 1, verse_number: 1 },
+    { book_key: 'GEN', chapter_number: 2, verse_number: 1 },
+    { book_key: 'GEN', chapter_number: 1, verse_number: 2 },
+    { book_key: 'EXO', chapter_number: 1, verse_number: 1 },
+    { book_key: 'GEN', chapter_number: '1', verse_number: 3 },
+  ]);
+  assert.equal(database.isLocalTableOversized('bible', 'verses'), true, 'the Bible\'s verses are known before their first query');
+  const chapter = await database.readLocalRowsWhere('bible', 'verses', [{ column: 'book_key', value: 'GEN' }, { column: 'chapter_number', value: 1 }]);
+  // A number and its text match alike (String(value)), and only the active version's rows count.
+  assert.deepEqual(chapter.map((entry) => entry.verse_number), [1, 2, 3]);
+  assert.deepEqual(await database.readLocalRowsWhere('bible', 'verses', [{ column: 'book_key', value: 'LEV' }]), []);
+  const counts = await database.countLocalRows('bible', 'verses', 'chapter_number', [{ column: 'book_key', value: 'GEN' }]);
+  const byChapter = {};
+  for (const { value, count } of counts) byChapter[String(value)] = (byChapter[String(value)] || 0) + count;
+  assert.deepEqual(byChapter, { 1: 3, 2: 1 });
+});
+
+test('a table too big to keep, or a row looked up before its table is read, is asked of SQLite, never read whole', async () => {
+  const verses = [
+    { book_key: 'GEN', chapter_number: 1, verse_number: 1 },
+    { book_key: 'GEN', chapter_number: 2, verse_number: 1 },
+  ];
+  const { client, calls } = loadClient({
+    installed: ['bible', 'calendar'],
+    oversized: ['bible.verses'],
+    tables: {
+      'bible.verses': verses,
+      'calendar.coptic_date_conversions': [{ gregorian_date: '2026-10-30', coptic_day: 20 }, { gregorian_date: '2026-10-31', coptic_day: 21 }],
+    },
+  });
+  const chapter = await client.schema('bible').from('verses').select('*').eq('book_key', 'GEN').eq('chapter_number', 2);
+  assert.deepEqual(chapter.data.map((entry) => entry.chapter_number), [2]);
+  const day = await client.schema('calendar').from('coptic_date_conversions').select('*').eq('gregorian_date', '2026-10-31').maybeSingle();
+  assert.equal(day.data.coptic_day, 21);
+  assert.deepEqual(calls.sqlite, ['bible.verses', 'calendar.coptic_date_conversions']);
+  // A query over many rows still reads the (keepable) table whole, and is then answered from it.
+  const month = await client.schema('calendar').from('coptic_date_conversions').select('*').gte('gregorian_date', '2026-10-01');
+  assert.equal(month.data.length, 2);
+  assert.equal(calls.sqlite.length, 2);
 });

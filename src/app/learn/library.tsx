@@ -2,7 +2,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -80,17 +80,22 @@ export default function LearningLibraryScreen() {
   const wide = layout !== 'phone';
   // The page and its glow run to both edges; its content keeps clear of the notch.
   const sidePadding = useSidePadding(wide ? 36 : 0);
-  const [library, setLibrary] = useState(EMPTY_LIBRARY);
-  const [playlistLibrary, setPlaylistLibrary] = useState(EMPTY_PLAYLISTS);
+  // Drawn at once from the session's copies when the page is opened again, while they are read afresh.
+  const [library, setLibrary] = useState(() => learningService.peekItemLibrary(locale) ?? EMPTY_LIBRARY);
+  const [playlistLibrary, setPlaylistLibrary] = useState(() => learningService.peekPlaylists(locale) ?? EMPTY_PLAYLISTS);
   const [activeState, setActiveState] = useState<LearningProgressState>('will_learn');
   const [playlistName, setPlaylistName] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !learningService.peekItemLibrary(locale) || !learningService.peekPlaylists(locale));
   const [creating, setCreating] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Whether the lists are on screen yet: read again each time the page comes
+  // back into view, but with no spinner over them, which pushed them down and back.
+  const shown = useRef(!loading);
   const load = useCallback(async (active: { current: boolean }) => {
-    setLoading(true);
+    const kept = shown.current;
+    setLoading(!kept);
     setError(null);
     try {
       const [nextLibrary, nextPlaylists] = await Promise.all([
@@ -100,8 +105,9 @@ export default function LearningLibraryScreen() {
       if (!active.current) return;
       setLibrary(nextLibrary);
       setPlaylistLibrary(nextPlaylists);
+      shown.current = true;
     } catch (cause) {
-      if (active.current) setError(cause instanceof Error ? cause.message : 'Unable to load My Learning.');
+      if (active.current && !kept) setError(cause instanceof Error ? cause.message : 'Unable to load My Learning.');
     } finally {
       if (active.current) setLoading(false);
     }
