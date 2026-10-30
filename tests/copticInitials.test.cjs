@@ -161,15 +161,71 @@ test('its letter takes the ornaments\' colour and its vine the titles\' gold, on
 test('the page decides after layout whether the paragraph wraps, and decides again when it reflows', () => {
   const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], OPTIONS);
   const script = html.slice(html.indexOf('<script>'));
-  assert.match(script, /function fitCopticInitials\(\) \{/);
+  assert.match(script, /function fitCopticInitials\(root\) \{/);
   // Measured with the initial a line tall: the paragraph's lines are counted from it on.
-  assert.match(script, /initial\.classList\.add\('one-line'\);\s+var range = document\.createRange\(\);\s+range\.setStartBefore\(initial\);[\s\S]+initial\.classList\.toggle\('one-line', lines < 2\);/);
+  assert.match(script, /initials\[i\]\.classList\.add\('one-line'\);[\s\S]+var range = document\.createRange\(\);\s+range\.setStartBefore\(fit\.initial\);[\s\S]+fit\.oneLine = lines < 2;/);
   // Ahead of every other resize listener, so they measure the outcome.
   assert.ok(script.indexOf('fitCopticInitials();') < script.indexOf("window.addEventListener('resize'"));
   assert.match(script, /document\.fonts\.load\('25px CopticVine'\)\.then\(function \(\) \{\s+fitCopticInitials\(\);/);
-  assert.match(script, /var collapsed = section\.classList\.toggle\('collapsed'\);\s+if \(!collapsed\) fitCopticInitials\(\);/);
+  // A hymn opened fits its own initials only.
+  assert.match(script, /var collapsed = section\.classList\.toggle\('collapsed'\);[\s\S]{0,80}if \(!collapsed\) fitCopticInitials\(section\);/);
   // A page without an initial carries the script but no listeners for it.
   assert.equal(initials(build([hymn([verse('ⲙⲁⲣⲉⲛ')])], OPTIONS)).length, 0);
+});
+
+test('initials are fitted in one layout: all set a line tall, all measured, then each settled', () => {
+  const { FIT_COPTIC_INITIALS_SCRIPT } = loadFile('src/components/vine/openingHtml.ts', (name) => ({
+    '../../constants/copticInitialArt': art,
+    '../../constants/englishInitialArt': loadFile('src/constants/englishInitialArt.ts'),
+    './copticInitial': loadFile('src/components/vine/copticInitial.ts', (n) => (n === '../../constants/copticInitialArt' ? art : require(n))),
+    './openingInitials': loadFile('src/components/vine/openingInitials.ts', (n) => (n === '../../constants/englishInitialArt' ? loadFile('src/constants/englishInitialArt.ts') : require(n))),
+  }[name] || require(name)));
+  // A paragraph lays out on `lines` lines once its initial is a line tall; a hidden one has no boxes.
+  const log = [];
+  const classList = (owner, initial) => {
+    const set = new Set(initial);
+    return {
+      add: (name) => { set.add(name); log.push(`write ${owner}`); },
+      contains: (name) => set.has(name),
+      toggle: (name, on) => { if (on) set.add(name); else set.delete(name); log.push(`write ${owner}`); },
+      has: (name) => set.has(name),
+    };
+  };
+  const make = (id, lines, hidden = false, was = []) => {
+    const paragraph = { id, lines, hidden, getClientRects: () => { log.push(`read ${id}`); return hidden ? [] : [{}]; }, lastChild: {} };
+    const initial = { id, classList: classList(id, was), closest: () => paragraph, paragraph };
+    return initial;
+  };
+  const wraps = make('wraps', 3);
+  const short = make('short', 1);
+  const hidden = make('hidden', 3, true, []);
+  const hiddenOneLine = make('hidden-one', 3, true, ['one-line']);
+  const all = [wraps, short, hidden, hiddenOneLine];
+  const range = () => {
+    let start = null;
+    return {
+      setStartBefore: (initial) => { start = initial; },
+      setEndAfter: () => {},
+      getClientRects: () => Array.from({ length: start.paragraph.lines }, (_, line) => ({ width: 10, top: line * 20 })),
+    };
+  };
+  const document = { querySelectorAll: () => all, createRange: range };
+  const fit = new Function('document', 'getComputedStyle', `${FIT_COPTIC_INITIALS_SCRIPT}; return fitCopticInitials;`)(document, () => ({ lineHeight: '20px' }));
+  fit({ length: 1 }); // what fonts.load hands it: the whole page
+  assert.equal(wraps.classList.has('one-line'), false, 'a paragraph of two lines or more keeps the tall initial');
+  assert.equal(short.classList.has('one-line'), true);
+  assert.equal(hidden.classList.has('one-line'), false, 'a hidden hymn keeps what it had');
+  assert.equal(hiddenOneLine.classList.has('one-line'), true);
+  // Every write before the first read, and none between the reads.
+  const firstRead = log.findIndex((entry) => entry.startsWith('read'));
+  const lastRead = log.map((entry) => entry.startsWith('read')).lastIndexOf(true);
+  assert.ok(log.slice(0, firstRead).every((entry) => entry.startsWith('write')));
+  assert.ok(log.slice(firstRead, lastRead + 1).every((entry) => entry.startsWith('read')));
+  // Handed a hymn, only its own initials are fitted.
+  const section = { nodeType: 1, querySelectorAll: () => [short] };
+  log.length = 0;
+  fit(section);
+  assert.deepEqual([...new Set(log.map((entry) => entry.split(' ')[1]))], ['short']);
 });
 
 // ---- The opening in all three columns (Coptic Vine Design, "Drop caps and decorated initials", option 3) ----

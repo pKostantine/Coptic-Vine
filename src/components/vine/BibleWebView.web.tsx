@@ -13,6 +13,8 @@ interface BibleWebViewProps {
   onAction?: (action: BibleWebViewAction) => void;
   /** The page the chapter is read on (constants/documentThemes.ts), painted behind the HTML as it loads. */
   backgroundColor?: string;
+  /** Room kept below the last verse for the Now Playing bar, set on the page without reloading it. */
+  bottomInset?: number;
 }
 
 type BibleFrameWindow = Window & {
@@ -21,7 +23,7 @@ type BibleFrameWindow = Window & {
 };
 
 /** Web Bible chapter renderer — plain iframe, same HTML builder as the native renderer. */
-const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, highlights, onAction, backgroundColor = COLORS.black }, ref) => {
+const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, highlights, onAction, backgroundColor = COLORS.black, bottomInset = 0 }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const restoreVerseRef = useRef(restoreVerse);
   restoreVerseRef.current = restoreVerse;
@@ -35,6 +37,15 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
   useEffect(() => {
     drawHighlights();
   }, [highlights]);
+
+  const bottomInsetRef = useRef(bottomInset);
+  bottomInsetRef.current = bottomInset;
+  const applyBottomInset = () => {
+    iframeRef.current?.contentDocument?.documentElement.style.setProperty('--now-playing-inset', `${Math.max(0, Math.round(bottomInsetRef.current))}px`);
+  };
+  useEffect(() => {
+    applyBottomInset();
+  }, [bottomInset]);
 
   useImperativeHandle(ref, () => ({
     selectVerse: (verse: number | string) => {
@@ -65,6 +76,7 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
       sandbox="allow-same-origin allow-scripts"
       srcDoc={html}
       onLoad={() => {
+        applyBottomInset();
         drawHighlights();
         const verse = restoreVerseRef.current;
         if (verse) {

@@ -229,6 +229,7 @@ export function buildDocumentHtml(
     theme = NIGHT_DOCUMENT_THEME,
     ornamentColor = theme.colors.accent,
     initialColors = { vine: theme.colors.accent, letter: ornamentColor },
+    initialRestore = [],
   }: {
     copticFontDataUri: string;
     /** The Coptic face's italic, for Coptic set in italic; without it the browser fakes one. */
@@ -267,6 +268,12 @@ export function buildDocumentHtml(
     ornamentColor?: string;
     /** The decorated initials' vine and letter (documentInitialColors); the letter's colour is the opening words' too. */
     initialColors?: InitialColors;
+    /**
+     * Where the reader was (scrollToSection's candidates), gone to before the
+     * page is first drawn: a page rebuilt for a new size, theme or language
+     * opens there, rather than at its top and then jumping down.
+     */
+    initialRestore?: { sectionId: string; edge: 'start' | 'end'; verseId?: string }[];
   },
 ) {
   const colors = theme.colors;
@@ -905,7 +912,8 @@ export function buildDocumentHtml(
         var section = button.closest('.section');
         if (!section) return;
         var collapsed = section.classList.toggle('collapsed');
-        if (!collapsed) fitCopticInitials();
+        // Only this hymn's initials can have changed.
+        if (!collapsed) fitCopticInitials(section);
         button.classList.toggle('is-collapsed', collapsed);
         button.setAttribute('aria-label', collapsed ? 'Expand section' : 'Collapse section');
         postAction('toggleCollapse', { sectionId: section.getAttribute('data-section-id'), collapsed: collapsed });
@@ -1275,6 +1283,10 @@ export function buildDocumentHtml(
         document.addEventListener('touchcancel', function () { if (swipe) finish(0); start = null; });
       })();
       ${sermonPlannerMode ? sermonPlannerScript() : ''}
+      (function () {
+        var restore = ${JSON.stringify(initialRestore).replace(/</g, '\\u003c')};
+        if (restore.length && window.scrollToSection(restore)) enforceHeldJump();
+      })();
     </script>
   </body>
 </html>`;

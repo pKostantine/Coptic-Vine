@@ -216,7 +216,7 @@ test('a chapter opens on its verse 1 with the drop cap and decorated first words
   assert.equal((body.match(/class="english-initial"/g) || []).length, 3);
   // The page decides how tall the initial stands, before a slideshow cuts its pages and as the page reflows.
   const script = html.slice(html.indexOf('<script>'));
-  assert.match(script, /function fitCopticInitials\(\) \{/);
+  assert.match(script, /function fitCopticInitials\(root\) \{/);
   assert.match(script, /fitCopticInitials\(\);\s+if \(document\.querySelector\('\.coptic-initial\[data-fit\]'\)\) \{/);
   const slideshow = build(true).slice(build(true).indexOf('<script>'));
   assert.match(slideshow, /initialPaginationDone = true;\s+fitCopticInitials\(\);\s+paginate\(initialAnchorVerse\);/);

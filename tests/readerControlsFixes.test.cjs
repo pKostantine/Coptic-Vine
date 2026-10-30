@@ -28,9 +28,9 @@ function loadModule(file, stubs) {
  * (the sheet's scroll view reads it), where the sheet was dragged, and whether
  * it closed.
  */
-function sheetDrag() {
+function sheetDrag(travel) {
   const created = [];
-  const seen = { held: false, drag: 0, closed: false, sprung: false };
+  const seen = { held: false, drag: 0, closed: false, sprung: false, carried: null };
   const react = {
     createContext: (value) => ({ value }),
     useEffect: () => {},
@@ -41,12 +41,23 @@ function sheetDrag() {
     },
   };
   const reactNative = {
-    Animated: { spring: () => ({ start() { seen.sprung = true; } }) },
+    Animated: {
+      spring: () => ({ start() { seen.sprung = true; } }),
+      timing: (_value, config) => ({ start() { seen.carried = config; } }),
+    },
+    Easing: { out: (easing) => easing, quad: 'quad' },
     PanResponder: { create: (config) => { created.push(config); return { panHandlers: config }; } },
   };
-  const { useSheetDragToClose } = loadModule('components/vine/ui/useSheetDragToClose.ts', { react, 'react-native': reactNative });
+  const motion = {
+    getReducedMotion: () => false,
+    motionDuration: (ms, reduced) => (reduced ? 0 : ms),
+    releaseDuration: (remaining, velocity) => Math.round(Math.min(280, Math.max(140, (2 * remaining) / Math.max(velocity, 1.2)))),
+  };
+  const { useSheetDragToClose } = loadModule('components/vine/ui/useSheetDragToClose.ts', {
+    react, 'react-native': reactNative, '../../../utils/useReducedMotion': motion,
+  });
   const drag = { setValue(value) { seen.drag = value; } };
-  const result = useSheetDragToClose(true, drag, () => { seen.closed = true; });
+  const result = useSheetDragToClose(true, drag, () => { seen.closed = true; }, travel);
   const sheet = created.find((config) => config.onMoveShouldSetPanResponderCapture);
   return { result, sheet, seen };
 }
@@ -93,6 +104,19 @@ test('a hold also stops the sheet scrolling, and keeps it still if it lands once
   assert.equal(seen.closed, true);
 });
 
+test('a sheet let go to close carries on out of sight at the finger\'s speed as it closes', () => {
+  const { sheet, seen } = sheetDrag(800);
+  sheet.onStartShouldSetPanResponderCapture();
+  sheet.onPanResponderMove({}, { dx: 2, dy: 100 });
+  sheet.onPanResponderRelease({}, { dx: 2, dy: 100, vy: 2 });
+  assert.equal(seen.closed, true);
+  assert.equal(seen.carried.toValue, 800, 'on down the rest of the way');
+  assert.equal(seen.carried.duration, 280, 'eased out from the finger\'s pace, not from rest');
+  assert.equal(seen.carried.easing, 'quad');
+  const frame = source('components/vine/ui/SheetFrame.tsx');
+  assert.match(frame, /useSheetDragToClose\(visible, drag, onClose, height\)/);
+});
+
 test('the app\'s slider holds the sheet from the finger landing until both it lifts and the slide ends', () => {
   const slider = source('components/vine/ui/FontScaleControl.tsx');
   assert.match(slider, /useContext\(SheetDragHoldContext\)/);
@@ -100,7 +124,10 @@ test('the app\'s slider holds the sheet from the finger landing until both it li
   assert.match(slider, /onTouchStart=\{\(\) => holdSheet\('touch', true\)\}/);
   assert.match(slider, /onTouchEnd=\{\(\) => holdSheet\('touch', false\)\}/);
   assert.match(slider, /onTouchCancel=\{\(\) => holdSheet\('touch', false\)\}/);
-  assert.match(slider, /onSlidingChange=\{\(sliding\) => holdSheet\('slide', sliding\)\}/);
+  assert.match(slider, /onSlidingChange=\{\(sliding\) => \{\n\s+holdSheet\('slide', sliding\);\n\s+if \(!sliding\) commit\(\);/);
+  // The size under the finger shows at once; the document takes it once the finger rests or lifts.
+  assert.match(slider, /onValueChange=\{slideTo\}/);
+  assert.match(slider, /pending\.current = \{ value, timer: setTimeout\(commit, RESTING_MS\) \};/);
   // iOS's own slider says when a slide starts and ends; the universal one doesn't pass it on.
   assert.match(source('components/vine/ui/FontScaleSlider.ios.tsx'), /from '@expo\/ui\/swift-ui'[\s\S]+onEditingChanged=\{onSlidingChange\}/);
   const frame = source('components/vine/ui/SheetFrame.tsx');

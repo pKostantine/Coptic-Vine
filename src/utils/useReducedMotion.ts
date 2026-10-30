@@ -52,3 +52,15 @@ export function useReducedMotion(): boolean {
 export function motionDuration(milliseconds: number, reducedMotion: boolean): number {
   return reducedMotion ? 0 : milliseconds;
 }
+
+/**
+ * How long something let go of mid-drag takes to carry on the `remaining`
+ * points out of sight. Eased out (Easing.out(Easing.quad)), it leaves at the
+ * finger's own speed, `velocity` points a millisecond, rather than stopping
+ * dead under the finger and setting off again; never quicker than 140ms nor
+ * slower than 280ms.
+ */
+export function releaseDuration(remaining: number, velocity: number): number {
+  const speed = Math.max(Math.abs(velocity), 1.2);
+  return Math.round(Math.min(280, Math.max(140, (2 * Math.max(0, remaining)) / speed)));
+}

@@ -278,6 +278,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // The season of the day being prayed, which the ornaments on Night and Paper
   // are drawn in; read with the document so it arrives with it.
   const [ornamentSeason, setOrnamentSeason] = useState<SeasonThemeKey | null>(null);
+  // One object for as long as the page and the season stay: the document's
+  // HTML is built again whenever it changes.
+  const initialColors = useMemo(() => documentInitialColors(documentTheme, ornamentSeason), [documentTheme, ornamentSeason]);
   // An old hydration must not briefly render as though it belongs to a new
   // date/condition set while the replacement document is being fetched.
   const conditionsKey = JSON.stringify([schema, table, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags]);
@@ -343,13 +346,15 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // after a rotation/window-resize reflows the layout (see the effect below).
   // Slideshow mode doesn't need this: SlideshowContainer already restores
   // its own verse-level position internally whenever it repaginates.
-  const [currentVerseId, setCurrentVerseId] = useState<string | null>(null);
+  // Kept in refs, not state: the verse changes with every line scrolled
+  // past, and drawing the whole reader again each time (the HTML rebuilt
+  // with it) held up the scroll. The section, which changes once a hymn, is
+  // what renders.
+  const currentVerseIdRef = useRef<string | null>(null);
   // The same verse as its index in the hymn's own rows, reported by both
   // renderers (the scrolling reader names it `<section>::v<index>`, the
   // slideshow by its item): what every change -- a setting, the calendar, a
-  // mode switch -- brings the reader back to. Read through the ref where a
-  // snapshot is taken outside a render.
-  const [currentVerseIndex, setCurrentVerseIndex] = useState<number | null>(null);
+  // mode switch -- brings the reader back to.
   const currentVerseIndexRef = useRef<number | null>(null);
   // The Antiphonary only: the tune of the verse being read, for its pills.
   const [currentTune, setCurrentTune] = useState<AntiphonaryTune | null>(null);
@@ -629,8 +634,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     currentSectionIdRef.current = target.sectionId;
     setCurrentSectionId(target.sectionId);
     currentVerseIndexRef.current = targetVerseIndex;
-    setCurrentVerseIndex(targetVerseIndex);
-    setCurrentVerseId(targetVerseIndex != null ? `${target.sectionId}::v${targetVerseIndex}` : null);
+    currentVerseIdRef.current = targetVerseIndex != null ? `${target.sectionId}::v${targetVerseIndex}` : null;
     setLastDocumentPosition(documentPositionKey, target.sectionId);
     setSelectedSlideSectionId(target.sectionId);
     setRestoreRequest({ token, target });
@@ -712,14 +716,16 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     if (dimensionKeyRef.current === nextKey) return;
     dimensionKeyRef.current = nextKey;
     if (preferences.slideshowMode || getPendingDocumentRestore(documentPositionKey)) return;
-    if (!currentVerseId && !currentSectionId) return;
+    if (!currentVerseIdRef.current && !currentSectionIdRef.current) return;
 
     const timeoutId = setTimeout(() => {
-      if (currentVerseId) documentRef.current?.scrollToVerse(currentVerseId);
-      else if (currentSectionId) documentRef.current?.scrollToSection(currentSectionId);
+      const verseId = currentVerseIdRef.current;
+      const sectionId = currentSectionIdRef.current;
+      if (verseId) documentRef.current?.scrollToVerse(verseId);
+      else if (sectionId) documentRef.current?.scrollToSection(sectionId);
     }, 260);
     return () => clearTimeout(timeoutId);
-  }, [screenWidth, screenHeight, preferences.slideshowMode, currentVerseId, currentSectionId]);
+  }, [screenWidth, screenHeight, preferences.slideshowMode, documentPositionKey]);
 
   // Flipping the Slideshow Mode toggle unmounts one renderer and mounts the
   // other (DocumentSurface.tsx renders either SlideshowContainer or
@@ -927,9 +933,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         setCurrentSectionId(action.sectionId);
         setLastDocumentPosition(documentPositionKey, action.sectionId);
       }
-      setCurrentVerseId(action.verseId || null);
+      currentVerseIdRef.current = action.verseId || null;
       currentVerseIndexRef.current = verseIndexFromId(action.verseId);
-      setCurrentVerseIndex(currentVerseIndexRef.current);
       if (isAntiphonary) setCurrentTune(getVerseTune(sections, action.verseId));
       return;
     }
@@ -1067,6 +1072,13 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // slides away with the finger, then goes without a second slide.
   const nativeBackSwipe = Platform.OS === 'ios' && !isSermonPlanner;
   const [leavingBySwipe, setLeavingBySwipe] = useState(false);
+  // One object while nothing in it changes: a new one sets the navigator's
+  // options again at every render of the reader.
+  const screenOptions = useMemo(() => ({
+    gestureEnabled: nativeBackSwipe && !isCoveredByModal,
+    fullScreenGestureEnabled: true,
+    ...(leavingBySwipe ? { animation: 'none' as const } : null),
+  }), [isCoveredByModal, leavingBySwipe, nativeBackSwipe]);
   const [selectorOpenFrom, setSelectorOpenFrom] = useState(0);
   const panelLayout = useReaderPanelLayout();
   const readerSwipes = useReaderSwipes({
@@ -1113,13 +1125,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           open subdocument it would pop this whole document out from under
           it. Left by a swipe of its own, the page has already slid away, so
           the screen goes without a slide of its own. */}
-      <Stack.Screen
-        options={{
-          gestureEnabled: nativeBackSwipe && !isCoveredByModal,
-          fullScreenGestureEnabled: true,
-          ...(leavingBySwipe ? { animation: 'none' as const } : null),
-        }}
-      />
+      <Stack.Screen options={screenOptions} />
       {/* The page runs up under the status bar; on a light one its clock and battery turn dark. */}
       <DocumentStatusBar theme={documentTheme} />
       <Head>
@@ -1181,8 +1187,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               currentSectionIdRef.current = id;
               setCurrentSectionId(id);
               currentVerseIndexRef.current = verseIndex;
-              setCurrentVerseIndex(verseIndex);
-              setCurrentVerseId(verseIndex != null ? `${id}::v${verseIndex}` : null);
+              currentVerseIdRef.current = verseIndex != null ? `${id}::v${verseIndex}` : null;
               setLastDocumentPosition(documentPositionKey, id);
               setCurrentTune(tune);
             }}
@@ -1190,13 +1195,15 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             copticGospelRite={copticGospelRite}
             suppressAllSpeakerLabels={schema === 'agpeya'}
             initialScrollSectionId={restoreRequest?.target.sectionId ?? currentSectionId ?? getLastDocumentPosition(documentPositionKey)}
-            initialScrollVerseIndex={restoreRequest ? restoreRequest.target.verseIndex ?? null : currentVerseIndex}
+            // Read as the reader mounts (a switch from the slideshow), which is when it is used.
+            // eslint-disable-next-line react-hooks/refs
+            initialScrollVerseIndex={restoreRequest ? restoreRequest.target.verseIndex ?? null : currentVerseIndexRef.current}
             onCollapseToggle={setSelectedSlideSectionId}
             keyboardNavigationEnabled={!isCoveredByModal}
             sermonPlannerMode={isSermonPlanner}
             sermonHighlights={sermonPlanner.plan.highlights}
             ornamentColor={documentOrnamentColor(documentTheme, ornamentSeason)}
-            initialColors={documentInitialColors(documentTheme, ornamentSeason)}
+            initialColors={initialColors}
             topContentInset={controlsOverText ? floatingLayout.contentTop : 0}
             onHeadpieceInViewChange={setHeadpieceInView}
             swipeExitsInPage={!nativeBackSwipe}

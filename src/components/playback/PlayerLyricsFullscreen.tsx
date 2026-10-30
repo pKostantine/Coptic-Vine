@@ -67,7 +67,6 @@ interface PlayerLyricsFullscreenProps {
   activeLineId: string | null;
   loading: boolean;
   onSeekLine: (startMs: number) => void;
-  positionMs: number;
   durationMs: number;
   onSeek: (positionMs: number) => void;
   playing: boolean;
@@ -138,7 +137,6 @@ function FullscreenBody({
   activeLineId,
   loading,
   onSeekLine,
-  positionMs,
   durationMs,
   onSeek,
   playing,
@@ -176,7 +174,7 @@ function FullscreenBody({
       hideTabs
     />
   );
-  const seek = <SeekBar positionMs={positionMs} durationMs={durationMs} onSeek={onSeek} />;
+  const seek = <SeekBar durationMs={durationMs} onSeek={onSeek} />;
   const transport = (size: 'regular' | 'small') => (
     <PlayerTransport
       playing={playing}

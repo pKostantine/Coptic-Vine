@@ -1,6 +1,6 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, BackHandler, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, BackHandler, Easing, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -57,16 +57,16 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
   useEffect(() => {
     if (visible) {
       drag.setValue(0);
-      Animated.timing(progress, { toValue: 1, duration: motionDuration(260, reduced), useNativeDriver: true }).start();
+      Animated.timing(progress, { toValue: 1, duration: motionDuration(260, reduced), easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     } else if (mounted) {
-      Animated.timing(progress, { toValue: 0, duration: motionDuration(200, reduced), useNativeDriver: true }).start(({ finished }) => {
+      Animated.timing(progress, { toValue: 0, duration: motionDuration(200, reduced), easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(({ finished }) => {
         if (finished) setMounted(false);
       });
     }
   }, [visible, mounted, progress, drag, reduced]);
 
   // Pulled down from anywhere on the sheet, the calendar scrolling back up to its top first.
-  const sheetDrag = useSheetDragToClose(visible, drag, onClose);
+  const sheetDrag = useSheetDragToClose(visible, drag, onClose, height);
 
   // Inline there is no modal to catch Android's back button, so the sheet does.
   useEffect(() => {

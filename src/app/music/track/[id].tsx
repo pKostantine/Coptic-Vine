@@ -22,6 +22,7 @@ import RoundIconButton from '@/components/playback/RoundIconButton';
 import { COLORS, RADII, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { type MusicQueueItem, useMusicPlayer } from '@/context/MusicPlayerContext';
+import { usePlaybackClock } from '@/context/PlaybackContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { musicService } from '@/services/musicService';
 import type { MusicConsumerTrackDetail, PublishedTrackLyricsPayload, PublishedLyricSet } from '@/types/musicConsumer';
@@ -157,16 +158,17 @@ export default function MusicTrackDetailScreen() {
     ));
   }, [lyrics]);
   const selectedLyricSet = lyricSets.find((set) => set.id === selectedLyricSetId) ?? null;
-  const activeLineId = useMemo(() => {
+  // Drawn again only when the line being sung changes, not at every tick.
+  const activeLineId = usePlaybackClock(({ currentTimeMs }) => {
     if (!isCurrent || !selectedLyricSet) return null;
-    const timed = selectedLyricSet.lines.filter((line) => line.startMs != null);
     let active: string | null = null;
-    for (const line of timed) {
-      if ((line.startMs ?? 0) <= player.currentTimeMs) active = line.id;
+    for (const line of selectedLyricSet.lines) {
+      if (line.startMs == null) continue;
+      if (line.startMs <= currentTimeMs) active = line.id;
       else break;
     }
     return active;
-  }, [isCurrent, player.currentTimeMs, selectedLyricSet]);
+  });
 
   const togglePlayback = () => {
     if (!queueItem) return;

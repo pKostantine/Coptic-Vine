@@ -33,7 +33,10 @@ interface SwipeToRemoveProps {
 export default function SwipeToRemove({ label, onRemove, style, children }: SwipeToRemoveProps) {
   const reduced = useReducedMotion();
   const [offset] = useState(() => new Animated.Value(0));
-  const lane = useRef({ width: 0, rest: 0, dragFrom: 0, draggedAt: 0 });
+  const lane = useRef({ width: 0, height: 0, rest: 0, dragFrom: 0, draggedAt: 0 });
+  // Gone from the row, its place closes up before the row is let go, so the
+  // rows beneath rise into it rather than jumping up in one frame.
+  const [closing, setClosing] = useState<Animated.Value | null>(null);
   // The gesture below is made once: it reads the latest of these when it ends.
   const latest = useRef({ onRemove, reduced });
   useLayoutEffect(() => {
@@ -46,7 +49,17 @@ export default function SwipeToRemove({ label, onRemove, style, children }: Swip
       if (finished) then?.();
     });
   };
-  const remove = () => settle(-(lane.current.width || 320), () => latest.current.onRemove());
+  const remove = () => settle(-(lane.current.width || 320), () => {
+    const { onRemove: removeRow, reduced: still } = latest.current;
+    if (still || !lane.current.height) {
+      removeRow();
+      return;
+    }
+    const height = new Animated.Value(lane.current.height);
+    setClosing(height);
+    // Height is a layout value: the JavaScript side draws it.
+    Animated.timing(height, { toValue: 0, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(() => removeRow());
+  });
 
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
   const [swipe] = useState(() => {
@@ -84,7 +97,13 @@ export default function SwipeToRemove({ label, onRemove, style, children }: Swip
   const actionShift = offset.interpolate({ inputRange: [-ACTION_WIDTH, 0], outputRange: [0, ACTION_WIDTH], extrapolate: 'clamp' });
 
   return (
-    <View style={[styles.frame, style]} onLayout={(event) => { lane.current.width = event.nativeEvent.layout.width; }}>
+    <Animated.View
+      style={[styles.frame, style, closing && { height: closing }]}
+      onLayout={(event) => {
+        lane.current.width = event.nativeEvent.layout.width;
+        if (!closing) lane.current.height = event.nativeEvent.layout.height;
+      }}
+    >
       <Animated.View style={[styles.action, { transform: [{ translateX: actionShift }] }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={remove} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
           <Icon name="trash-outline" size={19} color={DESTRUCTIVE} />
@@ -94,7 +113,7 @@ export default function SwipeToRemove({ label, onRemove, style, children }: Swip
       <Animated.View {...swipe.panHandlers} style={{ transform: [{ translateX: offset }] }}>
         {children(guard)}
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -92,7 +92,7 @@ test('Add to playlist opens in the sheet it was chosen from, for Music and Learn
 test('the sheets over the player: a sheet, a side panel or a dialog, closed by drag, dimming, back and Escape', () => {
   const frame = read('src/components/playback/ActionSheetFrame.tsx');
   assert.match(frame, /const mode: ActionSheetMode = landscapePhone \? 'side' : layout === 'phone' \? 'sheet' : 'dialog';/);
-  assert.match(frame, /useSheetDragToClose\(visible, drag, onClose\)/);
+  assert.match(frame, /useSheetDragToClose\(visible, drag, onClose, height\)/);
   assert.match(frame, /\{\.\.\.sheetDrag\.grabHandlers\}/);
   assert.match(frame, /\{\.\.\.swipeResponder\.panHandlers\}/);
   assert.match(frame, /onRequestClose=\{onClose\}/);

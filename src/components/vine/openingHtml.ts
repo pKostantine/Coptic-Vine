@@ -178,18 +178,32 @@ export function renderOpeningRest(rest: string, html: (text: string) => string, 
  * reflows.
  */
 export const FIT_COPTIC_INITIALS_SCRIPT = `
-      function fitCopticInitials() {
-        var initials = document.querySelectorAll('.coptic-initial[data-fit]');
+      // Within \`root\` (a hymn just opened) or the whole page; anything else
+      // it is handed -- a resize event, fonts loaded -- means the whole page.
+      // Set in three passes, every initial on one line, then every paragraph
+      // measured, then each initial settled: one layout for the lot, where
+      // measuring each in turn laid the page out again for every initial.
+      function fitCopticInitials(root) {
+        var scope = root && root.nodeType === 1 ? root : document;
+        var initials = scope.querySelectorAll('.coptic-initial[data-fit]');
+        var fits = [];
         for (var i = 0; i < initials.length; i += 1) {
-          var initial = initials[i];
-          var paragraph = initial.closest('.verse-text');
-          if (!paragraph || !paragraph.getClientRects().length) continue;
-          initial.classList.add('one-line');
+          var paragraph = initials[i].closest('.verse-text');
+          if (!paragraph) continue;
+          fits.push({ initial: initials[i], paragraph: paragraph, was: initials[i].classList.contains('one-line') });
+          initials[i].classList.add('one-line');
+        }
+        for (var f = 0; f < fits.length; f += 1) {
+          var fit = fits[f];
+          if (!fit.paragraph.getClientRects().length) {
+            fit.oneLine = fit.was;
+            continue;
+          }
           var range = document.createRange();
-          range.setStartBefore(initial);
-          range.setEndAfter(paragraph.lastChild);
+          range.setStartBefore(fit.initial);
+          range.setEndAfter(fit.paragraph.lastChild);
           var rects = range.getClientRects();
-          var lineHeight = parseFloat(getComputedStyle(paragraph).lineHeight) || 1;
+          var lineHeight = parseFloat(getComputedStyle(fit.paragraph).lineHeight) || 1;
           var lines = 0;
           var lineTop = null;
           for (var r = 0; r < rects.length && lines < 2; r += 1) {
@@ -197,6 +211,7 @@ export const FIT_COPTIC_INITIALS_SCRIPT = `
             lines += 1;
             lineTop = rects[r].top;
           }
-          initial.classList.toggle('one-line', lines < 2);
+          fit.oneLine = lines < 2;
         }
+        for (var s = 0; s < fits.length; s += 1) fits[s].initial.classList.toggle('one-line', fits[s].oneLine);
       }`;

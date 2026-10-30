@@ -22,6 +22,9 @@ import {
 import { arabicItalicStyle } from '../../../utils/arabicItalic';
 import { gatherUnderDividers, isDividerSection } from '../../../utils/sectionDividers';
 
+/** While the rows of a panel just opened are still being laid out, the list keeps following its place. */
+const SCROLL_SETTLE_MS = 600;
+
 interface ContentSelectorDrawerProps {
   visible: boolean;
   sections: DocumentSection[];
@@ -218,13 +221,23 @@ export default function ContentSelectorDrawer({
   // Keep the panel scrolled to wherever the user currently is in the
   // document — on open, and any time that position changes while the panel
   // is already open (e.g. it was left open while swiping through slides).
+  // Only then: once the list has settled on a place, rows moving under it
+  // (a heading folded or unfolded reflows every card below) leave it where
+  // the reader has scrolled to, rather than snapping back to "you are here".
+  const scrolledFor = useRef<{ id: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!visible || searching) scrolledFor.current = null;
+  }, [visible, searching]);
   useEffect(() => {
     if (!visible || !highlightedSectionId || searching) return;
+    const done = scrolledFor.current;
+    if (done && done.id === highlightedSectionId && Date.now() - done.at > SCROLL_SETTLE_MS) return;
     const ownerId = dividerOwners.get(highlightedSectionId);
     const groupY = ownerId ? groupLayouts[ownerId] : 0;
     const y = itemLayouts[highlightedSectionId];
     if (y === undefined || groupY === undefined) return;
     scrollViewRef.current?.scrollTo({ y: Math.max(groupY + y - 12, 0), animated: false });
+    if (done?.id !== highlightedSectionId) scrolledFor.current = { id: highlightedSectionId, at: Date.now() };
   }, [visible, highlightedSectionId, itemLayouts, groupLayouts, dividerOwners, searching]);
 
   const recordGroupLayout = (headingId: string) => (event: LayoutChangeEvent) => {

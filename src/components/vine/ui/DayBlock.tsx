@@ -7,7 +7,7 @@ import { appText, tr } from '../../../utils/appText';
 import { getWeekStrip, type WeekStripDay } from '../../../utils/calendarService';
 import { formatCopticDayMonth, formatDayMonthYearDate, toEasternArabicDigits } from '../../../utils/localeFormat';
 import { NEXT_SEASON_NAMES } from '../../../utils/nextSeason';
-import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
+import { motionDuration, releaseDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import DayControls from './DayControls';
 import TodayCard, { DayStrip, type DayStripItem } from './TodayCard';
 import type { LiturgicalDay } from './useLiturgicalDay';
@@ -187,14 +187,14 @@ export default function DayBlock({ day, arabic, onOpenCalendar, onOpenSeasons, a
         if (swipe.reduced) {
           motion.position.setValue(target);
         } else {
-          // On the rest of the way at the pace it was thrown, on the native
-          // side, so the page catching up with the new date cannot hold it up.
+          // On the rest of the way at the pace it was thrown (eased out from
+          // the finger's own speed, not three times it), on the native side,
+          // so the page catching up with the new date cannot hold it up.
           const remaining = Math.abs(target * width - (swipe.dragFrom * width + gesture.dx));
-          const speed = Math.max(Math.abs(gesture.vx), 1);
           Animated.timing(motion.position, {
             toValue: target,
-            duration: Math.min(260, Math.max(120, remaining / speed)),
-            easing: Easing.out(Easing.cubic),
+            duration: releaseDuration(remaining, gesture.vx),
+            easing: Easing.out(Easing.quad),
             useNativeDriver: NATIVE_DRIVER,
           }).start(({ finished }) => {
             // Should the date not have moved after all, the week goes back.

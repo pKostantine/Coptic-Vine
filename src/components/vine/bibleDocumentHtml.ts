@@ -263,7 +263,7 @@ export function buildBibleChapterHtml({
       .chapter {
         box-sizing: border-box;
         min-height: 100vh;
-        padding: ${Math.max(14, chromeTop)}px 20px calc(28px + env(safe-area-inset-bottom) + ${Math.max(0, Math.round(bottomContentInset))}px);
+        padding: ${Math.max(14, chromeTop)}px 20px calc(28px + env(safe-area-inset-bottom) + var(--now-playing-inset, ${Math.max(0, Math.round(bottomContentInset))}px));
       }
       /* The page's margins: a phone's 20px, a tablet's 28px, a desktop's 36px. */
       @media (min-width: 700px) {

@@ -1,5 +1,5 @@
 import { Host } from '@expo/ui';
-import { useContext, useRef } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
@@ -59,7 +59,33 @@ export default function FontScaleControl({
   onSetValue,
   compact = false,
 }: FontScaleControlProps) {
-  const level = fontScaleToLevel(fontScale);
+  // The size under the finger shows at once, here and on the slider; the
+  // document takes it once the finger rests or lifts. Each new size rebuilds
+  // and reloads the whole document, and a sweep across the track did that a
+  // dozen times or more on the way.
+  const [draft, setDraft] = useState<number | null>(null);
+  const pending = useRef<{ value: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const latestSetValue = useRef(onSetValue);
+  useEffect(() => {
+    latestSetValue.current = onSetValue;
+  }, [onSetValue]);
+  const commit = () => {
+    const waiting = pending.current;
+    if (!waiting) return;
+    clearTimeout(waiting.timer);
+    pending.current = null;
+    latestSetValue.current(waiting.value);
+    setDraft(null);
+  };
+  const slideTo = (value: number) => {
+    setDraft(value);
+    if (pending.current) clearTimeout(pending.current.timer);
+    pending.current = { value, timer: setTimeout(commit, RESTING_MS) };
+  };
+  // Closed mid-slide, the size reached is still kept.
+  useEffect(() => () => commit(), []);
+  const shownScale = draft ?? fontScale;
+  const level = fontScaleToLevel(shownScale);
   // In a sheet, the slider's finger is the slider's: the sheet's pull-down to
   // close, or its scrolling, would otherwise take a slide that dips and move
   // the page under it. Held from the moment the finger lands until both it
@@ -111,12 +137,15 @@ export default function FontScaleControl({
           style={styles.sliderHost}
         >
           <FontScaleSlider
-            value={fontScale}
+            value={shownScale}
             min={MIN_FONT_SCALE}
             max={MAX_FONT_SCALE}
             step={FONT_SCALE_STEP}
-            onValueChange={onSetValue}
-            onSlidingChange={(sliding) => holdSheet('slide', sliding)}
+            onValueChange={slideTo}
+            onSlidingChange={(sliding) => {
+              holdSheet('slide', sliding);
+              if (!sliding) commit();
+            }}
           />
         </Host>
         <Text style={[styles.endMarker, styles.endMarkerLarge]}>A</Text>
@@ -124,6 +153,9 @@ export default function FontScaleControl({
     </View>
   );
 }
+
+/** How long the finger rests on a size before the document is set in it. */
+const RESTING_MS = 250;
 
 const styles = StyleSheet.create({
   card: { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, gap: 10, paddingBottom: 13, paddingHorizontal: 16, paddingTop: 11 },

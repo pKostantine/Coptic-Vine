@@ -26,6 +26,7 @@ import {
   lessonHasVideo,
   useLearningPlayer,
 } from '@/context/LearningPlayerContext';
+import { usePlaybackClock } from '@/context/PlaybackContext';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { usePlayLessons } from '@/hooks/usePlayLessons';
 import { learningService, type LearningLessonDetailPayload } from '@/services/learningService';
@@ -142,8 +143,8 @@ export default function LearningLessonScreen() {
   }, [lessonId, locale]);
 
   const selectedSet = lyricSets.find((set) => set.id === selectedLyricSetId) ?? null;
-  const positionMs = isCurrent ? player.currentTimeMs : 0;
-  const activeLineId = useMemo(() => {
+  // Drawn again only when the line being sung changes, not at every tick.
+  const activeLineId = usePlaybackClock(({ currentTimeMs: positionMs }) => {
     if (!isCurrent || !selectedSet || selectedSet.syncPrecision === 'unsynced') return null;
     return selectedSet.lines.find((line, lineIndex) => {
       if (line.startMs == null) return false;
@@ -151,7 +152,7 @@ export default function LearningLessonScreen() {
       const effectiveEnd = line.endMs ?? nextStart ?? Number.POSITIVE_INFINITY;
       return positionMs >= line.startMs && positionMs < effectiveEnd;
     })?.id ?? null;
-  }, [isCurrent, positionMs, selectedSet]);
+  });
 
   const playLesson = (lessonIndex: number) => {
     if (!data || lessonIndex < 0 || lessonIndex >= queue.length) return;

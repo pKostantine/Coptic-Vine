@@ -125,6 +125,10 @@ export default function BibleChapterDocument() {
     native: Platform.OS !== 'web',
   });
   const { nowPlayingInset } = useBottomChrome();
+  const nowPlayingInsetRef = useRef(nowPlayingInset);
+  useEffect(() => {
+    nowPlayingInsetRef.current = nowPlayingInset;
+  }, [nowPlayingInset]);
   // Width-aware, not just Platform.OS -- a narrow mobile-web browser should
   // get the same headerless, gesture-nav UI as the native app, same as
   // ServiceDocument.tsx/lectionary/index.tsx.
@@ -317,8 +321,12 @@ export default function BibleChapterDocument() {
       restoreVerse,
       readerId,
       // Now Playing is an overlay in slideshow mode. It must never shorten
-      // the page or change where Bible verses split.
-      bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInset,
+      // the page or change where Bible verses split. Read, not depended on:
+      // the bar's height changing (hidden, shown, playback starting) is put
+      // on the page as it is (BibleWebView's bottomInset), where rebuilding
+      // the chapter for it reloaded the page and lost the reader's verse.
+      // eslint-disable-next-line react-hooks/refs
+      bottomContentInset: preferences.slideshowMode ? 0 : nowPlayingInsetRef.current,
       // The reading view runs up under the controls; a slideshow is laid out below them (verseScreen's padding).
       topContentInset: preferences.slideshowMode ? 0 : floatingLayout.contentTop,
       highlighting: effectiveSelectText,
@@ -326,7 +334,7 @@ export default function BibleChapterDocument() {
       copyReference,
       theme,
     });
-  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, copticItalicFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, nowPlayingInset, selectorText, copyReference, theme, floatingLayout.contentTop]);
+  }, [verses, effectiveLanguageKeys, fontSize, copticFontDataUri, copticItalicFontDataUri, effectiveSelectText, preferences.slideshowMode, preface, targetVerse, restoreVerse, readerId, selectorText, copyReference, theme, floatingLayout.contentTop]);
 
   const bookmarkId = `bible:${book?.testament || ''}:${bookKey}:${chapter}`;
   const bookmarked = isBookmarked(bookmarkId);
@@ -469,6 +477,7 @@ export default function BibleChapterDocument() {
           <BibleWebView
             ref={bibleWebViewRef}
             html={chapterHtml}
+            bottomInset={preferences.slideshowMode ? 0 : nowPlayingInset}
             backgroundColor={theme.colors.page}
             scrollEnabled={!preferences.slideshowMode}
             restoreVerse={restoreVerse}

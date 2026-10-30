@@ -137,9 +137,13 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
       if (cancelled) return;
       setDays(grid);
       setFeastDates(feasts);
-      setShownMonth(mode === 'gregorian'
+      const next = mode === 'gregorian'
         ? { mode, year: gregorianYear, month: gregorianMonth, copticName: '' }
-        : { mode, year: copticYear, month: copticMonth, copticName: copticMonthName });
+        : { mode, year: copticYear, month: copticMonth, copticName: copticMonthName };
+      // The same month read again (a day picked in it) keeps the grid as it
+      // is: a new object would fade it to a quarter and back at every tap.
+      setShownMonth((current) => (current && current.mode === next.mode && current.year === next.year
+        && current.month === next.month && current.copticName === next.copticName ? current : next));
     };
     load().catch(() => {});
     return () => {
