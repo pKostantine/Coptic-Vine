@@ -14,6 +14,26 @@ import type {
 import type { MusicLyricKind, MusicPlaylistVisibility } from '@/types/mediaPlatform';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
 import { api } from '@/utils/api';
+import { createSessionCache } from '@/utils/sessionCache';
+
+// Kept for the session, so a page opened again draws at once while it is
+// read afresh (utils/sessionCache.ts). The library is the listener's own:
+// anything that changes it here forgets it, as does signing in or out.
+const homeCache = createSessionCache<MusicHomePayload>();
+const releaseCache = createSessionCache<MusicConsumerRelease>();
+const artistCache = createSessionCache<MusicConsumerArtist>();
+const libraryCache = createSessionCache<MusicLibraryPayload>();
+
+/** A change to the listener's library: the kept copy is forgotten once it is made (or fails). */
+function changesLibrary<Args extends unknown[], Result>(change: (...args: Args) => Promise<Result>) {
+  return async (...args: Args): Promise<Result> => {
+    try {
+      return await change(...args);
+    } finally {
+      libraryCache.clear();
+    }
+  };
+}
 
 function assertRpcData<T>(data: T | null, error: { message: string } | null, operation: string): T {
   if (error) {
@@ -46,26 +66,30 @@ export function resolveMusicAsset(asset: MusicConsumerAsset | null | undefined):
 }
 
 export async function getMusicHome(locale = 'en'): Promise<MusicHomePayload> {
-  const { data, error } = await api.rpc('get_music_home', { p_locale: locale });
-  return assertRpcData(data as MusicHomePayload | null, error, 'Load music home');
+  return homeCache.load(locale, async () => {
+    const { data, error } = await api.rpc('get_music_home', { p_locale: locale });
+    return assertRpcData(data as MusicHomePayload | null, error, 'Load music home');
+  });
 }
 
 export async function getMusicRelease(releaseId: string, locale = 'en'): Promise<MusicConsumerRelease> {
-  return offlineFallback(async () => {
+  return releaseCache.load(`${releaseId}:${locale}`, () => offlineFallback(async () => {
     const { data, error } = await api.rpc('get_published_music_release_for_locale', {
       p_release_id: releaseId,
       p_locale: locale,
     });
     return assertRpcData(data as MusicConsumerRelease | null, error, 'Load release');
-  }, 'music_release', releaseId, locale);
+  }, 'music_release', releaseId, locale));
 }
 
 export async function getMusicArtist(artistId: string, locale = 'en'): Promise<MusicConsumerArtist> {
-  const { data, error } = await api.rpc('get_published_music_artist', {
-    p_artist_id: artistId,
-    p_locale: locale,
+  return artistCache.load(`${artistId}:${locale}`, async () => {
+    const { data, error } = await api.rpc('get_published_music_artist', {
+      p_artist_id: artistId,
+      p_locale: locale,
+    });
+    return assertRpcData(data as MusicConsumerArtist | null, error, 'Load artist');
   });
-  return assertRpcData(data as MusicConsumerArtist | null, error, 'Load artist');
 }
 
 export async function getMusicTrack(trackId: string, locale = 'en'): Promise<MusicConsumerTrackDetail> {
@@ -118,7 +142,7 @@ export async function searchMusic(query: string, locale = 'en'): Promise<MusicSe
 }
 
 export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayload> {
-  return offlineFallback(async () => {
+  return libraryCache.load(locale, () => offlineFallback(async () => {
     const { data, error } = await api.rpc('get_my_music_library', { p_locale: locale });
     const library = assertRpcData(data as MusicLibraryPayload | null, error, 'Load music library');
     return {
@@ -130,7 +154,7 @@ export async function getMusicLibrary(locale = 'en'): Promise<MusicLibraryPayloa
       recentTracks: library.recentTracks ?? [],
       recentReleases: library.recentReleases ?? [],
     };
-  }, 'music_library', 'library', locale);
+  }, 'music_library', 'library', locale));
 }
 
 export async function getMusicPlaylist(playlistId: string, locale = 'en'): Promise<MusicPlaylistPayload> {
@@ -254,25 +278,30 @@ export async function getTrackLyrics(
 
 export const musicService = {
   getHome: getMusicHome,
+  /** What getHome last answered this session, to draw at once: null before it has. */
+  peekHome: (locale = 'en') => homeCache.peek(locale),
   getRelease: getMusicRelease,
+  peekRelease: (releaseId: string, locale = 'en') => releaseCache.peek(`${releaseId}:${locale}`),
   getArtist: getMusicArtist,
+  peekArtist: (artistId: string, locale = 'en') => artistCache.peek(`${artistId}:${locale}`),
   getTrack: getMusicTrack,
   getArtistSearchArt: getMusicArtistSearchArt,
   search: searchMusic,
   getLibrary: getMusicLibrary,
+  peekLibrary: (locale = 'en') => libraryCache.peek(locale),
   getPlaylist: getMusicPlaylist,
-  setLiked: setTrackLiked,
+  setLiked: changesLibrary(setTrackLiked),
   getReleaseLiked,
-  setReleaseLiked,
+  setReleaseLiked: changesLibrary(setReleaseLiked),
   getArtistFollowed,
-  setArtistFollowed,
-  createPlaylist: createMusicPlaylist,
-  updatePlaylist: updateMusicPlaylist,
-  deletePlaylist: deleteMusicPlaylist,
-  setPlaylistTrackOrder: setMusicPlaylistTrackOrder,
+  setArtistFollowed: changesLibrary(setArtistFollowed),
+  createPlaylist: changesLibrary(createMusicPlaylist),
+  updatePlaylist: changesLibrary(updateMusicPlaylist),
+  deletePlaylist: changesLibrary(deleteMusicPlaylist),
+  setPlaylistTrackOrder: changesLibrary(setMusicPlaylistTrackOrder),
   recordPlay: recordMusicPlay,
-  addToPlaylist: addTrackToMusicPlaylist,
-  removeFromPlaylist: removeTrackFromMusicPlaylist,
+  addToPlaylist: changesLibrary(addTrackToMusicPlaylist),
+  removeFromPlaylist: changesLibrary(removeTrackFromMusicPlaylist),
   getLyrics: getTrackLyrics,
   resolveAsset: resolveMusicAsset,
 } as const;

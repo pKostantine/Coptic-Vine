@@ -31,7 +31,9 @@ function contentStyleWithInset(
 /**
  * Scroll containers used by app-level pages. The global mini player floats
  * above screen content, so these add exactly the currently reported player
- * clearance to the page's existing bottom padding.
+ * clearance to the page's existing bottom padding. A row that scrolls
+ * sideways (a rail of covers) takes none: the page around it already has
+ * it, and the rail grew by the bar's height when playback started.
  */
 export const NowPlayingAwareScrollView = forwardRef<ScrollView, ScrollViewProps>(
   function NowPlayingAwareScrollView(props, ref) {
@@ -40,7 +42,7 @@ export const NowPlayingAwareScrollView = forwardRef<ScrollView, ScrollViewProps>
       <ScrollView
         ref={ref}
         {...props}
-        contentContainerStyle={contentStyleWithInset(props.contentContainerStyle, nowPlayingInset)}
+        contentContainerStyle={contentStyleWithInset(props.contentContainerStyle, props.horizontal ? 0 : nowPlayingInset)}
       />
     );
   },
@@ -53,7 +55,7 @@ export function NowPlayingAwareFlatList<ItemT>(
   return (
     <FlatList
       {...props}
-      contentContainerStyle={contentStyleWithInset(props.contentContainerStyle, nowPlayingInset)}
+      contentContainerStyle={contentStyleWithInset(props.contentContainerStyle, props.horizontal ? 0 : nowPlayingInset)}
     />
   );
 }

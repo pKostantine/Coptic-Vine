@@ -52,7 +52,8 @@ export default function MusicHomeScreen() {
   const locale = preferences.appLanguage === 'ar' ? 'ar' : 'en';
   const arabic = locale === 'ar';
   const wide = layout !== 'phone';
-  const [data, setData] = useState<MusicHomePayload | null>(null);
+  // Drawn at once from the session's copy when the tab is opened again, while it is read afresh.
+  const [data, setData] = useState<MusicHomePayload | null>(() => musicService.peekHome(locale));
   const [error, setError] = useState<string | null>(null);
   // Bumped by Retry on a failed load: a new value re-runs the load below.
   const [attempt, setAttempt] = useState(0);
@@ -67,7 +68,8 @@ export default function MusicHomeScreen() {
         setError(null);
         setData(payload);
       })
-      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Unable to load music.'); });
+      // With the session's copy on screen, a failed refresh leaves it there.
+      .catch((cause) => { if (active && !musicService.peekHome(locale)) setError(cause instanceof Error ? cause.message : 'Unable to load music.'); });
     return () => { active = false; };
   }, [locale, attempt]);
 
@@ -99,6 +101,7 @@ export default function MusicHomeScreen() {
         onPress={() => openRelease(release)}
         onPlay={() => playRelease(release)}
         playing={isPlaying(release.id)}
+        loading={loadingReleaseId === release.id}
         playLabel={`${isPlaying(release.id) ? tr('Pause', 'Pause', 'إيقاف مؤقت') : tr('Play', 'Lire', 'تشغيل')}: ${release.title}`}
         liked={liked}
         onToggleLike={() => likes.toggle(release.id)}
@@ -147,9 +150,10 @@ export default function MusicHomeScreen() {
                       onOpen={() => openRelease(featured)}
                       onPlay={() => playRelease(featured)}
                       playing={isPlaying(featured.id)}
+                      loading={loadingReleaseId === featured.id}
                       liked={likes.isLiked(featured.id)}
                       onToggleLike={() => likes.toggle(featured.id)}
-                      likeBusy={likes.busyId === featured.id || loadingReleaseId === featured.id}
+                      likeBusy={likes.busyId === featured.id}
                     />
                   </View>
                   {rail.length ? (

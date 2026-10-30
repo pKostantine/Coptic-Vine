@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -94,17 +94,29 @@ function NativeOfflineDownloadButton({
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [storageAvailable, setStorageAvailable] = useState(true);
 
-  const prepare = useCallback(
-    async () => typeof request === 'function' ? request() : request,
-    [request],
-  );
+  // Read through refs: the pages that hand these over make them afresh at
+  // each render, and the status check below ran again every time they did
+  // (for a downloaded album, a lyrics request per track).
+  const requestRef = useRef(request);
+  const holdersRef = useRef(holders);
+  useEffect(() => {
+    requestRef.current = request;
+    holdersRef.current = holders;
+  });
+  const prepare = useCallback(async () => {
+    const current = requestRef.current;
+    return typeof current === 'function' ? current() : current;
+  }, []);
+  // A finished download is checked for an update once, not at every change
+  // in any download on the device.
+  const updateCheckedFor = useRef<string | null>(null);
 
   const refresh = useCallback(() => {
     let active = true;
 
     void (async () => {
       try {
-        const holding = await holders();
+        const holding = await holdersRef.current();
         const shown = holding[0]?.packageKey ?? packageKey;
         const value = await downloadManager.getProgress(shown);
         if (!active) return;
@@ -116,12 +128,16 @@ function NativeOfflineDownloadButton({
 
         // Only the item's own download is brought up to date from here.
         if (value?.status === 'complete' && shown === packageKey) {
+          if (updateCheckedFor.current === packageKey) return;
+          updateCheckedFor.current = packageKey;
           try {
+            // Kept even if another check has begun meanwhile: this one is not repeated.
             setUpdateAvailable(await downloadManager.checkForUpdate(await prepare()));
           } catch {
             if (active) setUpdateAvailable(false);
           }
         } else {
+          updateCheckedFor.current = null;
           setUpdateAvailable(false);
         }
       } catch {
@@ -138,7 +154,7 @@ function NativeOfflineDownloadButton({
     return () => {
       active = false;
     };
-  }, [holders, packageKey, prepare]);
+  }, [packageKey, prepare]);
 
   useEffect(() => refresh(), [refresh, revision]);
 

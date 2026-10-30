@@ -22,7 +22,11 @@ interface LikesState {
 export function useReleaseLikes(locale: string) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const [state, setState] = useState<LikesState | null>(null);
+  // The session's copy of the library colours the hearts at once (utils/sessionCache.ts).
+  const [state, setState] = useState<LikesState | null>(() => {
+    const kept = userId ? musicService.peekLibrary(locale) : null;
+    return kept && userId ? { userId, authenticated: kept.authenticated, ids: new Set(kept.likedReleases.map((release) => release.id)) } : null;
+  });
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,7 +72,11 @@ export function useReleaseLikes(locale: string) {
     isLiked,
     toggle,
     busyId,
-    /** Signed in with a library to save to (follows and likes need one). */
-    authenticated: Boolean(current?.authenticated),
+    /**
+     * Signed in with a library to save to (follows and likes need one). While
+     * the library is still on its way, a signed-in listener is taken at their
+     * word: a Follow tapped then asked them to sign in.
+     */
+    authenticated: current ? current.authenticated : Boolean(userId),
   };
 }

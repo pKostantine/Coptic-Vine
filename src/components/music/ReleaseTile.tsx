@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Icon from '@/components/vine/ui/Icon';
 import { BuddedCross } from '@/components/vine/ui/Ornaments';
@@ -49,6 +49,8 @@ interface ReleaseTileProps {
   playLabel?: string;
   /** Pause on the cover's button while this release plays. */
   playing?: boolean;
+  /** Its tracks are being fetched to play: the button spins, so the tap is seen to have taken. */
+  loading?: boolean;
   /** The heart after the name, on a shelf that saves likes. */
   liked?: boolean;
   onToggleLike?: () => void;
@@ -69,7 +71,7 @@ interface ReleaseTileProps {
  * in gold beneath.
  */
 export default function ReleaseTile({
-  id, title, subtitle, artworkUri, width, arabic = false, onPress, onPlay, playLabel, playing = false,
+  id, title, subtitle, artworkUri, width, arabic = false, onPress, onPlay, playLabel, playing = false, loading = false,
   liked = false, onToggleLike, likeLabel, trailing, wrapTitle = false, large = false, badge,
 }: ReleaseTileProps) {
   const [from, to] = coverFall(id);
@@ -122,7 +124,9 @@ export default function ReleaseTile({
             pressed && styles.pressed,
           ]}
         >
-          <Icon name={playing ? 'pause' : 'play'} size={size.playIcon} color={COLORS.greenDeep} />
+          {loading
+            ? <ActivityIndicator size="small" color={COLORS.greenDeep} />
+            : <Icon name={playing ? 'pause' : 'play'} size={size.playIcon} color={COLORS.greenDeep} />}
         </Pressable>
       ) : null}
       {onToggleLike ? (

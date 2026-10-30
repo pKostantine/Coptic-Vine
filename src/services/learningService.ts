@@ -24,6 +24,25 @@ import type {
 } from '@/types/learningPlatform';
 import { unifiedSearchService } from '@/services/unifiedSearchService';
 import { api } from '@/utils/api';
+import { createSessionCache } from '@/utils/sessionCache';
+
+// Kept for the session, so a page opened again draws at once while it is
+// read afresh (utils/sessionCache.ts). My Learning is the listener's own:
+// a like or a progress change here forgets it, as does signing in or out.
+const homeCache = createSessionCache<LearningHomePayload>();
+const itemLibraryCache = createSessionCache<LearningItemLibraryPayload>();
+const playlistsCache = createSessionCache<LearningPlaylistLibraryPayload>();
+
+/** A change to the listener's playlists: the kept list is forgotten once it is made (or fails). */
+function changesPlaylists<Args extends unknown[], Result>(change: (...args: Args) => Promise<Result>) {
+  return async (...args: Args): Promise<Result> => {
+    try {
+      return await change(...args);
+    } finally {
+      playlistsCache.clear();
+    }
+  };
+}
 
 type RpcError = { message: string } | null;
 
@@ -71,8 +90,10 @@ export function resolveLearningAsset(asset: LearningMediaAsset | null | undefine
 }
 
 export async function getLearningHome(locale = 'en'): Promise<LearningHomePayload> {
-  const { data, error } = await api.rpc('get_learning_home', { p_locale: locale });
-  return assertRpcData(data as LearningHomePayload | null, error, 'Load Learn & Study');
+  return homeCache.load(locale, async () => {
+    const { data, error } = await api.rpc('get_learning_home', { p_locale: locale });
+    return assertRpcData(data as LearningHomePayload | null, error, 'Load Learn & Study');
+  });
 }
 
 export async function getLearningCantor(cantorId: string, locale = 'en'): Promise<LearningCantorDetail> {
@@ -148,15 +169,19 @@ export async function setLearningProgress(
 }
 
 export async function getMyLearningPlaylists(locale = 'en'): Promise<LearningPlaylistLibraryPayload> {
-  if (!await hasAuthenticatedSession()) return { authenticated: false, playlists: [] };
-  const { data, error } = await api.rpc('get_my_learning_playlists', { p_locale: locale });
-  return assertRpcData(data as LearningPlaylistLibraryPayload | null, error, 'Load learning playlists');
+  return playlistsCache.load(locale, async () => {
+    if (!await hasAuthenticatedSession()) return { authenticated: false, playlists: [] };
+    const { data, error } = await api.rpc('get_my_learning_playlists', { p_locale: locale });
+    return assertRpcData(data as LearningPlaylistLibraryPayload | null, error, 'Load learning playlists');
+  });
 }
 
 export async function getMyLearningItems(locale = 'en'): Promise<LearningItemLibraryPayload> {
-  if (!await hasAuthenticatedSession()) return { authenticated: false, likedItemIds: [], items: [] };
-  const { data, error } = await api.rpc('get_my_learning_items', { p_locale: locale });
-  return assertRpcData(data as LearningItemLibraryPayload | null, error, 'Load My Learning');
+  return itemLibraryCache.load(locale, async () => {
+    if (!await hasAuthenticatedSession()) return { authenticated: false, likedItemIds: [], items: [] };
+    const { data, error } = await api.rpc('get_my_learning_items', { p_locale: locale });
+    return assertRpcData(data as LearningItemLibraryPayload | null, error, 'Load My Learning');
+  });
 }
 
 export async function setLearningItemProgress(
@@ -169,6 +194,7 @@ export async function setLearningItemProgress(
     p_item_id: itemId,
     p_state: state,
   });
+  itemLibraryCache.clear();
   if (error) throw new Error('Update learning list: ' + error.message);
 }
 
@@ -182,6 +208,7 @@ export async function setLearningItemLiked(
     p_item_id: itemId,
     p_liked: liked,
   });
+  itemLibraryCache.clear();
   return assertRpcData(data as boolean | null, error, 'Update liked learning item');
 }
 
@@ -328,6 +355,8 @@ export async function searchLearning(query: string, locale = 'en'): Promise<Lear
 
 export const learningService = {
   getHome: getLearningHome,
+  /** What getHome last answered this session, to draw at once: null before it has. */
+  peekHome: (locale = 'en') => homeCache.peek(locale),
   getCantor: getLearningCantor,
   getSeason: getLearningSeason,
   getHymn: getLearningHymn,
@@ -337,16 +366,18 @@ export const learningService = {
   getProgress: getMyLearningProgress,
   setProgress: setLearningProgress,
   getItemLibrary: getMyLearningItems,
+  peekItemLibrary: (locale = 'en') => itemLibraryCache.peek(locale),
   setItemProgress: setLearningItemProgress,
   setItemLiked: setLearningItemLiked,
   getLyrics: getLearningLyrics,
   getPlaylists: getMyLearningPlaylists,
+  peekPlaylists: (locale = 'en') => playlistsCache.peek(locale),
   getPlaylist: getLearningPlaylist,
-  createPlaylist: createLearningPlaylist,
-  updatePlaylist: updateLearningPlaylist,
-  deletePlaylist: deleteLearningPlaylist,
-  addPlaylistItem: addLearningPlaylistItem,
-  removePlaylistItem: removeLearningPlaylistItem,
+  createPlaylist: changesPlaylists(createLearningPlaylist),
+  updatePlaylist: changesPlaylists(updateLearningPlaylist),
+  deletePlaylist: changesPlaylists(deleteLearningPlaylist),
+  addPlaylistItem: changesPlaylists(addLearningPlaylistItem),
+  removePlaylistItem: changesPlaylists(removeLearningPlaylistItem),
   search: searchLearning,
   resolveAsset: resolveLearningAsset,
 } as const;

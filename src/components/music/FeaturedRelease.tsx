@@ -18,6 +18,8 @@ interface FeaturedReleaseProps {
   onOpen: () => void;
   onPlay: () => void;
   playing?: boolean;
+  /** Its tracks are being fetched to play: the Play button spins. */
+  loading?: boolean;
   liked?: boolean;
   onToggleLike?: () => void;
   likeBusy?: boolean;
@@ -28,7 +30,7 @@ interface FeaturedReleaseProps {
  * "Latest Releases"): its cover large on a wash of its own colours, its name,
  * the artist in gold, and Play and Like beneath.
  */
-export default function FeaturedRelease({ release, arabic = false, onOpen, onPlay, playing = false, liked = false, onToggleLike, likeBusy = false }: FeaturedReleaseProps) {
+export default function FeaturedRelease({ release, arabic = false, onOpen, onPlay, playing = false, loading = false, liked = false, onToggleLike, likeBusy = false }: FeaturedReleaseProps) {
   const coverUri = musicService.resolveAsset(release.coverAsset);
   const artist = release.primaryArtist?.displayName
     ?? (release.releaseType === 'album' ? tr('Album', 'Album', 'ألبوم') : release.releaseType === 'ep' ? 'EP' : tr('Single', 'Single', 'أغنية'));
@@ -56,7 +58,7 @@ export default function FeaturedRelease({ release, arabic = false, onOpen, onPla
               onPress={onPlay}
               style={({ pressed }) => [styles.play, pressed && styles.pressed]}
             >
-              <Icon name={playing ? 'pause' : 'play'} size={16} color={COLORS.greenDeep} />
+              {loading ? <ActivityIndicator size="small" color={COLORS.greenDeep} style={styles.playSpinner} /> : <Icon name={playing ? 'pause' : 'play'} size={16} color={COLORS.greenDeep} />}
               <Text style={[styles.playText, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{playing ? tr('Pause', 'Pause', 'إيقاف') : tr('Play', 'Lire', 'تشغيل')}</Text>
             </Pressable>
             {onToggleLike ? (
@@ -79,6 +81,8 @@ export default function FeaturedRelease({ release, arabic = false, onOpen, onPla
 }
 
 const styles = StyleSheet.create({
+  // The spinner in the play icon's own 16pt box, so the label beside it never moves.
+  playSpinner: { width: 16, height: 16, transform: [{ scale: 0.8 }] },
   card: { backgroundColor: COLORS.surface, borderRadius: 24, overflow: 'hidden' },
   // The cover, blurred, bleeding past the card's edges so the blur has no hard rim.
   wash: { bottom: -40, left: -40, opacity: 0.75, position: 'absolute', right: -40, top: -40 },
