@@ -576,7 +576,11 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
             </View>
           ) : null}
 
-          {loading ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
+          {/* A search after the first keeps the last results on screen, dimmed,
+              until its own arrive: they used to give way to a spinner at
+              every pause in the typing, and come back with every cover
+              fading in again. The spinner is for a first search alone. */}
+          {loading && !grouped.length ? <ActivityIndicator color={COLORS.gold} style={styles.loader} /> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           {hasQuery && !loading && !error && grouped.length === 0 ? (
@@ -592,16 +596,18 @@ export default function SectionSearchScreen({ section }: SectionSearchScreenProp
             </View>
           ) : null}
 
-          {!loading && grouped.length ? (
-            columns ? (
-              <View style={[styles.columns, styles.resultsWide]}>
-                {columns.map((groups) => (
-                  <View key={groups[0].kind} style={styles.column}>{groups.map((group) => renderGroup(group))}</View>
-                ))}
-              </View>
-            ) : wide ? (
-              <View style={styles.resultsWide}>{renderGroup(grouped[0], true)}</View>
-            ) : grouped.map((group) => renderGroup(group))
+          {grouped.length ? (
+            <View style={loading && styles.refreshing}>
+              {columns ? (
+                <View style={[styles.columns, styles.resultsWide]}>
+                  {columns.map((groups) => (
+                    <View key={groups[0].kind} style={styles.column}>{groups.map((group) => renderGroup(group))}</View>
+                  ))}
+                </View>
+              ) : wide ? (
+                <View style={styles.resultsWide}>{renderGroup(grouped[0], true)}</View>
+              ) : grouped.map((group) => renderGroup(group))}
+            </View>
           ) : null}
         </PageGutterProvider>
       </NowPlayingAwareScrollView>
@@ -672,6 +678,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 28 },
   contentWide: { paddingHorizontal: 36 },
   loader: { marginTop: 28 },
+  refreshing: { opacity: 0.55 },
   error: { color: COLORS.priest, fontFamily: TYPOGRAPHY.body, padding: 32, textAlign: 'center' },
 
   emptyState: { alignItems: 'center', paddingHorizontal: 40, paddingTop: 78 },

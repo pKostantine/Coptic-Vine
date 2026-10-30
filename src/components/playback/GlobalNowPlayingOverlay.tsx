@@ -529,16 +529,18 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
                 );
                 return;
               }
+              // Turned at once, and back if the change fails: it waited for the server.
+              const nextLiked = !miniLiked;
+              setMiniLiked(nextLiked);
               setMiniLikeBusy(true);
               try {
-                const nextLiked = !miniLiked;
                 if (isMusic && musicTrackId) {
                   await musicService.setLiked(musicTrackId, nextLiked);
                 } else if (learningItemId) {
                   await learningService.setItemLiked(learningItemKind, learningItemId, nextLiked);
                 }
-                setMiniLiked(nextLiked);
               } catch (cause) {
+                setMiniLiked(!nextLiked);
                 Alert.alert(
                   tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'),
                   cause instanceof Error ? cause.message : `Unable to update ${isMusic ? 'Liked Songs' : 'liked learning items'}.`,

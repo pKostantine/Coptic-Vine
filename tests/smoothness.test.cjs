@@ -205,3 +205,18 @@ test('Books, Home and the calendar opened again draw what they last read at once
   assert.match(strip, /if \(current\[start\] === days && Object\.keys\(current\)\.every\(\(key\) => starts\.includes\(key\)\)\) return current;/);
   assert.match(source('components/vine/screens/SeasonSelectorScreen.tsx'), /for \(const near of \[year - 1, year \+ 1\]\)/);
 });
+
+test('a search keeps its last results on screen, dimmed, until the next arrive', () => {
+  const search = source('components/search/SectionSearchScreen.tsx');
+  assert.match(search, /\{loading && !grouped\.length \? <ActivityIndicator/);
+  assert.match(search, /\{grouped\.length \? \(\n\s+<View style=\{loading && styles\.refreshing\}>/);
+});
+
+test('hearts turn at once, and back if the change fails', () => {
+  for (const file of ['app/music/release/[id].tsx', 'app/music/playlist/[id].tsx', 'components/music/MusicNowPlayingScreen.tsx', 'components/learning/LearningNowPlayingScreen.tsx']) {
+    const page = source(file);
+    assert.match(page, /turn\(!?\w+\);\n[\s\S]{0,80}try \{\n\s+await \w+Service\.set(Item)?Liked\(/, file);
+  }
+  assert.match(source('app/music/track/[id].tsx'), /setLiked\(next\);\n\s+setLikeBusy\(true\);\n\s+try \{\n\s+await musicService\.setLiked\(track\.id, next\);\n\s+\} catch \(cause\) \{\n\s+setLiked\(!next\);/);
+  assert.match(source('components/playback/GlobalNowPlayingOverlay.tsx'), /setMiniLiked\(nextLiked\);\n\s+setMiniLikeBusy\(true\);/);
+});

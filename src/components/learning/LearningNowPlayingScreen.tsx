@@ -186,16 +186,19 @@ export default function LearningNowPlayingScreen({
       );
       return;
     }
-    setLikeBusy(true);
+    // Turned at once, and back if the change fails: it waited for the server.
     const nextLiked = !likedItemIds.has(item.id);
+    const turn = (on: boolean) => setLikedItemIds((current) => {
+      const next = new Set(current);
+      if (on) next.add(item.id); else next.delete(item.id);
+      return next;
+    });
+    turn(nextLiked);
+    setLikeBusy(true);
     try {
       await learningService.setItemLiked(itemKind(item), item.id, nextLiked);
-      setLikedItemIds((current) => {
-        const next = new Set(current);
-        if (nextLiked) next.add(item.id); else next.delete(item.id);
-        return next;
-      });
     } catch (cause) {
+      turn(!nextLiked);
       Alert.alert(tr('Liked Learning', 'Apprentissages aimés', 'المحتوى المفضّل'), cause instanceof Error ? cause.message : 'Unable to update this item.');
     } finally {
       setLikeBusy(false);
@@ -341,7 +344,6 @@ export default function LearningNowPlayingScreen({
           accessibilityLabel={liked ? tr('Unlike', 'Je n’aime plus', 'إزالة الإعجاب') : tr('Like', 'J’aime', 'إعجاب')}
           onPress={() => void toggleLike(currentItem)}
           gold={liked}
-          disabled={likeBusy}
           size={size}
         />
         <LearningItemActionsMenu

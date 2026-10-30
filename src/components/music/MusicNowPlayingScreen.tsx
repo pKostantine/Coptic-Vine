@@ -230,17 +230,19 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
       );
       return;
     }
+    // Turned at once, and back if the change fails: it waited for the server.
+    const nextLiked = !likedTrackIds.has(trackId);
+    const turn = (on: boolean) => setLikedTrackIds((current) => {
+      const nextSet = new Set(current);
+      if (on) nextSet.add(trackId); else nextSet.delete(trackId);
+      return nextSet;
+    });
+    turn(nextLiked);
     setLikeBusy(true);
     try {
-      const wasLiked = likedTrackIds.has(trackId);
-      const nextLiked = !wasLiked;
       await musicService.setLiked(trackId, nextLiked);
-      setLikedTrackIds((current) => {
-        const nextSet = new Set(current);
-        if (nextLiked) nextSet.add(trackId); else nextSet.delete(trackId);
-        return nextSet;
-      });
     } catch (cause) {
+      turn(!nextLiked);
       Alert.alert(tr('Liked Songs', 'Titres aimés', 'الأغاني المعجبة'), cause instanceof Error ? cause.message : 'Unable to update Liked Songs.');
     } finally {
       setLikeBusy(false);
@@ -369,7 +371,6 @@ export default function MusicNowPlayingScreen({ embedded = false, onClose }: Mus
           accessibilityLabel={liked ? tr('Unlike', 'Je n’aime plus', 'إزالة الإعجاب') : tr('Like', 'J’aime', 'إعجاب')}
           onPress={() => void toggleTrackLike(currentItem.track.id)}
           gold={liked}
-          disabled={likeBusy}
           size={size}
         />
         <MusicTrackActionsMenu
