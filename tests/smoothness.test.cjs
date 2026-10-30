@@ -220,3 +220,37 @@ test('hearts turn at once, and back if the change fails', () => {
   assert.match(source('app/music/track/[id].tsx'), /setLiked\(next\);\n\s+setLikeBusy\(true\);\n\s+try \{\n\s+await musicService\.setLiked\(track\.id, next\);\n\s+\} catch \(cause\) \{\n\s+setLiked\(!next\);/);
   assert.match(source('components/playback/GlobalNowPlayingOverlay.tsx'), /setMiniLiked\(nextLiked\);\n\s+setMiniLikeBusy\(true\);/);
 });
+
+test('a condition compiled once answers exactly as compiling it each time did', () => {
+  const ts = require('typescript');
+  const js = ts.transpileModule(fs.readFileSync('src/utils/conditionEngine.js', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, allowJs: true } }).outputText;
+  const mod = { exports: {} };
+  new Function('exports', 'require', 'module', js)(mod.exports, (id) => (id === './dateUtils' ? { toIsoDate: () => '' } : id === '../services/contentDataClient' ? { contentDataClient: {} } : require(id)), mod);
+  const { evaluateCondition } = mod.exports;
+  // The engine as it was: every atom written in as true or false, and the whole compiled per call.
+  const TOKEN_RE = /[A-Za-z0-9][A-Za-z0-9_.:]*/g;
+  const satisfied = (token, flags) => Boolean(flags[token]) || (token.indexOf(':') > 0 && Boolean(flags[token.slice(0, token.indexOf(':'))]));
+  const before = (condition, flags) => {
+    const trimmed = String(condition || '').trim();
+    if (!trimmed) return true;
+    const expr = trimmed.replace(TOKEN_RE, (token) => (satisfied(token, flags) ? 'true' : 'false'));
+    try { return Boolean(new Function(`"use strict"; return (${expr});`)()); } catch { return false; }
+  };
+  const atoms = ['Lent', 'Saturday', 'StMark', 'StMark:VOC', 'StMark:Psali1', 'Kiahk.5', '318AssembledAtNicea', 'BishopPresent', 'true', 'Paope.30'];
+  const shapes = ['A', '!A', 'A && B', 'A || B', '(A || B) && !C', '!(A && B) || C', 'A B', 'A(B)', 'A &&', '((A))', ''];
+  let seed = 7;
+  const random = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  for (let i = 0; i < 3000; i += 1) {
+    const condition = shapes[random(shapes.length)].replace(/[ABC]/g, () => atoms[random(atoms.length)]);
+    const flags = Object.fromEntries(atoms.filter(() => random(2)).map((atom) => [atom, true]));
+    assert.equal(evaluateCondition(condition, flags), before(condition, flags), `${condition} ${JSON.stringify(flags)}`);
+  }
+});
+
+test('the canon\'s days land together, and the launch reads the book manifest once', () => {
+  const canon = source('context/SpiritualCanonContext.tsx');
+  assert.match(canon, /void Promise\.allSettled\(wanted\.map\(\(day\) => readCanonCalendarDay\(day\)\)\)\.then\(\(results\) => \{/);
+  assert.match(canon, /if \(Object\.keys\(read\)\.length\) setCalendarDays\(\(current\) => \(\{ \.\.\.current, \.\.\.read \}\)\);/);
+  assert.match(source('services/bookDownloadManager.ts'), /const manifest = await this\.fetchManifest\(manual\);/);
+  assert.match(source('components/BookSyncBootstrap.tsx'), /syncing = true;\n\s+const network = await Network\.getNetworkStateAsync\(\)\.catch\(\(\) => null\);/);
+});

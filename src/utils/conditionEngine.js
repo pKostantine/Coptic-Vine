@@ -40,22 +40,42 @@ function isConditionAtomSatisfied(token, flags) {
   return Boolean(flags?.[token.slice(0, separator)]);
 }
 
+// Each distinct condition is compiled once, for the session: a service has
+// some hundred of them across thousands of rows, and compiling one afresh
+// for every row (twice, with the Bishop's presence) was much of opening it.
+// null for one that does not parse.
+const compiledConditions = new Map();
+
+function compileCondition(trimmed) {
+  if (compiledConditions.has(trimmed)) return compiledConditions.get(trimmed);
+  // Each atom becomes a look-up of its own, leaving &&/||/!/() untouched — the
+  // parser still has to handle "(StMark:Psali1 || Paope.30) && AdamDays"
+  // exactly as before, so the hierarchy is resolved as it runs rather than by
+  // rewriting condition strings. One pass over the string, so a name can
+  // never match inside another name.
+  const tokens = [];
+  const body = trimmed.replace(TOKEN_RE, (token) => {
+    tokens.push(token);
+    return `atom(${tokens.length - 1})`;
+  });
+  let compiled = null;
+  try {
+    compiled = { tokens, run: new Function("atom", `"use strict"; return (${body});`) };
+  } catch {
+    compiled = null;
+  }
+  compiledConditions.set(trimmed, compiled);
+  return compiled;
+}
+
 export function evaluateCondition(condition, flags) {
   const trimmed = String(condition || "").trim();
   if (!trimmed) return true;
 
-  // Substituted per atom, leaving &&/||/!/() untouched — the parser still has
-  // to handle "(StMark:Psali1 || Paope.30) && AdamDays" exactly as before, so
-  // the hierarchy is resolved here rather than by rewriting condition strings.
-  // One pass over the string, so a name can never match inside another name
-  // or inside a "true"/"false" already written in.
-  const expr = trimmed.replace(TOKEN_RE, (token) =>
-    isConditionAtomSatisfied(token, flags) ? "true" : "false",
-  );
-
-  // expr now only contains true/false/&&/||/!/().
+  const compiled = compileCondition(trimmed);
   try {
-    return Boolean(new Function(`"use strict"; return (${expr});`)());
+    if (!compiled) throw new Error("unparseable");
+    return Boolean(compiled.run((index) => isConditionAtomSatisfied(compiled.tokens[index], flags)));
   } catch {
     // A condition that does not parse hides its row, exactly as a false one
     // would, so a typo in the data ("Joyful 29") silently removes a verse.
