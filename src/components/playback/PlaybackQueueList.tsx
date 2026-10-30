@@ -91,7 +91,8 @@ interface DragHandlers {
 
 interface DragState {
   from: number;
-  dy: number;
+  /** The slot the lifted row is over: the rest of the list makes room for it there. */
+  target: number;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -126,6 +127,12 @@ export default function PlaybackQueueList({
   style,
 }: PlaybackQueueListProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
+  // Where the lifted row is, moved by the finger itself: the list is drawn
+  // again only when the slot under it changes, not at every step of the drag
+  // (every row of it, menus and all, which held the row back from the finger).
+  const [liftedDy] = useState(() => new Animated.Value(0));
+  // The same drag for the gesture, written as it happens: the first moves come before the list is drawn again.
+  const dragRef = useRef<DragState | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [moreBelow, setMoreBelow] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -144,10 +151,10 @@ export default function PlaybackQueueList({
   };
   const listHeight = count > 0 ? topFor(count - 1) + ROW_HEIGHT : 0;
 
-  // The slot the lifted row is over: the one whose top lies nearest it.
-  let target = -1;
-  if (drag) {
-    const lifted = topFor(drag.from) + drag.dy;
+  // The slot a row lifted from `from` and moved `dy` is over: the one whose top lies nearest it.
+  const slotUnder = (from: number, dy: number): number => {
+    const lifted = topFor(from) + dy;
+    let target = from;
     let best = Number.POSITIVE_INFINITY;
     for (let slot = 0; slot < count; slot += 1) {
       const distance = Math.abs(topFor(slot) - lifted);
@@ -156,16 +163,14 @@ export default function PlaybackQueueList({
         target = slot;
       }
     }
-  }
+    return target;
+  };
 
+  // The lifted row moves by liftedDy; the others make room for it.
   const offsetFor = (index: number): number => {
-    if (!drag) return 0;
-    if (index === drag.from) {
-      // Keep the lifted row inside the list instead of letting it fly off.
-      return clamp(drag.dy, topFor(0) - topFor(drag.from), topFor(count - 1) - topFor(drag.from));
-    }
-    if (drag.from < index && index <= target) return topFor(index - 1) - topFor(index);
-    if (target <= index && index < drag.from) return topFor(index + 1) - topFor(index);
+    if (!drag || index === drag.from) return 0;
+    if (drag.from < index && index <= drag.target) return topFor(index - 1) - topFor(index);
+    if (drag.target <= index && index < drag.from) return topFor(index + 1) - topFor(index);
     return 0;
   };
 
@@ -175,13 +180,28 @@ export default function PlaybackQueueList({
   useEffect(() => {
     handlers.current = {
       start: (index) => {
-        setDrag({ from: index, dy: 0 });
+        liftedDy.setValue(0);
+        dragRef.current = { from: index, target: index };
+        setDrag(dragRef.current);
         onDragActiveChange?.(true);
       },
-      move: (dy) => setDrag((current) => (current ? { ...current, dy } : current)),
+      move: (dy) => {
+        const current = dragRef.current;
+        if (!current) return;
+        // Kept inside the list instead of letting it fly off.
+        const kept = clamp(dy, topFor(0) - topFor(current.from), topFor(count - 1) - topFor(current.from));
+        liftedDy.setValue(kept);
+        const target = slotUnder(current.from, kept);
+        if (target === current.target) return;
+        dragRef.current = { ...current, target };
+        setDrag(dragRef.current);
+      },
       end: () => {
-        if (drag && target >= 0 && target !== drag.from) onMove(drag.from, target);
+        const current = dragRef.current;
+        dragRef.current = null;
+        if (current && current.target !== current.from) onMove(current.from, current.target);
         setDrag(null);
+        liftedDy.setValue(0);
         onDragActiveChange?.(false);
       },
     };
@@ -241,6 +261,7 @@ export default function PlaybackQueueList({
           playing={playing}
           offset={offsetFor(index)}
           lifted={drag?.from === index}
+          liftedDy={liftedDy}
           dragging={drag != null}
           handlers={handlers}
           onSelect={onSelect}
@@ -332,6 +353,8 @@ interface QueueRowProps {
   playing: boolean;
   offset: number;
   lifted: boolean;
+  /** Where the lifted row is, set by the finger: the row follows it while it is the one lifted. */
+  liftedDy: Animated.Value;
   dragging: boolean;
   handlers: MutableRefObject<DragHandlers>;
   onSelect: (index: number) => void;
@@ -377,7 +400,7 @@ function describeRow(
   }
 }
 
-function QueueRow({ index, top, entry, state, playing, offset, lifted, dragging, handlers, onSelect, onRemove, isArabic, showKind }: QueueRowProps) {
+function QueueRow({ index, top, entry, state, playing, offset, lifted, liftedDy, dragging, handlers, onSelect, onRemove, isArabic, showKind }: QueueRowProps) {
   const reduced = useReducedMotion();
   const [translateY] = useState(() => new Animated.Value(0));
   const indexRef = useRef(index);
@@ -386,9 +409,9 @@ function QueueRow({ index, top, entry, state, playing, offset, lifted, dragging,
   }, [index]);
 
   useEffect(() => {
-    // The lifted row tracks the pointer 1:1, other rows glide out of its way,
-    // and on drop everything snaps to 0 in the same frame the reorder lands,
-    // so rows never animate twice.
+    // The lifted row tracks the pointer 1:1 (by liftedDy), other rows glide
+    // out of its way, and on drop everything snaps to 0 in the same frame the
+    // reorder lands, so rows never animate twice.
     if (lifted || !dragging) {
       translateY.setValue(offset);
       return;
@@ -416,7 +439,7 @@ function QueueRow({ index, top, entry, state, playing, offset, lifted, dragging,
     <Animated.View
       style={[
         styles.rowShell,
-        { top, transform: [{ translateY }] },
+        { top, transform: [{ translateY: lifted ? liftedDy : translateY }] },
         state === 'played' && !lifted && styles.rowPlayed,
         lifted && styles.rowLifted,
       ]}

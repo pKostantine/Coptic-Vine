@@ -263,3 +263,9 @@ test('a document draws without waiting on fold choices or faces already read', (
   const layout = source('app/_layout.tsx');
   assert.match(layout, /preloadCopticFonts\(\);\n\s+preloadCollapsedSectionStates\(\);/);
 });
+
+test('a queue row dragged follows the finger itself; the list is drawn again only as the slot under it changes', () => {
+  const queue = source('components/playback/PlaybackQueueList.tsx');
+  assert.match(queue, /liftedDy\.setValue\(kept\);\n\s+const target = slotUnder\(current\.from, kept\);\n\s+if \(target === current\.target\) return;/);
+  assert.match(queue, /\{ top, transform: \[\{ translateY: lifted \? liftedDy : translateY \}\] \}/);
+});
