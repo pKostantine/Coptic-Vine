@@ -124,7 +124,10 @@ test('the app\'s slider holds the sheet from the finger landing until both it li
   assert.match(slider, /onTouchStart=\{\(\) => holdSheet\('touch', true\)\}/);
   assert.match(slider, /onTouchEnd=\{\(\) => holdSheet\('touch', false\)\}/);
   assert.match(slider, /onTouchCancel=\{\(\) => holdSheet\('touch', false\)\}/);
-  assert.match(slider, /onSlidingChange=\{\(sliding\) => holdSheet\('slide', sliding\)\}/);
+  assert.match(slider, /onSlidingChange=\{\(sliding\) => \{\n\s+holdSheet\('slide', sliding\);\n\s+if \(!sliding\) commit\(\);/);
+  // The size under the finger shows at once; the document takes it once the finger rests or lifts.
+  assert.match(slider, /onValueChange=\{slideTo\}/);
+  assert.match(slider, /pending\.current = \{ value, timer: setTimeout\(commit, RESTING_MS\) \};/);
   // iOS's own slider says when a slide starts and ends; the universal one doesn't pass it on.
   assert.match(source('components/vine/ui/FontScaleSlider.ios.tsx'), /from '@expo\/ui\/swift-ui'[\s\S]+onEditingChanged=\{onSlidingChange\}/);
   const frame = source('components/vine/ui/SheetFrame.tsx');

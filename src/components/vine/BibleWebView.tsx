@@ -43,6 +43,11 @@ interface BibleWebViewProps {
   onAction?: (action: BibleWebViewAction) => void;
   /** The page the chapter is read on (constants/documentThemes.ts), painted behind the HTML as it loads. */
   backgroundColor?: string;
+  /**
+   * Room kept below the last verse for the Now Playing bar. Set on the page
+   * as it is, not built into it: a new height never reloads the chapter.
+   */
+  bottomInset?: number;
 }
 
 /**
@@ -53,7 +58,7 @@ interface BibleWebViewProps {
 const NO_NATIVE_SELECTION_MENU: [] = [];
 
 /** Native (iOS/Android) Bible chapter renderer — see bibleDocumentHtml.ts for the shared HTML builder. BibleWebView.web.tsx is the web counterpart (plain iframe). */
-const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, scrollEnabled = true, selectText = false, highlights, onAction, backgroundColor = COLORS.black }, ref) => {
+const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, restoreVerse, scrollEnabled = true, selectText = false, highlights, onAction, backgroundColor = COLORS.black, bottomInset = 0 }, ref) => {
   const webviewRef = useRef<WebView>(null);
   const restoreVerseRef = useRef(restoreVerse);
   restoreVerseRef.current = restoreVerse;
@@ -67,6 +72,15 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
   useEffect(() => {
     drawHighlights();
   }, [highlightsJson]);
+
+  const bottomInsetRef = useRef(bottomInset);
+  bottomInsetRef.current = bottomInset;
+  const applyBottomInset = () => {
+    webviewRef.current?.injectJavaScript(`document.documentElement.style.setProperty('--now-playing-inset', '${Math.max(0, Math.round(bottomInsetRef.current))}px'); true;`);
+  };
+  useEffect(() => {
+    applyBottomInset();
+  }, [bottomInset]);
 
   useImperativeHandle(ref, () => ({
     selectVerse: (verse: number | string) => {
@@ -100,6 +114,7 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
       {...(selectText ? { menuItems: NO_NATIVE_SELECTION_MENU } : null)}
       onMessage={handleMessage}
       onLoadEnd={() => {
+        applyBottomInset();
         drawHighlights();
         const verse = restoreVerseRef.current;
         if (verse) webviewRef.current?.injectJavaScript(`window.selectBibleVerse && window.selectBibleVerse(${JSON.stringify(verse)}); true;`);

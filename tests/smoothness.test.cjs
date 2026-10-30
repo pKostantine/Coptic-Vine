@@ -79,3 +79,39 @@ test('the contents panel stays where the reader scrolled it when a heading folds
   assert.match(drawer, /if \(done && done\.id === highlightedSectionId && Date\.now\(\) - done\.at > SCROLL_SETTLE_MS\) return;/);
   assert.match(drawer, /if \(!visible \|\| searching\) scrolledFor\.current = null;/);
 });
+
+test('a reader drawn again with the same colours never rebuilds its document', () => {
+  for (const file of ['components/vine/DocumentWebView.tsx', 'components/vine/DocumentWebView.web.tsx']) {
+    const view = source(file);
+    const memo = view.slice(view.indexOf('const html = useMemo('));
+    const deps = memo.slice(memo.indexOf('\n      [\n'), memo.indexOf('\n      ],\n    );'));
+    assert.ok(deps.includes('sections,'), file);
+    assert.doesNotMatch(deps, /\binitialColors\b/, file);
+    assert.match(deps, /initialVine,\s+initialLetter,/, file);
+  }
+  assert.match(source('components/vine/screens/ServiceDocument.tsx'), /const initialColors = useMemo\(\(\) => documentInitialColors\(documentTheme, ornamentSeason\), \[documentTheme, ornamentSeason\]\);/);
+});
+
+test('a rebuilt page opens where the reader was, before it is first drawn', () => {
+  const html = source('components/vine/documentHtml.ts');
+  assert.match(html, /if \(restore\.length && window\.scrollToSection\(restore\)\) enforceHeldJump\(\);/);
+  for (const file of ['components/vine/DocumentWebView.tsx', 'components/vine/DocumentWebView.web.tsx']) {
+    assert.match(source(file), /initialRestore: restoreCandidates\(\),/, file);
+  }
+});
+
+test('the Now Playing bar\'s height is set on a Bible chapter without reloading it', () => {
+  const chapter = source('app/bible/[bookKey]/[chapter].tsx');
+  const deps = chapter.slice(chapter.indexOf('const chapterHtml = useMemo('), chapter.indexOf('const bookmarkId'));
+  assert.doesNotMatch(deps.slice(deps.lastIndexOf('}, [')), /nowPlayingInset/);
+  assert.match(chapter, /bottomInset=\{preferences\.slideshowMode \? 0 : nowPlayingInset\}/);
+  assert.match(source('components/vine/bibleDocumentHtml.ts'), /var\(--now-playing-inset, /);
+  assert.match(source('components/vine/BibleWebView.tsx'), /setProperty\('--now-playing-inset'/);
+  assert.match(source('components/vine/BibleWebView.web.tsx'), /setProperty\('--now-playing-inset'/);
+});
+
+test('the video player\'s clock ticks only while a lesson with a picture plays', () => {
+  const playback = source('context/PlaybackContext.tsx');
+  assert.match(playback, /instance\.timeUpdateEventInterval = 0;/);
+  assert.match(playback, /videoPlayerRef\.current\.timeUpdateEventInterval = activeEngine === 'video' \? 0\.25 : 0;/);
+});

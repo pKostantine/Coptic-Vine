@@ -435,6 +435,9 @@ test('both renderers name a verse by its index in the hymn\'s rows and go back t
   assert.match(reader, /resolveDocumentRestore\(pending\.originalSections, pending\.sectionId, visibleRefs, pending\.verseIndex\)/);
   assert.match(reader, /setSlideJumpRequest\(\(current\) => \(\{ sectionId: currentSectionId, verseIndex: currentVerseIndexRef\.current, token:/);
   assert.match(reader, /initialScrollVerseIndex=/);
-  assert.match(modal, /requestSlideJump\(\{ sectionId: currentSectionId, verseIndex: currentVerseIndex \}\)/);
-  assert.match(modal, /initialScrollVerseIndex=\{currentVerseIndex\}/);
+  assert.match(modal, /requestSlideJump\(\{ sectionId: currentSectionId, verseIndex: currentVerseIndexRef\.current \}\)/);
+  assert.match(modal, /initialScrollVerseIndex=\{currentVerseIndexRef\.current\}/);
+  // The verse is kept in refs, never state: the reader isn't drawn again for every line scrolled past.
+  assert.doesNotMatch(reader, /setCurrentVerse(Id|Index)\(/);
+  assert.doesNotMatch(modal, /setCurrentVerseIndex\(/);
 });

@@ -166,8 +166,10 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
   const [overlayScreen, setOverlayScreen] = useState<'calendar' | 'seasons' | 'settings' | null>(null);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   // The verse at the top of the reader's page, as its index in the hymn's
-  // rows: what a Slideshow Mode flip opens the other renderer at.
-  const [currentVerseIndex, setCurrentVerseIndex] = useState<number | null>(null);
+  // rows: what a Slideshow Mode flip opens the other renderer at. A ref, not
+  // state: it changes with every line scrolled past, and the subdocument
+  // need not be drawn again for it.
+  const currentVerseIndexRef = useRef<number | null>(null);
   // The Antiphonary only: the tune of the verse being read, for its pills.
   const [currentTune, setCurrentTune] = useState<AntiphonaryTune | null>(null);
   const [selectedSlideSectionId, setSelectedSlideSectionId] = useState<string | undefined>();
@@ -213,7 +215,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       // section the reader never actually scrolled to.
       if (!isCovered && action.sectionId) {
         setCurrentSectionId(action.sectionId);
-        setCurrentVerseIndex(verseIndexFromId(action.verseId));
+        currentVerseIndexRef.current = verseIndexFromId(action.verseId);
         setCurrentTune(getVerseTune(sections, action.verseId));
       }
       return;
@@ -316,7 +318,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedSlideSectionId(currentSectionId);
     // The slide opens at the verse the page was scrolled to, not the hymn's first.
-    requestSlideJump({ sectionId: currentSectionId, verseIndex: currentVerseIndex });
+    requestSlideJump({ sectionId: currentSectionId, verseIndex: currentVerseIndexRef.current });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferences.slideshowMode]);
 
@@ -536,12 +538,14 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 jumpRequest={slideJumpRequest}
                 onCurrentSectionChange={(id, tune, verseIndex) => {
                   setCurrentSectionId(id);
-                  setCurrentVerseIndex(verseIndex);
+                  currentVerseIndexRef.current = verseIndex;
                   setCurrentTune(tune);
                 }}
                 onOpenSelector={() => setSelectorOpen(true)}
                 initialScrollSectionId={currentSectionId}
-                initialScrollVerseIndex={currentVerseIndex}
+                // Read as the reader mounts (a switch from the slideshow), which is when it is used.
+                // eslint-disable-next-line react-hooks/refs
+                initialScrollVerseIndex={currentVerseIndexRef.current}
                 onCollapseToggle={setSelectedSlideSectionId}
                 keyboardNavigationEnabled={visible && !isCovered}
                 topContentInset={controlsOverText ? floatingLayout.contentTop : 0}

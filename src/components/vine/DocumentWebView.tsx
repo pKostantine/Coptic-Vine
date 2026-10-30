@@ -264,13 +264,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       // usually a settings change rebuilding the document, and that setting
       // may be what hid the section being restored to. See
       // sectionRestoreCandidates.
-      const candidates = sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current)
-        .map((sectionId, index) => ({
-          sectionId,
-          edge: index ? 'end' : preservedEdgeRef.current,
-          // The reader's own verse first, for their own section only.
-          verseId: index ? undefined : preservedVerseIdRef.current || undefined,
-        }));
+      const candidates = restoreCandidates();
       if (candidates.length) {
         webviewRef.current?.injectJavaScript(
           `if (window.scrollToSection) { window.scrollToSection(${JSON.stringify(candidates)}); } true;`,
@@ -308,6 +302,21 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       collapsedSectionIdsRef.current = collapsedSectionIds;
     }, [collapsedSectionIds]);
 
+    // Where a load puts the reader back: the whole chain, not just the
+    // remembered section, since the change that rebuilt the document may be
+    // what hid the section being restored to (sectionRestoreCandidates).
+    const restoreCandidates = () => sectionRestoreCandidates(sections.map((section) => section.id), preservedSectionIdRef.current)
+      .map((sectionId, index) => ({
+        sectionId,
+        edge: index ? 'end' as const : preservedEdgeRef.current,
+        // The reader's own verse first, for their own section only.
+        verseId: index ? undefined : preservedVerseIdRef.current || undefined,
+      }));
+
+    // The initials' colours by value, not by object: a caller that makes the
+    // object afresh at each render would rebuild the whole document with it.
+    const initialVine = initialColors?.vine;
+    const initialLetter = initialColors?.letter;
     const html = useMemo(
       () =>
         copticFontDataUri && copticItalicFontDataUri
@@ -330,7 +339,9 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               sermonPlannerMode,
               theme,
               ornamentColor,
-              initialColors,
+              initialColors: initialVine && initialLetter ? { vine: initialVine, letter: initialLetter } : undefined,
+              // Gone to before the page is first drawn; the load's own restore follows it there.
+              initialRestore: restoreCandidates(),
               nativeSwipeNavigation: true,
               swipeExitsInPage,
             })
@@ -354,7 +365,8 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         swipeExitsInPage,
         theme,
         ornamentColor,
-        initialColors,
+        initialVine,
+        initialLetter,
       ],
     );
 

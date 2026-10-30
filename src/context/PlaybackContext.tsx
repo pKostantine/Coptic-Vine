@@ -276,7 +276,10 @@ function setupVideoPlayer(instance: VideoPlayer): void {
   instance.loop = false;
   instance.staysActiveInBackground = true;
   instance.audioMixingMode = 'doNotMix';
-  instance.timeUpdateEventInterval = 0.25;
+  // Its clock is off until a lesson with a picture plays on it (the effect on
+  // activeEngine): ticking with nothing loaded, it drew the provider four
+  // times a second on every page, music or nothing playing.
+  instance.timeUpdateEventInterval = 0;
   // Half a minute ahead, not iOS's own choice (minutes of a long lesson):
   // what is fetched and never watched, when the listener switches to the
   // sound alone or stops, is data spent for nothing.
@@ -467,6 +470,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const buffering = activeEngine === 'video'
     ? videoStatusEvent.status === 'loading' || videoSwitching
     : Boolean(status.isBuffering);
+
+  useEffect(() => {
+    videoPlayerRef.current.timeUpdateEventInterval = activeEngine === 'video' ? 0.25 : 0;
+  }, [activeEngine]);
 
   const [clock] = useState(createPlaybackClockStore);
   useEffect(() => {
