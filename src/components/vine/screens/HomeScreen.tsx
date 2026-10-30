@@ -414,7 +414,8 @@ export default function HomeScreen() {
   );
 
   // Temporary, for the beta: where testers report what they find, and see
-  // everything reported (app/feedback.tsx).
+  // everything reported (app/feedback.tsx). The first of the cards, under the
+  // seal and the date, in every layout.
   const feedbackCard = (
     <Pressable
       accessibilityRole="button"
@@ -445,10 +446,10 @@ export default function HomeScreen() {
           {prayCard}
         </View>
         <NowPlayingAwareScrollView style={styles.flex} showsVerticalScrollIndicator={false} contentContainerStyle={styles.landscapeCards}>
+          {feedbackCard}
           {canonCard}
           {readingsCard}
           {synaxCard}
-          {feedbackCard}
         </NowPlayingAwareScrollView>
       </View>
     );
@@ -457,38 +458,40 @@ export default function HomeScreen() {
       <View style={styles.columns}>
         <View style={[styles.column, styles.columnNarrow]}>
           {hero}
+          {feedbackCard}
           {prayCard}
         </View>
         <View style={styles.column}>{canonCard}</View>
         <View style={styles.column}>
           {readingsCard}
           {synaxCard}
-          {feedbackCard}
         </View>
       </View>
     ) : layout === 'grid' ? (
       <>
         <View style={[styles.columns, styles.gridTop]}>
           <View style={styles.column}>{hero}</View>
-          <View style={styles.column}>{prayCard}</View>
+          <View style={styles.column}>
+            {feedbackCard}
+            {prayCard}
+          </View>
         </View>
         <View style={[styles.columns, styles.gridGap]}>
           <View style={styles.column}>{canonCard}</View>
           <View style={styles.column}>
             {readingsCard}
             {synaxCard}
-            {feedbackCard}
           </View>
         </View>
       </>
     ) : (
       <View style={styles.stack}>
         {hero}
+        {feedbackCard}
         {prayCard}
         {canonCard}
         {readingsCard}
         {synaxCard}
-        {feedbackCard}
       </View>
     );
     page = (

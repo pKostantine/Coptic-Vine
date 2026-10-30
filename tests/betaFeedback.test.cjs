@@ -77,6 +77,11 @@ test('the page files and lists through cv-api, and Home and the Account page lea
   const home = read('src/components/vine/screens/HomeScreen.tsx');
   assert.match(home, /onPress=\{\(\) => router\.push\('\/feedback' as never\)\}/);
   assert.equal((home.match(/\{feedbackCard\}/g) || []).length, 4, 'in every layout of Home');
+  // The first of the cards, under the seal and the date: before Pray now on a phone, the desktop and the iPad, heading the cards beside them on a phone on its side.
+  assert.match(home, /\{hero\}\s+\{feedbackCard\}\s+\{prayCard\}\s+\{canonCard\}/, 'a phone');
+  assert.match(home, /\{hero\}\s+\{feedbackCard\}\s+\{prayCard\}\s+<\/View>/, 'the desktop');
+  assert.match(home, /<View style=\{styles\.column\}>\{hero\}<\/View>\s+<View style=\{styles\.column\}>\s+\{feedbackCard\}\s+\{prayCard\}/, 'the iPad');
+  assert.match(home, /contentContainerStyle=\{styles\.landscapeCards\}>\s+\{feedbackCard\}\s+\{canonCard\}/, 'a phone on its side');
   const account = read('src/app/account.tsx');
   assert.match(account, /icon="construct-outline"\s+label=\{tr\('Beta feedback'/);
   assert.match(account, /onPress=\{\(\) => router\.push\('\/feedback' as never\)\}/);
