@@ -8,14 +8,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { useCalendar } from '../../../context/CalendarContext';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
 import { appText, tr } from '../../../utils/appText';
-import {
-  CalendarDay,
-  getAdjacentCopticMonth,
-  getCopticMonthForDate,
-  getCopticMonthGrid,
-  getFeastDatesBetween,
-  getGregorianMonthGrid,
-} from '../../../utils/calendarService';
+import { CalendarDay, getAdjacentCopticMonth, getCopticMonthForDate, getCopticMonthGrid, getFeastDatesBetween, getGregorianMonthGrid, peekFeastDatesBetween, peekGregorianMonthGrid } from '../../../utils/calendarService';
 import { formatCalendarDay, formatCopticMonthName, GREGORIAN_MONTHS_AR, GREGORIAN_MONTHS_EN, GREGORIAN_MONTHS_FR } from '../../../utils/localeFormat';
 import { DISABLED_TEXT_SELECTION_STYLE } from '../../../utils/textSelection';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
@@ -79,11 +72,22 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   const [copticYear, setCopticYear] = useState<number | null>(null);
   const [copticMonth, setCopticMonth] = useState<number | null>(null);
   const [copticMonthName, setCopticMonthName] = useState('');
-  const [days, setDays] = useState<CalendarDay[] | null>(null);
-  const [feastDates, setFeastDates] = useState<Set<string>>(new Set());
+  // The month as last read this session, if it has been: the calendar opened
+  // again draws it at once rather than a spinner (calendarService's caches).
+  const [openingGrid] = useState(() => {
+    const grid = peekGregorianMonthGrid(rawDate.getUTCFullYear(), rawDate.getUTCMonth() + 1);
+    const feasts = grid?.length ? peekFeastDatesBetween(grid[0].gregorianDate, grid[grid.length - 1].gregorianDate) : undefined;
+    return grid && feasts ? { grid, feasts } : null;
+  });
+  const [days, setDays] = useState<CalendarDay[] | null>(() => openingGrid?.grid ?? null);
+  const [feastDates, setFeastDates] = useState<Set<string>>(() => openingGrid?.feasts ?? new Set());
   // The month the grid on screen shows: its title changes with the grid, not
   // a moment ahead of it while the next month is read.
-  const [shownMonth, setShownMonth] = useState<{ mode: Mode; year: number | null; month: number | null; copticName: string } | null>(null);
+  const [shownMonth, setShownMonth] = useState<{ mode: Mode; year: number | null; month: number | null; copticName: string } | null>(
+    () => (openingGrid ? { mode: 'gregorian', year: rawDate.getUTCFullYear(), month: rawDate.getUTCMonth() + 1, copticName: '' } : null),
+  );
+  // Drawn on the first frame, the opening month doesn't fade in as a month read afterwards does.
+  const drawnAtOpening = useRef(openingGrid != null);
   // Which way the last move went -- 1 to a later month, -1 to an earlier one,
   // 0 to a day picked or a calendar switched -- for the grid to slide in from.
   const slideDirection = useRef(0);
@@ -156,6 +160,10 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
     if (!shownMonth) return;
     const direction = slideDirection.current;
     slideDirection.current = 0;
+    if (drawnAtOpening.current) {
+      drawnAtOpening.current = false;
+      return;
+    }
     if (reduced) return;
     gridMotion.x.setValue(direction * 24);
     gridMotion.opacity.setValue(0.25);

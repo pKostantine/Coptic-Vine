@@ -186,3 +186,22 @@ test('the calendar is read into memory when JavaScript has a moment, a chunk at 
   assert.match(source('components/BookSyncBootstrap.tsx'), /idle = requestIdleCallback\(begin, \{ timeout: CALENDAR_WARM_DELAY_MS \}\);/);
   assert.match(source('services/bookContentDatabase.ts'), /if \(index\) await new Promise\(\(resolve\) => setTimeout\(resolve, 0\)\);/);
 });
+
+test('Books, Home and the calendar opened again draw what they last read at once', () => {
+  const day = source('components/vine/ui/useLiturgicalDay.ts');
+  assert.match(day, /useState<CopticRead \| null>\(\(\) => lastCoptic\)/);
+  assert.match(day, /useState<OverviewRead \| null>\(\(\) => lastOverview\)/);
+  const home = source('components/vine/screens/HomeScreen.tsx');
+  assert.match(home, /useState<SynaxRead \| null>\(\(\) => lastSynax\)/);
+  assert.match(home, /useState<ReadingsRead \| null>\(\(\) => lastReadings\)/);
+  const calendar = source('utils/calendarService.ts');
+  assert.match(calendar, /return monthGrids\.get\(`g\$\{year\}-\$\{month\}`/);
+  assert.match(calendar, /return weekStrips\.get\(sunday, \(\) => readWeekStrip\(sunday\)\);/);
+  assert.match(calendar, /return feastSpans\.get\(`\$\{fromDate\}:\$\{toDate\}`/);
+  const panel = source('components/vine/ui/CalendarPanel.tsx');
+  assert.match(panel, /const \[days, setDays\] = useState<CalendarDay\[\] \| null>\(\(\) => openingGrid\?\.grid \?\? null\);/);
+  assert.match(panel, /if \(drawnAtOpening\.current\) \{\n\s+drawnAtOpening\.current = false;\n\s+return;/);
+  const strip = source('components/vine/ui/DayBlock.tsx');
+  assert.match(strip, /if \(current\[start\] === days && Object\.keys\(current\)\.every\(\(key\) => starts\.includes\(key\)\)\) return current;/);
+  assert.match(source('components/vine/screens/SeasonSelectorScreen.tsx'), /for \(const near of \[year - 1, year \+ 1\]\)/);
+});

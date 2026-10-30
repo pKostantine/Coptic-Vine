@@ -65,6 +65,18 @@ type HomeLayout =
  * Home already shows the next day's date, readings and saints. Home always
  * shows the live day, whatever date the Books screen has been moved to.
  */
+type NextCopticRead = { key: string; value: CopticDate | null };
+type SynaxRead = { key: string; today: HomeSynaxariumEvent[]; tomorrow: HomeSynaxariumEvent[] };
+type ReadingsRead = { key: string; citations: Record<LectionaryService, ReadingCitation[]> | null };
+
+// What Home last read, kept with the day it was read for: Home opened again
+// (the tab bar mounts it afresh) draws the day's readings and saints at once,
+// rather than an ellipsis and "Loading…", while they are read again behind.
+// Only what was read is kept, never a failure.
+let lastNextCoptic: NextCopticRead | null = null;
+let lastSynax: SynaxRead | null = null;
+let lastReadings: ReadingsRead | null = null;
+
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -90,27 +102,35 @@ export default function HomeScreen() {
   const nextIso = isoDate(nextDay);
   const hour = agpeyaHourAt(live.now.getHours());
 
-  const [nextCoptic, setNextCoptic] = useState<{ key: string; value: CopticDate | null } | null>(null);
+  const [nextCoptic, setNextCoptic] = useState<NextCopticRead | null>(() => lastNextCoptic);
   // A service or day picked on the cards holds for that liturgical day; until then the clock picks.
   const [readingsChoice, setReadingsChoice] = useState<{ key: string; service: LectionaryService } | null>(null);
   const [synaxChoice, setSynaxChoice] = useState<{ key: string; day: 'today' | 'tomorrow' } | null>(null);
   const readingsService = readingsChoice?.key === dayIso ? readingsChoice.service : readingsServiceAt(live.now, live.evening);
   const synaxDay = synaxChoice?.key === dayIso ? synaxChoice.day : 'today';
-  const [synax, setSynax] = useState<{ key: string; today: HomeSynaxariumEvent[]; tomorrow: HomeSynaxariumEvent[] } | null>(null);
+  const [synax, setSynax] = useState<SynaxRead | null>(() => lastSynax);
   // Each service's readings, kept with the day they were read for; null
   // citations mean the day's could not be loaded (the outline still shows).
-  const [readings, setReadings] = useState<{ key: string; citations: Record<LectionaryService, ReadingCitation[]> | null } | null>(null);
+  const [readings, setReadings] = useState<ReadingsRead | null>(() => lastReadings);
 
   useEffect(() => {
     let active = true;
-    void getCopticDate(nextDay).then((value) => { if (active) setNextCoptic({ key: nextIso, value }); });
+    void getCopticDate(nextDay).then((value) => {
+      if (!active) return;
+      lastNextCoptic = { key: nextIso, value };
+      setNextCoptic(lastNextCoptic);
+    });
     return () => { active = false; };
   }, [nextDay, nextIso]);
 
   useEffect(() => {
     let active = true;
     getServiceReadingCitations(day)
-      .then((citations) => { if (active) setReadings({ key: dayIso, citations }); })
+      .then((citations) => {
+        if (!active) return;
+        lastReadings = { key: dayIso, citations };
+        setReadings(lastReadings);
+      })
       .catch(() => { if (active) setReadings({ key: dayIso, citations: null }); });
     return () => { active = false; };
   }, [day, dayIso]);
@@ -118,7 +138,11 @@ export default function HomeScreen() {
   useEffect(() => {
     let active = true;
     Promise.all([homeService.getSynaxariumEvents(dayIso), homeService.getSynaxariumEvents(nextIso)])
-      .then(([today, tomorrow]) => { if (active) setSynax({ key: dayIso, today, tomorrow }); })
+      .then(([today, tomorrow]) => {
+        if (!active) return;
+        lastSynax = { key: dayIso, today, tomorrow };
+        setSynax(lastSynax);
+      })
       .catch(() => { if (active) setSynax({ key: dayIso, today: [], tomorrow: [] }); });
     return () => { active = false; };
   }, [dayIso, nextIso]);

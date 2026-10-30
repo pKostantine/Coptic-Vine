@@ -65,8 +65,34 @@ export interface SeasonRange {
   endEvent: string;
 }
 
+// Each month the calendar has shown, and each span's feast days: the
+// calendar opened again draws its month at once rather than a spinner, and a
+// month turned back to needs no second read.
+const monthGrids = new SessionCache<string, CalendarDay[]>(48);
+const feastSpans = new SessionCache<string, Set<string>>(64);
+const weekStrips = new SessionCache<string, WeekStripDay[]>(32);
+
+/** A Gregorian month's grid if it has been read this session. */
+export function peekGregorianMonthGrid(year: number, month: number): CalendarDay[] | undefined {
+  return monthGrids.peek(`g${year}-${month}`);
+}
+
+/** The week starting on a Sunday, if it has been read this session. */
+export function peekWeekStrip(sundayIso: string): WeekStripDay[] | undefined {
+  return weekStrips.peek(sundayIso);
+}
+
+/** The feast days of a span if they have been read this session. */
+export function peekFeastDatesBetween(fromDate: string, toDate: string): Set<string> | undefined {
+  return feastSpans.peek(`${fromDate}:${toDate}`);
+}
+
 /** Gregorian calendar-month grid: every row in `calendar.coptic_date_conversions` for the given Gregorian year/month. */
-export async function getGregorianMonthGrid(year: number, month: number): Promise<CalendarDay[]> {
+export function getGregorianMonthGrid(year: number, month: number): Promise<CalendarDay[]> {
+  return monthGrids.get(`g${year}-${month}`, () => readGregorianMonthGrid(year, month));
+}
+
+async function readGregorianMonthGrid(year: number, month: number): Promise<CalendarDay[]> {
   const firstDate = toIsoDate(new Date(Date.UTC(year, month - 1, 1)));
   const lastDate = toIsoDate(new Date(Date.UTC(year, month, 0)));
 
@@ -91,7 +117,11 @@ export async function getGregorianMonthGrid(year: number, month: number): Promis
 }
 
 /** Coptic calendar-month grid: every row for the given Coptic year/month (1-13, 13 = the short month Nesi). */
-export async function getCopticMonthGrid(copticYear: number, copticMonth: number): Promise<CalendarDay[]> {
+export function getCopticMonthGrid(copticYear: number, copticMonth: number): Promise<CalendarDay[]> {
+  return monthGrids.get(`c${copticYear}-${copticMonth}`, () => readCopticMonthGrid(copticYear, copticMonth));
+}
+
+async function readCopticMonthGrid(copticYear: number, copticMonth: number): Promise<CalendarDay[]> {
   const { data, error } = await supabase
     .schema('calendar')
     .from('coptic_date_conversions')
@@ -494,10 +524,15 @@ export interface WeekStripDay {
   hasFeast: boolean;
 }
 
-/** The Sunday-to-Saturday week around a day, each with its Coptic day number. */
-export async function getWeekStrip(isoDate: string): Promise<WeekStripDay[]> {
+/** The Sunday-to-Saturday week around a day, each with its Coptic day number; read once a session per week. */
+export function getWeekStrip(isoDate: string): Promise<WeekStripDay[]> {
   const weekday = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
-  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(isoDate, index - weekday));
+  const sunday = addDaysIso(isoDate, -weekday);
+  return weekStrips.get(sunday, () => readWeekStrip(sunday));
+}
+
+async function readWeekStrip(sunday: string): Promise<WeekStripDay[]> {
+  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(sunday, index));
   const [copticDates, feastDates] = await Promise.all([
     getCopticDatesBetween(days[0], days[6]).catch(() => new Map<string, CopticDate>()),
     getFeastDatesBetween(days[0], days[6]).catch(() => new Set<string>()),
@@ -515,7 +550,11 @@ export async function getWeekStrip(isoDate: string): Promise<WeekStripDay[]> {
  * the gold dots of the week strip and the month grid. The Sundays of Kiahk are
  * left out — they are the season's own Sundays, not feasts of their own.
  */
-export async function getFeastDatesBetween(fromDate: string, toDate: string): Promise<Set<string>> {
+export function getFeastDatesBetween(fromDate: string, toDate: string): Promise<Set<string>> {
+  return feastSpans.get(`${fromDate}:${toDate}`, () => readFeastDatesBetween(fromDate, toDate));
+}
+
+async function readFeastDatesBetween(fromDate: string, toDate: string): Promise<Set<string>> {
   const years = new Set<number>();
   for (const date of [fromDate, toDate]) {
     const year = await getCopticYearForDate(new Date(`${date}T00:00:00Z`));
