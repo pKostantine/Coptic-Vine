@@ -27,6 +27,10 @@ test('the full player rises from the bar and goes back down into it', () => {
   // Drawn through its way down, over the bar it uncovers, and touched by nothing then.
   assert.match(overlay, /pointerEvents=\{isPopupOpen \? 'box-none' : 'none'\}/);
   assert.match(overlay, /\{playerScreen\}\n\s+<\/>/);
+  // Open or closed, the player keeps its place in what is drawn, so closing never draws it afresh:
+  // a player pulled out of sight popped back up to fully open, then went down again.
+  assert.doesNotMatch(overlay, /return playerScreen;/);
+  assert.match(overlay, /<>\n\s+\{isPopupOpen \? null : button\}\n\s+\{!isPopupOpen && cardMounted \? \(/);
   // Opened again on its way down after a pull, a fresh player rises, not the one still pulled out of sight.
   assert.match(overlay, /<MusicNowPlayingScreen key=\{playerKey\}/);
   // A pulled player goes on down at the finger's speed and is never put back for a frame.
@@ -43,7 +47,7 @@ test('hidden or shown, the bar\'s card and round button cross-fade', () => {
   assert.match(overlay, /if \(!isCollapsed && !cardMounted\) setCardMounted\(true\);/);
   assert.match(overlay, /if \(isCollapsed\) setCardMounted\(false\);\n\s+else setButtonMounted\(false\);/);
   assert.match(overlay, /buttonOpacity: collapseAnimation\.interpolate\(\{ inputRange: \[0, 1\], outputRange: \[0, 0\.92\] \}\)/);
-  assert.match(overlay, /\{cardMounted \? \(/);
+  assert.match(overlay, /\{!isPopupOpen && cardMounted \? \(/);
 });
 
 test('a sheet closed after a pull goes down from where it was let go, not from fully open', () => {
