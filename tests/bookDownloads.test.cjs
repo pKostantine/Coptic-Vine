@@ -330,6 +330,9 @@ test('transactions take turns, with foreign keys on and the write lock taken bef
   };
   const { getOfflineDatabase, updateOfflineFile } = loadTypeScriptModule('src/services/offlineDatabase.ts', {
     'expo-sqlite': { openDatabaseAsync: async () => fakeDb },
+    // Nothing under the old names to move (utils/legacyNames.ts).
+    'expo-file-system': { File: class { exists = false; }, Directory: class { exists = false; }, Paths: { document: {} } },
+    'react-native': { Platform: { OS: 'ios' } },
     '@/utils/downloadHolders': loadTypeScriptModule('src/utils/downloadHolders.ts'),
   });
   const db = await getOfflineDatabase();

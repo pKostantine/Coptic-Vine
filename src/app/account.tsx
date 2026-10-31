@@ -317,7 +317,7 @@ function SignedInAccount({ recoveryMode, wide, tablet, gutter }: { recoveryMode:
   const arabic = preferences.appLanguage === 'ar';
   const user = auth.user!;
   const currentName = typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : '';
-  const customAvatarUrl = typeof user.user_metadata.chc_avatar_url === 'string' ? user.user_metadata.chc_avatar_url : null;
+  const customAvatarUrl = typeof user.user_metadata.cv_avatar_url === 'string' ? user.user_metadata.cv_avatar_url : null;
   const providerAvatarUrl = typeof user.user_metadata.avatar_url === 'string' ? user.user_metadata.avatar_url : null;
   const avatarUrl = customAvatarUrl || providerAvatarUrl;
   const [displayName, setDisplayName] = useState(currentName);

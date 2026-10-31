@@ -4,21 +4,30 @@ import { Platform } from 'react-native';
 
 import { accountAuth } from '@/services/accountAuth';
 import { api } from '@/utils/api';
+import { moveLegacyStorageKey } from '@/utils/legacyNames';
 
 export type NotificationPreferenceMap = Record<string, boolean>;
 export type NotificationSyncResult = 'registered' | 'permission_required' | 'signed_out' | 'unsupported' | 'unconfigured';
 
 const APP_KEY = 'chc';
 const PROVIDER = 'expo';
-const CHANNEL_ID = 'chc-default';
-const LAST_TOKEN_KEY = '@chc/notification-token/chc';
+const CHANNEL_ID = 'cv-default';
+// The channel earlier builds made, taken down so the app is listed once in the phone's settings.
+const LEGACY_CHANNEL_ID = 'chc-default';
+const LAST_TOKEN_KEY = '@cv/notification-token';
+const LEGACY_LAST_TOKEN_KEY = '@chc/notification-token/chc';
 /** Set once this device has been asked to allow notifications on its first launch. */
-const FIRST_LAUNCH_ASKED_KEY = '@chc/notification-permission-asked/chc';
+const FIRST_LAUNCH_ASKED_KEY = '@cv/notification-permission-asked';
+const LEGACY_FIRST_LAUNCH_ASKED_KEY = '@chc/notification-permission-asked/chc';
 
 let handlerConfigured = false;
 
 function storage() {
-  return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
+  const store = typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
+  // What earlier builds kept under the old names (utils/legacyNames.ts).
+  moveLegacyStorageKey(LEGACY_LAST_TOKEN_KEY, LAST_TOKEN_KEY, store);
+  moveLegacyStorageKey(LEGACY_FIRST_LAUNCH_ASKED_KEY, FIRST_LAUNCH_ASKED_KEY, store);
+  return store;
 }
 
 function projectId() {
@@ -47,6 +56,7 @@ async function prepareNativeNotifications(requestPermission: boolean) {
   }
 
   if (Platform.OS === 'android') {
+    await Notifications.deleteNotificationChannelAsync(LEGACY_CHANNEL_ID).catch(() => undefined);
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: 'Coptic Vine',
       importance: Notifications.AndroidImportance.MAX,

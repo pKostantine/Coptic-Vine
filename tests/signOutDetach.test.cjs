@@ -58,6 +58,7 @@ function loadWebPush() {
   return load('src/services/webPushService.ts', {
     'react-native': { Platform: { OS: 'web' } },
     '@/utils/api': { api: { rpc: async () => ({ error: null }) } },
+    '@/utils/legacyNames': load('src/utils/legacyNames.ts'),
   });
 }
 

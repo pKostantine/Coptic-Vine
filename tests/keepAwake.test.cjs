@@ -28,6 +28,7 @@ function loadPreferences() {
     'expo-device': { deviceType: 1, osName: 'iOS' },
     'react-native': reactNative,
     './kiahkInterpretations': load('src/utils/kiahkInterpretations.ts'),
+    './legacyNames': load('src/utils/legacyNames.ts'),
     './playerVolume': load('src/utils/playerVolume.ts', { 'react-native': reactNative }),
     './readingFontSize': {
       classifyReadingDevice: () => 'phone',
@@ -63,11 +64,11 @@ test('a stored choice is honoured and anything else falls back to on', async () 
     configurable: true,
     writable: true,
   });
-  stored['chc-reading-preferences'] = JSON.stringify({ keepScreenAwake: false });
+  stored['cv-reading-preferences'] = JSON.stringify({ keepScreenAwake: false });
   assert.equal((await loadReadingPreferences()).keepScreenAwake, false);
-  stored['chc-reading-preferences'] = JSON.stringify({ keepScreenAwake: 'yes' });
+  stored['cv-reading-preferences'] = JSON.stringify({ keepScreenAwake: 'yes' });
   assert.equal((await loadReadingPreferences()).keepScreenAwake, true);
-  stored['chc-reading-preferences'] = JSON.stringify({});
+  stored['cv-reading-preferences'] = JSON.stringify({});
   assert.equal((await loadReadingPreferences()).keepScreenAwake, true);
 });
 
@@ -82,7 +83,7 @@ test('the player keeps its volume on the device, and anything unreadable plays a
     writable: true,
   });
   const volumeFrom = async (value) => {
-    stored['chc-reading-preferences'] = JSON.stringify({ playerVolume: value });
+    stored['cv-reading-preferences'] = JSON.stringify({ playerVolume: value });
     return (await loadReadingPreferences()).playerVolume;
   };
   assert.equal(await volumeFrom(0.29), 0.29);

@@ -47,6 +47,7 @@ function device({ platform = 'ios', status = 'undetermined', signedIn = true } =
     'react-native': { Platform: { OS: platform } },
     'expo-notifications': Notifications,
     '@/services/accountAuth': { accountAuth: { getUser: async () => (signedIn ? { id: 'user-1' } : null) } },
+    '@/utils/legacyNames': load('src/utils/legacyNames.ts', {}),
     '@/utils/api': {
       api: {
         rpc: async (name, args) => {
