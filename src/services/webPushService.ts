@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 import { api } from '@/utils/api';
+import { moveLegacyStorageKey } from '@/utils/legacyNames';
 
 export type WebPushSyncResult =
   | 'registered'
@@ -12,7 +13,15 @@ export type WebPushSyncResult =
 
 const APP_KEY = 'chc';
 const PROVIDER = 'web_push';
-const LAST_ENDPOINT_KEY = '@chc/notification-token/chc-web';
+const LAST_ENDPOINT_KEY = '@cv/notification-token/web';
+// Its name in earlier builds (utils/legacyNames.ts).
+const LEGACY_LAST_ENDPOINT_KEY = '@chc/notification-token/chc-web';
+
+/** Where the endpoint last registered is kept, with what an earlier build kept moved there. */
+function endpointStore() {
+  moveLegacyStorageKey(LEGACY_LAST_ENDPOINT_KEY, LAST_ENDPOINT_KEY);
+  return globalThis.localStorage;
+}
 
 function vapidPublicKey() {
   return process.env.EXPO_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY || '';
@@ -45,7 +54,8 @@ export async function syncWebPushDevice(options: {
     return 'permission_required';
   }
 
-  await navigator.serviceWorker.register('/chc-notification-sw.js');
+  // Registered at the same scope, it takes the place of chc-notification-sw.js, which earlier builds registered; the subscription stays.
+  await navigator.serviceWorker.register('/cv-notification-sw.js');
 
   const { subscribe } = await import('@mmmike/web-push/client');
   const result = await subscribe(publicKey);
@@ -64,14 +74,14 @@ export async function syncWebPushDevice(options: {
   });
   if (error) throw new Error('Register web notifications: ' + error.message);
 
-  globalThis.localStorage?.setItem(LAST_ENDPOINT_KEY, subscription.endpoint);
+  endpointStore()?.setItem(LAST_ENDPOINT_KEY, subscription.endpoint);
   return 'registered';
 }
 
 export async function disableWebPushDevice(): Promise<void> {
   if (Platform.OS !== 'web' || typeof navigator === 'undefined') return;
 
-  const endpoint = globalThis.localStorage?.getItem(LAST_ENDPOINT_KEY);
+  const endpoint = endpointStore()?.getItem(LAST_ENDPOINT_KEY);
   if (endpoint) {
     const { error } = await api.rpc('disable_notification_device', {
       p_app_key: APP_KEY,
@@ -97,5 +107,5 @@ export async function disableWebPushDevice(): Promise<void> {
     }
   }
 
-  globalThis.localStorage?.removeItem(LAST_ENDPOINT_KEY);
+  endpointStore()?.removeItem(LAST_ENDPOINT_KEY);
 }

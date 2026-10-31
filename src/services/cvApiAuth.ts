@@ -167,7 +167,7 @@ export function createCvApiAuth(options: CvApiAuthOptions): CvApiAuth {
       id: user.id,
       email: user.email,
       email_confirmed_at: user.emailVerified ? user.createdAt : undefined,
-      user_metadata: { full_name: user.name, chc_avatar_url: own ? image : null, avatar_url: own ? null : image },
+      user_metadata: { full_name: user.name, cv_avatar_url: own ? image : null, avatar_url: own ? null : image },
       app_metadata: { provider: providers[0] ?? 'email', providers },
     };
   }

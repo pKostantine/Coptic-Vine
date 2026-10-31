@@ -321,7 +321,7 @@ test('rescheduling keeps what is unchanged, replaces what moved, and never touch
   };
   const reminders = load('src/services/canonReminders.ts', {
     'react-native': { Platform: { OS: 'ios' } },
-    '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'chc-default' },
+    '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'cv-default' },
     'expo-notifications': Notifications,
   });
   const at = new Date('2026-10-19T11:00:00.000Z');
@@ -334,7 +334,7 @@ test('rescheduling keeps what is unchanged, replaces what moved, and never touch
   assert.deepEqual(calls.cancelled.sort(), ['canon_moved', 'canon_stale']);
   assert.deepEqual(calls.added.map((request) => request.identifier).sort(), ['canon_moved', 'canon_new']);
   const added = calls.added[0];
-  assert.deepEqual(added.trigger, { type: 'date', date: at, channelId: 'chc-default' });
+  assert.deepEqual(added.trigger, { type: 'date', date: at, channelId: 'cv-default' });
   assert.equal(added.content.data.deep_link, '/agpeya/first_hour');
   assert.equal(added.content.data.signature, signatureOf);
   // Held down, it shows the canon's buttons; pressed with the app closed, they know whose canon it is.
@@ -351,7 +351,7 @@ test('rescheduling keeps what is unchanged, replaces what moved, and never touch
   // The web schedules nothing.
   const web = load('src/services/canonReminders.ts', {
     'react-native': { Platform: { OS: 'web' } },
-    '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'chc-default' },
+    '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'cv-default' },
   });
   assert.equal(await web.scheduleCanonReminders([occurrence('canon_new')], describe, 'user-1'), 'unsupported');
 });

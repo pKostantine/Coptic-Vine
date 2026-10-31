@@ -122,7 +122,7 @@ test('a carried-over user signs in on a phone: a bearer token, and the user in S
     id: USER,
     email: 'reader@example.com',
     email_confirmed_at: session?.user.email_confirmed_at,
-    user_metadata: { full_name: 'Carried Over', chc_avatar_url: null, avatar_url: null },
+    user_metadata: { full_name: 'Carried Over', cv_avatar_url: null, avatar_url: null },
     app_metadata: { provider: 'email', providers: ['email'] },
   });
   assert.ok(session?.user.email_confirmed_at, 'confirmed');
@@ -225,15 +225,15 @@ test('the name and photo: an upload to cv-api is the user\'s own photo, anything
   await auth.updateAvatarUrl(own);
   let user = (await auth.getSession())!.user;
   assert.equal(user.user_metadata.full_name, 'New Name');
-  assert.deepEqual([user.user_metadata.chc_avatar_url, user.user_metadata.avatar_url], [own, null]);
+  assert.deepEqual([user.user_metadata.cv_avatar_url, user.user_metadata.avatar_url], [own, null]);
   assert.deepEqual(events, ['SIGNED_IN', 'USER_UPDATED', 'USER_UPDATED']);
 
   await auth.updateAvatarUrl(null);
   user = (await auth.getSession())!.user;
-  assert.deepEqual([user.user_metadata.chc_avatar_url, user.user_metadata.avatar_url], [null, null]);
+  assert.deepEqual([user.user_metadata.cv_avatar_url, user.user_metadata.avatar_url], [null, null]);
   db.prepare('UPDATE "auth.users" SET "image" = ? WHERE "id" = ?').run('https://lh3.googleusercontent.com/a/photo', USER);
   user = (await auth.refresh())!.user;
-  assert.deepEqual([user.user_metadata.chc_avatar_url, user.user_metadata.avatar_url], [null, 'https://lh3.googleusercontent.com/a/photo']);
+  assert.deepEqual([user.user_metadata.cv_avatar_url, user.user_metadata.avatar_url], [null, 'https://lh3.googleusercontent.com/a/photo']);
 });
 
 test('changing the email: approved from the old address, confirmed at the new one, whose link brings the app the new address', async () => {

@@ -3,6 +3,7 @@ import { Dimensions, Platform } from 'react-native';
 
 import { DEFAULT_DOCUMENT_THEME_ID, isDocumentThemeId, type DocumentThemeId } from '../constants/documentThemes';
 import { DEFAULT_SELECTED_INTERPRETATIONS, normalizeSelectedInterpretations } from './kiahkInterpretations';
+import { moveLegacyFile, moveLegacyStorageKey } from './legacyNames';
 import { clampVolume } from './playerVolume';
 import {
   classifyReadingDevice,
@@ -259,7 +260,9 @@ export function stepFontScaleValue(value: number, delta: number): number {
   return stepFontScale(value, delta, MAX_FONT_SCALE);
 }
 
-const STORAGE_KEY = 'chc-reading-preferences';
+const STORAGE_KEY = 'cv-reading-preferences';
+// Its name in earlier builds (utils/legacyNames.ts).
+const LEGACY_STORAGE_KEY = 'chc-reading-preferences';
 
 function normalizeSermonPlannerVisibleLanguages(
   value: unknown,
@@ -400,6 +403,7 @@ export function applySyncedReadingPreferences(
 export async function loadReadingPreferences(): Promise<ReadingPreferences> {
   try {
     if (Platform.OS === 'web') {
+      moveLegacyStorageKey(LEGACY_STORAGE_KEY, STORAGE_KEY);
       const raw = window.localStorage.getItem(STORAGE_KEY);
       const preferences = mergePreferences(raw ? JSON.parse(raw) : null);
       currentAppLanguage = preferences.appLanguage;
@@ -408,6 +412,7 @@ export async function loadReadingPreferences(): Promise<ReadingPreferences> {
 
     const FileSystem = await import('expo-file-system/legacy');
     const fileUri = `${FileSystem.documentDirectory}${STORAGE_KEY}.json`;
+    await moveLegacyFile(`${FileSystem.documentDirectory}${LEGACY_STORAGE_KEY}.json`, fileUri);
     const info = await FileSystem.getInfoAsync(fileUri);
     if (!info.exists) {
       const preferences = mergePreferences(null);
@@ -429,12 +434,14 @@ export async function saveReadingPreferences(preferences: ReadingPreferences): P
   currentAppLanguage = preferences.appLanguage;
   try {
     if (Platform.OS === 'web') {
+      moveLegacyStorageKey(LEGACY_STORAGE_KEY, STORAGE_KEY);
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
       return;
     }
 
     const FileSystem = await import('expo-file-system/legacy');
     const fileUri = `${FileSystem.documentDirectory}${STORAGE_KEY}.json`;
+    await moveLegacyFile(`${FileSystem.documentDirectory}${LEGACY_STORAGE_KEY}.json`, fileUri);
     await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(preferences));
   } catch {
     // Best-effort persistence — a failed write just means the next session falls back to defaults.

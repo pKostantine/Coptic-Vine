@@ -68,6 +68,7 @@ function storageWith(navigationType) {
   const storage = load('src/utils/playbackStateStorage.ts', {
     'react-native': { Platform: { OS: 'web' } },
     '@/utils/playbackEngine': { sanitizePlaybackSnapshot: (value) => value },
+    '@/utils/legacyNames': load('src/utils/legacyNames.ts'),
   });
   return { storage, session };
 }

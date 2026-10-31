@@ -60,7 +60,7 @@ function device({ platform = 'ios', lastResponse = null } = {}) {
       CANON_SNOOZE_PREFIX: 'canonsnooze_',
       cancelCanonRemindersFor: async (day, taskKey) => { calls.cancelledFor.push(`${day}/${taskKey}`); },
     },
-    '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'chc-default' },
+    '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'cv-default' },
   });
   return { actions, calls, files, listen: () => listener, task: () => task };
 }
@@ -131,7 +131,7 @@ test('Remind me in an hour puts the same reminder off an hour, with its buttons,
   assert.equal(again.content.data.snoozed, true);
   assert.equal(again.content.data.identity, 'user-1');
   assert.equal(again.trigger.type, 'date');
-  assert.equal(again.trigger.channelId, 'chc-default');
+  assert.equal(again.trigger.channelId, 'cv-default');
   const delay = again.trigger.date.getTime() - before;
   assert.ok(delay >= 60 * 60 * 1000 - 1000 && delay <= 60 * 60 * 1000 + 1000, `put off by ${delay} ms`);
   assert.deepEqual(calls.dismissed, ['canon_2026_10_19_agpeya_1_first_hour']);

@@ -9,7 +9,7 @@ export interface AccountUser {
   email?: string;
   /** Set once the email is confirmed. */
   email_confirmed_at?: string;
-  /** full_name; chc_avatar_url, the photo the user uploaded; avatar_url, Google's. */
+  /** full_name; cv_avatar_url, the photo the user uploaded; avatar_url, Google's. */
   user_metadata: { [key: string]: unknown };
   /** provider, how the account was first signed in to ('email' or 'google'); providers, every way it can be. */
   app_metadata: { provider?: string; providers?: string[]; [key: string]: unknown };

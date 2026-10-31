@@ -1,13 +1,13 @@
 import { Directory, DownloadTask, File, Paths, type DownloadPauseState, type DownloadProgress, type DownloadTaskOptions } from 'expo-file-system';
 
-import { findEntityDownloads, findPlayableHolders, findPlayableLocalUri, getDownloadProgress, getOfflineFile, getPackageFiles, getStoredDownloadRequest, isEntityDownloaded, refreshPackageProgress, removeOfflinePackage, saveDownloadRequest, setPackageProgress, setPackageState, updateOfflineFile, type OfflineFileRow } from '@/services/offlineDatabase';
+import { DOWNLOADS_FOLDER, findEntityDownloads, findPlayableHolders, findPlayableLocalUri, getDownloadProgress, getOfflineFile, getPackageFiles, getStoredDownloadRequest, isEntityDownloaded, refreshPackageProgress, removeOfflinePackage, saveDownloadRequest, setPackageProgress, setPackageState, updateOfflineFile, type OfflineFileRow } from '@/services/offlineDatabase';
 import { assertDownloadNetworkAllowed } from '@/services/downloadPreferences';
 import { cleanupIncompleteDownloads, getDownloadStorageSummary, isDownloadRequestStale, listDownloads, removeAllDownloadRecords, validateDownloadedFiles } from '@/services/downloadStorageManager';
 import type { OfflineDownloadManager, OfflineDownloadProgress, OfflineDownloadRequest, OfflineDownloadResource } from '@/types/offlineDownloads';
 import type { PlaybackEntityKind } from '@/types/playback';
 import { forEachLimited, throttled } from '@/utils/concurrency';
 
-const DOWNLOAD_DIRECTORY = new Directory(Paths.document, 'chc-offline', 'files');
+const DOWNLOAD_DIRECTORY = new Directory(Paths.document, DOWNLOADS_FOLDER, 'files');
 // How many of a package's files are fetched at once. A book resource is many
 // small chunks, and fetched one by one each paid a whole round trip.
 const FILE_CONCURRENCY = 6;

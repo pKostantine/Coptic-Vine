@@ -6,8 +6,7 @@
     "orientation": "default",
     "icon": "./assets/images/coptic-vine-icon.png",
     "scheme": [
-      "copticvine",
-      "coptichymnscentre"
+      "copticvine"
     ],
     "userInterfaceStyle": "automatic",
     "ios": {

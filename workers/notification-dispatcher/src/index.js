@@ -78,7 +78,7 @@ async function dispatchQueued(env) {
     body: delivery.body,
     sound: 'default',
     priority: 'high',
-    channelId: 'chc-default',
+    channelId: 'cv-default',
     data: {
       ...(delivery.payload || {}),
       ...(delivery.image_url ? { image_url: delivery.image_url } : {}),

@@ -3,11 +3,14 @@ import { Platform } from 'react-native';
 import type { BibleHighlightBook } from '@/types/bibleHighlights';
 import { emptyBibleHighlightBook, normalizeBibleHighlightBook } from '@/utils/bibleHighlights';
 import { api } from '@/utils/api';
+import { moveLegacyFile, moveLegacyStorageKey } from '@/utils/legacyNames';
 
-const STORAGE_PREFIX = 'chc-bible-highlights';
+const STORAGE_PREFIX = 'cv-bible-highlights';
+// Its name in earlier builds (utils/legacyNames.ts).
+const LEGACY_STORAGE_PREFIX = 'chc-bible-highlights';
 
-function storageKey(bookKey: string) {
-  return `${STORAGE_PREFIX}-${encodeURIComponent(bookKey)}`;
+function storageKey(bookKey: string, prefix = STORAGE_PREFIX) {
+  return `${prefix}-${encodeURIComponent(bookKey)}`;
 }
 
 /** One book's highlights on this device: localStorage on the web, a JSON file in the app — as bookmarks are kept. */
@@ -15,10 +18,12 @@ export async function loadLocalBibleHighlights(bookKey: string): Promise<BibleHi
   try {
     let raw: string | null = null;
     if (Platform.OS === 'web') {
+      moveLegacyStorageKey(storageKey(bookKey, LEGACY_STORAGE_PREFIX), storageKey(bookKey));
       raw = window.localStorage.getItem(storageKey(bookKey));
     } else {
       const FileSystem = await import('expo-file-system/legacy');
       const fileUri = `${FileSystem.documentDirectory}${storageKey(bookKey)}.json`;
+      await moveLegacyFile(`${FileSystem.documentDirectory}${storageKey(bookKey, LEGACY_STORAGE_PREFIX)}.json`, fileUri);
       const info = await FileSystem.getInfoAsync(fileUri);
       if (info.exists) raw = await FileSystem.readAsStringAsync(fileUri);
     }
@@ -32,11 +37,14 @@ export async function saveLocalBibleHighlights(book: BibleHighlightBook): Promis
   try {
     const serialized = JSON.stringify(book);
     if (Platform.OS === 'web') {
+      moveLegacyStorageKey(storageKey(book.bookKey, LEGACY_STORAGE_PREFIX), storageKey(book.bookKey));
       window.localStorage.setItem(storageKey(book.bookKey), serialized);
       return;
     }
     const FileSystem = await import('expo-file-system/legacy');
-    await FileSystem.writeAsStringAsync(`${FileSystem.documentDirectory}${storageKey(book.bookKey)}.json`, serialized);
+    const fileUri = `${FileSystem.documentDirectory}${storageKey(book.bookKey)}.json`;
+    await moveLegacyFile(`${FileSystem.documentDirectory}${storageKey(book.bookKey, LEGACY_STORAGE_PREFIX)}.json`, fileUri);
+    await FileSystem.writeAsStringAsync(fileUri, serialized);
   } catch {
     // Best-effort persistence; the cloud copy (when signed in) still holds them.
   }

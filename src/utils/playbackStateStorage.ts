@@ -1,9 +1,12 @@
 import { Platform } from 'react-native';
 
 import type { PlaybackReloadPoint, PlaybackSnapshot } from '@/types/playback';
+import { moveLegacyFile, moveLegacyStorageKey } from '@/utils/legacyNames';
 import { sanitizePlaybackSnapshot } from '@/utils/playbackEngine';
 
-const STORAGE_KEY = 'chc-playback-state-v1';
+const STORAGE_KEY = 'cv-playback-state-v1';
+// Its name in earlier builds (utils/legacyNames.ts).
+const LEGACY_STORAGE_KEY = 'chc-playback-state-v1';
 // The tab's own storage: it survives a reload and goes when the tab is closed.
 const RELOAD_KEY = 'cv-playback-reload-v1';
 // A reload point older than this is from another listening session.
@@ -12,12 +15,14 @@ const RELOAD_POINT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 export async function loadPlaybackSnapshot(): Promise<PlaybackSnapshot | null> {
   try {
     if (Platform.OS === 'web') {
+      moveLegacyStorageKey(LEGACY_STORAGE_KEY, STORAGE_KEY);
       const raw = window.localStorage.getItem(STORAGE_KEY);
       return raw ? sanitizePlaybackSnapshot(JSON.parse(raw)) : null;
     }
 
     const FileSystem = await import('expo-file-system/legacy');
     const fileUri = `${FileSystem.documentDirectory}${STORAGE_KEY}.json`;
+    await moveLegacyFile(`${FileSystem.documentDirectory}${LEGACY_STORAGE_KEY}.json`, fileUri);
     const info = await FileSystem.getInfoAsync(fileUri);
     if (!info.exists) return null;
     const raw = await FileSystem.readAsStringAsync(fileUri);
@@ -30,6 +35,7 @@ export async function loadPlaybackSnapshot(): Promise<PlaybackSnapshot | null> {
 export async function savePlaybackSnapshot(snapshot: PlaybackSnapshot | null): Promise<void> {
   try {
     if (Platform.OS === 'web') {
+      moveLegacyStorageKey(LEGACY_STORAGE_KEY, STORAGE_KEY);
       if (snapshot) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
       else window.localStorage.removeItem(STORAGE_KEY);
       return;
@@ -37,6 +43,7 @@ export async function savePlaybackSnapshot(snapshot: PlaybackSnapshot | null): P
 
     const FileSystem = await import('expo-file-system/legacy');
     const fileUri = `${FileSystem.documentDirectory}${STORAGE_KEY}.json`;
+    await moveLegacyFile(`${FileSystem.documentDirectory}${LEGACY_STORAGE_KEY}.json`, fileUri);
     if (!snapshot) {
       const info = await FileSystem.getInfoAsync(fileUri);
       if (info.exists) await FileSystem.deleteAsync(fileUri, { idempotent: true });

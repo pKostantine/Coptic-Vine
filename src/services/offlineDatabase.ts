@@ -1,4 +1,6 @@
+import { Directory, File, Paths } from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 import type {
   OfflineDownloadEntityType,
@@ -12,7 +14,12 @@ import type {
 import type { PlaybackEntityKind } from '@/types/playback';
 import { orderHolders } from '@/utils/downloadHolders';
 
-const DATABASE_NAME = 'chc-offline.db';
+const DATABASE_NAME = 'cv-offline.db';
+/** The folder in the app's documents that downloaded files are kept in (services/downloadManager.ts). */
+export const DOWNLOADS_FOLDER = 'cv-offline';
+// Their names in earlier builds (utils/legacyNames.ts): moved to the new ones as the database first opens.
+const LEGACY_DATABASE_NAME = 'chc-offline.db';
+const LEGACY_DOWNLOADS_FOLDER = 'chc-offline';
 const DATABASE_VERSION = 2;
 // How long a connection waits for another's write to finish before giving up
 // with "database is locked". Several downloads now write while a book's
@@ -268,11 +275,61 @@ function serializeWrites(db: SQLite.SQLiteDatabase): void {
   db.runAsync = ((...args: unknown[]) => takeTurn(() => write(...args))) as typeof db.runAsync;
 }
 
+/**
+ * The database an earlier build kept under the old name moves to the new one,
+ * its write-ahead log with it, before it is first opened: nothing has it open.
+ * A device that already has the new one keeps it.
+ */
+async function moveLegacyDatabase(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    // A path on iOS and Android, not a URI.
+    const directory = String(SQLite.defaultDatabaseDirectory ?? '');
+    if (!directory) return;
+    const folder = directory.startsWith('file://') ? directory : `file://${directory}`;
+    if (!new File(folder, LEGACY_DATABASE_NAME).exists || new File(folder, DATABASE_NAME).exists) return;
+    // The log and its index first, the database last: a move cut short leaves the old database whole where it was.
+    for (const suffix of ['-wal', '-shm', '']) {
+      const legacy = new File(folder, `${LEGACY_DATABASE_NAME}${suffix}`);
+      if (legacy.exists) await legacy.move(new File(folder, `${DATABASE_NAME}${suffix}`));
+    }
+  } catch {
+    // Left where it was: the app starts a new database, and the old one stays on the device.
+  }
+}
+
+/**
+ * The downloaded files move to the new folder, and the records of where each
+ * is kept (and where a paused one was going) follow them, before any download
+ * is read or started. With both folders there, the records stay where their files are.
+ */
+async function moveLegacyDownloads(db: SQLite.SQLiteDatabase): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    const legacy = new Directory(Paths.document, LEGACY_DOWNLOADS_FOLDER);
+    const folder = new Directory(Paths.document, DOWNLOADS_FOLDER);
+    if (legacy.exists && !folder.exists) await legacy.move(folder);
+    if (legacy.exists) return;
+    const from = `/${LEGACY_DOWNLOADS_FOLDER}/`;
+    const to = `/${DOWNLOADS_FOLDER}/`;
+    await db.runAsync(
+      `UPDATE offline_files
+          SET local_uri = replace(local_uri, ?, ?), resume_json = replace(resume_json, ?, ?)
+        WHERE instr(local_uri, ?) > 0 OR instr(resume_json, ?) > 0`,
+      from, to, from, to, from, from,
+    );
+  } catch {
+    // The records keep their old paths, and the files are still there.
+  }
+}
+
 export async function getOfflineDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!databasePromise) {
-    databasePromise = SQLite.openDatabaseAsync(DATABASE_NAME, { useNewConnection: true })
+    databasePromise = moveLegacyDatabase()
+      .then(() => SQLite.openDatabaseAsync(DATABASE_NAME, { useNewConnection: true }))
       .then(async (db) => {
         await migrate(db);
+        await moveLegacyDownloads(db);
         serializeWrites(db);
         // A JavaScript download task cannot survive process death. Preserve the
         // package and resume data, but expose interrupted work as paused.
