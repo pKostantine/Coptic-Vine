@@ -43,7 +43,7 @@ export async function getPublishedLearningCantor(ctx: ApiContext, cantorId: stri
     loadLocalizations(ctx, 'cantor_localizations', 'cantor_id', [cantorId], locale),
     loadLocalizations(ctx, 'album_localizations', 'album_id', albums.map((a) => a.id), locale),
     loadLocalizations(ctx, 'lesson_set_localizations', 'lesson_set_id', sets.map((s) => s.id), locale),
-    loadAssets(ctx, [cantor.profile_image_asset_id, ...albums.map((a) => a.cover_asset_id)]),
+    loadAssets(ctx, [cantor.profile_image_asset_id, ...albums.map((a) => a.cover_asset_id), ...sets.map((s) => s.cover_asset_id)]),
   ]);
   const l = cantorL.get(cantorId);
   return payload({
@@ -53,9 +53,14 @@ export async function getPublishedLearningCantor(ctx: ApiContext, cantorId: stri
       const al = albumL.get(a.id as string);
       return { id: a.id, title: localized(al, a, 'title'), description: localized(al, a, 'description'), seasonId: a.season_id, coverAsset: assetObject(assets.get(a.cover_asset_id as string), COVER) };
     }),
+    // Each with its cover, as the albums: Supabase's function left the sets'
+    // out, and the cantor page's tiles showed a placeholder for every one.
     lessonSets: sets.sort((a, b) => order.descNullsLast(a.created_at, b.created_at)).map((s) => {
       const sl = setL.get(s.id as string);
-      return { id: s.id, title: localized(sl, s, 'title'), description: localized(sl, s, 'description'), seasonId: s.season_id, hymnId: s.hymn_id };
+      return {
+        id: s.id, title: localized(sl, s, 'title'), description: localized(sl, s, 'description'), seasonId: s.season_id, hymnId: s.hymn_id,
+        coverAsset: assetObject(assets.get(s.cover_asset_id as string), COVER),
+      };
     }),
   });
 }

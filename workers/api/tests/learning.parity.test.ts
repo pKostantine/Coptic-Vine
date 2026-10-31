@@ -20,7 +20,7 @@ const S1 = id(310); const S2 = id(311); const S3_DRAFT = id(312);
 const H1 = id(320); const H2 = id(321); const H3_DRAFT = id(322);
 const AL1 = id(330); const AL2_DRAFT = id(331); const AL3 = id(332); const AL4 = id(333);
 const RC1 = id(340); const RC2_DRAFT = id(341); const RC3_NO_AUDIO = id(342); const RC4 = id(343);
-const LS1 = id(350); const LS2 = id(351); const LS3_DRAFT = id(352);
+const LS1 = id(350); const LS2 = id(351); const LS3_DRAFT = id(352); const LS4_NO_COVER = id(353);
 const L1 = id(360); const L2 = id(361); const L3_DRAFT = id(362); const L4_NO_MEDIA = id(363); const L5 = id(364);
 const asset = (n: number) => id(500 + n);
 const AT = (day: number) => `2026-03-${String(day + 1).padStart(2, '0')}T08:00:00+00:00`;
@@ -89,6 +89,7 @@ function catalog(): Seed {
       { id: LS1, owner_creator_account_id: C1, cantor_id: K1, season_id: S1, hymn_id: H1, cover_asset_id: asset(10), title: 'Learning Tenen', description: 'Lessons', publication_status: 'published', metadata: {}, release_timing_mode: 'asap', ...stamps(7) },
       { id: LS2, owner_creator_account_id: C1, cantor_id: K2_DRAFT, hymn_id: H2, title: 'Draft Cantor Lessons', publication_status: 'published', metadata: {}, release_timing_mode: 'asap', ...stamps(8) },
       { id: LS3_DRAFT, owner_creator_account_id: C1, cantor_id: K1, hymn_id: H1, title: 'Draft Lessons', publication_status: 'draft', metadata: {}, release_timing_mode: 'asap', ...stamps(9) },
+      { id: LS4_NO_COVER, owner_creator_account_id: C1, cantor_id: K1, season_id: S1, hymn_id: H2, title: 'Learning Ari Ehmot', publication_status: 'published', metadata: {}, release_timing_mode: 'asap', ...stamps(10) },
     ]],
     ['learning.lesson_set_localizations', [{ lesson_set_id: LS1, locale: 'fr', title: 'Apprendre Tenen', ...stamps(7) }]],
     ['learning.lessons', [
@@ -139,10 +140,22 @@ function same(pg: PgAnswer, w: Answer, what: string): void {
   }
 }
 
+/**
+ * What cv-api answers beyond Supabase's original: a cantor's lesson sets carry
+ * their covers, as its albums do. Left out of the comparison, the rest is
+ * compared as it is; the covers are checked in a test of their own.
+ */
+function beyondSupabase(fn: string, w: Answer): Answer {
+  if (fn !== 'get_published_learning_cantor' || !w.data) return w;
+  const cantor = w.data as { lessonSets: Record<string, unknown>[] };
+  const lessonSets = cantor.lessonSets.map((set) => Object.fromEntries(Object.entries(set).filter(([key]) => key !== 'coverAsset')));
+  return { ...w, data: { ...cantor, lessonSets } };
+}
+
 async function both(user: string | null, fn: string, args: Record<string, unknown> = {}) {
   const pg = await oracle.call(user, fn, args);
   const w = await worker.rpc(user, fn, args);
-  same(pg, w, `${fn}(${JSON.stringify(args)}) as ${user ?? 'anon'}`);
+  same(pg, beyondSupabase(fn, w), `${fn}(${JSON.stringify(args)}) as ${user ?? 'anon'}`);
   return { pg, w };
 }
 
@@ -164,6 +177,22 @@ test('the learning catalog, for every kind of caller and language', async () => 
     }
   }
   await both(null, 'get_published_learning_item_lyrics', { p_item_kind: 'video', p_item_id: RC1 });
+});
+
+test("a cantor's lesson sets carry their covers, the same as the season's and the set's own", async () => {
+  type Cover = Record<string, unknown> | null;
+  type Sets = { lessonSets: { id: string; coverAsset?: Cover }[] };
+  const cantor = (await worker.rpc(null, 'get_published_learning_cantor', { p_cantor_id: K1, p_locale: 'en' })).data as Sets;
+  const season = (await worker.rpc(null, 'get_published_learning_season', { p_season_id: S1, p_locale: 'en' })).data as Sets;
+  assert.deepEqual(cantor.lessonSets.map((set) => set.id), [LS4_NO_COVER, LS1]);
+  for (const set of cantor.lessonSets) {
+    const own = (await worker.rpc(null, 'get_published_learning_lesson_set', { p_lesson_set_id: set.id, p_locale: 'en' })).data as { coverAsset: Cover };
+    assert.ok('coverAsset' in set, `${set.id} says whether it has a cover`);
+    assert.deepEqual(set.coverAsset, season.lessonSets.find((other) => other.id === set.id)!.coverAsset, `${set.id}: as the season's`);
+    assert.deepEqual(set.coverAsset, own.coverAsset, `${set.id}: as its own page's`);
+  }
+  assert.equal(cantor.lessonSets.find((set) => set.id === LS1)!.coverAsset!.id, asset(10));
+  assert.equal(cantor.lessonSets.find((set) => set.id === LS4_NO_COVER)!.coverAsset, null);
 });
 
 test('progress, likes and the learner\'s items', async () => {
