@@ -1,3 +1,4 @@
+import { contentDataClient } from '@/services/contentDataClient';
 import { contentApi } from '@/services/contentSource';
 
 export interface HomeSynaxariumEvent {
@@ -32,13 +33,14 @@ export async function getSundayMessage(date: string): Promise<string | null> {
   return typeof data === 'string' && data.trim() ? data.trim() : null;
 }
 
+// The Synaxarium is read from a downloaded Liturgy when there is one (services/contentDataClient.ts), else from the server.
 export async function getSynaxariumEvents(date: string): Promise<HomeSynaxariumEvent[]> {
-  const { data, error } = await contentApi.rpc('get_home_synaxarium_events', { p_date: date });
+  const { data, error } = await contentDataClient.rpc('get_home_synaxarium_events', { p_date: date });
   return assertData(data as HomeSynaxariumEvent[] | null, error, 'Load Synaxarium events');
 }
 
 export async function getSynaxariumYear(referenceDate: string): Promise<SynaxariumYearRow[]> {
-  const { data, error } = await contentApi.rpc('get_synaxarium_year', { p_reference_date: referenceDate });
+  const { data, error } = await contentDataClient.rpc('get_synaxarium_year', { p_reference_date: referenceDate });
   return assertData(data as SynaxariumYearRow[] | null, error, 'Load Synaxarium year');
 }
 
