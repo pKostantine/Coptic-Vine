@@ -96,7 +96,7 @@ test("Home's saints open their own documents, read in the reader for their day",
   // The search still opens the Synaxarium itself, where each saint opens the same document: from its day's card, and from a search.
   assert.match(home, /'search-outline', \(\) => router\.push\('\/synaxarium'\)\)/);
   const synaxarium = read('src/app/synaxarium/index.tsx');
-  assert.match(synaxarium, /const openEntry = \(entryKey: string, isoDate: string\) => router\.push\(synaxariumEntryHref\(entryKey, isoDate\) as never\);/);
+  assert.match(synaxarium, /const openEntry = useCallback\(\(entryKey: string, isoDate: string\) => router\.push\(synaxariumEntryHref\(entryKey, isoDate\) as never\), \[router\]\);/);
   assert.equal((synaxarium.match(/onPress=\{\(\) => openEntry\(entry\.entryKey, day\.gregorianDate\)\}/g) || []).length, 2);
   assert.doesNotMatch(synaxarium, /liturgy_of_the_word\?sub=SYNAXARIUM|selectDate\(/, "nor the Liturgy of the Word's, nor does it move the Books' day");
 
