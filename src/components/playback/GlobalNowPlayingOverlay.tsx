@@ -373,8 +373,6 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
     </Animated.View>
   ) : null;
 
-  if (isPopupOpen) return playerScreen;
-
   // Everything opens the full player, a lesson's picture with it.
   const onOpen = () => setIsPopupOpen(true);
   const onTogglePlayback = isMusic ? music.togglePlayback : learning.togglePlayback;
@@ -488,10 +486,14 @@ export default function GlobalNowPlayingOverlay({ documentTheme: ownDocumentThem
     </>
   ) : null;
 
+  // Open, the player covers the bar, which isn't drawn under it. The player
+  // keeps its place in what is drawn, open or closed: returned on its own
+  // while open, it was drawn afresh as it closed, and one pulled down out of
+  // sight popped back up to fully open before going down again.
   return (
     <>
-      {button}
-      {cardMounted ? (
+      {isPopupOpen ? null : button}
+      {!isPopupOpen && cardMounted ? (
         <Animated.View
           pointerEvents={isCollapsed ? 'none' : 'box-none'}
           onLayout={(event) => {
