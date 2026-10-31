@@ -81,6 +81,7 @@ test('contentDataClient sends table reads and RPCs it cannot answer offline to t
   const { contentDataClient } = loadModule(source('services/contentDataClient.ts'), {
     '@/services/bookContentDatabase': { hasLocalSchema: async () => false, readLocalRpc: async () => ({ found: false }), readLocalTable: async () => null, readLocalRowsWhere: async () => null, isLocalTableKept: () => false, isLocalTableOversized: () => false },
     '@/services/contentSource': { contentApi },
+    '../utils/synaxariumLocal': loadModule(source('utils/synaxariumLocal.ts'), {}),
   });
   const rows = await contentDataClient.schema('liturgy').from('hymn_titles').select('hymn_key').eq('hymn_key', 'x');
   assert.deepEqual(rows.data, [{ hymn_key: 'x' }]);
@@ -95,15 +96,16 @@ test('on web, contentDataClient is the content source itself', () => {
   assert.doesNotMatch(fs.readFileSync(source('services/contentDataClient.web.ts'), 'utf8'), /@\/utils\/api/);
 });
 
-test('the home screen reads its calendar and Synaxarium from the content source', async () => {
+test('the home screen reads its Sunday message from the content source, and the Synaxarium from a download first', async () => {
   const contentApi = fakeClient('content', { data: 'A Sunday message', error: null });
-  const home = loadModule(source('services/homeService.ts'), { '@/services/contentSource': { contentApi } });
+  // contentDataClient answers from a downloaded Liturgy when there is one (tests/synaxariumLocal.test.cjs), else asks the content source.
+  const contentDataClient = fakeClient('data', { data: [], error: null });
+  const home = loadModule(source('services/homeService.ts'), { '@/services/contentSource': { contentApi }, '@/services/contentDataClient': { contentDataClient } });
   assert.equal(await home.getSundayMessage('2026-10-25'), 'A Sunday message');
+  await home.getSynaxariumEvents('2026-10-31');
+  await home.getSynaxariumYear('2026-10-31');
   assert.deepEqual(contentApi.calls.map((call) => call.fn), ['get_sunday_message']);
-  const text = fs.readFileSync(source('services/homeService.ts'), 'utf8');
-  for (const fn of ['get_sunday_message', 'get_home_synaxarium_events', 'get_synaxarium_year']) {
-    assert.match(text, new RegExp(`contentApi\\.rpc\\('${fn}'`));
-  }
+  assert.deepEqual(contentDataClient.calls.map((call) => call.fn), ['get_home_synaxarium_events', 'get_synaxarium_year']);
 });
 
 test('every content module reads through contentDataClient, not the user-data client', () => {

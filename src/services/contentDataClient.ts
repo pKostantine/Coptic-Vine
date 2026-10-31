@@ -10,6 +10,7 @@ import {
 } from '@/services/bookContentDatabase';
 import { contentApi } from '@/services/contentSource';
 import type { api } from '@/utils/api';
+import { homeSynaxariumEvents, saintsOfDay, synaxariumDayJson, synaxariumYearRows } from '../utils/synaxariumLocal';
 
 type Filter = { kind: 'eq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'ilike'; column: string; value: unknown };
 type Ordering = { column: string; ascending: boolean };
@@ -282,6 +283,45 @@ async function localBibleRpc(functionName: string, args: Record<string, any>): P
   return { found: false, data: null };
 }
 
+/** A table's installed rows holding these values: through its index once it is kept, else picked out by SQLite. */
+async function localRowsWhere(schema: string, table: string, equalities: LocalEquality[]): Promise<Record<string, unknown>[] | null> {
+  if (!isLocalTableKept(schema, table)) return readLocalRowsWhere(schema, table, equalities);
+  const rows = await readLocalTable(schema, table);
+  if (rows === null) return null;
+  const [first, ...rest] = equalities;
+  return indexedRows(rows, { kind: 'eq', column: first.column, value: first.value })
+    .filter((row) => rest.every(({ column, value }) => String(row[column]) === String(value)));
+}
+
+const LOCAL_SYNAXARIUM = new Set(['public.get_synaxarium_year', 'public.get_home_synaxarium_events', 'synaxarium.get_day_json']);
+
+/**
+ * The Synaxarium from a downloaded Liturgy's own tables (utils/synaxariumLocal.ts):
+ * the Synaxarium page's year and Home's saints, which no package holds as
+ * answers, and a day's entries past the window the package holds them for.
+ * Read on the device, they come at once, and offline. A date the downloaded
+ * calendar doesn't have is left to the server.
+ */
+async function localSynaxariumRpc(schemaName: string, functionName: string, args: Record<string, unknown>): Promise<{ found: boolean; data: unknown }> {
+  const missing = { found: false, data: null };
+  if (!LOCAL_SYNAXARIUM.has(`${schemaName}.${functionName}`)) return missing;
+  if (!(await hasLocalSchema('synaxarium')) || !(await hasLocalSchema('calendar'))) return missing;
+  const date = String(args.p_reference_date ?? args.p_date ?? '');
+  const [day] = (await localRowsWhere('calendar', 'coptic_date_conversions', [{ column: 'gregorian_date', value: date }])) ?? [];
+  if (!day) return missing;
+  const entries = (await readLocalTable('synaxarium', 'entries')) ?? [];
+  if (functionName === 'get_synaxarium_year') {
+    const days = (await localRowsWhere('calendar', 'coptic_date_conversions', [{ column: 'coptic_year', value: String(day.coptic_year) }])) ?? [];
+    return { found: true, data: synaxariumYearRows(days, entries) };
+  }
+  if (functionName === 'get_home_synaxarium_events') return { found: true, data: homeSynaxariumEvents(day, entries) };
+  const saints = saintsOfDay(entries, day.coptic_month, day.coptic_day);
+  const texts = (await Promise.all(saints.map((saint) => localRowsWhere('synaxarium', 'entry_texts', [{ column: 'entry_key', value: String(saint.entry_key) }]))))
+    .flatMap((lines) => lines ?? []);
+  const monthNames = ((await readLocalTable('synaxarium', 'coptic_days')) ?? []).find((row) => String(row.coptic_month) === String(day.coptic_month)) ?? null;
+  return { found: true, data: synaxariumDayJson(day, saints, texts, monthNames) };
+}
+
 class HybridRpc implements PromiseLike<QueryResult> {
   private signal: AbortSignal | undefined;
   constructor(private schemaName: string, private functionName: string, private args: Record<string, unknown>) {}
@@ -300,6 +340,8 @@ class HybridRpc implements PromiseLike<QueryResult> {
       const base = await readLocalRpc('calendar', 'get_context_flags', { p_date: this.args.p_date, p_extra_context: {} });
       if (base.found) return { data: { ...(base.data as Record<string, unknown> || {}), ...(this.args.p_extra_context as Record<string, unknown> || {}) }, error: null };
     }
+    const synaxarium = await localSynaxariumRpc(this.schemaName, this.functionName, this.args);
+    if (synaxarium.found) return { data: synaxarium.data, error: null };
     if (this.schemaName === 'bible' || ['get_bible_books', 'get_bible_chapter_list'].includes(this.functionName)) {
       const derived = await localBibleRpc(this.functionName, this.args);
       // Derived from the kept Bible rows, so handed over as a copy.
