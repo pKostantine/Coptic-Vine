@@ -21,7 +21,7 @@ import { rebuildSearchIndex } from '../src/db/searchIndex.ts';
 import { triggerError } from '../src/pg.ts';
 import { createOracle, type Oracle } from './lib/oracle.ts';
 import { seed, type Seed } from './lib/seed.ts';
-import { WorkerSide } from './lib/worker.ts';
+import { RENAMED_APP_KEYS, WorkerSide } from './lib/worker.ts';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const ALICE = id(1); const BOB = id(2); const CAROL = id(3); const DAVE = id(4);
@@ -163,7 +163,9 @@ async function rows(name: string): Promise<{ pg: string[]; sqlite: string[] }> {
   const drop = new Set(['notifications', 'notification_deliveries', 'search_documents'].includes(tableName) ? ['id'] : []);
   const kept = new Set(table.columns.map((c) => c.name)); // not the columns D1 doesn't keep (search_vector)
   const clean = (row: Record<string, unknown>) => JSON.stringify(Object.fromEntries(Object.keys(row).sort().filter((key) => kept.has(key) && !drop.has(key))
-    .map((key) => [key, typeof row[key] === 'string' && TIMESTAMP.test(row[key] as string) ? '<timestamp>' : row[key]])));
+    .map((key) => [key, typeof row[key] === 'string' && TIMESTAMP.test(row[key] as string) ? '<timestamp>' : row[key]])),
+  // Supabase's app keys are the old names (chc…); D1's the new (cv…).
+  (_key, value) => (typeof value === 'string' && Object.hasOwn(RENAMED_APP_KEYS, value) ? RENAMED_APP_KEYS[value] : value));
   const pg = (await oracle.sql<{ row: Record<string, unknown> }>(`select to_jsonb(x) as row from "${schemaName}"."${tableName}" x`)).map(({ row }) => row);
   const sqlite = (worker.db.prepare(`SELECT * FROM "${name}"`).all() as Record<string, unknown>[]).map((row) => Object.fromEntries(table.columns.map((c) => {
     const value = row[c.name];

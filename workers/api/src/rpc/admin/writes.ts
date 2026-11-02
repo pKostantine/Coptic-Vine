@@ -426,7 +426,7 @@ function checkDeepLink(link: string | null): void {
   if (link != null && (!link.startsWith('/') || link.startsWith('//'))) raise('Deep link must be an internal Coptic Vine path beginning with /', '22023');
 }
 
-const MY_DEVICES = `${col('user_id')} = ? AND ${col('app_key')} = 'chc' AND ${col('enabled')} = 1 AND ${col('provider')} IN ('expo', 'web_push')`;
+const MY_DEVICES = `${col('user_id')} = ? AND ${col('app_key')} = 'cv' AND ${col('enabled')} = 1 AND ${col('provider')} IN ('expo', 'web_push')`;
 
 /** A test notification to the admin's own devices. */
 export async function adminSendNotificationTest(ctx: ApiContext, title: string | null, body: string | null, deepLink: string | null): Promise<unknown> {
@@ -444,7 +444,7 @@ export async function adminSendNotificationTest(ctx: ApiContext, title: string |
     }
     const notificationId = crypto.randomUUID();
     await tx.run(`INSERT INTO ${NOTIFICATIONS} (${['id', 'user_id', 'app_key', 'category', 'event_type', 'title', 'body', 'deep_link', 'payload'].map(col).join(', ')})
-      VALUES (?, ?, 'chc', 'announcements', 'admin_test', ?, ?, ?, ?)`, notificationId, userId, heading, message, link, jsonbText({ source: 'chc_admin', test: true }));
+      VALUES (?, ?, 'cv', 'announcements', 'admin_test', ?, ?, ?, ?)`, notificationId, userId, heading, message, link, jsonbText({ source: 'cv_admin', test: true }));
     const deliveries = (await tx.run(`INSERT INTO ${DELIVERIES} (${col('notification_id')}, ${col('device_id')}, ${col('provider')})
       SELECT ?, ${col('id')}, ${col('provider')} FROM ${DEVICES} WHERE ${MY_DEVICES} ON CONFLICT DO NOTHING`, notificationId, userId)).meta.changes;
     return payload({ notificationId, deliveryCount: deliveries, queuedAt: tx.at });
@@ -469,11 +469,11 @@ export async function adminSendNotificationBroadcast(ctx: ApiContext, a: {
   return transaction(ctx, async (tx) => {
     const broadcastId = crypto.randomUUID();
     await tx.run(`INSERT INTO ${t('public', 'notification_broadcasts')} (${['id', 'app_key', 'category', 'title', 'body', 'deep_link', 'payload', 'created_by'].map(col).join(', ')})
-      VALUES (?, 'chc', ?, ?, ?, ?, ?, ?)`, broadcastId, category, title, body, link, jsonbText(extra), userId);
+      VALUES (?, 'cv', ?, ?, ?, ?, ?, ?)`, broadcastId, category, title, body, link, jsonbText(extra), userId);
     // An account's devices share one inbox notification; an install with no account has none.
     await tx.run(`INSERT INTO ${NOTIFICATIONS} (${['user_id', 'app_key', 'category', 'event_type', 'title', 'body', 'deep_link', 'payload'].map(col).join(', ')})
-      SELECT DISTINCT a.${col('user_id')}, 'chc', ?, 'admin_broadcast', ?, ?, ?, ? FROM ${DEVICES} a WHERE ${audienceSql('a')} AND a.${col('user_id')} IS NOT NULL`,
-    category, title, body, link, jsonbText({ ...(extra as Row), broadcast_id: broadcastId, source: 'chc_admin' }), category);
+      SELECT DISTINCT a.${col('user_id')}, 'cv', ?, 'admin_broadcast', ?, ?, ?, ? FROM ${DEVICES} a WHERE ${audienceSql('a')} AND a.${col('user_id')} IS NOT NULL`,
+    category, title, body, link, jsonbText({ ...(extra as Row), broadcast_id: broadcastId, source: 'cv_admin' }), category);
     const deliveries = (await tx.run(`INSERT INTO ${DELIVERIES} (${col('notification_id')}, ${col('broadcast_id')}, ${col('device_id')}, ${col('provider')})
       SELECT n.${col('id')}, ?, a.${col('id')}, a.${col('provider')} FROM ${DEVICES} a
         LEFT JOIN ${NOTIFICATIONS} n ON n.${col('user_id')} = a.${col('user_id')} AND n.${col('event_type')} = 'admin_broadcast' AND json_extract(n.${col('payload')}, '$.broadcast_id') = ?

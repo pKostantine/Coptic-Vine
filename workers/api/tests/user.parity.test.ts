@@ -85,6 +85,15 @@ test('push devices: who may register, which tokens, moving between accounts, dis
   const wRows = worker.rows(`SELECT ${columns.map((c) => `"${c}"`).join(', ')}, "provider_data" FROM "public.notification_devices" ORDER BY "push_token"`)
     .map((row) => ({ ...row, enabled: row.enabled === 1, provider_data: JSON.parse(row.provider_data as string) }));
   assert.deepEqual(normalize(wRows, new Set([ALICE, BOB])), normalize(pgRows, new Set([ALICE, BOB])), 'the devices table');
+
+  // D1 keeps the app keys' new names. An app built before the rename still sends chc; either name is the same device.
+  assert.ok(wRows.every((row) => String((row as Record<string, unknown>).app_key).startsWith('cv')), 'stored by the new names');
+  const devices = () => worker.rows<{ app_key: string; enabled: number }>('SELECT "app_key", "enabled" FROM "public.notification_devices" WHERE "user_id" = ? AND "push_token" = ?', ALICE, EXPO);
+  assert.deepEqual(devices(), [{ app_key: 'cv', enabled: 1 }]);
+  assert.equal((await worker.rpc(ALICE, 'register_notification_device', { p_app_key: 'cv', p_platform: 'ios', p_provider: 'expo', p_push_token: EXPO })).error, null);
+  assert.deepEqual(devices(), [{ app_key: 'cv', enabled: 1 }], 'registered again by the new name, still one device');
+  assert.equal((await worker.rpc(ALICE, 'disable_notification_device', { p_app_key: 'cv', p_provider: 'expo', p_push_token: EXPO })).error, null);
+  assert.deepEqual(devices(), [{ app_key: 'cv', enabled: 0 }]);
 });
 
 /** A table request on both sides: supabase-js's request to the Worker, and the SQL PostgREST would run in Postgres. */
@@ -133,7 +142,8 @@ test('notifications: the user\'s own list, marking one read, and nothing else', 
     ('22222222-2222-4222-8222-222222222222', $1, 'chc', 'music_releases', 'release_published', 'Older', 'Before', null, '{}', '2026-10-19T10:00:00+00:00'),
     ('33333333-3333-4333-8333-333333333333', $2, 'chc', 'music_releases', 'release_published', 'Bob''s', 'Not Alice''s', null, '{}', '2026-10-20T11:00:00+00:00')`;
   await oracle.sql(insert, [ALICE, BOB]);
-  worker.db.prepare(insert.replaceAll('public.notifications', '"public.notifications"').replace(/\$[12]/g, '?')).run(ALICE, ALICE, BOB);
+  // D1 keeps the app keys' new names; an app built before the rename still asks for chc.
+  worker.db.prepare(insert.replaceAll('public.notifications', '"public.notifications"').replaceAll("'chc'", "'cv'").replace(/\$[12]/g, '?')).run(ALICE, ALICE, BOB);
 
   const list = (user: string | null) => table(user,
     { method: 'GET', path: '/rest/v1/notifications?select=id,category,event_type,title,body,image_url,deep_link,payload,created_at,read_at&app_key=eq.chc&order=created_at.desc&limit=50' },
@@ -141,6 +151,8 @@ test('notifications: the user\'s own list, marking one read, and nothing else', 
      from (select * from public.notifications where app_key = 'chc' order by created_at desc limit 50) n`);
   const before = await list(ALICE);
   assert.deepEqual((before.data as { title: string }[]).map((n) => n.title), ['New album', 'Older']);
+  const byNewName = await worker.request(ALICE, 'GET', '/rest/v1/notifications?select=title&app_key=eq.cv&order=created_at.desc');
+  assert.deepEqual((byNewName.data as { title: string }[]).map((n) => n.title), ['New album', 'Older'], 'by the new name too');
   await list(null);
 
   const readAt = '2026-10-21T08:00:00.000Z';

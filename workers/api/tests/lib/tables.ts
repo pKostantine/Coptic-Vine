@@ -9,17 +9,19 @@
 import schema from '../../schema/user-tables.json' with { type: 'json' };
 import type { UserTable } from '../../scripts/gen-schema.ts';
 import type { Oracle } from './oracle.ts';
-import type { WorkerSide } from './worker.ts';
+import { RENAMED_APP_KEYS, type WorkerSide } from './worker.ts';
 
 const tables = new Map((schema as { tables: UserTable[] }).tables.map((table) => [`${table.schema}.${table.table}`, table]));
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+00:00$/;
 
 type Rows = Record<string, Record<string, unknown>[]>;
 
+/** Supabase's app keys are the old names (chc…); D1's the new (cv…). Read as one. */
 function walk(value: unknown, leaf: (v: string) => string): unknown {
   if (Array.isArray(value)) return value.map((v) => walk(v, leaf));
   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((k) => [k, walk((value as Record<string, unknown>)[k], leaf)]));
-  return typeof value === 'string' ? leaf(value) : value;
+  if (typeof value !== 'string') return value;
+  return leaf(Object.hasOwn(RENAMED_APP_KEYS, value) ? RENAMED_APP_KEYS[value] : value);
 }
 
 /** The tables as one text, generated ids renamed, timestamps masked. */

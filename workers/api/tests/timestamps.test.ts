@@ -24,7 +24,7 @@ before(async () => {
   worker = new WorkerSide();
   await worker.addUser(ADMIN, 'admin@time.test');
   worker.db.prepare(`INSERT INTO "creator.user_roles" ("user_id", "role") VALUES (?, 'admin')`).run(ADMIN);
-  worker.db.prepare(`INSERT INTO "public.notification_devices" ("user_id", "app_key", "platform", "provider", "push_token") VALUES (?, 'chc_admin', 'ios', 'expo', 'token')`).run(ADMIN);
+  worker.db.prepare(`INSERT INTO "public.notification_devices" ("user_id", "app_key", "platform", "provider", "push_token") VALUES (?, 'cv_admin', 'ios', 'expo', 'token')`).run(ADMIN);
   ctx = { db: worker.env.DB, env: worker.env, userId: null };
 });
 

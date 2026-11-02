@@ -2,7 +2,7 @@
 import type { Args, Rpc } from '../index.ts';
 import {
   getAdminArtistProfile, getAdminArtists, getAdminCreatorArtistClaims, getAdminNotificationBroadcastOverview, getAdminProcessingJobs, getAdminPublicationOverview,
-  getAdminReviewQueue, getAdminSubmissionDetail, isChcAdmin,
+  getAdminReviewQueue, getAdminSubmissionDetail, isCvAdmin,
 } from './reads.ts';
 import {
   adminDeleteCatalogItem, adminSendNotificationBroadcast, adminSendNotificationTest, adminUpdateMusicReleaseDates, confirmAdminCreatorArtistClaim, deleteAdminMusicRelease,
@@ -17,7 +17,9 @@ const list = (a: Args, name: string) => a[name] as (string | null)[] | null;
 const bool = (a: Args, name: string) => a[name] as boolean | null;
 
 export const adminRpcs: Record<string, Rpc> = {
-  'public.is_chc_admin': (c) => isChcAdmin(c),
+  'public.is_cv_admin': (c) => isCvAdmin(c),
+  // Its name in CV-Admin's builds from before the rename.
+  'public.is_chc_admin': (c) => isCvAdmin(c),
   'public.get_admin_review_queue': (c, a) => getAdminReviewQueue(c, list(a, 'p_statuses')),
   'public.get_admin_submission_detail': (c, a) => getAdminSubmissionDetail(c, s(a, 'p_submission_id')),
   'public.get_admin_publication_overview': (c) => getAdminPublicationOverview(c),
