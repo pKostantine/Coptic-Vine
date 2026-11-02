@@ -11,7 +11,7 @@ export type WebPushSyncResult =
   | 'unsupported'
   | 'unconfigured';
 
-const APP_KEY = 'chc';
+const APP_KEY = 'cv';
 const PROVIDER = 'web_push';
 const LAST_ENDPOINT_KEY = '@cv/notification-token/web';
 // Its name in earlier builds (utils/legacyNames.ts).

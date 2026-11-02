@@ -95,7 +95,7 @@ notification triggers and the wake call.
     `https://copticvine.ca/account`.
   - Native Google sign-in is installed (`@react-native-google-signin`) but
     never called.
-- **CV-Admin:** email and password only. `is_chc_admin` gates the site.
+- **CV-Admin:** email and password only. `is_cv_admin` (`is_chc_admin` on Supabase, a name cv-api still answers) gates the site.
 - **CV-Artists:** email and password, and Google OAuth with PKCE
   (`copticvineartists://auth/callback`).
 - **Profile data:** kept in auth `user_metadata` (`full_name`,

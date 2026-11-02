@@ -2121,9 +2121,11 @@ Cloudflare notification dispatcher
 
 The app identifier is stored on every registration and notification:
 
-- `chc`
-- `chc_artists`
-- `chc_admin`
+- `cv`
+- `cv_artists`
+- `cv_admin`
+
+(Supabase kept them under the app's old name: `chc`, `chc_artists`, `chc_admin`. D1 took the new names in migrations 0037 and 0038; cv-api still understands the old ones from builds made before.)
 
 A user may therefore register multiple devices and multiple Coptic Vine apps without sharing tokens between apps.
 
