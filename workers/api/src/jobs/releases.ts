@@ -1,8 +1,7 @@
 /**
  * Releases due by their schedule, published every minute by the cron: ports
  * of private.publish_due_music_releases and publish_due_learning_releases
- * (schema/pg-user-schema.sql), which pg_cron ran as
- * chc-publish-due-music-releases and chc-publish-due-learning-releases.
+ * (schema/pg-user-schema.sql), which pg_cron ran every minute on Supabase.
  * Each submission is published in a transaction of its own; one that fails
  * is noted on the submission (scheduled_publish_failed, with the error) and
  * the rest carry on, as Supabase's per-release savepoints did.

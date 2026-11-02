@@ -1,5 +1,5 @@
 /**
- * CV-Admin's reads: ports of public.is_chc_admin, get_admin_review_queue,
+ * CV-Admin's reads: ports of public.is_chc_admin (now is_cv_admin), get_admin_review_queue,
  * get_admin_submission_detail, get_admin_publication_overview,
  * get_admin_processing_jobs, get_admin_artists, get_admin_artist_profile,
  * get_admin_creator_artist_claims and
@@ -44,10 +44,10 @@ const plusHours = (at: string, hours: number) => pgTimestamp(new Date(Date.parse
 /** uuid order: by the bytes, which for the lowercase text is plain string order. */
 const byUuid = (a: unknown, b: unknown) => ((a as string) < (b as string) ? -1 : (a as string) > (b as string) ? 1 : 0);
 
-// ── is_chc_admin ──────────────────────────────────────────────────────────
+// ── is_cv_admin ───────────────────────────────────────────────────────────
 
-/** public.is_chc_admin(): private.is_admin(). */
-export async function isChcAdmin(ctx: ApiContext): Promise<boolean> {
+/** public.is_cv_admin(), Supabase's is_chc_admin renamed: private.is_admin(). */
+export async function isCvAdmin(ctx: ApiContext): Promise<boolean> {
   return (await viewer(ctx)).admin;
 }
 
@@ -153,9 +153,9 @@ const DELIVERIES = t('private', 'notification_deliveries');
 /** private.broadcast_audience(category): the app's enabled push devices, less the accounts that turned the category off. */
 export function audienceSql(alias: string): string {
   const p = `${alias}_pref`;
-  return `${alias}.${col('app_key')} = 'chc' AND ${alias}.${col('enabled')} = 1 AND ${alias}.${col('provider')} IN ('expo', 'web_push')
+  return `${alias}.${col('app_key')} = 'cv' AND ${alias}.${col('enabled')} = 1 AND ${alias}.${col('provider')} IN ('expo', 'web_push')
     AND (${alias}.${col('user_id')} IS NULL OR NOT EXISTS (SELECT 1 FROM ${t('public', 'notification_preferences')} ${p}
-      WHERE ${p}.${col('user_id')} = ${alias}.${col('user_id')} AND ${p}.${col('app_key')} = 'chc' AND ${p}.${col('category')} = ? AND ${p}.${col('enabled')} = 0))`;
+      WHERE ${p}.${col('user_id')} = ${alias}.${col('user_id')} AND ${p}.${col('app_key')} = 'cv' AND ${p}.${col('category')} = ? AND ${p}.${col('enabled')} = 0))`;
 }
 
 /** greatest(a, b), which ignores nulls. */
@@ -172,14 +172,14 @@ export async function getAdminNotificationBroadcastOverview(ctx: ApiContext, cat
     first(ctx, `SELECT count(*) AS devices, count(DISTINCT a.${col('user_id')}) AS users, ${countWhere(`a.${col('user_id')} IS NULL`)} AS anonymous,
         ${countWhere(`a.${col('platform')} = 'ios'`)} AS ios, ${countWhere(`a.${col('platform')} = 'android'`)} AS android, ${countWhere(`a.${col('platform')} IN ('web', 'windows')`)} AS web
       FROM ${DEVICES} a WHERE ${audienceSql('a')}`, wanted),
-    first(ctx, `SELECT count(*) AS n FROM ${DEVICES} WHERE ${col('user_id')} = ? AND ${col('app_key')} = 'chc' AND ${col('enabled')} = 1 AND ${col('provider')} IN ('expo', 'web_push')`, userId),
+    first(ctx, `SELECT count(*) AS n FROM ${DEVICES} WHERE ${col('user_id')} = ? AND ${col('app_key')} = 'cv' AND ${col('enabled')} = 1 AND ${col('provider')} IN ('expo', 'web_push')`, userId),
     first(ctx, `SELECT min(CASE WHEN d.${col('status')} = 'queued' AND d.${col('available_at')} <= ? THEN d.${col('available_at')} END) AS oldest,
         ${countWhere(`d.${col('status')} IN ('queued', 'processing')`)} AS waiting, max(${greatest(`d.${col('accepted_at')}`, `d.${col('delivered_at')}`)}) AS last_sent
-      FROM ${DELIVERIES} d JOIN ${DEVICES} dev ON dev.${col('id')} = d.${col('device_id')} WHERE dev.${col('app_key')} = 'chc'`, at),
+      FROM ${DELIVERIES} d JOIN ${DEVICES} dev ON dev.${col('id')} = d.${col('device_id')} WHERE dev.${col('app_key')} = 'cv'`, at),
     all(ctx, `SELECT b.*, ${countWhere(`d.${col('status')} IN ('queued', 'processing')`)} AS waiting, ${countWhere(`d.${col('status')} = 'accepted'`)} AS sent,
         ${countWhere(`d.${col('status')} = 'delivered'`)} AS delivered, ${countWhere(`d.${col('status')} = 'failed'`)} AS failed, ${countWhere(`d.${col('status')} = 'disabled'`)} AS unreachable
       FROM ${t('public', 'notification_broadcasts')} b LEFT JOIN ${DELIVERIES} d ON d.${col('broadcast_id')} = b.${col('id')}
-      WHERE b.${col('app_key')} = 'chc' GROUP BY b.${col('id')} ORDER BY b.${col('created_at')} DESC LIMIT ?`, limit),
+      WHERE b.${col('app_key')} = 'cv' GROUP BY b.${col('id')} ORDER BY b.${col('created_at')} DESC LIMIT ?`, limit),
   ]);
   const crowd = {
     devices: audience!.devices, signedInUsers: audience!.users, devicesWithoutAccount: audience!.anonymous, ios: audience!.ios, android: audience!.android, web: audience!.web,

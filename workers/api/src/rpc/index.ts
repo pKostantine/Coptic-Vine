@@ -45,7 +45,12 @@ export const RPCS: Record<string, Rpc> = {
 };
 
 /** cv-api's own functions' signatures. */
-export const OWN_FUNCTIONS: Record<string, FunctionInfo> = { ...USER_FUNCTIONS, ...FEEDBACK_FUNCTIONS };
+export const OWN_FUNCTIONS: Record<string, FunctionInfo> = {
+  ...USER_FUNCTIONS,
+  ...FEEDBACK_FUNCTIONS,
+  // Supabase's is_chc_admin under Coptic Vine's name (src/rpc/admin/reads.ts); the old name still answers.
+  'public.is_cv_admin': { roles: ['authenticated'], returns: 'boolean', params: [] },
+};
 
 /** The dump's functions, then cv-api's own. */
 export const SUPABASE_FUNCTIONS = functions as Record<string, FunctionInfo>;

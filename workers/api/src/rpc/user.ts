@@ -5,6 +5,7 @@
  * disable_notification_device (schema/pg-user-schema.sql), checked against
  * them by tests/user.parity.test.ts.
  */
+import { APP_KEYS, appKey } from './appKeys.ts';
 import { col, t } from '../../../content-api/src/db/names.ts';
 import { asJsonb, jsonbText, now, raise } from '../pg.ts';
 import type { ApiContext } from '../rest/context.ts';
@@ -47,7 +48,6 @@ export async function saveMyContentPreferences(ctx: ApiContext, preferences: unk
   return true;
 }
 
-const APP_KEYS = ['chc', 'chc_artists', 'chc_admin'];
 const PLATFORMS = ['ios', 'android', 'web', 'windows'];
 const PROVIDERS = ['expo', 'web_push', 'wns'];
 
@@ -56,17 +56,18 @@ export async function registerNotificationDevice(ctx: ApiContext, a: {
   p_provider_data: unknown; p_device_name: string | null; p_app_version: string | null;
 }): Promise<string> {
   const userId = ctx.userId;
+  a = { ...a, p_app_key: appKey(a.p_app_key) };
   // Coptic Vine's own installs may register signed out; the Artists and Admin apps are for accounts only.
-  if (userId == null && a.p_app_key !== 'chc') raise('authentication_required');
+  if (userId == null && a.p_app_key !== 'cv') raise('authentication_required');
   const providerData = a.p_provider_data ?? {};
   const token = a.p_push_token;
-  if (!APP_KEYS.includes(a.p_app_key) || !PLATFORMS.includes(a.p_platform) || !PROVIDERS.includes(a.p_provider)
+  if (!(APP_KEYS as readonly string[]).includes(a.p_app_key) || !PLATFORMS.includes(a.p_platform) || !PROVIDERS.includes(a.p_provider)
     || token == null || token.replace(/^ +| +$/g, '') === '' || [...token].length > 4096
     || new TextEncoder().encode(jsonbText(providerData)).length > 16384) {
     raise('invalid_notification_device');
   }
   if (a.p_provider === 'web_push') {
-    if (a.p_app_key !== 'chc' || !['web', 'windows'].includes(a.p_platform)) raise('invalid_web_push_app');
+    if (a.p_app_key !== 'cv' || !['web', 'windows'].includes(a.p_platform)) raise('invalid_web_push_app');
     const host = token.match(/^https:\/\/([^/:?#]+)/)?.[1]?.toLowerCase();
     const ok = host === 'fcm.googleapis.com' || host === 'push.services.mozilla.com' || host?.endsWith('.push.services.mozilla.com')
       || host === 'push.apple.com' || host?.endsWith('.push.apple.com');
@@ -95,6 +96,7 @@ export async function registerNotificationDevice(ctx: ApiContext, a: {
 
 export async function disableNotificationDevice(ctx: ApiContext, a: { p_app_key: string; p_provider: string; p_push_token: string }): Promise<boolean> {
   if (!ctx.userId) return false;
+  a = { ...a, p_app_key: appKey(a.p_app_key) };
   const result = await ctx.db.prepare(`UPDATE ${DEVICES} SET ${col('enabled')} = 0, ${col('updated_at')} = ? WHERE ${col('user_id')} = ? AND ${col('app_key')} = ? AND ${col('provider')} = ? AND ${col('push_token')} = ?`)
     .bind(now(), ctx.userId, a.p_app_key, a.p_provider, a.p_push_token).run();
   return result.meta.changes > 0;

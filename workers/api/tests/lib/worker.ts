@@ -31,7 +31,7 @@ export class WorkerSide {
     this.db = new DatabaseSync(':memory:');
     this.db.exec('PRAGMA foreign_keys = ON');
     this.db.exec('CREATE TABLE "public.hymn_titles" ("hymn_key" TEXT PRIMARY KEY) STRICT');
-    for (const name of ['0006_auth.sql', '0007_user_schema.sql', '0008_auth_rate_limits.sql', '0009_user_triggers.sql', '0010_undo_log.sql', '0011_job_lease.sql']) this.db.exec(migration(name));
+    for (const name of ['0006_auth.sql', '0007_user_schema.sql', '0008_auth_rate_limits.sql', '0009_user_triggers.sql', '0010_undo_log.sql', '0011_job_lease.sql', '0037_cv_app_keys_both.sql', '0038_cv_app_keys.sql']) this.db.exec(migration(name));
     this.env = {
       DB: d1(this.db), BETTER_AUTH_URL: BASE, BETTER_AUTH_SECRET: 'a-parity-secret-that-is-long-enough-0123456789',
       EMAIL_FROM: 'no-reply@copticvine.ca', TRUSTED_ORIGINS: `${ORIGIN},copticvine://`, EMAIL_MODE: 'outbox', SERVICE_TOKEN, USER_MEDIA: r2(),
@@ -88,6 +88,9 @@ export class WorkerSide {
  * placeholders in order of first appearance, so the structure and every other
  * value are compared exactly.
  */
+/** The apps' keys as Supabase named them, and as D1 now stores them (src/rpc/appKeys.ts): the same apps. */
+export const RENAMED_APP_KEYS: Record<string, string> = { chc: 'cv', chc_artists: 'cv_artists', chc_admin: 'cv_admin' };
+
 export function normalize(value: unknown, keep: Set<string> = new Set()): unknown {
   const ids = new Map<string, string>();
   const walk = (v: unknown): unknown => {
@@ -97,6 +100,7 @@ export function normalize(value: unknown, keep: Set<string> = new Set()): unknow
       const value = (v as Record<string, unknown>)[key];
       return [key, key === 'version' && typeof value === 'number' && value > 1e9 ? '<epoch>' : walk(value)];
     }));
+    if (typeof v === 'string' && Object.hasOwn(RENAMED_APP_KEYS, v)) return RENAMED_APP_KEYS[v];
     if (typeof v === 'string' && !keep.has(v)) {
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)) {
         if (!ids.has(v)) ids.set(v, `<id ${ids.size + 1}>`);

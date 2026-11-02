@@ -20,6 +20,7 @@ import { parseList } from '../../../content-api/src/rest/rows.ts';
 import schema from '../../schema/user-tables.json' with { type: 'json' };
 import type { UserTable } from '../../scripts/gen-schema.ts';
 import { jsonbText, PgError, timestampInput } from '../pg.ts';
+import { appKey } from '../rpc/appKeys.ts';
 import type { ApiContext } from './context.ts';
 
 type Column = UserTable['columns'][number];
@@ -51,6 +52,8 @@ function findColumn(table: UserTable, name: string): Column {
 /** A value from the client as D1 stores the column. */
 export function input(column: Column, value: unknown): unknown {
   if (value === null || value === undefined) return null;
+  // An app's old name, from a build from before the rename (src/rpc/appKeys.ts).
+  if (column.name === 'app_key') value = appKey(value);
   switch (column.kind) {
     case 'timestamptz': return timestampInput(value, column.name);
     case 'jsonb': return jsonbText(value);
@@ -88,7 +91,7 @@ function filterValue(column: Column, raw: string): unknown {
   if (column.kind === 'boolean') return raw === 'true' ? 1 : raw === 'false' ? 0 : input(column, raw);
   if (column.kind === 'integer' || column.kind === 'float4') return Number(raw);
   if (column.kind === 'timestamptz') return timestampInput(raw, column.name);
-  return raw;
+  return column.name === 'app_key' ? appKey(raw) : raw;
 }
 
 const RESERVED = new Set(['select', 'order', 'limit', 'offset', 'columns', 'on_conflict']);
