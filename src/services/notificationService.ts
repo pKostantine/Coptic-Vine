@@ -9,7 +9,7 @@ import { moveLegacyStorageKey } from '@/utils/legacyNames';
 export type NotificationPreferenceMap = Record<string, boolean>;
 export type NotificationSyncResult = 'registered' | 'permission_required' | 'signed_out' | 'unsupported' | 'unconfigured';
 
-const APP_KEY = 'chc';
+const APP_KEY = 'cv';
 const PROVIDER = 'expo';
 const CHANNEL_ID = 'cv-default';
 // The channel earlier builds made, taken down so the app is listed once in the phone's settings.

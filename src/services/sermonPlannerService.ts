@@ -1,11 +1,17 @@
 import { api } from '@/utils/api';
 import type { SermonPlan } from '@/types/sermonPlanner';
+import { moveLegacyStorageKey } from '@/utils/legacyNames';
 import { emptySermonPlan, normalizeSermonPlan } from '@/utils/sermonPlanner';
 
-const LOCAL_STORAGE_PREFIX = 'chc.sermon-plans.v1';
+const LOCAL_STORAGE_PREFIX = 'cv.sermon-plans.v1';
+// Before the app's rename (utils/legacyNames.ts).
+const LEGACY_STORAGE_PREFIX = 'chc.sermon-plans.v1';
 
+/** A plan's key, the first time it's asked for moved from where an earlier build kept it. */
 function storageKey(documentKey: string, serviceDate: string) {
-  return `${LOCAL_STORAGE_PREFIX}:${encodeURIComponent(documentKey)}:${serviceDate}`;
+  const key = `${LOCAL_STORAGE_PREFIX}:${encodeURIComponent(documentKey)}:${serviceDate}`;
+  moveLegacyStorageKey(`${LEGACY_STORAGE_PREFIX}:${encodeURIComponent(documentKey)}:${serviceDate}`, key);
+  return key;
 }
 
 export async function loadLocalSermonPlan(documentKey: string, serviceDate: string): Promise<SermonPlan> {
