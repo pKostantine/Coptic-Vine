@@ -267,6 +267,42 @@ test('the Contents fold St Basil\'s seven short litanies under their heading, th
   assert.equal(gatherUnderDividers(basil.filter((entry) => !entry.hymnKey.startsWith('litanyOfTheOblations')), speaks).size, 0);
 });
 
+test('the Contents fold St Gregory\'s short litanies under their heading, through the Litany of the Place before the Commemoration', () => {
+  const { gatherUnderDividers, isDividerSection } = load('src/utils/sectionDividers.ts');
+  const section = (id, hymnKey, titled = true) => ({ id, hymnKey, titled });
+  const speaks = (entry) => entry.titled;
+  // liturgy.liturgy_of_st_gregory, items 16 to 35.
+  const gregory = [
+    section('epiclesisStGregory-16', 'epiclesisStGregory'),
+    section('shortLitaniesStGregory-17', 'shortLitaniesStGregory'),
+    section('yesWeAskYou-18', 'yesWeAskYou'),
+    section('litanyOfPeaceStGregory-19', 'litanyOfPeaceStGregory'),
+    section('litanyOfTheFathersStGregory-20', 'litanyOfTheFathersStGregory'),
+    section('litanyOfTheDepartedPatriarchMetropolitanBishop1-21', 'litanyOfTheDepartedPatriarchMetropolitanBishop1'),
+    section('litanyOfTheClergyStGregory-22', 'litanyOfTheClergyStGregory'),
+    section('litanyOfMercyStGregory-23', 'litanyOfMercyStGregory'),
+    section('litanyOfTheLeadersStGregory-24', 'litanyOfTheLeadersStGregory'),
+    // St Basil's ends on its Litany of the Oblations; St Gregory's goes on past its own.
+    section('litanyOfTheOblationsStGregory-25', 'litanyOfTheOblationsStGregory'),
+    section('litanyOfTheCaptives-26', 'litanyOfTheCaptives'),
+    section('forYourPeople-27', 'forYourPeople'),
+    section('litanyOfTheSeasonOfPlants-29', 'litanyOfTheSeasonOfPlants'),
+    section('combinedLitanyForTheThreeSeasons-31', 'combinedLitanyForTheThreeSeasons'),
+    section('healingToTheSickStGregory-32', 'healingToTheSickStGregory'),
+    section('litanyOfThePlaceStGregory-33', 'litanyOfThePlaceStGregory'),
+    section('litanyOfThePlaceStGregory-33-cont1', 'litanyOfThePlaceStGregory', false),
+    section('commemorationOfTheSaintsStGregory-34', 'commemorationOfTheSaintsStGregory'),
+    section('litanyOfTheDepartedPatriarchMetropolitanBishop2-35', 'litanyOfTheDepartedPatriarchMetropolitanBishop2'),
+  ];
+  assert.ok(isDividerSection(gregory[1]));
+  const owners = gatherUnderDividers(gregory, speaks);
+  assert.deepEqual([...owners.keys()], gregory.slice(2, 17).map((entry) => entry.id));
+  assert.ok([...owners.values()].every((owner) => owner === 'shortLitaniesStGregory-17'));
+
+  // Without the Litany of the Place it holds nothing, rather than the rest of the service.
+  assert.equal(gatherUnderDividers(gregory.filter((entry) => !entry.hymnKey.startsWith('litanyOfThePlace')), speaks).size, 0);
+});
+
 test('the Contents still fold the Agpeya hours by their openings', () => {
   const { gatherUnderDividers, isDividerSection } = load('src/utils/sectionDividers.ts');
   const section = (id, titled = true) => ({ id, hymnKey: id, titled });
