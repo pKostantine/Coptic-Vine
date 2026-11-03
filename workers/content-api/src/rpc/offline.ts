@@ -13,9 +13,15 @@
  * nor do bible.verses' generated tsvector columns: rows are what D1 holds.
  * Pages follow rowid where Supabase's followed ctid; the script passes the
  * cursor back without reading it.
+ *
+ * The plan's dependencies are the hand-kept ones and, on top of them,
+ * whatever each resource's documents call (offlineCalls.ts): a Liturgy that
+ * calls ADAM_ASPASMOS carries aspasmos. A schema called that has no resource
+ * of its own gets one, named after it, with all its tables.
  */
 import { contentTable, type Table } from '../content.ts';
-import { col, t } from '../db/names.ts';
+import { CONTENT_SCHEMAS, col, t } from '../db/names.ts';
+import { deriveCalls, readContentKeys } from '../offlineCalls.ts';
 import { int4, jsonb, PgError } from '../pg.ts';
 import type { ContentContext, Row } from '../types.ts';
 import schema from '../../schema/content-tables.json' with { type: 'json' };
@@ -34,17 +40,52 @@ function packageTables(resource: Resource): string[] {
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
+/** A content schema with no resource row of its own, packaged whole under its own name. */
+function schemaResource(schemaName: string): Resource | null {
+  return (CONTENT_SCHEMAS as readonly string[]).includes(schemaName) ? { resource_key: schemaName, schema_name: schemaName, include_tables: null } : null;
+}
+
+const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
 export async function getOfflinePackagePlan(context: ContentContext): Promise<unknown> {
   const db = context.db;
-  const [books, dependencies, resources] = await db.batch([
-    db.prepare(`SELECT ${['book_key', 'title_english', 'title_arabic', 'root_resources'].map(col).join(', ')} FROM ${t('offline_content', 'books')} WHERE ${col('enabled')} = 1 ORDER BY ${col('book_key')}`),
-    db.prepare(`SELECT ${col('resource_key')}, ${col('dependency_key')} FROM ${t('offline_content', 'resource_dependencies')} ORDER BY ${col('resource_key')}, ${col('dependency_key')}`),
-    db.prepare(`SELECT ${['resource_key', 'schema_name', 'include_tables'].map(col).join(', ')} FROM ${t('offline_content', 'resources')} ORDER BY ${col('resource_key')}`),
+  const [[books, dependencies, resources], contentKeys] = await Promise.all([
+    db.batch([
+      db.prepare(`SELECT ${['book_key', 'title_english', 'title_arabic', 'root_resources'].map(col).join(', ')} FROM ${t('offline_content', 'books')} WHERE ${col('enabled')} = 1 ORDER BY ${col('book_key')}`),
+      db.prepare(`SELECT ${col('resource_key')}, ${col('dependency_key')} FROM ${t('offline_content', 'resource_dependencies')} ORDER BY ${col('resource_key')}, ${col('dependency_key')}`),
+      db.prepare(`SELECT ${['resource_key', 'schema_name', 'include_tables'].map(col).join(', ')} FROM ${t('offline_content', 'resources')} ORDER BY ${col('resource_key')}`),
+    ]),
+    readContentKeys(context),
   ]);
+
+  // The hand-kept plan, then what each resource's documents call on top of it.
+  const planned = new Map((resources.results as unknown as Resource[]).map((r) => [r.resource_key, r]));
+  const resourceOf = new Map([...planned.values()].map((r) => [r.schema_name, r.resource_key]));
+  const pairs = new Set((dependencies.results as Row[]).map((d) => `${d.resource_key}\u0000${d.dependency_key}`));
+  const calls = deriveCalls(contentKeys);
+  const queue = [...planned.values()];
+  while (queue.length) {
+    const resource = queue.shift()!;
+    for (const called of [...(calls.get(resource.schema_name) ?? [])].sort(byKey)) {
+      let dependency = resourceOf.get(called);
+      if (!dependency) {
+        const added = schemaResource(called);
+        if (!added || planned.has(added.resource_key)) continue;
+        planned.set(added.resource_key, added);
+        resourceOf.set(called, added.resource_key);
+        queue.push(added);
+        dependency = added.resource_key;
+      }
+      if (dependency !== resource.resource_key) pairs.add(`${resource.resource_key}\u0000${dependency}`);
+    }
+  }
+
   return jsonb({
     books: (books.results as Row[]).map((book) => jsonb({ key: book.book_key, title: book.title_english, titleArabic: book.title_arabic, roots: JSON.parse(String(book.root_resources)) })),
-    dependencies: (dependencies.results as Row[]).map((d) => jsonb({ resource: d.resource_key, dependency: d.dependency_key })),
-    resources: (resources.results as unknown as Resource[]).map((r) => jsonb({ id: r.resource_key, schema: r.schema_name, tables: packageTables(r) })),
+    dependencies: [...pairs].map((pair) => pair.split('\u0000')).sort(([a, b], [c, d]) => byKey(a, c) || byKey(b, d))
+      .map(([resource, dependency]) => jsonb({ resource, dependency })),
+    resources: [...planned.values()].sort((a, b) => byKey(a.resource_key, b.resource_key))
+      .map((r) => jsonb({ id: r.resource_key, schema: r.schema_name, tables: packageTables(r) })),
   });
 }
 
@@ -66,7 +107,7 @@ export async function getOfflineTableRows(context: ContentContext, resourceKey: 
   const resource = await context.db
     .prepare(`SELECT ${['resource_key', 'schema_name', 'include_tables'].map(col).join(', ')} FROM ${t('offline_content', 'resources')} WHERE ${col('resource_key')} = ?`)
     .bind(resourceKey)
-    .first<Resource>();
+    .first<Resource>() ?? (resourceKey === null ? null : schemaResource(resourceKey));
   if (!resource || tableName === null || !packageTables(resource).includes(tableName)) throw new PgError('P0001', 'not a packaged table');
   const table = contentTable(resource.schema_name, tableName)!;
   const cursor = after === null || after === '' ? 0 : Number(after);
