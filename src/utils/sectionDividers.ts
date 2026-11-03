@@ -28,13 +28,20 @@ const SECTION_DIVIDER_KEY = /^introduction(?!Of|To)[A-Za-z]*(?:Hour|Watch|Veil)$
 
 /**
  * Headings over a run of hymns that ends on a named one rather than on the
- * next `introduction…` row: St Basil's Seven Short Litanies holds the litanies
- * from the Litany of Peace through the Litany of the Oblations, the seventh.
+ * next `introduction…` row, each holding everything from it to the last
+ * hymn before the Commemoration of the Saints:
+ * - St Basil's Seven Short Litanies: the Litany of Peace through the Litany of
+ *   the Oblations, the seventh.
+ * - St Gregory's Short Litanies: Yes We Ask You, the litanies, For Your People
+ *   and Healing to the Sick, through the Litany of the Place.
  * The last hymn is matched by the start of its key, and is gathered with
  * everything that is part of it (its continuations and what it splices in).
+ * Each ends on a hymn its own liturgy always says (its condition is that
+ * liturgy's: hymnLibrary.js sets it for the document).
  */
 const SPAN_DIVIDER_ENDS: Readonly<Record<string, RegExp>> = Object.freeze({
   sevenShortLitanies: /^litanyOfTheOblations/,
+  shortLitaniesStGregory: /^litanyOfThePlaceStGregory/,
 });
 
 type DividerSection = { id: string; hymnKey?: string | null };
