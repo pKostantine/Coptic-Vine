@@ -384,6 +384,12 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
 
     return (
       <WebView
+        // A new web view whenever text can or can't be selected: iOS reads
+        // textInteractionEnabled (below) only as it makes the web view, so a
+        // document opened with Select text off stayed unselectable when it
+        // was turned on, until the reader opened another document. The page
+        // reloads for the change anyway (selectText is in its html).
+        key={selectText || sermonPlannerMode ? 'selectable' : 'unselectable'}
         ref={webviewRef}
         originWhitelist={['*']}
         // Memoized alongside the html string: a bare object literal here is a

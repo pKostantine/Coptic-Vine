@@ -242,6 +242,7 @@ function loadBibleBuilder() {
   const local = {
     '../../constants/documentThemes': themes,
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),
+    '../../utils/readerSwipe': loadFile('src/utils/readerSwipe.ts'),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
     './readerChromeFade': readerChromeFade(),
     '../../utils/bibleNumerals': loadFile('src/utils/bibleNumerals.ts'),

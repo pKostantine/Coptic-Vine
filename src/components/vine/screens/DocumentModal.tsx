@@ -256,6 +256,11 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       readerSwipes.release(action.swipe, isCovered ? 0 : action.distance ?? 0, action.velocity ?? 0);
       return;
     }
+    // Text selected on the page or no longer: the swipes leave a selection alone.
+    if (action.type === 'textSelected') {
+      readerSwipes.textSelectedChanged(Boolean(action.selected));
+      return;
+    }
   };
 
   function requestSlideJump(target: Omit<SlideJumpRequest, 'token'>) {
@@ -415,6 +420,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
       setSelectorOpen(true);
     },
     ignores: (startX) => touchOnPillBarRef.current || startsInInset(startX),
+    // As the page's own (DocumentSurface's effectiveSelectText).
+    selectsText: preferences.selectText && !preferences.slideshowMode,
   });
   // Shown again, it opens where it belongs, not where it was swiped away to.
   const { resetPage } = readerSwipes;

@@ -29,6 +29,7 @@ function loadBuilder() {
   // The builder's local imports: the shared highlighting layer, numerals, document metrics and the floating controls' fade.
   const localModules = {
     './textHighlights': evaluateModule(fs.readFileSync('src/components/vine/textHighlights.ts', 'utf8'), 'textHighlights.ts', require),
+    '../../utils/readerSwipe': evaluateModule(fs.readFileSync('src/utils/readerSwipe.ts', 'utf8'), 'readerSwipe.ts', require),
     './documentPresentationMetrics': evaluateModule(fs.readFileSync('src/components/vine/documentPresentationMetrics.js', 'utf8'), 'documentPresentationMetrics.js', require),
     './readerChromeFade': evaluateModule(
       fs.readFileSync('src/components/vine/readerChromeFade.ts', 'utf8'),

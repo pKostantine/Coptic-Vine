@@ -4,6 +4,10 @@
  * goes back, a subdocument closes -- and to the left it brings the contents
  * in. Both follow the finger, and go through or slide back when it lifts.
  *
+ * With Select text on, a selection comes first: neither swipe takes a finger
+ * held before it moved (a long press selecting), nor one that lands while
+ * text is selected (on a handle, or tapping the selection away).
+ *
  * On a slide a swipe is always one of these, never a page turned: the slides
  * turn with a tap on either half (SlideshowContainer.js). A browser has
  * neither swipe; its controls float over the page.
@@ -22,6 +26,43 @@ const FLICK = 0.3;
 
 /** A swipe let go past this share of its way goes through. */
 const THROUGH = 0.35;
+
+/**
+ * Where text can be selected, a finger held still this long before it moves
+ * is pressing, not swiping: a long press picks out a word, and the drag after
+ * it carries the selection on, never the page or the contents. Short of the
+ * platforms' own long press (iOS's half second, Android's 400ms or more), so
+ * the press is never a swipe by the time it selects.
+ */
+export const READER_SWIPE_HOLD_MS = 400;
+
+/** Whether a finger down at `downAt` (ms) and only now, at `now`, moving off was held first: a press, not a swipe. */
+export function readerSwipeWasHeld(downAt: number, now: number): boolean {
+  return Number.isFinite(downAt) && Number.isFinite(now) && now - downAt >= READER_SWIPE_HOLD_MS;
+}
+
+/** A touch's moment: by its own clock where it has one, and by the wall clock. */
+export interface ReaderTouchTime {
+  stamp: number;
+  wall: number;
+}
+
+/** When a touch event happened (a responder's `event`). */
+export function readerTouchTime(event: { nativeEvent?: { timestamp?: number } } | null | undefined): ReaderTouchTime {
+  const stamp = event?.nativeEvent?.timestamp;
+  return { stamp: typeof stamp === 'number' ? stamp : Number.NaN, wall: Date.now() };
+}
+
+/**
+ * Whether a finger down at `down` and moving off only `now` was held first.
+ * By the touches' own clock where both have it, so a busy JavaScript thread,
+ * handling a quick swipe's touches late, can't make it look held.
+ */
+export function readerTouchWasHeld(down: ReaderTouchTime, now: ReaderTouchTime): boolean {
+  return Number.isFinite(down.stamp) && Number.isFinite(now.stamp)
+    ? readerSwipeWasHeld(down.stamp, now.stamp)
+    : readerSwipeWasHeld(down.wall, now.wall);
+}
 
 /** Which swipe a move is, or null while it may still be a tap, a scroll or a stroke up or down the page. */
 export function readerSwipeFor(dx: number, dy: number): ReaderSwipe | null {

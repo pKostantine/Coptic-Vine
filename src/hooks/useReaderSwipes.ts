@@ -8,8 +8,11 @@ import {
   readerSwipeFinishMs,
   readerSwipeFor,
   readerSwipeGoesThrough,
+  readerTouchTime,
+  readerTouchWasHeld,
   type ReaderSwipe,
   type ReaderSwipeSource,
+  type ReaderTouchTime,
 } from '../utils/readerSwipe';
 import { motionDuration, useReducedMotion } from '../utils/useReducedMotion';
 
@@ -30,6 +33,13 @@ interface ReaderSwipesOptions {
   onOpenContents: (from: number) => void;
   /** A touch the swipes leave alone besides a pencil's (`startX`: where it went down, across the screen): one on the pill bar or the Now Playing button. */
   ignores?: (startX: number) => boolean;
+  /**
+   * Text on the page can be selected (Select text, or the Sermon Planner):
+   * a selection comes first (utils/readerSwipe.ts). A finger held before it
+   * moves is selecting, and none is taken while the page says text is
+   * selected (`textSelectedChanged`).
+   */
+  selectsText?: boolean;
 }
 
 /**
@@ -64,6 +74,17 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
   const [sheetShown, setSheetShown] = useState(false);
   const sheetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [arbiter] = useState(createReaderSwipeArbiter);
+  // Text is selected on the page (its 'textSelected' message): the swipes
+  // leave the finger to the selection, and (textSelected) so does iOS's own
+  // back swipe, turned off by the screen meanwhile.
+  const textSelectedRef = useRef(false);
+  const [textSelected, setTextSelected] = useState(false);
+  const textSelectedChanged = useCallback((selected: boolean) => {
+    textSelectedRef.current = selected;
+    setTextSelected(selected);
+  }, []);
+  // When the finger on the screen now went down.
+  const downAtRef = useRef<ReaderTouchTime>({ stamp: Number.NaN, wall: Number.NaN });
   // The page is on its way out: 'going' as it slides, 'gone' once onExit is called.
   const leavingRef = useRef<'going' | 'gone' | null>(null);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -181,6 +202,11 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
       taken.swipe === 'exit' ? dx - taken.fromDx : taken.fromDx - dx;
     // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
     return PanResponder.create({
+      // Only noted: when the finger went down, for a press held before it moves.
+      onStartShouldSetPanResponderCapture: (event) => {
+        downAtRef.current = readerTouchTime(event);
+        return false;
+      },
       onMoveShouldSetPanResponderCapture: (event, gestureState) => {
         const current = optionsRef.current;
         if (!current.enabled || gestureState.numberActiveTouches > 1 || isStylusGestureEvent(event)) return false;
@@ -188,6 +214,8 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
         if (current.ignores?.(gestureState.moveX - gestureState.dx)) return false;
         const swipe = readerSwipeFor(gestureState.dx, gestureState.dy);
         if (!swipe || (swipe === 'exit' && !current.exitsByDrag)) return false;
+        // A selection comes first: text selected, or a long press selecting.
+        if (current.selectsText && (textSelectedRef.current || readerTouchWasHeld(downAtRef.current, readerTouchTime(event)))) return false;
         // Not while the page is going, nor while the page's script has this swipe.
         if (leavingRef.current || !arbiter.take('touch')) return false;
         takenRef.current = { swipe, fromDx: gestureState.dx };
@@ -229,5 +257,13 @@ export function useReaderSwipes(options: ReaderSwipesOptions) {
     leave,
     drag,
     release,
+    /**
+     * Whether the page says text is selected: the screen turns iOS's own back
+     * swipe off meanwhile. Never while nothing can be selected; a page drawn
+     * afresh says nothing is (documentHtml.ts).
+     */
+    textSelected: Boolean(options.selectsText) && textSelected,
+    /** The page's 'textSelected' message (documentHtml.ts). */
+    textSelectedChanged,
   };
 }

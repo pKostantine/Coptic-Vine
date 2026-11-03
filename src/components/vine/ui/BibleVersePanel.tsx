@@ -14,7 +14,7 @@ import type { AppLanguage } from '../../../utils/preferencesStorage';
 import { bibleHighlightVerseId, type BibleDisplayVerse, type BibleLanguageKey } from '../bibleDocumentHtml';
 import { highlightWash } from '../textHighlights';
 import Icon from './Icon';
-import ReaderPanel from './ReaderPanel';
+import ReaderPanel, { ReaderPanelOwnDrag } from './ReaderPanel';
 import { chapterPosition, highlightColorsByVerse, readerPanelColors, readerPanelText } from './readerPanelParts';
 
 export const BIBLE_LANGUAGE_OPTIONS: { key: BibleLanguageKey; label: AppText }[] = [
@@ -170,6 +170,8 @@ export default function BibleVersePanel({
   const highlightColors = useMemo(() => highlightColorsByVerse(highlights), [highlights]);
 
   const scrollRef = useRef<ScrollView>(null);
+  // How far along the language chips are scrolled: away from their start, a swipe to the right on them scrolls them back.
+  const chipsScrolledRef = useRef(0);
   const [rowLayouts, setRowLayouts] = useState<Record<string, number>>({});
   useEffect(() => {
     if (!visible || !currentVerse) return;
@@ -218,11 +220,16 @@ export default function BibleVersePanel({
               <Icon name={arabicApp ? 'chevron-back' : 'chevron-forward'} size={19} color={nextChapter === null ? disabledColor : panel.voice} />
             </Pressable>
           </View>
+          <ReaderPanelOwnDrag when={() => chipsScrolledRef.current > 1}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.chipsScroller}
             contentContainerStyle={[styles.chips, layout.compact && styles.chipsCompact]}
+            scrollEventThrottle={32}
+            onScroll={(event) => {
+              chipsScrolledRef.current = event.nativeEvent.contentOffset.x;
+            }}
           >
             {BIBLE_LANGUAGE_OPTIONS.filter((option) => availableLanguages.includes(option.key)).map((option) => {
               const on = Boolean(enabledLanguages[option.key]);
@@ -241,6 +248,7 @@ export default function BibleVersePanel({
               );
             })}
           </ScrollView>
+          </ReaderPanelOwnDrag>
         </View>
       )}
     >

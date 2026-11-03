@@ -129,6 +129,7 @@ function loadBibleBuilder() {
   );
   const local = {
     './textHighlights': loadFile('src/components/vine/textHighlights.ts'),
+    '../../utils/readerSwipe': loadFile('src/utils/readerSwipe.ts'),
     './documentPresentationMetrics': loadFile('src/components/vine/documentPresentationMetrics.js'),
     './readerChromeFade': fade,
     '../../utils/bibleNumerals': loadFile('src/utils/bibleNumerals.ts'),
