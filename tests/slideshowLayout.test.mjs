@@ -108,7 +108,7 @@ test("responsive padding never creates a budget taller than the viewport", () =>
 test("a slide keeps no margin of its own, so a verse as tall as the screen allows stays whole", () => {
   // Each verse keeps 8px above and below itself; the slide adds nothing to it.
   assert.deepEqual(getSlidePadding(351), { bottom: 0, top: 0 });
-  assert.equal(getSlideContentBudget(351), 349);
+  assert.equal(getSlideContentBudget(351), 351);
   // A phone on its side at 36px, under the Doxologies' pills (a slide 351px
   // tall): seven English lines and five Coptic, 7 x 47 + 16 = 345px, stay on
   // one slide rather than turn over 5 + 2.
@@ -122,9 +122,9 @@ test("a slide keeps no margin of its own, so a verse as tall as the screen allow
   assert.equal(slides.length, 1);
   assert.equal(slides[0].length, 1);
   assert.deepEqual(slides[0][0].slideshowLineCounts, { english: 7, coptic: 5 });
-  // With the 16px it used to keep above and below, the same slide took only five of the lines.
+  // With the 16px it used to keep above and below, the same slide took only six of the lines.
   const before = paginateItems([item], { [item.id]: 345 }, { [item.id]: metric }, 351 - 32 - 2, 36, languages, 814);
-  assert.deepEqual(before.map((slide) => slide[0].slideshowLineCounts.english), [5, 2]);
+  assert.deepEqual(before.map((slide) => slide[0].slideshowLineCounts.english), [6, 1]);
 });
 
 test("overlay insets never change slideshow padding or page formation", () => {
@@ -322,13 +322,44 @@ test("a verse that doesn't fit moves on whole; only one taller than a slide is t
   assert.deepEqual(slides.map((slide) => slide.map(lineCount)), [[0], [6]]);
   assert.equal(slides[1][0].verse.slideshowForcedLines.english.length, 6);
   // A verse of forty lines, taller than any slide, is turned over in pieces that each fit, from a fresh slide,
-  // never leaving a single line either side of a turn.
+  // each piece but the last as full as its slide allows.
   const giant = paginateItems([first, second], { first: 100, second: lineHeight * 40 + 40 }, { second: lines(40) }, 400, 18, english, 1024);
   assert.deepEqual(giant[0].map((entry) => entry.id), ["first"]);
   const pieces = giant.slice(1).map((slide) => slide.map(lineCount));
   assert.ok(pieces.length > 1 && pieces.every((slide) => slide.length === 1));
   assert.equal(pieces.flat().reduce((sum, count) => sum + count, 0), 40);
-  pieces.flat().forEach((count) => assert.ok(count >= 2 && count * lineHeight <= 400, `piece of ${count} lines`));
+  const full = Math.floor((400 - 16) / lineHeight);
+  pieces.flat().forEach((count, index, all) => {
+    assert.ok(count * lineHeight <= 400, `piece of ${count} lines`);
+    if (index < all.length - 1) assert.equal(count, full, `piece ${index} is full`);
+  });
+});
+
+test("a column turned over the page fills its slide to the last line that fits", () => {
+  // St. Basil's "when we disobeyed Your commandment", on an iPhone 14 held
+  // sideways at 34px: the slide is 369px tall (390 less the home indicator),
+  // a line 44px, the verse's own margin 16px. Seven English lines and nine
+  // Coptic: eight Coptic lines take 368px, so eight go on the first slide.
+  // Both the 2px the budget kept and the line held back so as not to leave
+  // one alone took the eighth to the next slide with it.
+  const english = ["when we disobeyed", "Your commandment by", "the deceit of the", "serpent, we fell from", "eternal life and were", "exiled from the", "Paradise of joy."];
+  const coptic = ["ϧⲉⲛ", "ⲡ̀ϫⲓⲛⲑ̀ⲣⲉⲛⲉⲣⲡⲁⲣⲁⲃⲉⲛⲓⲛ", "ⲇⲉ ⲛ̀ⲧⲉⲕⲉⲛⲧⲟⲗⲏ: ϩⲓⲧⲉⲛ", "ϯⲁ̀ⲡⲁⲧⲏ ⲛ̀ⲧⲉ ⲡⲓϩⲟϥ:", "ⲁⲛϩⲉⲓ ⲉ̀ⲃⲟⲗϧⲉⲛ ⲡⲓⲱⲛϧ", "ⲛ̀ⲉ̀ⲛⲉϩ: ⲟⲩⲟϩ", "ⲁⲩⲉⲣⲉⲝⲟⲣⲓⲍⲓⲛ ⲙ̀ⲙⲟⲛ", "ⲉ̀ⲃⲟⲗϧⲉⲛ ⲡⲓⲡⲁⲣⲁⲇⲓⲥⲟⲥ", "ⲛ̀ⲧⲉ ⲡ̀ⲟⲩⲛⲟϥ."];
+  const asLines = (texts) => texts.map((text, index) => ({ text, isParagraphEnd: index === texts.length - 1 }));
+  const item = verseItem({ verse: { english: english.join(" "), coptic: coptic.join(" "), type: "priest" } });
+  const languages = { english: true, french: false, coptic: true, arabic: false };
+  assert.equal(getSlideshowLanguageLineHeight("coptic", item, 34), 44);
+  assert.equal(getSlideContentBudget(369), 369);
+  const slides = paginateItems(
+    [item],
+    { [item.id]: 16 + 9 * 44 },
+    { [item.id]: { english: { lines: asLines(english) }, coptic: { lines: asLines(coptic) } } },
+    getSlideContentBudget(369),
+    34,
+    languages,
+    750,
+  );
+  assert.deepEqual(slides.map((slide) => slide[0].slideshowLineCounts), [{ english: 7, coptic: 8 }, { coptic: 1 }]);
+  assert.deepEqual(slides[1][0].verse.slideshowForcedLines.coptic.map((line) => line.text), ["ⲛ̀ⲧⲉ ⲡ̀ⲟⲩⲛⲟϥ."]);
 });
 
 test("line anchors follow the same content when page capacity changes", () => {
@@ -723,10 +754,10 @@ test("each column takes as many of its own lines as fit, whatever the others do"
     independentLineTakes(lineState({ english: 14, coptic: 10, arabic: 6 }), { english: 11, coptic: 11, arabic: 9 }),
     { english: 11, coptic: 10, arabic: 6 },
   );
-  // Never a single line left over for the next slide.
+  // Nothing that fits is held back, even where one line is left for the next slide.
   assert.deepEqual(
     independentLineTakes(lineState({ english: 12, arabic: 4 }), { english: 11, arabic: 3 }),
-    { english: 10, arabic: 2 },
+    { english: 11, arabic: 3 },
   );
   // Columns already finished are left out; a column with no room takes nothing.
   assert.deepEqual(
