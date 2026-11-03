@@ -1,7 +1,7 @@
 # Slideshow mode
 
 How a document is turned into slides, measured, paged and kept still.
-Last brought up to date: October 22, 2026.
+Last brought up to date: November 3, 2026.
 
 Files:
 
@@ -124,7 +124,10 @@ returns the slides, each a list of items (or verse pieces). The budget is
 the viewport height less `getSlidePadding`, which is nothing: each verse
 keeps 8px above and below itself (`getVerseVerticalPadding`), and that is
 the slide's whole margin at its top and foot, in documents and
-subdocuments alike.
+subdocuments alike. The budget keeps no slack of its own: an item placed by
+its measured height carries 2px of it, for the fractions a layout reports,
+and a verse's pieces are placed by its lines, whose heights are whole
+numbers. A line that fits by a single pixel goes on.
 
 ### Where a slide must begin (`buildPaginationUnits`)
 
@@ -182,8 +185,9 @@ Items are placed in order; a slide holds whole items:
 Only such a verse is split (`appendTallVerseSegments`), from a fresh
 slide. Each column takes as many of its own lines as fit on the slide,
 independently (`independentLineTakes`): the Arabic may finish on the first
-piece while the English carries on, leaving its cell empty. A column holds
-back only a single stray line, so a turn never leaves it one line alone.
+piece while the English carries on, leaving its cell empty. Nothing that
+fits is held back, even when that leaves a column one line for the next
+slide: the slide ends at its foot, not a line short.
 The last piece shares its slide with whatever follows that fits.
 
 Each piece (`createVerseLineSegment`) carries, per language,
