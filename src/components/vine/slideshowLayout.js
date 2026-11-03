@@ -90,11 +90,14 @@ export function getSpeakerRowHeight(item = {}, fontSize = 18, visibleLanguages =
   );
 }
 
-// Coptic is labelled wherever VerseBlock gives it a column; a Coptic line
-// standing alone spans the row below the other columns' labels instead.
+// Coptic is labelled wherever VerseBlock gives it a column -- and a Coptic
+// line standing alone, spanning the row, keeps its label's place in the
+// labels' row wherever Coptic is shown.
 function showsCopticSpeakerLabel(item, visibleLanguages) {
   const verse = item.verse || {};
-  if (copticStandsAlone(verse)) return false;
+  if (copticStandsAlone(verse)) {
+    return Boolean(visibleLanguages.coptic) && getVisibleVerseLanguages(item, visibleLanguages).includes("coptic");
+  }
   return Boolean(verse.slideshowLanguageKeys?.includes("coptic")) ||
     getVisibleVerseLanguages(item, visibleLanguages).includes("coptic");
 }

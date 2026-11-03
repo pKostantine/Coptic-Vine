@@ -1261,12 +1261,28 @@ test("a Coptic speaker label is a line of the verse wherever Coptic has a column
   // A decoration-only page keeps the column, so the label too.
   const decoration = { ...copticVerse, coptic: "", slideshowLanguageKeys: ["coptic"] };
   assert.equal(heightOf({ hasSpeakerLabel: true, verse: decoration }) - heightOf({ verse: decoration }), labelLine);
-  // A Coptic line standing alone spans the row, unlabelled.
+  // A Coptic line standing alone spans the row, and still names who says it.
   const standing = { ...copticVerse, invincibleCoptic: true };
-  assert.equal(heightOf({ hasSpeakerLabel: true, verse: standing }), heightOf({ verse: standing }));
+  assert.equal(heightOf({ hasSpeakerLabel: true, verse: standing }) - heightOf({ verse: standing }), labelLine);
+  // With Coptic switched off it still shows (Invincible), named by the columns that are on.
+  const englishOnly = { english: true };
+  assert.equal(
+    heightOf({ hasSpeakerLabel: true, verse: standing }, englishOnly) - heightOf({ verse: standing }, englishOnly),
+    getSlideshowLanguageLineHeight("english", {}, fontSize),
+  );
   // Beside English and Arabic, the row is as tall as their labels already make it.
   assert.equal(
     heightOf({ hasSpeakerLabel: true }, ALL_LANGUAGES) - heightOf({}, ALL_LANGUAGES),
     getSlideshowLanguageLineHeight("arabic", {}, fontSize),
   );
+});
+
+test("a slide's Coptic line standing alone keeps its label's place in the labels' row", () => {
+  const block = fs.readFileSync(new URL("../src/components/vine/VerseBlock.js", import.meta.url), "utf8");
+  assert.match(block, /const labelLanguages = spanningLanguage && visibleLanguages\.coptic && spanningLanguage\.speakerLabel\n\s+\? rowLanguages\n\s+: columnLanguages;/);
+  assert.match(block, /\{renderSpeakerRow\(labelLanguages\)\}\n\s+<View style=\{styles\.row\}>\{renderLanguageCell\(spanningLanguage, true\)\}<\/View>/);
+  // Set in its column as any label is, not centred with the line.
+  assert.match(block, /textAlign: language === spanningLanguage \? "left" : getSafeTextAlign\(language\),/);
+  // As tall as the labels it shows.
+  assert.match(block, /const speakerLanguages = spanningLanguage \? labelLanguages : rowLanguages;/);
 });

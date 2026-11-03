@@ -278,15 +278,23 @@ export default function VerseBlock({
   const columnLanguages = spanningLanguage
     ? rowLanguages.filter((language) => language.key !== "coptic")
     : rowLanguages;
+  // Its speaker is still named, as any line's is: the labels' row keeps a
+  // place for the Coptic label too, where Coptic is shown, so a slide in
+  // Coptic alone still says who says it (as the reader does, documentHtml.ts).
+  const labelLanguages = spanningLanguage && visibleLanguages.coptic && spanningLanguage.speakerLabel
+    ? rowLanguages
+    : columnLanguages;
   // The same gap scroll mode puts between language columns, taken out of the
   // row before it is split so the columns still fill the table exactly.
   const languageGap = getLanguageColumnGap(fontSize);
   const rowColumnWidth =
     (tableWidth - languageGap * Math.max(columnLanguages.length - 1, 0)) / Math.max(columnLanguages.length, 1);
   const isCenteredAcrossPage = Boolean(verse.centeredAcrossPage);
-  const hasSpeakerLabel = rowLanguages.some((language) => language.speakerLabel);
+  // As tall as the labels it shows (getSpeakerRowHeight measures the same).
+  const speakerLanguages = spanningLanguage ? labelLanguages : rowLanguages;
+  const hasSpeakerLabel = speakerLanguages.some((language) => language.speakerLabel);
   const speakerRowHeight = hasSpeakerLabel
-    ? Math.max(...rowLanguages.filter((language) => language.speakerLabel).map((language) => language.lineHeight))
+    ? Math.max(...speakerLanguages.filter((language) => language.speakerLabel).map((language) => language.lineHeight))
     : 0;
 
   // Off-screen, in the slideshow's measurement layer: the metrics are
@@ -414,8 +422,10 @@ export default function VerseBlock({
     );
   }
 
-  function renderSpeakerRow(languages, speakerColumnWidth) {
+  function renderSpeakerRow(languages) {
     if (!speakerRowHeight || !languages.length) return null;
+    const speakerColumnWidth =
+      (tableWidth - languageGap * Math.max(languages.length - 1, 0)) / Math.max(languages.length, 1);
     return (
       <View style={[styles.speakerRow, { columnGap: languageGap }]}>
         {languages.map((language) => (
@@ -444,7 +454,8 @@ export default function VerseBlock({
                     fontStyle: language.key === "coptic" ? "normal" : bodyFontStyle,
                     fontWeight: bodyFontWeight,
                     lineHeight: language.lineHeight,
-                    textAlign: getSafeTextAlign(language),
+                    // The label of a line spanning the row sits in its column, as any column's label does.
+                    textAlign: language === spanningLanguage ? "left" : getSafeTextAlign(language),
                     width: "100%",
                   },
                   // Arabic in italic, slanted as Chrome slants it (utils/arabicItalic.ts).
@@ -463,7 +474,7 @@ export default function VerseBlock({
   if (spanningLanguage) {
     return (
       <View style={styles.spanningRowGroup}>
-        {renderSpeakerRow(columnLanguages, rowColumnWidth)}
+        {renderSpeakerRow(labelLanguages)}
         <View style={styles.row}>{renderLanguageCell(spanningLanguage, true)}</View>
       </View>
     );
@@ -471,7 +482,7 @@ export default function VerseBlock({
 
   return (
     <View style={styles.spanningRowGroup}>
-      {renderSpeakerRow(rowLanguages, rowColumnWidth)}
+      {renderSpeakerRow(rowLanguages)}
       <View style={[styles.row, { columnGap: languageGap }]}>{rowLanguages.map((language) => renderLanguageCell(language))}</View>
     </View>
   );

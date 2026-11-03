@@ -369,6 +369,39 @@ test('Book Settings offers the page picker first under Display: one radio per pa
   assert.match(source, /theme\.dark && styles\.swatchEdge/);
 });
 
+test('a Coptic line standing alone, centred across the row, still names its speaker', () => {
+  const build = loadDocumentBuilder();
+  const options = { copticFontDataUri: 'data:font/ttf;base64,AA==', fontSize: 18 };
+  // The Sanctus' ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ: the priest's, in Coptic only.
+  const agios = verse('', { type: 'priest', coptic: 'ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ.', prayerType: 'Invincible Coptic' });
+  const row = (visibleColumns) => {
+    const html = build([{ id: 's', title: { english: 'Sanctus', arabic: '' }, verses: [agios] }], { ...options, visibleColumns });
+    return /<div class="verse-row"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*(?:<\/div>|$)/.exec(html.slice(html.indexOf('<div class="verse-row"')))[0];
+  };
+  const cells = (html) => [...html.matchAll(/<div class="cell" data-language="(\w+)"( style="grid-column: 1 \/ -1;")?>\s*<p class="verse-text (\w+) ?(centered)?"[^>]*>(?:<span class="speaker-label priest">([^<]*)<\/span><br\/>)?([^<]*)<\/p>/g)]
+    .map(([, language, spans, , centered, label, text]) => ({ language, spans: Boolean(spans), centered: Boolean(centered), label: label || '', text }));
+
+  // Beside English and Arabic: each column's label in the labels' row, the Coptic's too, the line centred under them.
+  const all = row({ english: true, french: false, coptic: true, arabic: true });
+  assert.match(all, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.deepEqual(cells(all), [
+    { language: 'english', spans: false, centered: false, label: 'Priest:', text: '' },
+    { language: 'coptic', spans: false, centered: false, label: 'ⲡⲓⲟⲩⲏⲃ:', text: '' },
+    { language: 'arabic', spans: false, centered: false, label: 'الكاهن:', text: '' },
+    { language: 'coptic', spans: true, centered: true, label: '', text: 'ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ.' },
+  ]);
+  // In Coptic alone it is still the priest's.
+  assert.deepEqual(cells(row({ english: false, french: false, coptic: true, arabic: false })), [
+    { language: 'coptic', spans: false, centered: false, label: 'ⲡⲓⲟⲩⲏⲃ:', text: '' },
+    { language: 'coptic', spans: true, centered: true, label: '', text: 'ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ ⲁⲅⲓⲟⲥ.' },
+  ]);
+  // With Coptic switched off the line still shows, named by the columns that are on.
+  assert.deepEqual(cells(row({ english: true, french: false, coptic: false, arabic: false })).map((cell) => [cell.language, cell.label, cell.spans]), [
+    ['english', 'Priest:', false],
+    ['coptic', '', true],
+  ]);
+});
+
 test('the Coptic column names its speaker in Coptic, and only beside Coptic text', () => {
   const build = loadDocumentBuilder();
   const options = { copticFontDataUri: 'data:font/ttf;base64,AA==', fontSize: 18 };
