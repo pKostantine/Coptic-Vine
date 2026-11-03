@@ -6,7 +6,7 @@ import type {
   SermonHighlightColor,
 } from '../../types/sermonPlanner';
 import type { AppLanguage as AppTitleLanguage } from '../../utils/preferencesStorage';
-import { READER_SWIPE_SLOP } from '../../utils/readerSwipe';
+import { READER_SWIPE_HOLD_MS, READER_SWIPE_SLOP } from '../../utils/readerSwipe';
 import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGap } from './documentPresentationMetrics';
@@ -161,6 +161,8 @@ export interface DocumentAction {
   swipe?: 'exit' | 'contents';
   distance?: number;
   velocity?: number;
+  /** "textSelected" only: whether text is selected on the page now. */
+  selected?: boolean;
 }
 
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = { english: true, french: false, coptic: true, arabic: true };
@@ -1086,10 +1088,23 @@ export function buildDocumentHtml(
           });
           return blocks.join('\\n\\n');
         }
+        // Whether text is selected, told to the app as it changes, so its
+        // own swipes leave a finger carrying a selection alone
+        // (hooks/useReaderSwipes.ts) -- and told once as the page loads, a
+        // page drawn afresh having nothing selected.
+        var textSelected = false;
+        postAction('textSelected', { selected: false });
+        function reportTextSelected(selection) {
+          var selected = Boolean(selection && selection.rangeCount && !selection.isCollapsed);
+          if (selected === textSelected) return;
+          textSelected = selected;
+          postAction('textSelected', { selected: selected });
+        }
         document.addEventListener('selectionchange', function () {
+          var selection = window.getSelection && window.getSelection();
+          reportTextSelected(selection);
           // A Pencil stroke paints its own preview, and moves too often to rebuild this on.
           if (window.__sermonPencilActive) return;
-          var selection = window.getSelection && window.getSelection();
           updateSelectionPreview(buildSelectionPlan(selection));
         });
         document.addEventListener('copy', function (event) {
@@ -1211,8 +1226,16 @@ export function buildDocumentHtml(
         // (hooks/useReaderSwipes.ts). Where the platform's own back swipe
         // leaves instead (iOS's), a swipe to the right is left to it.
         var exitsHere = ${JSON.stringify(swipeExitsInPage)};
-        var SLOP = ${READER_SWIPE_SLOP}, SIDEWAYS = 1.2;
-        var start = null, swipe = null, fromDx = 0, distance = 0, samples = [], frame = 0;
+        // With Select text on, a selection comes first (utils/readerSwipe.ts):
+        // a finger held before it moves is selecting, and one landing while
+        // text is selected is on a handle or tapping the selection away.
+        var selectsText = ${JSON.stringify(effectiveSelectText)};
+        var SLOP = ${READER_SWIPE_SLOP}, SIDEWAYS = 1.2, HOLD = ${READER_SWIPE_HOLD_MS};
+        var start = null, swipe = null, fromDx = 0, distance = 0, samples = [], frame = 0, downAt = 0;
+        function hasTextSelected() {
+          var selection = selectsText && window.getSelection && window.getSelection();
+          return Boolean(selection && selection.rangeCount && !selection.isCollapsed);
+        }
         function preventEvent(event) {
           if (event && event.cancelable && event.preventDefault) event.preventDefault();
         }
@@ -1236,8 +1259,10 @@ export function buildDocumentHtml(
           return swipe === 'exit' ? v : -v;
         }
         function onStart(x, y) {
-          start = { x: x, y: y }; swipe = null; fromDx = 0; distance = 0;
-          samples = [{ x: x, t: Date.now() }];
+          swipe = null; fromDx = 0; distance = 0;
+          if (hasTextSelected()) { start = null; return; }
+          start = { x: x, y: y }; downAt = Date.now();
+          samples = [{ x: x, t: downAt }];
         }
         function onMove(x, y, event) {
           if (!start) return;
@@ -1253,6 +1278,8 @@ export function buildDocumentHtml(
               return;
             }
             if (dx > 0 && !exitsHere) { start = null; return; }
+            // Held first: a long press selecting, and the drag after it carries the selection on.
+            if (selectsText && now - downAt >= HOLD) { start = null; return; }
             swipe = dx > 0 ? 'exit' : 'contents';
             fromDx = dx;
           }

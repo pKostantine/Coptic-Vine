@@ -230,7 +230,31 @@ test('the sheet opens from off the right edge every time, whatever size its firs
   assert.match(sheet, /if \(finished && !visible\) setMounted\(false\);/);
   // Its row is never narrower than the window, so the panel is never drawn
   // against the right edge of a first frame laid out portrait-wide.
-  assert.match(sheet, /<View style=\{\[styles\.overlay, \{ minWidth: width \}\]\}>/);
+  assert.match(sheet, /<View style=\{\[styles\.overlay, \{ minWidth: width \}\]\}/);
+});
+
+test('the panels go as they came, under the finger: a swipe to the right takes them out', () => {
+  const sheet = fs.readFileSync('src/components/vine/ui/ReaderPanel.tsx', 'utf8');
+  // Over the panel and the dimmed page beside it, on a phone or a tablet; a browser clicks beside it.
+  assert.match(sheet, /<View style=\{\[styles\.overlay, \{ minWidth: width \}\]\} \{\.\.\.\(swipesOut \? swipeOut\.panHandlers : null\)\}>/);
+  assert.match(sheet, /const swipesOut = Platform\.OS !== 'web';/);
+  // Taken once a move is plainly to the right, ahead of the rows, the list and the tap beside it.
+  assert.match(sheet, /onMoveShouldSetPanResponderCapture: \(_, gestureState\) => \{/);
+  assert.match(sheet, /if \(readerSwipeFor\(gestureState\.dx, gestureState\.dy\) !== 'exit'\) return false;/);
+  assert.match(sheet, /onPanResponderTerminationRequest: \(\) => false,/);
+  // It follows the finger out, and let go it closes as the reader's swipes go through, or slides back.
+  assert.match(sheet, /slide\.setValue\(out\);/);
+  assert.match(sheet, /if \(readerSwipeGoesThrough\(out \* span, span, gestureState\.vx\)\) \{/);
+  assert.match(sheet, /close\(\);\n\s+\} else slideBack\(\);/);
+  assert.match(sheet, /onPanResponderTerminate: slideBack,/);
+  // Closing, it carries on from where the finger left it, at the finger's pace.
+  assert.match(sheet, /readerSwipeFinishMs\(\(1 - letGo\.out\) \* travel, travel, letGo\.velocity\)/);
+
+  // The Verses panel's language chips, scrolled along, scroll back under a swipe to the right.
+  const verses = fs.readFileSync('src/components/vine/ui/BibleVersePanel.tsx', 'utf8');
+  assert.match(verses, /<ReaderPanelOwnDrag when=\{\(\) => chipsScrolledRef\.current > 1\}>\n\s+<ScrollView\n\s+horizontal/);
+  assert.match(verses, /chipsScrolledRef\.current = event\.nativeEvent\.contentOffset\.x;/);
+  assert.match(sheet, /if \(!swipeRef\.current\.visible \|\| heldRef\.current \|\| gestureState\.numberActiveTouches > 1\) return false;/);
 });
 
 test('the sermon notes drawer opens from off the right edge every time, as the sheet does', () => {

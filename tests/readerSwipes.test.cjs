@@ -47,7 +47,7 @@ function loadDocumentBuilder() {
  * the messages it posts to the app come out. Frames and the clock are the
  * test's to move.
  */
-function swipeScript(options) {
+function swipeScript(options, pageWindow = {}) {
   const html = loadDocumentBuilder()(
     [{ id: 'hymn-1', title: { english: 'Prayer', arabic: '' }, verses: [{ english: 'Amen', coptic: 'Ⲁⲙⲏⲛ', arabic: 'آمين', type: 'verse' }] }],
     { copticFontDataUri: 'data:font/ttf;base64,AA==', fontSize: 20, ...options },
@@ -61,7 +61,7 @@ function swipeScript(options) {
   let now = 0;
   const page = {
     document: { addEventListener: (type, listener) => { listeners[type] = listener; } },
-    window: {},
+    window: pageWindow,
     postAction: (type, payload) => posted.push({ type, ...payload }),
     requestAnimationFrame: (callback) => { frames.push(callback); return frames.length; },
     cancelAnimationFrame: () => { frames = []; },
@@ -189,7 +189,7 @@ test('the documents and subdocuments take both swipes from anywhere, following t
   const service = read('src/components/vine/screens/ServiceDocument.tsx');
   // iOS leaves by its own back swipe, from anywhere, while nothing covers the document; never in the Sermon Planner.
   assert.match(service, /const nativeBackSwipe = Platform\.OS === 'ios' && !isSermonPlanner;/);
-  assert.match(service, /gestureEnabled: nativeBackSwipe && !isCoveredByModal,\s+fullScreenGestureEnabled: true,/);
+  assert.match(service, /gestureEnabled: nativeBackSwipe && !isCoveredByModal && !textSelected,\s+fullScreenGestureEnabled: true,/);
   assert.match(service, /exitsByDrag: !nativeBackSwipe,/);
   assert.match(service, /swipeExitsInPage=\{!nativeBackSwipe\}/);
   // Slid away by a finger, it goes without a slide of its own.
@@ -293,4 +293,77 @@ test('the contents come in under the finger on a sheet of the panel, and the pan
   assert.match(panel, /onShow=\{onShown\}/);
   const contents = read('src/components/vine/ui/ContentSelectorDrawer.tsx');
   assert.match(contents, /openFrom=\{openFrom\}\s+onShown=\{onShown\}/);
+});
+
+test('with Select text on, a finger held before it moves is selecting, never swiping', () => {
+  assert.equal(swipes.READER_SWIPE_HOLD_MS, 400);
+  assert.equal(swipes.readerSwipeWasHeld(1000, 1399), false);
+  assert.equal(swipes.readerSwipeWasHeld(1000, 1400), true);
+  assert.equal(swipes.readerSwipeWasHeld(Number.NaN, 1400), false, 'a finger never seen going down was not held');
+  // By the touches' own clock where both have it: a busy thread handling a quick swipe late can't make it look held.
+  assert.equal(swipes.readerTouchWasHeld({ stamp: 100, wall: 0 }, { stamp: 150, wall: 900 }), false);
+  assert.equal(swipes.readerTouchWasHeld({ stamp: Number.NaN, wall: 0 }, { stamp: 150, wall: 900 }), true);
+  assert.deepEqual(swipes.readerTouchTime({ nativeEvent: { timestamp: 42 } }).stamp, 42);
+  assert.ok(Number.isNaN(swipes.readerTouchTime({ nativeEvent: {} }).stamp));
+
+  const page = swipeScript({ nativeSwipeNavigation: true, selectText: true });
+  // A long press, then a drag carrying the selection on: the page leaves it be.
+  page.touch('touchstart', 300, 300);
+  page.at(450);
+  assert.equal(page.touch('touchmove', 260, 300).prevented, false);
+  page.touch('touchmove', 200, 300);
+  page.touch('touchend', 150, 300);
+  assert.deepEqual(page.posted, []);
+  // A swipe moving off at once is still one.
+  page.at(1000);
+  page.touch('touchstart', 300, 300);
+  page.at(1030);
+  page.touch('touchmove', 260, 300);
+  page.touch('touchend', 200, 300);
+  assert.equal(page.posted.at(-1).type, 'swipeEnd');
+  assert.equal(page.posted.at(-1).swipe, 'contents');
+
+  // With nothing to select, a held finger still swipes, as before.
+  const plain = swipeScript({ nativeSwipeNavigation: true, selectText: false });
+  plain.touch('touchstart', 300, 300);
+  plain.at(450);
+  plain.touch('touchmove', 260, 300);
+  plain.touch('touchend', 200, 300);
+  assert.equal(plain.posted.at(-1).swipe, 'contents');
+});
+
+test('with text selected, a finger is on its handle or tapping it away, never swiping', () => {
+  let selection = { rangeCount: 1, isCollapsed: false };
+  const page = swipeScript({ nativeSwipeNavigation: true, selectText: true }, { getSelection: () => selection });
+  page.touch('touchstart', 300, 300);
+  assert.equal(page.touch('touchmove', 260, 300).prevented, false);
+  page.touch('touchend', 150, 300);
+  assert.deepEqual(page.posted, [], 'a handle dragged to the left extends the selection, not the contents');
+  // Tapped away, the next swipe is one again.
+  selection = { rangeCount: 0, isCollapsed: true };
+  page.touch('touchstart', 300, 300);
+  page.touch('touchmove', 260, 300);
+  page.touch('touchend', 200, 300);
+  assert.equal(page.posted.at(-1).swipe, 'contents');
+
+  // The page tells the app whether text is selected, and nothing is as it loads.
+  const html = loadDocumentBuilder()([], { copticFontDataUri: 'data:font/ttf;base64,AA==', fontSize: 20, selectText: true });
+  assert.match(html, /var textSelected = false;\n\s+postAction\('textSelected', \{ selected: false \}\);/);
+  assert.match(html, /document\.addEventListener\('selectionchange', function \(\) \{\n\s+var selection = window\.getSelection && window\.getSelection\(\);\n\s+reportTextSelected\(selection\);/);
+
+  // The app's own swipes, and iOS's back swipe, leave a selection alone too.
+  const hook = read('src/hooks/useReaderSwipes.ts');
+  assert.match(hook, /if \(current\.selectsText && \(textSelectedRef\.current \|\| readerTouchWasHeld\(downAtRef\.current, readerTouchTime\(event\)\)\)\) return false;/);
+  for (const file of ['src/components/vine/screens/ServiceDocument.tsx', 'src/components/vine/screens/DocumentModal.tsx']) {
+    const screen = read(file);
+    assert.match(screen, /if \(action\.type === 'textSelected'\) \{\n\s+readerSwipes\.textSelectedChanged\(Boolean\(action\.selected\)\);/, file);
+    assert.match(screen, /selectsText: [^\n]*preferences\.selectText && !preferences\.slideshowMode/, file);
+  }
+
+  // The Bible's swipes too, on its page and in the app.
+  const bible = read('src/components/vine/bibleDocumentHtml.ts');
+  assert.match(bible, /if \(selectTextEnabled && \(startedOnSelection \|\| hasTextSelected\(\) \|\| \(movedAt \|\| Date\.now\(\)\) - startAt >= \$\{READER_SWIPE_HOLD_MS\}\)\) return;/);
+  assert.match(bible, /post\(\{ type: 'textSelected', selected: selected \}\);/);
+  const chapter = read('src/app/bible/[bookKey]/[chapter].tsx');
+  assert.match(chapter, /if \(effectiveSelectText && \(textSelectedRef\.current \|\| readerTouchWasHeld\(touchDownAtRef\.current, readerTouchTime\(event\)\)\)\) return false;/);
 });

@@ -944,6 +944,11 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       if (!isCoveredByModal) readerSwipes.drag(action.swipe, action.distance ?? 0);
       return;
     }
+    // Text selected on the page or no longer: the swipes leave a selection alone.
+    if (action.type === 'textSelected') {
+      readerSwipes.textSelectedChanged(Boolean(action.selected));
+      return;
+    }
     if (action.type === 'swipeEnd' && action.swipe) {
       readerSwipes.release(action.swipe, isCoveredByModal ? 0 : action.distance ?? 0, action.velocity ?? 0);
       return;
@@ -1072,13 +1077,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // slides away with the finger, then goes without a second slide.
   const nativeBackSwipe = Platform.OS === 'ios' && !isSermonPlanner;
   const [leavingBySwipe, setLeavingBySwipe] = useState(false);
-  // One object while nothing in it changes: a new one sets the navigator's
-  // options again at every render of the reader.
-  const screenOptions = useMemo(() => ({
-    gestureEnabled: nativeBackSwipe && !isCoveredByModal,
-    fullScreenGestureEnabled: true,
-    ...(leavingBySwipe ? { animation: 'none' as const } : null),
-  }), [isCoveredByModal, leavingBySwipe, nativeBackSwipe]);
   const [selectorOpenFrom, setSelectorOpenFrom] = useState(0);
   const panelLayout = useReaderPanelLayout();
   const readerSwipes = useReaderSwipes({
@@ -1091,7 +1089,19 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       setSelectorOpen(true);
     },
     ignores: () => pencilGestureActiveRef.current || touchOnPillBarRef.current,
+    // As the page's own (DocumentSurface's effectiveSelectText).
+    selectsText: isSermonPlanner || (preferences.selectText && !preferences.slideshowMode),
   });
+  // One object while nothing in it changes: a new one sets the navigator's
+  // options again at every render of the reader. iOS's own back swipe is off
+  // while text is selected, so dragging a selection's handle to the right
+  // carries the selection on rather than leaving the document.
+  const textSelected = readerSwipes.textSelected;
+  const screenOptions = useMemo(() => ({
+    gestureEnabled: nativeBackSwipe && !isCoveredByModal && !textSelected,
+    fullScreenGestureEnabled: true,
+    ...(leavingBySwipe ? { animation: 'none' as const } : null),
+  }), [isCoveredByModal, leavingBySwipe, nativeBackSwipe, textSelected]);
   // A frame after the page has slid away, so the screen is told first to go
   // without its own slide.
   useEffect(() => {

@@ -8,6 +8,7 @@ import { FIT_COPTIC_INITIALS_SCRIPT, openingInitialDefs, openingInitialStyles, r
 import { splitArabicOpening, splitEnglishOpening } from './openingInitials';
 import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
+import { READER_SWIPE_HOLD_MS, READER_SWIPE_SLOP } from '../../utils/readerSwipe';
 
 export interface BibleDisplayVerse {
   verseNumber: number | string;
@@ -481,6 +482,13 @@ export function buildBibleChapterHtml({
         };
         var startX = 0;
         var startY = 0;
+        // When the finger went down and first moved off, and whether text was
+        // selected as it landed: with text selectable, a selection comes
+        // first (utils/readerSwipe.ts), and neither a long press selecting
+        // nor a finger on a selection's handle is a swipe.
+        var startAt = 0;
+        var movedAt = 0;
+        var startedOnSelection = false;
         var suppressClickUntil = 0;
         var resizeFrame = 0;
         var resizeTimer = 0;
@@ -690,9 +698,19 @@ export function buildBibleChapterHtml({
         document.addEventListener('pointerdown', onSelectionStart, true);
         document.addEventListener('mousedown', onSelectionStart, true);
         document.addEventListener('touchstart', onSelectionStart, true);
+        // Whether text is selected, told to the app as it changes, so its own
+        // swipe leaves a finger carrying a selection alone -- and told once
+        // as the page loads, a page drawn afresh having nothing selected.
+        var textSelected = false;
+        post({ type: 'textSelected', selected: false });
         document.addEventListener('selectionchange', function () {
           var selection = window.getSelection && window.getSelection();
-          if (!selection || !selection.rangeCount || selection.isCollapsed) {
+          var selected = Boolean(selection && selection.rangeCount && !selection.isCollapsed);
+          if (selected !== textSelected) {
+            textSelected = selected;
+            post({ type: 'textSelected', selected: selected });
+          }
+          if (!selected) {
             setSelectingLanguage(null);
             return;
           }
@@ -1036,11 +1054,23 @@ export function buildBibleChapterHtml({
             applyPage();
           }
         });
+        function hasTextSelected() {
+          var selection = selectTextEnabled && window.getSelection && window.getSelection();
+          return Boolean(selection && selection.rangeCount && !selection.isCollapsed);
+        }
         document.addEventListener('touchstart', function (event) {
           var touch = event.touches && event.touches[0];
           if (!touch) return;
           startX = touch.clientX;
           startY = touch.clientY;
+          startAt = Date.now();
+          movedAt = 0;
+          startedOnSelection = hasTextSelected();
+        }, { passive: true });
+        document.addEventListener('touchmove', function (event) {
+          var touch = event.touches && event.touches[0];
+          if (!touch || movedAt) return;
+          if (Math.abs(touch.clientX - startX) >= ${READER_SWIPE_SLOP} || Math.abs(touch.clientY - startY) >= ${READER_SWIPE_SLOP}) movedAt = Date.now();
         }, { passive: true });
         document.addEventListener('touchend', function (event) {
           var touch = event.changedTouches && event.changedTouches[0];
@@ -1052,6 +1082,8 @@ export function buildBibleChapterHtml({
           // one swipe advances here and then advances a second time through
           // the transparent tap-zone button underneath it.
           suppressClickUntil = Date.now() + 500;
+          // A selection's: on a handle, tapping it away, or a long press selecting.
+          if (selectTextEnabled && (startedOnSelection || hasTextSelected() || (movedAt || Date.now()) - startAt >= ${READER_SWIPE_HOLD_MS})) return;
           if (${JSON.stringify(nativeSwipeNavigation)} && startX < Math.min(96, Math.max(56, window.innerWidth * 0.16)) && dx > 60) {
             post({ type: 'previousLevel' });
             return;

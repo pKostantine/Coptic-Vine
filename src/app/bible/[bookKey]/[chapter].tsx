@@ -34,6 +34,7 @@ import {
 import { goBack } from '@/utils/navigation';
 import { writeRichClipboard } from '@/utils/richClipboard';
 import { swipeEdge, swipeStartX } from '@/utils/edgeSwipe';
+import { readerTouchTime, readerTouchWasHeld, type ReaderTouchTime } from '@/utils/readerSwipe';
 import { fontScaleToPx, type AppLanguage } from '@/utils/preferencesStorage';
 import { useBrowserFullscreen } from '@/utils/useBrowserFullscreen';
 import { useReadingKeepAwake } from '@/utils/useReadingKeepAwake';
@@ -398,13 +399,25 @@ export default function BibleChapterDocument() {
   // Only a swipe from the very edge goes back or opens the verses
   // (utils/edgeSwipe.ts), measured from where it began.
   const swipeTakenFromXRef = useRef(0);
+  // With text selectable a selection comes first (utils/readerSwipe.ts):
+  // nothing is a swipe while the page says text is selected (a finger on a
+  // handle, or tapping it away), nor once a finger was held before it moved
+  // (a long press selecting).
+  const textSelectedRef = useRef(false);
+  const touchDownAtRef = useRef<ReaderTouchTime>({ stamp: Number.NaN, wall: Number.NaN });
   const gesturePanResponder = useMemo(() => {
     // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
     return PanResponder.create({
+      // Only noted: when the finger went down.
+      onStartShouldSetPanResponderCapture: (event) => {
+        touchDownAtRef.current = readerTouchTime(event);
+        return false;
+      },
       onMoveShouldSetPanResponder: (event, gestureState) => {
         if (isStylusGestureEvent(event) || pencilGestureActive || bookSettingsOpen) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
         if (!isHorizontal) return false;
+        if (effectiveSelectText && (textSelectedRef.current || readerTouchWasHeld(touchDownAtRef.current, readerTouchTime(event)))) return false;
         const startX = swipeStartX(gestureState);
         const edge = swipeEdge(startX, screenWidth);
         const isBackSwipe = edge === 'left' && gestureState.dx > 24;
@@ -424,7 +437,7 @@ export default function BibleChapterDocument() {
         }
       },
     });
-  }, [goBackALevel, openVerseSelector, screenWidth, isSelectorOpen, pencilGestureActive, bookSettingsOpen]);
+  }, [goBackALevel, openVerseSelector, screenWidth, isSelectorOpen, pencilGestureActive, bookSettingsOpen, effectiveSelectText]);
 
   return (
     <BleedPage
@@ -486,6 +499,11 @@ export default function BibleChapterDocument() {
             onAction={(action) => {
               if (action.type === 'biblePencilGesture') {
                 setPencilGestureActive(Boolean(action.active));
+                return;
+              }
+              // Text selected on the page or no longer: the edge swipes leave a selection alone.
+              if (action.type === 'textSelected') {
+                textSelectedRef.current = Boolean(action.selected);
                 return;
               }
               if (action.type === 'createBibleHighlights' || action.type === 'recolorBibleHighlight' || action.type === 'removeBibleHighlight') {

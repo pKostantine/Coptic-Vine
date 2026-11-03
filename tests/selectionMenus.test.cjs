@@ -29,6 +29,7 @@ function loadBibleBuilder() {
   );
   const localModules = {
     './textHighlights': evaluateModule(fs.readFileSync('src/components/vine/textHighlights.ts', 'utf8'), 'textHighlights.ts', require),
+    '../../utils/readerSwipe': evaluateModule(fs.readFileSync('src/utils/readerSwipe.ts', 'utf8'), 'readerSwipe.ts', require),
     './documentPresentationMetrics': evaluateModule(fs.readFileSync('src/components/vine/documentPresentationMetrics.js', 'utf8'), 'documentPresentationMetrics.js', require),
     './readerChromeFade': evaluateModule(
       fs.readFileSync('src/components/vine/readerChromeFade.ts', 'utf8'),
@@ -118,4 +119,15 @@ test('the saint hymn preview is selectable', () => {
   const picker = fs.readFileSync('src/components/vine/ui/SaintHymnPicker.tsx', 'utf8');
   assert.doesNotMatch(picker, /selectText=\{false\}/);
   assert.match(picker, /\n\s+selectText\n/, 'the preview should pass selectText');
+});
+
+test('turning Select text on in an open reader makes its text selectable at once', () => {
+  // iOS reads textInteractionEnabled only as it makes the web view, so the
+  // web view is made afresh whenever it changes.
+  const document = fs.readFileSync('src/components/vine/DocumentWebView.tsx', 'utf8');
+  assert.match(document, /key=\{selectText \|\| sermonPlannerMode \? 'selectable' : 'unselectable'\}/);
+  assert.match(document, /textInteractionEnabled=\{selectText \|\| sermonPlannerMode\}/);
+  const bible = fs.readFileSync('src/components/vine/BibleWebView.tsx', 'utf8');
+  assert.match(bible, /key=\{selectText \? 'selectable' : 'unselectable'\}/);
+  assert.match(bible, /textInteractionEnabled=\{selectText\}/);
 });

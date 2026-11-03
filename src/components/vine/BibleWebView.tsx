@@ -18,7 +18,8 @@ export interface BibleWebViewAction {
     | 'recolorBibleHighlight'
     | 'removeBibleHighlight'
     | 'biblePencilGesture'
-    | 'copyBibleText';
+    | 'copyBibleText'
+    | 'textSelected';
   verse?: string;
   readerId?: string;
   anchors?: unknown[];
@@ -31,6 +32,8 @@ export interface BibleWebViewAction {
   active?: boolean;
   text?: string;
   html?: string;
+  /** "textSelected" only: whether text is selected on the page now. */
+  selected?: boolean;
 }
 
 interface BibleWebViewProps {
@@ -98,6 +101,11 @@ const BibleWebView = forwardRef<BibleWebViewHandle, BibleWebViewProps>(({ html, 
 
   return (
     <WebView
+      // A new web view whenever text can or can't be selected: iOS reads
+      // textInteractionEnabled (below) only as it makes the web view, so a
+      // chapter opened with Select text off stayed unselectable when it was
+      // turned on. The page reloads for the change anyway.
+      key={selectText ? 'selectable' : 'unselectable'}
       ref={webviewRef}
       originWhitelist={['*']}
       source={{ html }}
