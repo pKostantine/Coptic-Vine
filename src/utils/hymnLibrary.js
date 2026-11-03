@@ -6,87 +6,31 @@ import { resolveBibleReadingReference } from "./readingReferenceResolver";
 import { contentDataClient as supabase, isContentSchemaInstalled } from "../services/contentDataClient";
 import { formatArabicDigits } from "./displayText";
 import { formatVerses } from "./verseFormatting";
+import { isSentinelKey as isAllCapsKey, sentinelTable } from "./sentinelTables";
 
-// ─── Subdocument sentinel → schema.table registry ────────────────────────────
-// Verified against live DB usage (see project memory project_subdocument_registry.md).
-// Entries that are null mean the content hasn't been built yet — skip gracefully.
-// Reading-resolution sentinels (PAULINE_EPISTLE_WITH_COPTIC, *_WITH_COPTIC, etc.)
-// are NOT schema/table targets — they route through the Lectionary/Bible reader
-// instead, so they're deliberately absent here. So are PROPHECY and
-// COPTIC_PROPHECY: a service can read several prophecies, and each is its own
-// hydration of readings.prophecy/coptic_prophecy (see resolveProphecySections).
+// ─── ALL_CAPS sentinel → schema.table ────────────────────────────────────────
+// A Subdocument or Inline row whose hymn_key is in capitals calls another
+// whole order table by that table's own name, found wherever it is
+// (utils/sentinelTables.js): FRACTIONS is fractions.fractions, GOSPEL_RITE
+// gospel_rite.gospel_rite, ADAM_ASPASMOS aspasmos.adam_aspasmos. A new call
+// needs only its row in the content, never an entry here. This is NOT a
+// hymn_key lookup within that schema's hymn_texts (the key isn't a row
+// there): the table is hydrated whole, recursively, as a document of its own.
+//
+// The keys the reader resolves its own way never stand for the table of
+// their name: the reading sentinels (PAULINE_EPISTLE_WITH_COPTIC, *_WITH_COPTIC
+// etc.) go through the Lectionary/Bible reader; a service can read several
+// prophecies, each its own hydration of readings.prophecy/coptic_prophecy
+// (resolveProphecySections); and the Synaxarium is the day's.
+const SENTINELS_RESOLVED_OTHERWISE = new Set(["PROPHECY", "COPTIC_PROPHECY", "SYNAXARIUM"]);
 
-export const SUBDOCUMENT_MAP = {
-  ANTIPHONARY: { schema: "psalmody", table: "antiphonary" },
-  CANONS: { schema: "canons", table: "canons" },
-  DOXOLOGIES: { schema: "doxologies", table: "doxologies" },
-  GOSPEL_RITE: { schema: "gospel_rite", table: "gospel_rite" },
-  // Holy Week's Psalm and Gospel: one Gospel an hour, four on Friday Eve and
-  // Good Friday. Their readings come from the hour (PASCHA_RITE_READINGS).
-  MOURNFUL_GOSPEL_RITE: { schema: "gospel_rite", table: "mournful_gospel_rite" },
-  MOURNFUL_4_GOSPELS_RITE: { schema: "gospel_rite", table: "mournful_4_gospels_rite" },
-  // Palm Sunday's Liturgy: two Psalms and four Gospels, each row naming which
-  // (implying_conditions) and its readings picked by ordinal (FIRST_LITURGY_…).
-  PALM_SUNDAY_LITURGY_GOSPEL_RITE: { schema: "gospel_rite", table: "palm_sunday_liturgy_gospel_rite" },
-  GOSPEL_RESPONSES: { schema: "gospel_responses", table: "gospel_responses" },
-  THE_FIVE_SHORT_LITANIES: { schema: "litanies", table: "the_five_short_litanies" },
-  THREE_GREAT_LITANIES: { schema: "litanies", table: "the_three_great_litanies" },
-  THE_THREE_GREAT_LITANIES: { schema: "litanies", table: "the_three_great_litanies" },
-  PRAXIS_RESPONSE: { schema: "praxis_response", table: "praxis_response" },
-  HYMN_OF_THE_INTERCESSIONS: { schema: "hymn_of_the_intercessions", table: "hymn_of_the_intercessions" },
-  VERSES_OF_THE_CYMBALS: { schema: "verses_of_the_cymbals", table: "verses_of_the_cymbals" },
-  // Extracted order-table blocks that are spliced back into their parent
-  // services through all-caps Inline sentinels.
-  LITURGY_AGPEYA: { schema: "liturgy", table: "liturgy_agpeya" },
-  // St Basil's hymns after the commemoration of the departed (Evshes, the
-  // Departed Patriarchs, the Pinishti, Ke Pandon Ton), opened as a subdocument.
-  COMMEMORATION_OF_THE_SAINTS_HYMNS: { schema: "liturgy", table: "commemoration_of_the_saints_hymns" },
-  PSALIES_SAINTS: { schema: "psalmody", table: "psalies_saints" },
-  PSALIES_SEASONAL: { schema: "psalmody", table: "psalies_seasonal" },
-  PSALIES_DAILY: { schema: "psalmody", table: "psalies_daily" },
-  // The intro/reading/conclusion wrapper tables for each epistle-style
-  // reading — PAULINE_EPISTLE/CATHOLIC_EPISTLE/PRAXIS are the "Inline"
-  // (English-only) variant spliced directly into the document flow;
-  // COPTIC_PAULINE_EPISTLE/COPTIC_CATHOLIC_EPISTLE/COPTIC_PRAXIS are the
-  // "Subdocument" (Coptic-included) variant opened as its own button/modal.
-  // Each table's own middle row (PAULINE_EPISTLE_WITH/WITHOUT_COPTIC etc.,
-  // see READING_SENTINEL_MAP) resolves the actual day's scripture text.
-  PAULINE_EPISTLE: { schema: "readings", table: "pauline_epistle" },
-  CATHOLIC_EPISTLE: { schema: "readings", table: "catholic_epistle" },
-  PRAXIS: { schema: "readings", table: "praxis" },
-  COPTIC_PAULINE_EPISTLE: { schema: "readings", table: "coptic_pauline_epistle" },
-  COPTIC_CATHOLIC_EPISTLE: { schema: "readings", table: "coptic_catholic_epistle" },
-  COPTIC_PRAXIS: { schema: "readings", table: "coptic_praxis" },
-  SEASONAL_LITURGY_HYMNS: null, // not yet in database — "seasonal_liturgy_hymns" is not an exposed schema/table
-  THIRD_HOUR: { schema: "agpeya", table: "third_hour" },
-  SIXTH_HOUR: { schema: "agpeya", table: "sixth_hour" },
-  NINTH_HOUR: { schema: "agpeya", table: "ninth_hour" },
-  ELEVENTH_HOUR: { schema: "agpeya", table: "eleventh_hour" },
-  TWELFTH_HOUR: { schema: "agpeya", table: "twelfth_hour" },
-  PRAYER_OF_THE_VEIL: { schema: "agpeya", table: "prayer_of_the_veil" },
-  INTRODUCTION_TO_EVERY_HOUR: { schema: "agpeya", table: "introduction_to_every_hour" },
-  FIRST_HOUR: { schema: "agpeya", table: "first_hour" },
-  MIDNIGHT_HOUR: { schema: "agpeya", table: "midnight_hour" },
-  OTHER_PRAYERS: { schema: "agpeya", table: "other_prayers" },
-  PROCESSION_OF_THE_CROSS: null, // not yet in database
-  VENERATION: { schema: "veneration", table: "veneration" },
-  VENERATION_MELODIES: null, // target table unclear, see project memory
-};
+function isResolvedOtherwise(hymnKey) {
+  return SENTINELS_RESOLVED_OTHERWISE.has(hymnKey) || isReadingSentinel(hymnKey) || PASCHA_READING_SENTINELS.has(hymnKey);
+}
 
-const ALL_CAPS_KEY_REGEX = /^[A-Z][A-Z0-9_]*$/;
-
-/**
- * Any Subdocument OR Inline item_type in an order table referencing an
- * all-caps hymn_key always points at *another entire type-3 order table*
- * from a different schema, resolved via SUBDOCUMENT_MAP — e.g. the
- * VERSES_OF_THE_CYMBALS inline in matins/vespers references the whole
- * verses_of_the_cymbals.verses_of_the_cymbals table, and GOSPEL_RITE
- * references the whole gospel_rite.gospel_rite table. This is NOT a
- * hymn_key lookup within that schema's hymn_texts (that key doesn't exist
- * as a row there) — it must be recursively hydrated like a Subdocument.
- */
+/** The whole order table an ALL_CAPS Subdocument or Inline key calls, or null (sentinelTable). */
 function resolveWholeTableInlineTarget(hymnKey) {
-  return ALL_CAPS_KEY_REGEX.test(hymnKey) ? SUBDOCUMENT_MAP[hymnKey] || null : null;
+  return sentinelTable(hymnKey, isResolvedOtherwise);
 }
 
 /** "COPTIC_PAULINE_EPISTLE" -> "Coptic Pauline Epistle" — a readable fallback label for a Subdocument/whole-table-inline sentinel with no hymn_titles row anywhere, rather than showing the raw ALL_CAPS key verbatim (e.g. in the content selector). */
@@ -177,7 +121,7 @@ export const READING_SENTINELS = new Set([
   "FOURTH_LITURGY_GOSPEL_WITH_COPTIC",
   "FOURTH_LITURGY_GOSPEL_WITHOUT_COPTIC",
   // The actual scripture-text sentinels nested inside readings.pauline_epistle/
-  // catholic_epistle/praxis/coptic_* (see SUBDOCUMENT_MAP) — everything
+  // catholic_epistle/praxis/coptic_* (whole tables their keys call) — everything
   // around them (intro/conclusion, title, minimization) now comes from
   // those tables directly; only the verses themselves still need live
   // day-of resolution.
@@ -803,8 +747,8 @@ async function resolveReadingSentinelSection(section, isoDate, flags) {
 // (day_key, part, hour), in the order it is read.
 
 // The Psalm and Gospel are not among them: those are read in the mournful
-// Gospel rites (MOURNFUL_GOSPEL_RITE, MOURNFUL_4_GOSPELS_RITE — see
-// SUBDOCUMENT_MAP and PASCHA_RITE_READINGS).
+// Gospel rites (MOURNFUL_GOSPEL_RITE, MOURNFUL_4_GOSPELS_RITE, the tables of
+// those names -- utils/sentinelTables.js -- and PASCHA_RITE_READINGS).
 const PASCHA_READING_SENTINELS = new Set([
   "PASCHA_PROPHECIES",
   "PASCHA_HOMILIES",
@@ -2049,13 +1993,13 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
     }
 
     if (section.isSubdocumentPlaceholder) {
-      const target = SUBDOCUMENT_MAP[section.hymn_key];
+      const target = resolveWholeTableInlineTarget(section.hymn_key);
       if (!target) {
         // A Subdocument row naming one hymn rather than a whole table
         // (mournful_4_gospels_rite's mournful4CopticGospels, the four Coptic
         // Gospels): that hymn alone, hydrated like any other, opens in the
         // modal — untitled there, since its button already names it.
-        if (!ALL_CAPS_KEY_REGEX.test(section.hymn_key)) {
+        if (!isAllCapsKey(section.hymn_key)) {
           if (depth >= 3) continue;
           const hymnRows = rawRows
             .filter((row) => `${row.hymn_key}-${row.item_order}` === section.id)

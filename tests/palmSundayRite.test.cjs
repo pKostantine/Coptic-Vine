@@ -13,7 +13,8 @@ function slice(source, startMarker, endMarker) {
 }
 
 test('Palm Sunday\'s Liturgy splices its own rite, Coptic Gospel Rite toggle and all', () => {
-  assert.match(hymnLibrarySource, /PALM_SUNDAY_LITURGY_GOSPEL_RITE: \{ schema: "gospel_rite", table: "palm_sunday_liturgy_gospel_rite" \}/);
+  // Called by its table's name, gospel_rite.palm_sunday_liturgy_gospel_rite (utils/sentinelTables.js).
+  assert.match(fs.readFileSync('src/constants/contentOrderTables.ts', 'utf8'), /\n  palm_sunday_liturgy_gospel_rite: 'gospel_rite',\n/);
   assert.match(hymnLibrarySource, /const GOSPEL_RITE_KEYS = new Set\(\[[^\]]*"PALM_SUNDAY_LITURGY_GOSPEL_RITE"/);
 });
 

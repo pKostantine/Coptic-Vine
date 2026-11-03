@@ -54,8 +54,8 @@ interface DocumentModalProps {
   onClose: () => void;
 }
 
-// COPTIC_PAULINE_EPISTLE/COPTIC_CATHOLIC_EPISTLE/COPTIC_PRAXIS (see
-// SUBDOCUMENT_MAP in hymnLibrary.js) each include one untitled reading
+// COPTIC_PAULINE_EPISTLE/COPTIC_CATHOLIC_EPISTLE/COPTIC_PRAXIS (the readings
+// tables of those names, utils/sentinelTables.js) each include one untitled reading
 // section whose citation (e.g. "Romans 1:1-7") lives as a readingReference
 // verse inside it, not as a section title. This lets the pill row use that
 // citation as the visible label. Holy Week's four Coptic Gospels
