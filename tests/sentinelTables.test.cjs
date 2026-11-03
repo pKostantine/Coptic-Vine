@@ -100,3 +100,23 @@ test("offline, the Liturgy book carries the Fractions and the seasonal hymns, as
   assert.ok(liturgy.includes('fractions'));
   assert.ok(liturgy.includes('seasonal_liturgy_hymns'));
 });
+
+test('the offline books look for what a document calls where the reader looks for it', () => {
+  // workers/content-api/src/offlineCalls.ts packs a book with whatever its
+  // documents call, by the reader's own lookup: these lists must stay the reader's.
+  const worker = fs.readFileSync('workers/content-api/src/offlineCalls.ts', 'utf8');
+  const list = (source, name) => {
+    const body = new RegExp(`const ${name}(?:: [^=]+)? = \\[([^\\]]*)\\]`).exec(source);
+    assert.ok(body, `${name} not found`);
+    return [...body[1].matchAll(/["']([a-z_]+)["']/g)].map((match) => match[1]);
+  };
+  for (const name of ['HYMN_KEY_FALLBACK_SCHEMAS', 'HYMN_TEXT_SCHEMAS']) {
+    assert.deepEqual(list(worker, name), list(library, name), name);
+  }
+  // The Sermon Planner's extra lookup, and the aliases.
+  assert.match(library, /const extraSchemas = schema === "liturgy" && table === "sermon_planner" \? \["gospel_rite"\] : \[\];/);
+  assert.match(worker, /schemaName === 'liturgy' && table === 'sermon_planner' \? \['gospel_rite'\] : \[\]/);
+  const aliases = Object.fromEntries(Object.entries(SENTINEL_TABLE_ALIASES).map(([key, target]) => [key, target.schema]));
+  assert.deepEqual(aliases, { THREE_GREAT_LITANIES: 'litanies' });
+  assert.match(worker, /export const SENTINEL_TABLE_ALIASES: Readonly<Record<string, string>> = \{ THREE_GREAT_LITANIES: 'litanies' \};/);
+});
