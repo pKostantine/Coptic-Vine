@@ -1704,9 +1704,10 @@ function renderVerse(
   // beside and be read against. Giving it one anyway wedged it into a third
   // (or a half) of the row and wrapped it in there, reading as text pushed
   // off to one side rather than a line of its own. It spans the whole row
-  // instead, centered on the row rather than on a cell. The speaker labels
-  // are genuinely per-language, so they keep the grid row above it — which
-  // is where this line already sat, just narrower.
+  // instead, centered on the row rather than on a cell. Its speaker is still
+  // named, as any line's is: the labels keep the grid row above it, each in
+  // its own column -- the Coptic one too, where Coptic is shown, so a page
+  // in Coptic alone still says who says it.
   const copticStandsAlone =
     isInvincibleCoptic && !hasTranslationText && languages.some((language) => language.key === 'coptic');
   // A line opens with the drop cap and decorated first words only where it is
@@ -1724,36 +1725,43 @@ function renderVerse(
   const arabicOpening = opens && !isCentered ? splitArabicOpening(formatArabicDigits(verse.arabic || '')) : null;
   // The English line's height, as the page sets it, for the initial beside it.
   const englishLineHeight = Math.round(fontSize * 1.3);
-  const columnLanguages = copticStandsAlone ? languages.filter((language) => language.key !== 'coptic') : languages;
+  // Standing alone, the Coptic keeps its column in the labels' row only, for its label.
+  const copticLabelShown = copticStandsAlone && Boolean(visibleColumns.coptic) && Boolean(copticCell?.speakerLabel);
+  const columnLanguages = copticStandsAlone
+    ? languages.filter((language) => language.key !== 'coptic' || copticLabelShown)
+    : languages;
   const gridTemplateColumns = `repeat(${Math.max(columnLanguages.length, 1)}, minmax(0, 1fr))`;
   const textStyle = `color:${color}; font-style:${italic ? 'italic' : 'normal'};`;
 
   const renderCell = (language: (typeof languages)[number], spansRow: boolean) => {
-    const verseNumberText = verse.bibleVerseNumber
+    // The Coptic's place in the labels' row, over a Coptic line spanning the row below it: its label, set as any column's.
+    const labelOnly = copticStandsAlone && language.key === 'coptic' && !spansRow;
+    const verseNumberText = !labelOnly && verse.bibleVerseNumber
       ? language.key === 'arabic'
         ? formatArabicDigits(verse.bibleVerseNumber)
         : language.key === 'coptic'
           ? formatCopticNumbers(verse.bibleVerseNumber)
           : verse.bibleVerseNumber
       : '';
-    const centered = language.key === 'coptic' ? isCopticCentered : isCentered;
-    // A Coptic line spanning the row sits below the other columns' labels
-    // already, so its own label would only repeat theirs above it.
+    const centered = labelOnly ? false : language.key === 'coptic' ? isCopticCentered : isCentered;
+    // A Coptic line spanning the row is labelled in the labels' row above it (labelOnly).
     const speakerLabel = spansRow ? '' : language.speakerLabel;
     const verseId = `${section.id}::v${index}`;
-    const cellInitial = language.key === 'coptic' ? initial : null;
+    const cellInitial = language.key === 'coptic' && !labelOnly ? initial : null;
     if (cellInitial) initialsUsed.add(cellInitial.letter);
     const englishInitial = language.key === 'english' ? englishOpening : language.key === 'french' ? frenchOpening : null;
     if (englishInitial) englishInitialsUsed.add(englishInitial.letter);
     const arabicWord = language.key === 'arabic' ? arabicOpening : null;
-    const bodyText = cellInitial
+    const bodyText = labelOnly
+      ? ''
+      : cellInitial
       ? renderCopticInitial(cellInitial, centered) + renderOpeningRest(cellInitial.rest, highlightMetropolitanBrackets)
       : englishInitial
         ? renderEnglishInitial(englishInitial, fontSize, englishLineHeight) + renderOpeningRest(englishInitial.rest, highlightMetropolitanBrackets, 'english-small-caps')
         : arabicWord
           ? `<span class="opening-word arabic-opening">${escapeHtml(arabicWord.word)}</span>${highlightMetropolitanBrackets(arabicWord.rest)}`
           : highlightMetropolitanBrackets(language.text);
-    const renderedBody = sermonPlannerMode
+    const renderedBody = sermonPlannerMode && !labelOnly
       ? `<span class="sermon-annotatable-text" data-sermon-section-id="${escapeAttribute(section.id)}" data-sermon-verse-id="${escapeAttribute(verseId)}" data-sermon-language="${escapeAttribute(language.key)}">${bodyText}</span>`
       : bodyText;
     return `
