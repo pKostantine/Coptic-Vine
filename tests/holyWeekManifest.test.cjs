@@ -180,8 +180,10 @@ test('an hour\'s evangelist comes from its own Gospels, every other one switched
 });
 
 test('Holy Week hours splice the mournful rites like GOSPEL_RITE, toggle and all', () => {
-  assert.match(hymnLibrarySource, /MOURNFUL_GOSPEL_RITE: \{ schema: "gospel_rite", table: "mournful_gospel_rite" \}/);
-  assert.match(hymnLibrarySource, /MOURNFUL_4_GOSPELS_RITE: \{ schema: "gospel_rite", table: "mournful_4_gospels_rite" \}/);
+  // Called by their tables' names, gospel_rite.mournful_gospel_rite and mournful_4_gospels_rite (utils/sentinelTables.js).
+  const orderTables = fs.readFileSync('src/constants/contentOrderTables.ts', 'utf8');
+  assert.match(orderTables, /\n  mournful_gospel_rite: 'gospel_rite',\n/);
+  assert.match(orderTables, /\n  mournful_4_gospels_rite: 'gospel_rite',\n/);
   assert.match(hymnLibrarySource, /const GOSPEL_RITE_KEYS = new Set\(\[[^\]]*"MOURNFUL_GOSPEL_RITE", "MOURNFUL_4_GOSPELS_RITE"\]\)/);
   assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) return null;/);
   assert.match(hymnLibrarySource, /if \(!GOSPEL_RITE_KEYS\.has\(hymnKey\)\) \{\r?\n\s+const sections = await safeHydrateNested/);

@@ -947,7 +947,7 @@ export async function getReadingsForDate(date: Date): Promise<ReadingsResult> {
   // Pauline/Catholic Epistle and Praxis now come from the readings schema's
   // own order tables (intro + live scripture text + conclusion) via the
   // standard hydration pipeline, same as any other document — see
-  // SUBDOCUMENT_MAP/READING_SENTINEL_MAP in hymnLibrary.js. This replaces
+  // utils/sentinelTables.js and READING_SENTINEL_MAP in hymnLibrary.js. This replaces
   // the old bare-verse-list buildReadingSection path for just these three;
   // Psalm/Gospel/Prophecy have no readings-schema table yet and stay on it.
   const epistleFlags = await computeEpistleConditionFlagsFromRules(rules);
