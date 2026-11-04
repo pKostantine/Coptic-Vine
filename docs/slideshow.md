@@ -219,7 +219,10 @@ offsets, primaryLanguage, direction, breaks}` (`createSlideAnchor`), where
   the piece holding the line asked for (the page before a continuation is
   the piece ending at the line above it; the page before the item after
   the verse is its last piece). It also ends there, so nothing from the
-  page the reader left appears again.
+  page the reader left appears again. Walking back past a verse turned over
+  the page, the slide takes that verse's last piece if it fits, as a forward
+  turn sets it with what follows, rather than leave the piece on a slide of
+  its own.
 - `breaks: false` (the Settings/Calendar "end" restore): the anchor only
   names the item; the page is not made to begin at it.
 
