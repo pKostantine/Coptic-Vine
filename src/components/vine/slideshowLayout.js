@@ -13,6 +13,8 @@ import { countInitialLines } from "./textLines.js";
 const SPACING_XS = 4;
 const SPACING_SM = 8;
 const MIN_USEFUL_FRAGMENT_LINES = 2;
+// What the content budget keeps below the viewport (getSlideContentBudget).
+const SLIDE_BUDGET_SLACK = 2;
 
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -123,18 +125,10 @@ export function getSlidePadding() {
   return { bottom: 0, top: 0 };
 }
 
-/**
- * The content budget: the whole viewport, less the slide's own margin. It
- * keeps no slack of its own. An item placed by its measured height already
- * carries 2px of it (paginateItems), for the fractions a layout reports, and
- * a verse's pieces are placed by its lines, whose heights are whole numbers.
- * The 2px the budget used to keep as well cost a line where the line fitted
- * by one: on an iPhone held sideways at 34px (a slide 369px tall), eight
- * lines of 44px and the verse's 16px make 368px, and the budget was 367.
- */
+/** The content budget is always bounded by the real viewport. */
 export function getSlideContentBudget(viewportHeight, padding = getSlidePadding(viewportHeight)) {
   const safeHeight = Math.max(Number(viewportHeight) || 0, 0);
-  return Math.max(safeHeight - (padding.top || 0) - (padding.bottom || 0), 1);
+  return Math.max(safeHeight - (padding.top || 0) - (padding.bottom || 0) - SLIDE_BUDGET_SLACK, 1);
 }
 
 /** FNV-1a keeps signatures compact while still hashing the actual content. */
@@ -430,8 +424,8 @@ export function paginateItems(
     }
 
     // Only a verse taller than a whole slide is turned over the page, from a
-    // fresh slide, each column as many of its lines at a time as fit, even
-    // where that leaves one line for the next slide.
+    // fresh slide, each column as many of its lines at a time as fit --
+    // never in a piece of fewer than two lines, either side of the turn.
     appendSegments(verseItem, createVerseLineState(languageMetric, fontSize, verseItem));
   };
 
@@ -589,14 +583,22 @@ function appendTallVerseSegments({
     const capacityItem = segmentIndex > 0
       ? createContinuationCapacityItem(item, state)
       : item;
-    const remainingHeight = availableHeight - currentHeight;
+    // The slide a verse begins on takes, in every language, each line that
+    // fits on it. Its lines are counted against the whole slide, the 2px
+    // the budget keeps included (a line's height is a whole number), and
+    // none is held back for the next slide. St. Basil's "when we disobeyed
+    // Your commandment", on an iPhone held sideways at 34px (a slide 369px
+    // tall), has room for eight of its nine Coptic lines (16 + 8 x 44 =
+    // 368px); it took seven.
+    const firstSlide = segmentIndex === 0;
+    const remainingHeight = availableHeight + (firstSlide ? SLIDE_BUDGET_SLACK : 0) - currentHeight;
     let lineCapacities = keepInitialLinesTogether(state, independentLineTakes(state, getIndependentLineCapacities(
       state,
       remainingHeight,
       fontSize,
       capacityItem,
       visibleLanguages,
-    )));
+    ), { holdBackStrayLine: !firstSlide }));
 
     const keepHere = keepWithSlide && segmentIndex === firstSegmentIndex && currentSlide.length > 0;
 
@@ -669,18 +671,19 @@ function appendTallVerseSegments({
  * Each column of a verse too tall for a slide shows as much of itself as
  * fits, on its own: the Arabic may finish on this slide while the English
  * carries on to the next, and an empty cell is left where it finished.
- * Nothing that fits is held back. A column used to keep its last line but
- * one for the next slide rather than leave one there alone, and the slide
- * then ended a line short with room to spare: St. Basil's "when we disobeyed
- * Your commandment" turned over as 7 Coptic lines and 2 with room for 8.
+ * Only a single stray line is held back, so the turn of the page never
+ * leaves a column one line on its own -- except on the slide the verse
+ * begins on, which keeps every line that fits (`holdBackStrayLine: false`).
  */
-export function independentLineTakes(state, capacities) {
+export function independentLineTakes(state, capacities, { holdBackStrayLine = true } = {}) {
   const takes = {};
   state.languages
     .filter((entry) => entry.offset < entry.end)
     .forEach((entry) => {
       const remaining = entry.end - entry.offset;
-      takes[entry.language] = Math.max(0, Math.min(capacities[entry.language] ?? 0, remaining));
+      let take = Math.max(0, Math.min(capacities[entry.language] ?? 0, remaining));
+      if (holdBackStrayLine && take >= 2 && remaining - take === 1) take -= 1;
+      takes[entry.language] = take;
     });
   return takes;
 }
