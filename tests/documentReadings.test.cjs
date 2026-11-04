@@ -114,8 +114,10 @@ test('every citation line hymnLibrary builds says which reading it is', () => {
   const source = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
   // The one place a citation line is made…
   assert.equal((source.match(/type: "readingReference"/g) || []).length, 1, 'citation lines are built by readingReferenceVerse alone');
-  // …used for a sentinel spliced into a hymn, one that is its own section, and a Pascha hour's epistle.
-  assert.equal((source.match(/(?<!function )readingReferenceVerse\(citation, /g) || []).length, 3);
+  // …used for a sentinel spliced into a hymn, one that is its own section, a Pascha hour's epistle,
+  // and a Procession station's Psalm and Gospel -- that one untagged: never one of the day's readings.
+  assert.equal((source.match(/(?<!function )readingReferenceVerse\(citation, /g) || []).length, 4);
+  assert.equal((source.match(/readingReferenceVerse\(citation, null\)/g) || []).length, 1);
   // And it is run here as written: a citation with its reading, and a reading with no citation to show.
   const start = source.indexOf('function readingIdentity(');
   const end = source.indexOf('/** A sentinel\'s verses and citation', start);

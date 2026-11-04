@@ -74,6 +74,9 @@ test("an ALL_CAPS key calls the order table of its name; a hymn's own key, the f
   // Its own hymns, and the day's readings (the hand-kept plan gives those their Bible), call nothing new;
   // a key found in public is public's, never psalmody's as well.
   assert.deepEqual([...calls.get('agpeya')!], ['public']);
+  // A schema with reading_rules of its own reads the Bible by them.
+  assert.deepEqual([...calls.get('procession_of_the_cross')!], ['bible']);
+  assert.ok(calls.get('holy_week')!.has('bible'));
 });
 
 test("a book carries what its documents call, on top of the hand-kept plan, and a schema called gets a package of its own", async () => {
@@ -93,6 +96,7 @@ test("a book carries what its documents call, on top of the hand-kept plan, and 
   const liturgy = dependenciesOf(plan, 'liturgy');
   for (const called of ['fractions', 'aspasmos', 'litanies']) assert.ok(liturgy.includes(called), `liturgy calls ${called}`);
   assert.deepEqual(dependenciesOf(plan, 'aspasmos'), ['procession_of_the_cross']);
+  assert.deepEqual(dependenciesOf(plan, 'procession_of_the_cross'), ['bible']);
   const aspasmos = plan.resources.find((r) => r.id === 'aspasmos');
   assert.deepEqual(aspasmos && { schema: aspasmos.schema, tables: aspasmos.tables }, { schema: 'aspasmos', tables: ['adam_aspasmos', 'hymn_texts', 'hymn_titles', 'vatos_aspasmos'] });
   assert.ok(plan.resources.some((r) => r.id === 'procession_of_the_cross'));

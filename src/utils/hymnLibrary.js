@@ -7,6 +7,7 @@ import { contentDataClient as supabase, isContentSchemaInstalled } from "../serv
 import { formatArabicDigits } from "./displayText";
 import { formatVerses } from "./verseFormatting";
 import { isSentinelKey as isAllCapsKey, sentinelTable } from "./sentinelTables";
+import { INLINE_READING_RULE_SCHEMAS } from "../constants/contentOrderTables";
 
 // ─── ALL_CAPS sentinel → schema.table ────────────────────────────────────────
 // A Subdocument or Inline row whose hymn_key is in capitals calls another
@@ -977,6 +978,88 @@ async function resolvePaschaReadingSections(section, flags, depth, isoDate) {
     }));
   }
   return sections;
+}
+
+// ─── Readings a schema's own reading_rules file under an Inline key ─────────
+// The Procession of the Cross reads a Psalm and a Gospel at each of its
+// twelve stations: its FIRST_GOSPEL_READINGS … TWELFTH_GOSPEL_READINGS rows
+// are Inline, and procession_of_the_cross.reading_rules files each station's
+// readings under that key (inline_hymn_key), in the order they are read. Any
+// schema whose reading_rules are shaped so (INLINE_READING_RULE_SCHEMAS,
+// built from the content Worker's table list) is read the same way.
+
+const inlineReadingRulesCache = new Map();
+
+/** The readings `schema`'s reading_rules file under `hymnKey`, in reading order. */
+function getInlineReadingRules(schema, hymnKey) {
+  const key = `${schema}:${hymnKey}`;
+  let cached = inlineReadingRulesCache.get(key);
+  if (!cached) {
+    cached = (async () => {
+      const { data, error } = await supabase
+        .schema(schema)
+        .from("reading_rules")
+        .select("reading_rule_id, reading_type, title_english, title_arabic, book_key, reading_reference, psalm_hymn_key, sort_order")
+        .eq("inline_hymn_key", hymnKey)
+        .order("sort_order", { ascending: true });
+      if (error) throw createReadableSupabaseError(error, `${schema}.reading_rules`);
+      return data || [];
+    })();
+    cached.catch(() => inlineReadingRulesCache.delete(key));
+    inlineReadingRulesCache.set(key, cached);
+  }
+  return cached;
+}
+
+/**
+ * An Inline key's readings (getInlineReadingRules) as one section under the
+ * calling row's own title ("Psalm and Gospel"): each reading's citation line,
+ * then the reading. A Psalm is read as it is sung, the schema's own hymn of it
+ * (psalm_hymn_key: the deacon's "From the Psalms of our teacher David…" and
+ * the verses, in every language), or from the Bible where there is none; any
+ * other reading is the Bible's, its Coptic too. Null when nothing is filed
+ * under the key.
+ */
+async function resolveInlineReadingRuleSection(schema, section, flags) {
+  const rows = await getInlineReadingRules(schema, section.hymn_key);
+  if (!rows.length) return null;
+  const verses = [];
+  for (const row of rows) {
+    const resolved = row.reading_reference ? (await resolveBibleReadingReference(row.reading_reference)).resolvedSegments : [];
+    const reading = { ...row, resolved_verses: resolved };
+    const citation = await buildReadingCitation(reading);
+    const isPsalm = row.reading_type === "Psalm";
+    let lines = [];
+    if (row.psalm_hymn_key) {
+      const [textRows, title] = await Promise.all([fetchInlineHymnVerses(schema, row.psalm_hymn_key), fetchInlineHymnTitle(schema, row.psalm_hymn_key)]);
+      lines = textRows.flatMap((textRow) => {
+        const visibility = evaluateBishopAwareVisibility(textRow.condition, flags);
+        if (!visibility.visible) return [];
+        return [{ ...buildVerseFromTextRow(textRow, title?.prayer_type || null), bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }];
+      });
+    }
+    if (!lines.length) lines = buildReadingVerses(reading, true, isPsalm);
+    if (!lines.length) continue;
+    // Not tagged as one of the day's readings (readingIdentity): a station's
+    // Gospel is the Procession's own, never the day's that a list of the
+    // day's readings opens a document at (documentReadings.ts).
+    verses.push(...readingReferenceVerse(citation, null), ...lines);
+  }
+  if (!verses.length) return null;
+  return applyCopticCaseToSection({
+    id: section.id,
+    hymn_key: section.hymn_key,
+    title: section.title,
+    titlePrayerType: section.titlePrayerType,
+    collapsible: Boolean(section.collapsible),
+    defaultCollapsed: Boolean(section.defaultCollapsed),
+    verses,
+    prayerType: null,
+    alternateEvery: null,
+    forceWhiteVerses: true,
+    bishopOnly: section.bishopOnly,
+    priestOnly: section.priestOnly,
+  });
 }
 
 // ─── Prophecies ─────────────────────────────────────────────────────────────
@@ -2170,6 +2253,16 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       // how the calling row's own title/prayer_type/minimization (already
       // resolved onto `section` above, same as any other hymn_key) get
       // applied to the imported content.
+      // A reading this schema's own reading_rules file under the key (the
+      // Procession's FIRST_GOSPEL_READINGS … TWELFTH_GOSPEL_READINGS).
+      if (INLINE_READING_RULE_SCHEMAS.includes(schema) && isAllCapsKey(section.hymn_key)) {
+        const readingSection = await resolveInlineReadingRuleSection(schema, section, flags);
+        if (readingSection) {
+          hydrated.push(readingSection);
+          continue;
+        }
+      }
+
       const target = resolveWholeTableInlineTarget(section.hymn_key);
       if (target) {
         if (depth >= 3) continue;
