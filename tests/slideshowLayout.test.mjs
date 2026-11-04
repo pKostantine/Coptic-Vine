@@ -1150,6 +1150,40 @@ test("turned back, the page is packed from its foot up, ending where the page on
   assert.equal(into[landing][0].slideshowLineRanges.english.end, 30);
 });
 
+test("turned back to the verse after a tall one, the page holds the tall verse's last piece, as it did going forward", () => {
+  // St. Basil's "when we disobeyed Your commandment" (7 English lines, 9
+  // Coptic) on an iPhone 14 held sideways at 34px: going forward, its last
+  // Coptic line shares a slide with "You have not abandoned us" (5 and 5).
+  // Going back from the slide after, that slide is the same one, not
+  // "You have not abandoned us" alone and the Coptic line on a slide of its own.
+  const lines = (prefix, count) => Array.from({ length: count }, (_, index) => ({ text: `${prefix}${index}`, isParagraphEnd: index === count - 1 }));
+  const verse = (id, english, coptic) => ({ item: verseItem({ id, sectionId: "s" }), english, coptic });
+  const rows = [verse("v4", 3, 4), verse("v5", 7, 9), verse("v6", 5, 5), verse("v7", 4, 5)];
+  const items = rows.map((row) => row.item);
+  const heights = Object.fromEntries(rows.map((row) => [row.item.id, 16 + Math.max(row.english, row.coptic) * 44]));
+  const metrics = Object.fromEntries(rows.map((row) => [row.item.id, { english: { lines: lines("E", row.english) }, coptic: { lines: lines("C", row.coptic) } }]));
+  const languages = { english: true, french: false, coptic: true, arabic: false };
+  const budget = getSlideContentBudget(369);
+  const pages = (breakAt) => paginateItems(items, heights, metrics, budget, 34, languages, 750, breakAt);
+  // Each entry by its verse and, for a piece, the Coptic lines it holds.
+  const ids = (slide) => slide.map((entry) => {
+    const coptic = entry.slideshowLineRanges?.coptic;
+    return `${entry.sourceItemId || entry.id}${coptic && entry.slideshowSegmentIndex ? ` C${coptic.start}-${coptic.end}` : ""}`;
+  });
+  const forward = pages({ itemId: "v4", offsets: {} });
+  assert.deepEqual(forward.map(ids), [["v4"], ["v5"], ["v5 C8-9", "v6"], ["v7"]]);
+  const back = pages({ itemId: "v6", offsets: {}, direction: "backward" });
+  const landing = findSlideIndexForAnchor(back, { sourceItemId: "v6", direction: "backward", offsets: {} });
+  assert.deepEqual(ids(back[landing]), ["v5 C8-9", "v6"]);
+  assert.deepEqual(back[landing][0].slideshowLineRanges, forward[2][0].slideshowLineRanges);
+  assert.deepEqual(ids(back[landing + 1]), ["v7"]);
+  // Where the last piece and what follows it don't fit on one slide, the page is what follows alone, as before.
+  const tallerNext = { ...heights, v6: 16 + 7 * 44 };
+  const apart = paginateItems(items, tallerNext, metrics, budget, 34, languages, 750, { itemId: "v6", offsets: {}, direction: "backward" });
+  const apartLanding = findSlideIndexForAnchor(apart, { sourceItemId: "v6", direction: "backward", offsets: {} });
+  assert.deepEqual(ids(apart[apartLanding]), ["v6"]);
+});
+
 test("turned back from the second piece of a tall verse, the page is the piece before it, not the slide before the verse", () => {
   const before = verseItem({ id: "before", sectionId: "s" });
   const giant = verseItem({ id: "giant", sectionId: "s" });

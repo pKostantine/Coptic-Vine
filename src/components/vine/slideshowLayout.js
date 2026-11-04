@@ -529,9 +529,41 @@ function packBackwardFromItem(items, units, heights, languageHeights, availableH
       return { itemId: first.sourceItemId || first.id, offsets, endsBeforeItemId };
     }
   }
+  // The last piece of a verse turned over the page, as a forward turn lays
+  // the verse out (from its title, if the title keeps it, else from a fresh
+  // slide): its height and where its lines begin. None for a verse placed
+  // whole.
+  const lastPieceOf = (index) => {
+    const item = items[index];
+    if (!measured(item)) return null;
+    const title = pairedTitleIndex(items, index);
+    if (title < 0 && heightOf(index) <= availableHeight) return null;
+    const pages = paginateItems(items.slice(title >= 0 ? title : index, index + 1), heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0);
+    const pieces = pages
+      .map((page) => page.find((entry) => (entry.sourceItemId || entry.id) === item.id && Object.keys(entry.slideshowLineRanges || {}).length > 0))
+      .filter(Boolean);
+    if (pieces.length < 2) return null;
+    const piece = pieces[pieces.length - 1];
+    return {
+      height: getVerseLineSegmentHeight({ item: piece }, fontSize, visibleLanguages),
+      offsets: Object.fromEntries(Object.entries(piece.slideshowLineRanges).map(([language, range]) => [language, range.start])),
+    };
+  };
   let first = last;
   let total = heightOf(last);
   while (first > 0 && !units[first].breakBefore) {
+    // A verse turned over the page ends on a piece that a forward turn sets
+    // on one slide with what follows it. Turned back, the page holds that
+    // piece too, as it did going forward, rather than leave it alone on a
+    // slide of its own: St. Basil's "when we disobeyed Your commandment"
+    // ends on a Coptic line that shares its slide with "You have not
+    // abandoned us" going forward, and going back showed "You have not
+    // abandoned us" on one slide and the Coptic line on another.
+    const tail = lastPieceOf(first - 1);
+    if (tail) {
+      if (total + tail.height > availableHeight) break;
+      return { itemId: items[first - 1].id, offsets: tail.offsets, endsBeforeItemId: items[last + 1]?.id };
+    }
     // The group ending just before: an item plus whatever keeps with it.
     let start = first - 1;
     while (start > 0 && keepsWithNext(items[start - 1])) start -= 1;
