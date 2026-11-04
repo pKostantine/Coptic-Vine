@@ -134,3 +134,16 @@ test('Lazarus Saturday and Palm Sunday keep only their own feasts; Pascha and Ho
   }
   assert.ok(!(await flags('2027-05-02')).has('Pascha'), 'the Resurrection is past Holy Week');
 });
+
+test('GreatFeasts is the Resurrection, Nativity and Theophany alone; Pentecost and the Ascension are feasts of the Lord without it', async () => {
+  // 2027: Nativity 01-07, Theophany 01-19, the Resurrection 05-02, the Ascension 06-10 (its 40th day), Pentecost 06-20.
+  for (const [name, date, own] of [['Nativity', '2027-01-07', 'Nativity'], ['Theophany', '2027-01-19', 'Theophany'], ['the Resurrection', '2027-05-02', 'Resurrection']] as const) {
+    const day = await flags(date);
+    assert.ok(day.has(own) && day.has('GreatFeasts') && day.has('Feasts'), name);
+  }
+  for (const [name, date, own] of [['the Ascension', '2027-06-10', 'Ascension'], ['Pentecost', '2027-06-20', 'Pentecost']] as const) {
+    const day = await flags(date);
+    assert.ok(day.has(own) && day.has('Feasts') && day.has('FeastsOfTheLordPeriods') && day.has('PentecostPeriod'), name);
+    assert.ok(!day.has('GreatFeasts'), `GreatFeasts on ${name}`);
+  }
+});

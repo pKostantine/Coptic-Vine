@@ -19,6 +19,8 @@ import { DocumentAction, DocumentSection, DocumentWebViewHandle } from '../Docum
 import { getSectionSelectorTitle } from '../sectionSelectorTitle';
 import DocumentPillBar from '../ui/DocumentPillBar';
 import { getDocumentTheme } from '../../../constants/documentThemes';
+import { documentInitialColors, documentOrnamentColor } from '../../../constants/documentOrnaments';
+import type { SeasonThemeKey } from '../../../constants/seasonAppearance';
 import FloatingReaderControls from '../ui/FloatingReaderControls';
 import { floatingControlsLayout } from '../ui/floatingControls';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
@@ -51,6 +53,12 @@ interface DocumentModalProps {
   collapseMemoryScope: string;
   /** Parent document's bookmark ID (e.g. "liturgy:vespers") — when provided alongside subdocumentKey, the content selector shows a bookmark button that saves "${parentBookmarkId}:sub:${subdocumentKey}". */
   parentBookmarkId?: string;
+  /**
+   * The season of the service it was opened from (ServiceDocument's
+   * ornamentSeason), whose colours its ornaments and drop caps take as that
+   * service's do. Without it they are the annual ones.
+   */
+  ornamentSeason?: SeasonThemeKey | null;
   onClose: () => void;
 }
 
@@ -150,10 +158,12 @@ function useStartsInInset() {
  * no fixed nesting cap, it's bounded only by how many buttons a user taps
  * through and the depth-3 guard hydrateWithFlags applies while prefetching.
  */
-function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, collapseMemoryScope, parentBookmarkId, onClose }: DocumentModalProps) {
+function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey, collapseMemoryScope, parentBookmarkId, ornamentSeason = null, onClose }: DocumentModalProps) {
   const modalOrientations = useModalOrientations();
   const { preferences, toggleBishopPresent, isBookmarked, toggleBookmark } = useReadingPreferences();
   const documentTheme = getDocumentTheme(preferences.documentTheme);
+  const ornamentColor = documentOrnamentColor(documentTheme, ornamentSeason);
+  const initialColors = useMemo(() => documentInitialColors(documentTheme, ornamentSeason), [documentTheme, ornamentSeason]);
   const [nestedModal, setNestedModal] = useState<DocumentModalTarget | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
   // Calendar/Settings can't be *navigated* to from in here. This whole
@@ -557,6 +567,8 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
                 keyboardNavigationEnabled={visible && !isCovered}
                 topContentInset={controlsOverText ? floatingLayout.contentTop : 0}
                 onHeadpieceInViewChange={setHeadpieceInView}
+                ornamentColor={ornamentColor}
+                initialColors={initialColors}
               />
             </View>
             <ContentSelectorDrawer
@@ -631,6 +643,7 @@ function DocumentModal({ visible, title, sections, isAntiphonary, subdocumentKey
           isAntiphonary={nestedModal?.isAntiphonary}
           subdocumentKey={nestedModal?.subdocumentKey}
           collapseMemoryScope={nestedModal?.collapseMemoryScope ?? `${collapseMemoryScope}:sub:unknown`}
+          ornamentSeason={ornamentSeason}
           onClose={() => setNestedModal(null)}
         />
         {/* The calendar over the subdocument, in this modal's own page: iOS
@@ -659,11 +672,13 @@ export function AntiphonaryModal({
   visible,
   sections,
   collapseMemoryScope,
+  ornamentSeason,
   onClose,
 }: {
   visible: boolean;
   sections: DocumentSection[] | null;
   collapseMemoryScope: string;
+  ornamentSeason?: SeasonThemeKey | null;
   onClose: () => void;
 }) {
   return (
@@ -673,6 +688,7 @@ export function AntiphonaryModal({
       sections={sections}
       isAntiphonary
       collapseMemoryScope={collapseMemoryScope}
+      ornamentSeason={ornamentSeason}
       onClose={onClose}
     />
   );

@@ -234,6 +234,9 @@ export async function getActiveFlagsForDate(context: ContentContext, date: strin
   const weekend = ['Saturday', 'Sunday'];
 
   // ══ A. GREAT FEASTS
+  // GreatFeasts is the Resurrection's, Nativity's and Theophany's alone (the
+  // days that leave out the Agpeya hours and say the Seven Tunes at Matins).
+  // Pentecost and the Ascension are Feasts of the Lord but not great feasts.
   if (resurrection !== null && p === resurrection) {
     emit(feast('Resurrection', 'Resurrection'), feast('GreatFeasts', 'Great Feasts'), feast('Feasts', 'Feasts'),
       feast('FeastsOfTheLordPeriods', 'Feasts of the Lord Periods'), feast('PentecostPeriod', 'Holy Fifty Days'),
@@ -248,12 +251,12 @@ export async function getActiveFlagsForDate(context: ContentContext, date: strin
       feast('GreatFeasts', 'Great Feasts'), feast('Feasts', 'Feasts'), feast('FeastsOfTheLordPeriods', 'Feasts of the Lord Periods'));
   }
   if (pentecost !== null && p === pentecost) {
-    emit(feast('Pentecost', 'Pentecost'), feast('GreatFeasts', 'Great Feasts'), feast('Feasts', 'Feasts'),
+    emit(feast('Pentecost', 'Pentecost'), feast('Feasts', 'Feasts'),
       feast('FeastsOfTheLordPeriods', 'Feasts of the Lord Periods'), feast('PentecostPeriod', 'Holy Fifty Days'),
       feast('PostAscensionPentecostPeriod', 'Post-Ascension Pentecost Period'));
   }
   if (ascension !== null && p === ascension) {
-    emit(feast('Ascension', 'Ascension'), feast('GreatFeasts', 'Great Feasts'), feast('Feasts', 'Feasts'),
+    emit(feast('Ascension', 'Ascension'), feast('Feasts', 'Feasts'),
       feast('FeastsOfTheLordPeriods', 'Feasts of the Lord Periods'), feast('PentecostPeriod', 'Holy Fifty Days'),
       feast('PostAscensionPentecostPeriod', 'Post-Ascension Pentecost Period'));
   }

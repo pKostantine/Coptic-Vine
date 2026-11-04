@@ -150,3 +150,22 @@ test('the reader draws each ornament once and points to it; the slideshow knows 
   assert.match(fs.readFileSync('src/app/holy-week/[dayId]/[hourId].tsx', 'utf8'), /ornamentSeason="holyweek"/);
   assert.match(service, /fixedOrnamentSeason\n?\s*\? Promise\.resolve\(fixedOrnamentSeason\)/);
 });
+
+test("a subdocument, the Antiphonary and a subdocument opened from one wear the season of the service they open from", () => {
+  const service = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+  const opened = (name) => service.slice(service.indexOf(`<${name}\n`), service.indexOf('/>', service.indexOf(`<${name}\n`)));
+  assert.match(opened('SubdocumentModal'), /ornamentSeason=\{ornamentSeason\}/);
+  assert.match(opened('AntiphonaryModal'), /ornamentSeason=\{ornamentSeason\}/);
+  const modal = fs.readFileSync('src/components/vine/screens/DocumentModal.tsx', 'utf8');
+  assert.match(modal, /const ornamentColor = documentOrnamentColor\(documentTheme, ornamentSeason\);/);
+  assert.match(modal, /const initialColors = useMemo\(\(\) => documentInitialColors\(documentTheme, ornamentSeason\), \[documentTheme, ornamentSeason\]\);/);
+  // The reader gets them; without them it falls back to the annual colours (DocumentSurface).
+  const surface = modal.slice(modal.indexOf('<DocumentSurface'), modal.indexOf('/>', modal.indexOf('<DocumentSurface')));
+  assert.match(surface, /ornamentColor=\{ornamentColor\}/);
+  assert.match(surface, /initialColors=\{initialColors\}/);
+  // A subdocument opened from inside one, and the Antiphonary, pass the season on.
+  const nested = modal.slice(modal.indexOf('<DocumentModal\n          visible={Boolean(nestedModal)}'));
+  assert.match(nested.slice(0, nested.indexOf('/>')), /ornamentSeason=\{ornamentSeason\}/);
+  const antiphonary = modal.slice(modal.indexOf('export function AntiphonaryModal'));
+  assert.match(antiphonary, /isAntiphonary\n\s+collapseMemoryScope=\{collapseMemoryScope\}\n\s+ornamentSeason=\{ornamentSeason\}/);
+});
