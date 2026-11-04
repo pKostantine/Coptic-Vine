@@ -240,6 +240,13 @@ async function fetchContextFlags(isoDate, extraContext) {
       if (flags.Joyful29 || flags.Joyful29thOfTheMonth) {
         flags.Feasts = true;
       }
+      // GreatFeasts is the Resurrection's, Nativity's and Theophany's alone.
+      // The calendar gave it to Pentecost and the Ascension too until 4 Nov
+      // 2026; an older content Worker or a book packed before then still
+      // does, and would leave out the Agpeya hours on them.
+      if (!(flags.Resurrection || flags.Nativity || flags.Theophany)) {
+        delete flags.GreatFeasts;
+      }
       return flags;
     })();
     rememberInCache(contextFlagsCache, key, cached);

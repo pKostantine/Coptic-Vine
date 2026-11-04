@@ -200,3 +200,23 @@ test('the calendar raises Pascha and HolyWeek from Monday Eve, the day after Pal
   assert.equal((holyWeek.match(/feast\('Pascha',/g) || []).length, 1, 'Pascha is raised in one place only');
   assert.doesNotMatch(calendar, /'PaschaWeek'/);
 });
+
+test('GreatFeasts stays only on the Resurrection, Nativity and Theophany, whatever an older calendar answer says', async () => {
+  // 2026: Pentecost 05-31, the Ascension 05-21, as a content Worker before 4 Nov 2026 (or a book packed then) gave them.
+  const { getContextFlags } = loadEngine({
+    '2026-05-31': { Pentecost: true, GreatFeasts: true, Feasts: true, PentecostPeriod: true },
+    '2026-05-21': { Ascension: true, GreatFeasts: true, Feasts: true, PentecostPeriod: true },
+    '2026-04-12': { Resurrection: true, GreatFeasts: true, Feasts: true },
+    '2027-01-07': { Nativity: true, GreatFeasts: true, Feasts: true },
+    '2027-01-19': { Theophany: true, GreatFeasts: true, Feasts: true },
+  });
+  for (const date of ['2026-05-31', '2026-05-21']) {
+    const flags = await getContextFlags(date);
+    assert.equal(Boolean(flags.GreatFeasts), false, date);
+    assert.equal(flags.Feasts, true, date);
+    assert.equal(flags.PentecostPeriod, true, date);
+  }
+  for (const date of ['2026-04-12', '2027-01-07', '2027-01-19']) {
+    assert.equal((await getContextFlags(date)).GreatFeasts, true, date);
+  }
+});

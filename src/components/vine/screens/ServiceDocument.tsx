@@ -1325,12 +1325,14 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         subdocumentKey={subdocumentModal?.subdocumentKey}
         collapseMemoryScope={subdocumentModal?.collapseMemoryScope ?? `${documentPositionKey}:sub:unknown`}
         parentBookmarkId={bookmarkId}
+        ornamentSeason={ornamentSeason}
         onClose={closeSubdocument}
       />
       <AntiphonaryModal
         visible={Boolean(antiphonaryModal)}
         sections={antiphonaryModal?.sections ?? null}
         collapseMemoryScope={antiphonaryModal?.collapseMemoryScope ?? `${documentPositionKey}:sub:antiphonary`}
+        ornamentSeason={ornamentSeason}
         onClose={() => setAntiphonaryModal(null)}
       />
       <CalendarSheet inline visible={calendarOpen} onClose={() => setCalendarOpen(false)} onOpenSeasons={() => navigateAway('/season-selector')} />
