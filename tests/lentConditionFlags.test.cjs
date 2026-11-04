@@ -120,16 +120,17 @@ test('Great Lent ends on its last Friday, not on Palm Sunday', async () => {
     for (const flag of ['Lent', 'GreatFast', 'LentWeekdays', 'LentWeekends', 'Fasts', 'LastFridayOfLent']) {
       assert.equal(Boolean(flags[flag]), false, `${flag} must not be active on ${isoDate}`);
     }
-    assert.equal(flags.Pascha, true, `Pascha must be active on ${isoDate}`);
   }
 });
 
-test('Lazarus Saturday and Palm Sunday keep their own feast flags', async () => {
-  // These two days are inside the holy-week range but before HolyWeek proper,
-  // so they must come back as Pascha days with nothing Lenten attached.
+test('Lazarus Saturday and Palm Sunday keep their own feast flags, and nothing of Holy Week', async () => {
+  // These two days are inside the holy-week range (the season selector shows
+  // them under Holy Week) but before Monday Eve, so no Holy Week flag is on:
+  // not even when the calendar answer has one, as the content Worker's did
+  // before 4 Nov 2026 and an offline book packed then still does.
   const { getContextFlags } = loadEngine({
-    '2026-04-04': { LazarusSaturday: true, Feasts: true },
-    '2026-04-05': { PalmSunday: true, HosannaSunday: true, Feasts: true },
+    '2026-04-04': { LazarusSaturday: true, Feasts: true, Pascha: true },
+    '2026-04-05': { PalmSunday: true, HosannaSunday: true, Feasts: true, Pascha: true, PaschaWeek: true },
   });
   const lazarusSaturday = await getContextFlags('2026-04-04');
   const palmSunday = await getContextFlags('2026-04-05');
@@ -141,6 +142,9 @@ test('Lazarus Saturday and Palm Sunday keep their own feast flags', async () => 
   assert.equal(palmSunday.PalmSunday, true);
   assert.equal(palmSunday.HosannaSunday, true);
   assert.equal(Boolean(palmSunday.LentWeekends), false);
+  for (const [name, flags] of [['Lazarus Saturday', lazarusSaturday], ['Palm Sunday', palmSunday]]) {
+    for (const flag of ['Pascha', 'HolyWeek', 'PaschaWeek']) assert.equal(Boolean(flags[flag]), false, `${flag} on ${name}`);
+  }
 });
 
 test('HolyWeek starts with Monday Eve, not with the season on Lazarus Saturday', async () => {
@@ -153,10 +157,12 @@ test('HolyWeek starts with Monday Eve, not with the season on Lazarus Saturday',
   const brightSaturday = await getContextFlags('2026-04-11');
   assert.equal(Boolean(lazarusSaturday.HolyWeek), false);
   assert.equal(Boolean(palmSunday.HolyWeek), false);
-  assert.equal(lazarusSaturday.Pascha, true);
-  assert.equal(palmSunday.Pascha, true);
+  assert.equal(Boolean(lazarusSaturday.Pascha), false);
+  assert.equal(Boolean(palmSunday.Pascha), false);
   assert.equal(palmSundayEvening.HolyWeek, true);
+  assert.equal(palmSundayEvening.Pascha, true);
   assert.equal(brightSaturday.HolyWeek, true);
+  assert.equal(brightSaturday.Pascha, true);
 });
 
 test('normal days outside Lent retain the conditions returned by the RPC', async () => {
@@ -186,15 +192,11 @@ test('the raw Coptic day-29 marker alone is not treated as Joyful 29', async () 
   assert.equal(Boolean(flags.Feasts), false);
 });
 
-test('the calendar raises HolyWeek, not PaschaWeek, from the day after Palm Sunday', () => {
-  // The last migration to define calendar.get_active_flags_for_date is the one the database runs.
-  const dir = 'supabase/migrations';
-  const latest = fs.readdirSync(dir).filter((name) => name.endsWith('.sql')).sort()
-    .map((name) => fs.readFileSync(`${dir}/${name}`, 'utf8'))
-    .filter((sql) => /CREATE OR REPLACE FUNCTION calendar\.get_active_flags_for_date/.test(sql))
-    .pop();
-  const holyWeek = latest.slice(latest.indexOf('B. HOLY WEEK'), latest.indexOf('C. HOLY 50 DAYS'));
-  assert.match(holyWeek, /RETURN QUERY VALUES \('Pascha','season_feast','Holy Pascha'\);/);
-  assert.match(holyWeek, /IF p_gregorian_date>palm_sun THEN RETURN QUERY VALUES \('HolyWeek','season_feast','Holy Week'\); END IF;/);
-  assert.doesNotMatch(latest, /\('PaschaWeek',/);
+test('the calendar raises Pascha and HolyWeek from Monday Eve, the day after Palm Sunday, and never PaschaWeek', () => {
+  // The calendar is the content Worker's (D1), workers/content-api/src/rpc/calendar.ts.
+  const calendar = fs.readFileSync('workers/content-api/src/rpc/calendar.ts', 'utf8');
+  const holyWeek = calendar.slice(calendar.indexOf('// ══ B. HOLY WEEK'), calendar.indexOf('// ══ C. HOLY 50 DAYS'));
+  assert.match(holyWeek, /if \(palmSun !== null && p > palmSun\) emit\(feast\('Pascha', 'Holy Pascha'\), feast\('HolyWeek', 'Holy Week'\)\);/);
+  assert.equal((holyWeek.match(/feast\('Pascha',/g) || []).length, 1, 'Pascha is raised in one place only');
+  assert.doesNotMatch(calendar, /'PaschaWeek'/);
 });

@@ -6,8 +6,8 @@ interface ServiceWeekdayConditionInput {
   schema: string;
   table: string;
   extraContext?: ExtraContext;
+  /** The liturgical date the service is read for (CalendarContext's effectiveDate, or a date it is opened for). */
   effectiveDate: Date;
-  vespersEffectiveDate: Date;
 }
 
 export function isVespersPraisesService(schema: string, table: string): boolean {
@@ -25,29 +25,24 @@ export function isVespersWeekdayService(schema: string, table: string, extraCont
  * Returns a date override for weekday/day-family condition flags only.
  *
  * The main hydration date still supplies feasts, fasts, seasons, Coptic date
- * tokens, and all non-weekday conditions. Vespers Praises is the special case:
- * its weekday condition vocabulary follows the previous liturgical day.
+ * tokens, and all non-weekday conditions. A day's Vespers (and its Vespers
+ * Praises) is prayed the evening before, so its weekday is that evening's,
+ * the day before the liturgical date: Palm Sunday's Vespers is Saturday's,
+ * VatosDays, never Sunday's AdamDays. It is the same whether the service is
+ * opened that Saturday night or on the Sunday morning: both read Palm
+ * Sunday, and an evening never shows anything its morning doesn't.
  */
 export function getServiceWeekdayConditionDate({
   schema,
   table,
   extraContext,
   effectiveDate,
-  vespersEffectiveDate,
 }: ServiceWeekdayConditionInput): Date | undefined {
-  if (isVespersPraisesService(schema, table)) {
-    return addUtcDays(effectiveDate, -1);
-  }
-
   // Sermon Planner mixes all three services in one document. Its hydrator
   // applies this override only to the Vespers rows, not Matins or Liturgy.
-  if (schema === 'liturgy' && table === 'sermon_planner') {
-    return vespersEffectiveDate;
+  const isSermonPlanner = schema === 'liturgy' && table === 'sermon_planner';
+  if (isVespersPraisesService(schema, table) || isVespersWeekdayService(schema, table, extraContext) || isSermonPlanner) {
+    return addUtcDays(effectiveDate, -1);
   }
-
-  if (isVespersWeekdayService(schema, table, extraContext)) {
-    return vespersEffectiveDate;
-  }
-
   return undefined;
 }

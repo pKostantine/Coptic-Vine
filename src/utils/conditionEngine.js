@@ -186,13 +186,20 @@ function fetchDerivedLentFlags(isoDate) {
         }
       }
       if (holyWeekRange) {
-        flags.Pascha = true;
-        // The holy-week season opens on Lazarus Saturday, but HolyWeek itself
-        // starts with Monday Eve, prayed on Palm Sunday evening — which the
-        // evening rollover (CalendarContext) already dates Holy Monday, two
-        // days into the season. Lazarus Saturday and Palm Sunday keep their
-        // own feast flags without Holy Week's.
-        if (daysBetweenIsoDates(holyWeekRange.start_date, isoDate) >= 2) flags.HolyWeek = true;
+        // The holy-week season opens on Lazarus Saturday, and Lazarus Saturday
+        // and Palm Sunday sit under Holy Week in the season selector, but no
+        // Holy Week flag is on until Monday Eve, prayed on Palm Sunday
+        // evening, which the evening rollover (CalendarContext) dates Holy
+        // Monday, two days into the season. Until then they keep only their
+        // own feast flags (LazarusSaturday, PalmSunday): the content is
+        // written so (a canon reads "PalmSunday && !Pascha"). Pascha and
+        // HolyWeek are said false outright before it, overruling a calendar
+        // answer that has them (an older content Worker, a book packed
+        // before 4 Nov 2026).
+        const holyWeekBegun = daysBetweenIsoDates(holyWeekRange.start_date, isoDate) >= 2;
+        flags.Pascha = holyWeekBegun;
+        flags.HolyWeek = holyWeekBegun;
+        if (!holyWeekBegun) flags.PaschaWeek = false;
       }
       return flags;
     })();
@@ -214,10 +221,11 @@ async function fetchContextFlags(isoDate, extraContext) {
       ]);
       if (error) throw new Error(`Unable to load context flags for ${isoDate}: ${error.message}`);
       const flags = { ...(data || {}), ...derivedLentFlags };
-      if (derivedLentFlags.Lent || derivedLentFlags.Pascha) {
+      if (derivedLentFlags.Lent || "Pascha" in derivedLentFlags) {
         // Older RPC deployments may incorrectly include ordinary-fast or
-        // annual flags during Lent or Pascha week. Never allow those to
-        // overlap either season's hour and hymn placements.
+        // annual flags during Lent or the holy-week season (Lazarus Saturday
+        // on). Never allow those to overlap either season's hour and hymn
+        // placements.
         delete flags.NormalFastingDays;
         delete flags.Annual;
       }

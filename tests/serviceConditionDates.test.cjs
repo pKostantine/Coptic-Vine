@@ -31,74 +31,42 @@ function isoDate(date) {
   return date?.toISOString().slice(0, 10);
 }
 
-test('Vespers Praises uses the previous liturgical day for weekday conditions', () => {
+test("a day's Vespers takes the weekday of the evening it is prayed on, the day before", () => {
   const { getServiceWeekdayConditionDate } = loadHelpers();
-
-  const weekdayDate = getServiceWeekdayConditionDate({
-    schema: 'psalmody',
-    table: 'vespers_praises',
-    effectiveDate: dateOnly('2026-09-19'),
-    vespersEffectiveDate: dateOnly('2026-09-19'),
-  });
-
-  assert.equal(isoDate(weekdayDate), '2026-09-18');
+  // Palm Sunday 2027 is 25 April: its Vespers is Saturday's, VatosDays.
+  const palmSunday = dateOnly('2027-04-25');
+  const services = [
+    { schema: 'psalmody', table: 'vespers_praises' },
+    { schema: 'liturgy', table: 'raising_of_incense', extraContext: { Vespers: true } },
+    { schema: 'liturgy', table: 'lectionary_vespers' },
+    { schema: 'liturgy', table: 'sermon_planner' },
+  ];
+  for (const service of services) {
+    assert.equal(isoDate(getServiceWeekdayConditionDate({ ...service, effectiveDate: palmSunday })), '2027-04-24', service.table);
+  }
 });
 
-test('Vespers Praises only shifts the weekday override from the effective date', () => {
+test('Vespers opened on the eve and on the morning after read the same weekday', () => {
   const { getServiceWeekdayConditionDate } = loadHelpers();
-
-  const weekdayDate = getServiceWeekdayConditionDate({
-    schema: 'psalmody',
-    table: 'vespers_praises',
-    effectiveDate: dateOnly('2026-09-20'),
-    vespersEffectiveDate: dateOnly('2026-09-19'),
-  });
-
-  assert.equal(isoDate(weekdayDate), '2026-09-19');
+  // Saturday night rolls the calendar forward to Palm Sunday (CalendarContext's
+  // effectiveDate); Sunday morning is Palm Sunday already. Nothing else goes in.
+  const saturdayNight = getServiceWeekdayConditionDate({ schema: 'liturgy', table: 'raising_of_incense', extraContext: { Vespers: true }, effectiveDate: dateOnly('2027-04-25') });
+  const sundayMorning = getServiceWeekdayConditionDate({ schema: 'liturgy', table: 'raising_of_incense', extraContext: { Vespers: true }, effectiveDate: dateOnly('2027-04-25') });
+  assert.equal(isoDate(saturdayNight), isoDate(sundayMorning));
+  const calendar = fs.readFileSync('src/context/CalendarContext.tsx', 'utf8');
+  assert.doesNotMatch(calendar, /vespersEffectiveDate/, 'no date of the hour for Vespers');
+  const document = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+  assert.doesNotMatch(document, /vespersEffectiveDate/);
 });
 
-test('Other Vespers services keep the existing raw-date weekday override', () => {
+test('Matins, the Liturgy and every other service take no weekday of their own', () => {
   const { getServiceWeekdayConditionDate } = loadHelpers();
-
-  const raisingWeekdayDate = getServiceWeekdayConditionDate({
-    schema: 'liturgy',
-    table: 'raising_of_incense',
-    extraContext: { Vespers: true },
-    effectiveDate: dateOnly('2026-09-20'),
-    vespersEffectiveDate: dateOnly('2026-09-19'),
-  });
-  const lectionaryWeekdayDate = getServiceWeekdayConditionDate({
-    schema: 'liturgy',
-    table: 'lectionary_vespers',
-    effectiveDate: dateOnly('2026-09-20'),
-    vespersEffectiveDate: dateOnly('2026-09-19'),
-  });
-
-  assert.equal(isoDate(raisingWeekdayDate), '2026-09-19');
-  assert.equal(isoDate(lectionaryWeekdayDate), '2026-09-19');
-});
-
-test('Sermon Planner passes the Vespers weekday only to its mixed-context hydrator', () => {
-  const { getServiceWeekdayConditionDate } = loadHelpers();
-  const vespersEffectiveDate = dateOnly('2026-09-19');
-  const weekdayDate = getServiceWeekdayConditionDate({
-    schema: 'liturgy',
-    table: 'sermon_planner',
-    effectiveDate: dateOnly('2026-09-20'),
-    vespersEffectiveDate,
-  });
-  assert.equal(weekdayDate, vespersEffectiveDate);
-});
-
-test('Non-Vespers services do not override weekday conditions', () => {
-  const { getServiceWeekdayConditionDate } = loadHelpers();
-
-  const weekdayDate = getServiceWeekdayConditionDate({
-    schema: 'psalmody',
-    table: 'midnight_praises',
-    effectiveDate: dateOnly('2026-09-19'),
-    vespersEffectiveDate: dateOnly('2026-09-19'),
-  });
-
-  assert.equal(weekdayDate, undefined);
+  for (const service of [
+    { schema: 'psalmody', table: 'midnight_praises' },
+    { schema: 'liturgy', table: 'raising_of_incense', extraContext: { Matins: true } },
+    { schema: 'liturgy', table: 'lectionary_matins' },
+    { schema: 'liturgy', table: 'liturgy_of_st_basil' },
+  ]) {
+    assert.equal(getServiceWeekdayConditionDate({ ...service, effectiveDate: dateOnly('2027-04-25') }), undefined, service.table);
+  }
 });
