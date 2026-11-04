@@ -14,7 +14,7 @@
  *
  * It also names the schemas whose reading_rules file their readings under the
  * Inline key that reads them (an inline_hymn_key column): the Procession of
- * the Cross's twelve stations, FIRST_GOSPEL_READINGS and on.
+ * the Cross's twelve stations, FIRST_GOSPEL and on.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -67,7 +67,7 @@ export function renderContentOrderTables(contentTables) {
     '',
     '/**',
     " * The schemas whose reading_rules file each reading under the Inline key that",
-    " * reads it (inline_hymn_key): the Procession of the Cross's FIRST_GOSPEL_READINGS",
+    " * reads it (inline_hymn_key): the Procession of the Cross's stations, FIRST_GOSPEL",
     ' * and on (hymnLibrary.js, resolveInlineReadingRuleSection).',
     ' */',
     `export const INLINE_READING_RULE_SCHEMAS: readonly string[] = Object.freeze([${ruleSchemas}]);`,

@@ -80,7 +80,7 @@ export const CONTENT_ORDER_TABLES: Readonly<Record<string, string>> = Object.fre
 
 /**
  * The schemas whose reading_rules file each reading under the Inline key that
- * reads it (inline_hymn_key): the Procession of the Cross's FIRST_GOSPEL_READINGS
+ * reads it (inline_hymn_key): the Procession of the Cross's stations, FIRST_GOSPEL
  * and on (hymnLibrary.js, resolveInlineReadingRuleSection).
  */
 export const INLINE_READING_RULE_SCHEMAS: readonly string[] = Object.freeze(['procession_of_the_cross']);
