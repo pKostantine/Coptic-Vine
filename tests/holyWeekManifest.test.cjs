@@ -345,7 +345,7 @@ test('every Holy Week service is read for the day it is prayed on, in the Holy W
   assert.match(route, /const conditionDate = useMemo\(\n\s+\(\) => \(prayedOn \? holyWeekDate\(prayedOn, new Date\(fromIso\)\) : undefined\),\n\s+\[fromIso, prayedOn\],/);
   assert.match(route, /conditionDate=\{conditionDate\}/);
   const document = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
-  assert.match(document, /const effectiveDate = conditionDate \?\? calendarEffectiveDate;\n\s+const vespersEffectiveDate = conditionDate \?\? calendar\.vespersEffectiveDate;/);
+  assert.match(document, /const effectiveDate = conditionDate \?\? calendarEffectiveDate;/);
   // Offline, past what an old downloaded calendar holds: the calendar's day rather than an error.
   assert.match(document, /return conditionDate\n\s+\? hydrated\.catch\(\(\) => hydrateSupabaseServiceHymn\(schema, table, calendarEffectiveDate, flags, undefined\)\)\n\s+: hydrated;/);
 });

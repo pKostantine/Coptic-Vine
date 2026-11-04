@@ -14,16 +14,12 @@ interface CalendarContextValue {
    * The liturgical date most documents should hydrate against, and whose
    * Coptic date is shown: the liturgical day begins the evening before
    * (normally at 6 PM — utils/liturgicalDay.ts), so once
-   * `liturgicalDayPeriod` is "evening" this is `rawDate + 1`.
+   * `liturgicalDayPeriod` is "evening" this is `rawDate + 1`. Every document
+   * reads this date and nothing of the hour, so an evening shows exactly what
+   * its following morning does (a Vespers' weekday is the evening before
+   * its day's: serviceConditionDates.ts).
    */
   effectiveDate: Date;
-  /**
-   * Always `rawDate`, never rolled forward. Vespers still chants in the raw
-   * day's weekday tune when evening has rolled `effectiveDate` forward.
-   * Vespers Praises has its own previous-day weekday override in
-   * serviceConditionDates.ts.
-   */
-  vespersEffectiveDate: Date;
   liturgicalDayPeriod: LiturgicalDayPeriod;
   isLive: boolean;
   selectDate: (date: Date) => void;
@@ -81,7 +77,6 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       selectedDate,
       rawDate,
       effectiveDate,
-      vespersEffectiveDate: rawDate,
       liturgicalDayPeriod,
       isLive,
       selectDate,

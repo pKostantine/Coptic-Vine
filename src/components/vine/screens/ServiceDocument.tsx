@@ -158,7 +158,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const calendar = useCalendar();
   const calendarEffectiveDate = calendar.effectiveDate;
   const effectiveDate = conditionDate ?? calendarEffectiveDate;
-  const vespersEffectiveDate = conditionDate ?? calendar.vespersEffectiveDate;
   const isSermonPlanner = schema === 'liturgy' && table === 'sermon_planner';
   // Read for a day, and often for another day than today: the day is changed
   // from a bar across the top (DocumentDateBar) rather than the content list.
@@ -193,9 +192,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
         table,
         extraContext,
         effectiveDate,
-        vespersEffectiveDate,
       }),
-    [schema, table, extraContext, effectiveDate, vespersEffectiveDate],
+    [schema, table, extraContext, effectiveDate],
   );
   const { isFullscreen, toggle: toggleFullscreen, shouldShow: shouldShowFullscreen } = useBrowserFullscreen();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -291,7 +289,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     preferences.selectText, preferences.slideshowMode, preferences.displayComments,
     preferences.displaySilentPrayers, preferences.displayNowPlayingBar,
     preferences.bishopPresent, preferences.copticGospelRite, preferences.inMonastery, preferences.saintPsalies,
-    preferences.selectedSaintHymns, preferences.selectedInterpretations, preferences.appLanguage, preferences.documentTheme, effectiveDate, vespersEffectiveDate,
+    preferences.selectedSaintHymns, preferences.selectedInterpretations, preferences.appLanguage, preferences.documentTheme, effectiveDate,
   ]);
   const [readerFocused, setReaderFocused] = useState(true);
   // A liturgy runs for hours: the screen stays on while this is the screen being read.

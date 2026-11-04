@@ -263,9 +263,12 @@ export async function getActiveFlagsForDate(context: ContentContext, date: strin
   if (inTheophanyPeriod) emit(feast('TheophanyPeriod', 'Theophany Period'));
 
   // ══ B. HOLY WEEK
+  // Lazarus Saturday and Palm Sunday open the season, and the season selector
+  // shows them under Holy Week, but they keep only their own feasts: Pascha
+  // and HolyWeek begin with Monday Eve, prayed on Palm Sunday evening and
+  // dated Holy Monday (the content reads "PalmSunday && !Pascha").
   if (paschaStart !== null && brightSat !== null && p >= paschaStart && p <= brightSat) {
-    emit(feast('Pascha', 'Holy Pascha'));
-    if (palmSun !== null && p > palmSun) emit(feast('HolyWeek', 'Holy Week'));
+    if (palmSun !== null && p > palmSun) emit(feast('Pascha', 'Holy Pascha'), feast('HolyWeek', 'Holy Week'));
     if (p === lazarusSat) emit(feast('LazarusSaturday', 'Lazarus Saturday'), feast('Feasts', 'Feasts'));
     if (p === palmSun) emit(feast('PalmSunday', 'Palm Sunday'), feast('HosannaSunday', 'Palm Sunday'), feast('Feasts', 'Feasts'));
     if (p === holyThu) emit(feast('HolyThursday', 'Holy Thursday'), feast('CovenantThursday', 'Holy Thursday'));

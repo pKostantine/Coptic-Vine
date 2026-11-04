@@ -118,3 +118,19 @@ test('an ordinary Wednesday after the fasts is a normal fasting day again', asyn
   assert.ok(day.has('NormalFastingDays') && day.has('Wednesday') && day.has('Weekdays'));
   assert.ok(!day.has('JonahsFast'));
 });
+
+test('Lazarus Saturday and Palm Sunday keep only their own feasts; Pascha and HolyWeek begin with Monday Eve', async () => {
+  // 2027-04-24 Lazarus Saturday, 04-25 Palm Sunday; Palm Sunday evening is dated Holy Monday, 04-26.
+  const lazarus = await flags('2027-04-24');
+  const palmSunday = await flags('2027-04-25');
+  assert.ok(lazarus.has('LazarusSaturday') && lazarus.has('Feasts'));
+  assert.ok(palmSunday.has('PalmSunday') && palmSunday.has('HosannaSunday') && palmSunday.has('Feasts'));
+  for (const [name, day] of [['Lazarus Saturday', lazarus], ['Palm Sunday', palmSunday]] as const) {
+    for (const flag of ['Pascha', 'HolyWeek', 'PaschaWeek', 'Lent', 'Annual', 'NormalFastingDays']) assert.ok(!day.has(flag), `${flag} on ${name}`);
+  }
+  for (const date of ['2027-04-26', '2027-04-29', '2027-05-01']) {
+    const day = await flags(date);
+    assert.ok(day.has('Pascha') && day.has('HolyWeek'), date);
+  }
+  assert.ok(!(await flags('2027-05-02')).has('Pascha'), 'the Resurrection is past Holy Week');
+});
