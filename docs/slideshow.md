@@ -183,7 +183,10 @@ Only such a verse is split (`appendTallVerseSegments`), from a fresh
 slide. Each column takes as many of its own lines as fit on the slide,
 independently (`independentLineTakes`): the Arabic may finish on the first
 piece while the English carries on, leaving its cell empty. A column holds
-back only a single stray line, so a turn never leaves it one line alone.
+back only a single stray line, so a turn never leaves it one line alone --
+except on the slide the verse begins on, which takes every line that fits
+on it, in every language, counted against the whole slide (the budget's 2px
+slack included).
 The last piece shares its slide with whatever follows that fits.
 
 Each piece (`createVerseLineSegment`) carries, per language,

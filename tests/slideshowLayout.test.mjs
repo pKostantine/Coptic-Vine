@@ -122,9 +122,9 @@ test("a slide keeps no margin of its own, so a verse as tall as the screen allow
   assert.equal(slides.length, 1);
   assert.equal(slides[0].length, 1);
   assert.deepEqual(slides[0][0].slideshowLineCounts, { english: 7, coptic: 5 });
-  // With the 16px it used to keep above and below, the same slide took only five of the lines.
+  // With the 16px it used to keep above and below, the same slide took only six of the lines.
   const before = paginateItems([item], { [item.id]: 345 }, { [item.id]: metric }, 351 - 32 - 2, 36, languages, 814);
-  assert.deepEqual(before.map((slide) => slide[0].slideshowLineCounts.english), [5, 2]);
+  assert.deepEqual(before.map((slide) => slide[0].slideshowLineCounts.english), [6, 1]);
 });
 
 test("overlay insets never change slideshow padding or page formation", () => {
@@ -732,6 +732,37 @@ test("each column takes as many of its own lines as fit, whatever the others do"
   assert.deepEqual(
     independentLineTakes(lineState({ english: 6, coptic: 6 }, { english: 6 }), { english: 9, coptic: 0 }),
     { coptic: 0 },
+  );
+});
+
+test("the slide a verse begins on takes every line that fits on it, in every language", () => {
+  // St. Basil's "when we disobeyed Your commandment", on an iPhone 14 held
+  // sideways at 34px: the slide is 369px tall (390 less the home indicator),
+  // a line 44px, the verse's own margin 16px. Seven English lines and nine
+  // Coptic: eight Coptic lines take 368px, so eight go on the first slide.
+  const english = ["when we disobeyed", "Your commandment by", "the deceit of the", "serpent, we fell from", "eternal life and were", "exiled from the", "Paradise of joy."];
+  const coptic = ["ϧⲉⲛ", "ⲡ̀ϫⲓⲛⲑ̀ⲣⲉⲛⲉⲣⲡⲁⲣⲁⲃⲉⲛⲓⲛ", "ⲇⲉ ⲛ̀ⲧⲉⲕⲉⲛⲧⲟⲗⲏ: ϩⲓⲧⲉⲛ", "ϯⲁ̀ⲡⲁⲧⲏ ⲛ̀ⲧⲉ ⲡⲓϩⲟϥ:", "ⲁⲛϩⲉⲓ ⲉ̀ⲃⲟⲗϧⲉⲛ ⲡⲓⲱⲛϧ", "ⲛ̀ⲉ̀ⲛⲉϩ: ⲟⲩⲟϩ", "ⲁⲩⲉⲣⲉⲝⲟⲣⲓⲍⲓⲛ ⲙ̀ⲙⲟⲛ", "ⲉ̀ⲃⲟⲗϧⲉⲛ ⲡⲓⲡⲁⲣⲁⲇⲓⲥⲟⲥ", "ⲛ̀ⲧⲉ ⲡ̀ⲟⲩⲛⲟϥ."];
+  const asLines = (texts) => texts.map((text, index) => ({ text, isParagraphEnd: index === texts.length - 1 }));
+  const item = verseItem({ verse: { english: english.join(" "), coptic: coptic.join(" "), type: "priest" } });
+  const languages = { english: true, french: false, coptic: true, arabic: false };
+  const slides = paginateItems(
+    [item],
+    { [item.id]: 16 + 9 * 44 },
+    { [item.id]: { english: { lines: asLines(english) }, coptic: { lines: asLines(coptic) } } },
+    getSlideContentBudget(369),
+    34,
+    languages,
+    750,
+  );
+  assert.deepEqual(slides.map((slide) => slide[0].slideshowLineCounts), [{ english: 7, coptic: 8 }, { coptic: 1 }]);
+  // Later slides still keep a column from leaving one line on its own.
+  assert.deepEqual(
+    independentLineTakes(lineState({ english: 12, arabic: 4 }), { english: 11, arabic: 3 }),
+    { english: 10, arabic: 2 },
+  );
+  assert.deepEqual(
+    independentLineTakes(lineState({ english: 12, arabic: 4 }), { english: 11, arabic: 3 }, { holdBackStrayLine: false }),
+    { english: 11, arabic: 3 },
   );
 });
 
