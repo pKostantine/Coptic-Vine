@@ -982,9 +982,10 @@ async function resolvePaschaReadingSections(section, flags, depth, isoDate) {
 
 // ─── Readings a schema's own reading_rules file under an Inline key ─────────
 // The Procession of the Cross reads a Psalm and a Gospel at each of its
-// twelve stations: its FIRST_GOSPEL_READINGS … TWELFTH_GOSPEL_READINGS rows
-// are Inline, and procession_of_the_cross.reading_rules files each station's
-// readings under that key (inline_hymn_key), in the order they are read. Any
+// twelve stations: each station's own row (FIRST_GOSPEL … TWELFTH_GOSPEL,
+// "1st Gospel (Before the Main Sanctuary)") is Inline, and
+// procession_of_the_cross.reading_rules files its readings under that key
+// (inline_hymn_key), in the order they are read. Any
 // schema whose reading_rules are shaped so (INLINE_READING_RULE_SCHEMAS,
 // built from the content Worker's table list) is read the same way.
 
@@ -1026,7 +1027,7 @@ function getGospelIntroductionRows(schema) {
 
 /**
  * An Inline key's readings (getInlineReadingRules) as one section under the
- * calling row's own title ("Psalm and Gospel"). Each reading opens with the
+ * calling row's own title ("1st Gospel (Before the Main Sanctuary)"). Each reading opens with the
  * deacon's introduction, then its citation line, then the reading:
  *
  *   - a Psalm as it is sung, the schema's own hymn of it (psalm_hymn_key),
@@ -2283,7 +2284,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
       // resolved onto `section` above, same as any other hymn_key) get
       // applied to the imported content.
       // A reading this schema's own reading_rules file under the key (the
-      // Procession's FIRST_GOSPEL_READINGS … TWELFTH_GOSPEL_READINGS).
+      // Procession's stations, FIRST_GOSPEL … TWELFTH_GOSPEL).
       if (INLINE_READING_RULE_SCHEMAS.includes(schema) && isAllCapsKey(section.hymn_key)) {
         const readingSection = await resolveInlineReadingRuleSection(schema, section, flags);
         if (readingSection) {

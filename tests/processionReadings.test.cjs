@@ -4,7 +4,7 @@ const test = require('node:test');
 
 /**
  * The Procession of the Cross reads a Psalm and a Gospel at each of its
- * twelve stations: FIRST_GOSPEL_READINGS … TWELFTH_GOSPEL_READINGS, Inline,
+ * twelve stations: each station's own row (FIRST_GOSPEL … TWELFTH_GOSPEL), Inline,
  * read from procession_of_the_cross.reading_rules (hymnLibrary.js,
  * resolveInlineReadingRuleSection).
  */
@@ -68,14 +68,14 @@ function stationReader({ rules, hymns = {}, titles = {}, introductions = {} }) {
 }
 
 const station = {
-  id: 'FIRST_GOSPEL_READINGS-10',
-  hymn_key: 'FIRST_GOSPEL_READINGS',
-  title: { english: 'Psalm and Gospel', arabic: 'المزمور والإنجيل', french: '' },
+  id: 'FIRST_GOSPEL-10',
+  hymn_key: 'FIRST_GOSPEL',
+  title: { english: '1st Gospel (Before the Main Sanctuary)', arabic: '', french: '' },
   bishopOnly: false,
   priestOnly: false,
 };
 const firstStation = {
-  FIRST_GOSPEL_READINGS: [
+  FIRST_GOSPEL: [
     { reading_rule_id: 'station_01_psalm', reading_type: 'Psalm', book_key: 'psalms', reading_reference: '19.103:4@19.137:1-2', psalm_hymn_key: 'psalm103_4_137_1_2', sort_order: 1 },
     { reading_rule_id: 'station_01_gospel', reading_type: 'Gospel', book_key: 'john', reading_reference: '43.1:43-51', psalm_hymn_key: null, sort_order: 2 },
   ],
@@ -101,7 +101,7 @@ test("a station reads each reading's introduction, then its citation, then the r
   });
   const section = await resolve('procession_of_the_cross', station, {});
   // Read from the schema's own reading_rules, filed under the Inline key, in reading order.
-  assert.deepEqual(queries[0], { schema: 'procession_of_the_cross', table: 'reading_rules', filters: [['inline_hymn_key', 'FIRST_GOSPEL_READINGS']], order: ['sort_order', true] });
+  assert.deepEqual(queries[0], { schema: 'procession_of_the_cross', table: 'reading_rules', filters: [['inline_hymn_key', 'FIRST_GOSPEL']], order: ['sort_order', true] });
   assert.deepEqual(section.title, station.title);
   const shown = (verses) => verses.map((verse) => verse.type === 'readingReference' ? `[${verse.english}]` : `${verse.personType ? `${verse.personType}: ` : ''}${verse.english}`);
   assert.deepEqual(shown(section.verses), [
@@ -116,10 +116,10 @@ test("a station reads each reading's introduction, then its citation, then the r
   ]);
   // Another station's Gospel takes its own evangelist's line.
   const luke = stationReader({
-    rules: { SECOND_GOSPEL_READINGS: [{ reading_rule_id: 'station_02_gospel', reading_type: 'Gospel', book_key: 'luke', reading_reference: '42.1:39-56', psalm_hymn_key: null, sort_order: 2 }] },
+    rules: { SECOND_GOSPEL: [{ reading_rule_id: 'station_02_gospel', reading_type: 'Gospel', book_key: 'luke', reading_reference: '42.1:39-56', psalm_hymn_key: null, sort_order: 2 }] },
     introductions: { 'procession_of_the_cross.gospelIntroduction': gospelIntroduction },
   });
-  const second = await luke.resolve('procession_of_the_cross', { ...station, hymn_key: 'SECOND_GOSPEL_READINGS' }, {});
+  const second = await luke.resolve('procession_of_the_cross', { ...station, hymn_key: 'SECOND_GOSPEL' }, {});
   assert.deepEqual(shown(second.verses).slice(0, 2), ['Deacon: A reading from the Gospel according to our teacher Saint Luke the Evangelist, and the pure disciple.', '[cites 42.1:39-56]']);
   // The Gospel in every language, Coptic too; the Psalm wasn't read from the Bible.
   assert.deepEqual(bible, [{ reference: '43.1:43-51', withCoptic: true, isPsalm: false }]);
@@ -132,7 +132,7 @@ test('a Psalm with no hymn of its own is read from the Bible, a Gospel with no i
   const section = await resolve('procession_of_the_cross', station, {});
   assert.deepEqual(bible.map((reading) => [reading.reference, reading.isPsalm]), [['19.103:4@19.137:1-2', true], ['43.1:43-51', false]]);
   assert.deepEqual(section.verses.map((verse) => verse.type || 'text'), ['readingReference', 'text', 'readingReference', 'text']);
-  assert.equal(await resolve('procession_of_the_cross', { ...station, hymn_key: 'THIRTEENTH_GOSPEL_READINGS' }, {}), null);
+  assert.equal(await resolve('procession_of_the_cross', { ...station, hymn_key: 'THIRTEENTH_GOSPEL' }, {}), null);
 });
 
 test("the reader reads an Inline key from its schema's reading_rules before looking for a table of its name", () => {
