@@ -1011,39 +1011,68 @@ function getInlineReadingRules(schema, hymnKey) {
   return cached;
 }
 
+const readingIntroductionCache = new Map();
+
+/** `schema`'s gospelIntroduction hymn: the deacon's line before a Gospel, one per evangelist (GospelMatthew …). */
+function getGospelIntroductionRows(schema) {
+  let cached = readingIntroductionCache.get(schema);
+  if (!cached) {
+    cached = fetchSchemaTextRowsByKeys(schema, ["gospelIntroduction"]);
+    cached.catch(() => readingIntroductionCache.delete(schema));
+    readingIntroductionCache.set(schema, cached);
+  }
+  return cached;
+}
+
 /**
  * An Inline key's readings (getInlineReadingRules) as one section under the
- * calling row's own title ("Psalm and Gospel"): each reading's citation line,
- * then the reading. A Psalm is read as it is sung, the schema's own hymn of it
- * (psalm_hymn_key: the deacon's "From the Psalms of our teacher David…" and
- * the verses, in every language), or from the Bible where there is none; any
- * other reading is the Bible's, its Coptic too. Null when nothing is filed
- * under the key.
+ * calling row's own title ("Psalm and Gospel"). Each reading opens with the
+ * deacon's introduction, then its citation line, then the reading:
+ *
+ *   - a Psalm as it is sung, the schema's own hymn of it (psalm_hymn_key),
+ *     whose first line is that introduction ("From the Psalms of our teacher
+ *     David the prophet…") and the rest the verses, read like the Gospel
+ *     beside them without a second "Deacon:"; or from the Bible where there
+ *     is no such hymn;
+ *   - a Gospel introduced by the schema's gospelIntroduction hymn, its line
+ *     for this Gospel's evangelist ("A reading from the Gospel according to
+ *     our teacher Saint Luke the Evangelist…"), then read from the Bible in
+ *     every language, its Coptic too.
+ *
+ * Null when nothing is filed under the key.
  */
 async function resolveInlineReadingRuleSection(schema, section, flags) {
   const rows = await getInlineReadingRules(schema, section.hymn_key);
   if (!rows.length) return null;
+  const verse = (textRow, visibilityFlags, titlePrayerType = null) => {
+    const visibility = evaluateBishopAwareVisibility(textRow.condition, visibilityFlags);
+    if (!visibility.visible) return [];
+    return [{ ...buildVerseFromTextRow(textRow, titlePrayerType), bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }];
+  };
   const verses = [];
   for (const row of rows) {
     const resolved = row.reading_reference ? (await resolveBibleReadingReference(row.reading_reference)).resolvedSegments : [];
     const reading = { ...row, resolved_verses: resolved };
     const citation = await buildReadingCitation(reading);
     const isPsalm = row.reading_type === "Psalm";
+    let introduction = [];
     let lines = [];
     if (row.psalm_hymn_key) {
       const [textRows, title] = await Promise.all([fetchInlineHymnVerses(schema, row.psalm_hymn_key), fetchInlineHymnTitle(schema, row.psalm_hymn_key)]);
-      lines = textRows.flatMap((textRow) => {
-        const visibility = evaluateBishopAwareVisibility(textRow.condition, flags);
-        if (!visibility.visible) return [];
-        return [{ ...buildVerseFromTextRow(textRow, title?.prayer_type || null), bishopOnly: visibility.bishopOnly, priestOnly: visibility.priestOnly }];
-      });
+      const titlePrayerType = title?.prayer_type || null;
+      const [opening, ...rest] = textRows.length > 1 ? textRows : [null, ...textRows];
+      introduction = opening ? verse(opening, flags, titlePrayerType) : [];
+      lines = rest.flatMap((textRow) => verse(textRow.person_type === "Comment" ? textRow : { ...textRow, person_type: null }, flags, titlePrayerType));
+    } else if (row.reading_type === "Gospel") {
+      const evangelist = { ...flags, ...gospelAuthorFlagsOf([row]) };
+      introduction = (await getGospelIntroductionRows(schema)).flatMap((textRow) => verse(textRow, evangelist));
     }
     if (!lines.length) lines = buildReadingVerses(reading, true, isPsalm);
     if (!lines.length) continue;
     // Not tagged as one of the day's readings (readingIdentity): a station's
     // Gospel is the Procession's own, never the day's that a list of the
     // day's readings opens a document at (documentReadings.ts).
-    verses.push(...readingReferenceVerse(citation, null), ...lines);
+    verses.push(...introduction, ...readingReferenceVerse(citation, null), ...lines);
   }
   if (!verses.length) return null;
   return applyCopticCaseToSection({
