@@ -17,9 +17,11 @@
  *   - a hymn's own key as an inline_hymn_key: the same, then any schema in
  *     HYMN_TEXT_SCHEMAS that has it.
  *
- * The day's readings (the *_WITH_COPTIC keys and the rest) read the Bible
- * and the calendar, which the hand-kept dependencies give every book that
- * reads them; they are not guessed at here.
+ * A schema that keeps reading_rules reads the Bible by them (Holy Week's
+ * hours, the Procession of the Cross's stations). The day's readings (the
+ * *_WITH_COPTIC keys and the rest) read the Bible and the calendar, which the
+ * hand-kept dependencies give every book that reads them; they are not
+ * guessed at here.
  */
 import { col, t } from './db/names.ts';
 import type { ContentContext } from './types.ts';
@@ -52,6 +54,11 @@ const hasColumns = (table: TableInfo, names: string[]) => names.every((name) => 
 export const ORDER_TABLES: ReadonlyMap<string, string> = new Map(
   tables.filter((table) => hasColumns(table, ['item_order', 'hymn_key', 'item_type'])).map((table) => [table.table, table.schema]),
 );
+
+/** The schemas that read the Bible by reading_rules of their own. */
+export const READING_RULE_SCHEMAS: readonly string[] = tables
+  .filter((table) => table.table === 'reading_rules' && hasColumns(table, ['book_key', 'reading_reference']))
+  .map((table) => table.schema);
 
 /** The content each derivation reads: the keys every order table places, every inline key, and where every hymn is. */
 export interface ContentKeys {
@@ -98,6 +105,7 @@ export function deriveCalls(keys: ContentKeys): Map<string, Set<string>> {
       call(from, nearby.find((lookup) => has(lookup, key)) ?? HYMN_TEXT_SCHEMAS.find((lookup) => !nearby.includes(lookup) && has(lookup, key)));
     }
   }
+  for (const from of READING_RULE_SCHEMAS) call(from, 'bible');
   return calls;
 }
 
