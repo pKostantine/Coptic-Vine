@@ -4,9 +4,12 @@ const test = require('node:test');
 const ts = require('typescript');
 
 /**
- * An ALL_CAPS Subdocument or Inline row calls the whole order table of its
- * name, wherever that table is (utils/sentinelTables.js), with nothing listed
- * for it in the app: FRACTIONS is fractions.fractions.
+ * A Subdocument, Inline or Hyperlink row calls a whole order table by its
+ * full name, schema and table (utils/sentinelTables.js), with nothing listed
+ * for it in the app: fractions.fractions, procession_of_the_cross.vespers_procession.
+ * Before 4 Nov 2026 a call named its table in capitals (FRACTIONS), found
+ * wherever that table was; offline books packed then still do, so that is
+ * understood too.
  */
 
 function loadFile(path, resolve = require) {
@@ -16,7 +19,7 @@ function loadFile(path, resolve = require) {
   return module.exports;
 }
 const orderTables = loadFile('src/constants/contentOrderTables.ts');
-const { sentinelTable, isSentinelKey, SENTINEL_TABLE_ALIASES } = loadFile('src/utils/sentinelTables.js', (name) => (name === '../constants/contentOrderTables' ? orderTables : require(name)));
+const { sentinelTable, isSentinelKey, SENTINEL_TABLE_ALIASES, tableCall, callName } = loadFile('src/utils/sentinelTables.js', (name) => (name === '../constants/contentOrderTables' ? orderTables : require(name)));
 const library = fs.readFileSync('src/utils/hymnLibrary.js', 'utf8');
 
 test("the app knows every order table the content API serves, as the Worker's own list has them", async () => {
@@ -35,7 +38,36 @@ test("the app knows every order table the content API serves, as the Worker's ow
   assert.equal(tables.hymn_titles, undefined);
 });
 
-test('a key calls the table of its name wherever it is, with nothing listed for it', () => {
+test('a call by full name goes straight to that table, listed or not, made today or long ago', () => {
+  assert.deepEqual(sentinelTable('procession_of_the_cross.vespers_procession'), { schema: 'procession_of_the_cross', table: 'vespers_procession' });
+  assert.deepEqual(sentinelTable('fractions.fractions'), { schema: 'fractions', table: 'fractions' });
+  assert.deepEqual(sentinelTable('liturgy.some_table_made_tomorrow'), { schema: 'liturgy', table: 'some_table_made_tomorrow' });
+  assert.deepEqual(tableCall('gospel_rite.mournful_4_gospels_rite'), { schema: 'gospel_rite', table: 'mournful_4_gospels_rite' });
+  // A hymn's key, a name in capitals, or anything else that isn't schema.table names no table by itself.
+  for (const key of ['introductionToTheFraction', 'FRACTIONS', 'Fractions.fractions', 'fractions.', '.fractions', 'a.b.c', 'fractions fractions', '', null]) {
+    assert.equal(tableCall(key), null, String(key));
+  }
+});
+
+test("a call goes by its table's name in capitals, so sections, bookmarks and the reader's own tables are as they were", () => {
+  assert.equal(callName('fractions.fractions'), 'FRACTIONS');
+  assert.equal(callName('procession_of_the_cross.vespers_procession'), 'VESPERS_PROCESSION');
+  assert.equal(callName('gospel_rite.gospel_rite'), 'GOSPEL_RITE');
+  assert.equal(callName('FRACTIONS'), 'FRACTIONS');
+  assert.equal(callName('introductionToTheFraction'), 'introductionToTheFraction');
+  assert.equal(callName(null), '');
+  // The prophecies are read their own way however they are called.
+  const otherwise = (key) => key === 'PROPHECY' || key === 'COPTIC_PROPHECY';
+  assert.equal(sentinelTable('readings.prophecy', otherwise), null);
+  assert.equal(sentinelTable('readings.coptic_prophecy', otherwise), null);
+  assert.deepEqual(sentinelTable('readings.pauline_epistle', otherwise), { schema: 'readings', table: 'pauline_epistle' });
+  // A section is named after the call's name, and keeps the key it was called by to find the table and its title.
+  assert.match(library, /const name = callName\(row\.hymn_key\);/);
+  assert.match(library, /id: `\$\{name\}-\$\{row\.item_order\}`,\n\s+hymn_key: name,\n\s+callKey: row\.hymn_key,/);
+  assert.match(library, /inlineHymnKey: callName\(row\.inline_hymn_key\),\n\s+inlineCallKey: row\.inline_hymn_key,/);
+});
+
+test('a key in capitals, as offline books packed before full names have it, calls the table of its name wherever it is', () => {
   assert.deepEqual(sentinelTable('FRACTIONS'), { schema: 'fractions', table: 'fractions' });
   assert.deepEqual(sentinelTable('ADAM_ASPASMOS'), { schema: 'aspasmos', table: 'adam_aspasmos' });
   assert.deepEqual(sentinelTable('SEASONAL_DISTRIBUTION_HYMNS'), { schema: 'seasonal_liturgy_hymns', table: 'seasonal_distribution_hymns' });
@@ -86,11 +118,13 @@ test("a hymn's own key, a table the content doesn't have, or a key resolved its 
   assert.deepEqual(sentinelTable('COPTIC_PROPHECY'), { schema: 'readings', table: 'coptic_prophecy' });
 });
 
-test('a Subdocument and an Inline both find their table the same way', () => {
+test('a Subdocument and an Inline both find their table the same way, by the key they were called by', () => {
   assert.match(library, /function resolveWholeTableInlineTarget\(hymnKey\) \{\n\s+return sentinelTable\(hymnKey, isResolvedOtherwise\);/);
-  assert.match(library, /if \(section\.isSubdocumentPlaceholder\) \{\n\s+const target = resolveWholeTableInlineTarget\(section\.hymn_key\);/);
-  assert.match(library, /const target = resolveWholeTableInlineTarget\(section\.hymn_key\);\n\s+if \(target\) \{\n\s+if \(depth >= 3\) continue;\n\s+const nestedSections = await hydrateWholeTableInlineNested/);
-  assert.match(library, /const wholeTableTarget = resolveWholeTableInlineTarget\(verse\.inlineHymnKey\);/);
+  assert.match(library, /if \(section\.isSubdocumentPlaceholder\) \{\n\s+const target = resolveWholeTableInlineTarget\(section\.callKey\);/);
+  assert.match(library, /const target = resolveWholeTableInlineTarget\(section\.callKey\);\n\s+if \(target\) \{\n\s+if \(depth >= 3\) continue;\n\s+const nestedSections = await hydrateWholeTableInlineNested/);
+  assert.match(library, /const wholeTableTarget = resolveWholeTableInlineTarget\(verse\.inlineCallKey\);/);
+  // Its title is the one the calling schema gives that key.
+  assert.match(library, /const inlineSentinelTitle = await fetchInlineHymnTitle\(schema, verse\.inlineCallKey\);/);
   assert.doesNotMatch(library, /SUBDOCUMENT_MAP/, 'no hand-kept list of tables');
 });
 
@@ -119,4 +153,26 @@ test('the offline books look for what a document calls where the reader looks fo
   const aliases = Object.fromEntries(Object.entries(SENTINEL_TABLE_ALIASES).map(([key, target]) => [key, target.schema]));
   assert.deepEqual(aliases, { THREE_GREAT_LITANIES: 'litanies' });
   assert.match(worker, /export const SENTINEL_TABLE_ALIASES: Readonly<Record<string, string>> = \{ THREE_GREAT_LITANIES: 'litanies' \};/);
+});
+
+test('a Hyperlink by full name leaves for the one service that opens that table, with nothing listed for it', () => {
+  const manifest = fs.readFileSync('src/constants/manifest.ts', 'utf8');
+  assert.match(manifest, /export function findHyperlinkTarget\(hyperlinkKey\?: string \| null\): HyperlinkTarget \| undefined \{/);
+  const document = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
+  assert.doesNotMatch(document, /HYPERLINK_TARGETS\[/, 'every hyperlink is looked up through findHyperlinkTarget');
+  assert.equal((document.match(/findHyperlinkTarget\(hyperlinkKey\)/g) || []).length, 2);
+
+  const { findHyperlinkTarget, HYPERLINK_TARGETS } = loadFile('src/constants/manifest.ts');
+  // Every name the content links by today is still where it was.
+  for (const [name, target] of Object.entries(HYPERLINK_TARGETS)) assert.equal(findHyperlinkTarget(name), target, name);
+  // A table one service opens is found by its name with nothing listed for it.
+  assert.equal(findHyperlinkTarget('VENERATION').href, '/veneration');
+  assert.equal(findHyperlinkTarget('SERMON_PLANNER').href, '/lectionary/sermon_planner');
+  assert.equal(findHyperlinkTarget('THURSDAY_FIRST_HOUR').href, findHyperlinkTarget('HW_THURSDAY_1ST').href);
+  // A table several entries open can't say which: Vespers and Matins, the Holy Week hours.
+  assert.equal(findHyperlinkTarget('RAISING_OF_INCENSE'), undefined);
+  assert.equal(findHyperlinkTarget('PASCHA_HOUR'), undefined);
+  assert.equal(findHyperlinkTarget('TO_STRING'), undefined);
+  assert.equal(findHyperlinkTarget('constructor'), undefined);
+  assert.equal(findHyperlinkTarget(null), undefined);
 });

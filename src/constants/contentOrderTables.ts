@@ -2,8 +2,10 @@
 // workers/content-api/schema/content-tables.json. Do not edit by hand.
 
 /**
- * Every order table the content API serves, by name, with the schema it is
- * in: the tables an ALL_CAPS Subdocument or Inline row can call (utils/sentinelTables.js).
+ * Every order table in the content API's list, by name, with the schema it
+ * is in. A call names its table in full (fractions.fractions) and needs none
+ * of this; a call in capitals (FRACTIONS), as offline books packed before
+ * 4 Nov 2026 have it, is found here (utils/sentinelTables.js).
  */
 export const CONTENT_ORDER_TABLES: Readonly<Record<string, string>> = Object.freeze({
   adam_aspasmos: 'aspasmos',

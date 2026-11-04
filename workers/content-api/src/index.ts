@@ -21,9 +21,11 @@
  * cache too, since the Worker version is part of the key.
  *
  * A cron every minute starts the offline-book build when the content has
- * changed (src/publish.ts).
+ * changed (src/publish.ts), after giving any order table made in D1 since
+ * the last minute its revision triggers (src/adopt.ts).
  */
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import { adoptNewTables } from './adopt.ts';
 import { col, t } from './db/names.ts';
 import { PgError } from './pg.ts';
 import { checkPublish } from './publish.ts';
@@ -179,6 +181,14 @@ export async function handle(request: Request, env: Env, ctx: Context): Promise<
 export default {
   fetch: handle,
   async scheduled(_controller: unknown, env: Env): Promise<void> {
+    // An order table made in D1 since the last minute gets its revision
+    // triggers first (adopt.ts), so the books are rebuilt with it.
+    try {
+      const adopted = await adoptNewTables(env.CONTENT_DB);
+      if (adopted.length) console.log(`new tables tracked: ${adopted.join(', ')}`);
+    } catch (error) {
+      console.error('new tables: could not track them', error);
+    }
     console.log(`offline books: ${await checkPublish(env)}`);
   },
 };

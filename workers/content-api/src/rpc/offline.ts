@@ -16,24 +16,25 @@
  *
  * The plan's dependencies are the hand-kept ones and, on top of them,
  * whatever each resource's documents call (offlineCalls.ts): a Liturgy that
- * calls ADAM_ASPASMOS carries aspasmos. A schema called that has no resource
- * of its own gets one, named after it, with all its tables.
+ * calls aspasmos.adam_aspasmos carries aspasmos. A schema called that has no
+ * resource of its own gets one, named after it, with all its tables. A
+ * resource's tables are its schema's in the list and any order table made in
+ * D1 since (content.ts, allContentTables).
  */
-import { contentTable, type Table } from '../content.ts';
+import { allContentTables, findContentTable, type Table } from '../content.ts';
 import { CONTENT_SCHEMAS, col, t } from '../db/names.ts';
 import { deriveCalls, readContentKeys } from '../offlineCalls.ts';
 import { int4, jsonb, PgError } from '../pg.ts';
 import type { ContentContext, Row } from '../types.ts';
-import schema from '../../schema/content-tables.json' with { type: 'json' };
 
 const EXCLUDED_NAMES = /(backup|archive|history|working|staging|admin|draft|audit)/i;
 
 type Resource = { resource_key: string; schema_name: string; include_tables: string | null };
 
-/** offline_content.package_tables(resource): the resource's tables, by name. */
-function packageTables(resource: Resource): string[] {
+/** offline_content.package_tables(resource): the resource's tables, by name, of every content table (allContentTables). */
+function packageTables(resource: Resource, tables: readonly Table[]): string[] {
   const include = resource.include_tables ? (JSON.parse(resource.include_tables) as string[]) : null;
-  return (schema.tables as { schema: string; table: string }[])
+  return tables
     .filter((table) => table.schema === resource.schema_name)
     .map((table) => table.table)
     .filter((name) => (include === null || include.includes(name)) && !EXCLUDED_NAMES.test(name))
@@ -49,13 +50,14 @@ const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 export async function getOfflinePackagePlan(context: ContentContext): Promise<unknown> {
   const db = context.db;
+  const tables = await allContentTables(db);
   const [[books, dependencies, resources], contentKeys] = await Promise.all([
     db.batch([
       db.prepare(`SELECT ${['book_key', 'title_english', 'title_arabic', 'root_resources'].map(col).join(', ')} FROM ${t('offline_content', 'books')} WHERE ${col('enabled')} = 1 ORDER BY ${col('book_key')}`),
       db.prepare(`SELECT ${col('resource_key')}, ${col('dependency_key')} FROM ${t('offline_content', 'resource_dependencies')} ORDER BY ${col('resource_key')}, ${col('dependency_key')}`),
       db.prepare(`SELECT ${['resource_key', 'schema_name', 'include_tables'].map(col).join(', ')} FROM ${t('offline_content', 'resources')} ORDER BY ${col('resource_key')}`),
     ]),
-    readContentKeys(context),
+    readContentKeys(context, tables),
   ]);
 
   // The hand-kept plan, then what each resource's documents call on top of it.
@@ -85,7 +87,7 @@ export async function getOfflinePackagePlan(context: ContentContext): Promise<un
     dependencies: [...pairs].map((pair) => pair.split('\u0000')).sort(([a, b], [c, d]) => byKey(a, c) || byKey(b, d))
       .map(([resource, dependency]) => jsonb({ resource, dependency })),
     resources: [...planned.values()].sort((a, b) => byKey(a.resource_key, b.resource_key))
-      .map((r) => jsonb({ id: r.resource_key, schema: r.schema_name, tables: packageTables(r) })),
+      .map((r) => jsonb({ id: r.resource_key, schema: r.schema_name, tables: packageTables(r, tables) })),
   });
 }
 
@@ -108,8 +110,8 @@ export async function getOfflineTableRows(context: ContentContext, resourceKey: 
     .prepare(`SELECT ${['resource_key', 'schema_name', 'include_tables'].map(col).join(', ')} FROM ${t('offline_content', 'resources')} WHERE ${col('resource_key')} = ?`)
     .bind(resourceKey)
     .first<Resource>() ?? (resourceKey === null ? null : schemaResource(resourceKey));
-  if (!resource || tableName === null || !packageTables(resource).includes(tableName)) throw new PgError('P0001', 'not a packaged table');
-  const table = contentTable(resource.schema_name, tableName)!;
+  if (!resource || tableName === null || !packageTables(resource, await allContentTables(context.db)).includes(tableName)) throw new PgError('P0001', 'not a packaged table');
+  const table = (await findContentTable(context.db, resource.schema_name, tableName))!;
   const cursor = after === null || after === '' ? 0 : Number(after);
   if (!Number.isInteger(cursor)) throw new PgError('22P02', `invalid input syntax for type tid: "${after}"`);
   const { results } = await context.db

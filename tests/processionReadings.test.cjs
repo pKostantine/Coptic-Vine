@@ -141,7 +141,7 @@ test('a Psalm with no hymn of its own is read from the Bible, a Gospel with no i
 test("the reader reads an Inline key from its schema's reading_rules before looking for a table of its name", () => {
   const orderTables = fs.readFileSync('src/constants/contentOrderTables.ts', 'utf8');
   assert.match(orderTables, /export const INLINE_READING_RULE_SCHEMAS: readonly string\[\] = Object\.freeze\(\['procession_of_the_cross'\]\);/);
-  assert.match(library, /if \(INLINE_READING_RULE_SCHEMAS\.includes\(schema\) && isAllCapsKey\(section\.hymn_key\)\) \{\n\s+const readingSection = await resolveInlineReadingRuleSection\(schema, section, flags\);\n\s+if \(readingSection\) \{\n\s+hydrated\.push\(readingSection\);\n\s+continue;\n\s+\}\n\s+\}\n\n\s+const target = resolveWholeTableInlineTarget\(section\.hymn_key\);/);
+  assert.match(library, /if \(INLINE_READING_RULE_SCHEMAS\.includes\(schema\) && isAllCapsKey\(section\.hymn_key\)\) \{\n\s+const readingSection = await resolveInlineReadingRuleSection\(schema, section, flags\);\n\s+if \(readingSection\) \{\n\s+hydrated\.push\(readingSection\);\n\s+continue;\n\s+\}\n\s+\}\n\n\s+const target = resolveWholeTableInlineTarget\(section\.callKey\);/);
 });
 
 test("the Gospel's introduction is the Procession's own hymn, one line per evangelist, in the words given", () => {
@@ -151,4 +151,33 @@ test("the Gospel's introduction is the Procession's own hymn, one line per evang
     assert.ok(migration.includes(`'فصلٌ من بشارة الإنجيل لمعلمنا ${arabic} البشير، التلميذُ الطاهر، بركاتهُ على جميعنا.', 'Deacon', NULL, 'Gospel${name}'`), name);
   }
   assert.match(library, /cached = fetchSchemaTextRowsByKeys\(schema, \["gospelIntroduction"\]\);/);
+});
+
+test("an order row's hymn that no schema near the document has is found wherever it is, and offline the row is only empty", async () => {
+  const definition = slice('export async function fetchServiceRows(', '\nasync function fetchOrderRows(').replace('export ', '');
+  const make = (offline) => new Function(
+    'fetchOrderRows', 'getHymnKeyLookupSchemas', 'fetchSchemaTitlesByKeys', 'fetchSchemaTextRowsByKeys', 'flattenServiceRows',
+    'uniqueNonEmpty', 'normalizeText', 'isAllCapsKey', 'tableCall', 'HYMN_TEXT_SCHEMAS',
+    `${definition}\nreturn fetchServiceRows;`,
+  )(
+    async () => [{ hymn_key: 'litanyOfTheGospel' }, { hymn_key: 'etavenNieskhai' }, { hymn_key: 'FIRST_GOSPEL' }, { hymn_key: 'gospel_rite.gospel_rite' }],
+    async (schema) => [schema, 'public', 'litanies'],
+    async (schema, keys) => {
+      if (offline && !['procession_of_the_cross', 'public', 'litanies'].includes(schema)) throw new Error('offline');
+      return keys.filter((key) => (schema === 'litanies' && key === 'litanyOfTheGospel') || (schema === 'seasonal_liturgy_hymns' && key === 'etavenNieskhai')).map((key) => ({ hymn_key: key, schema }));
+    },
+    async () => [],
+    (orderRows, lookups) => lookups,
+    (values) => [...new Set(values)],
+    (value) => String(value || '').trim(),
+    (key) => /^[A-Z][A-Z0-9_]*$/.test(key),
+    (key) => /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(key),
+    ['public', 'litanies', 'fractions', 'procession_of_the_cross', 'seasonal_liturgy_hymns'],
+  );
+  const online = await make(false)('procession_of_the_cross', 'procession_of_the_cross');
+  // The near schemas first, then the rest, asked only for the key none of them had (never a call or a station).
+  assert.deepEqual(online.lookupSchemas, ['procession_of_the_cross', 'public', 'litanies', 'fractions', 'seasonal_liturgy_hymns']);
+  assert.deepEqual(online.titleRowsBySchema.at(-1), [{ hymn_key: 'etavenNieskhai', schema: 'seasonal_liturgy_hymns' }]);
+  const offline = await make(true)('procession_of_the_cross', 'procession_of_the_cross');
+  assert.deepEqual(offline.titleRowsBySchema.slice(3), [[], []]);
 });

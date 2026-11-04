@@ -32,8 +32,8 @@ export const CONTENT_RESOURCE_DEPENDENCIES: Readonly<Record<string, readonly str
     'public', 'doxologies', 'verses_of_the_cymbals', 'hymn_of_the_intercessions',
     'praxis_response', 'psalmody', 'calendar',
   ],
-  // The Liturgies call the Fractions and the seasonal hymns by their tables (FRACTIONS,
-  // SEASONAL_DISTRIBUTION_HYMNS ...), as the server's plan already packs them.
+  // The Liturgies call the Fractions and the seasonal hymns by their tables (fractions.fractions,
+  // seasonal_liturgy_hymns.seasonal_distribution_hymns ...), as the server's plan already packs them.
   liturgy: [
     'public', 'verses_of_the_cymbals', 'doxologies', 'bible', 'gospel_rite',
     'gospel_responses', 'agpeya', 'hymn_of_the_intercessions', 'readings',

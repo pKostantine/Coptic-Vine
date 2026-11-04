@@ -9,13 +9,16 @@
  * app; tests/sentinelTables.test.cjs there keeps the lists below the same as
  * the reader's):
  *
- *   - an ALL_CAPS hymn_key, in an order table or as a hymn_texts row's
- *     inline_hymn_key: the order table of that name, wherever it is
- *     (FRACTIONS is fractions.fractions), or the Synaxarium;
- *   - a hymn's own key in an order table: the first of the table's own schema
- *     and HYMN_KEY_FALLBACK_SCHEMAS whose hymn_titles or hymn_texts has it;
- *   - a hymn's own key as an inline_hymn_key: the same, then any schema in
- *     HYMN_TEXT_SCHEMAS that has it.
+ *   - a "schema.table" hymn_key, in an order table or as a hymn_texts row's
+ *     inline_hymn_key: that table's schema (fractions.fractions is
+ *     fractions'); before the content took full names (4 Nov 2026), the
+ *     ALL_CAPS table name alone, which is still read as the order table of
+ *     that name wherever it is (FRACTIONS); and SYNAXARIUM, the Synaxarium;
+ *   - a hymn's own key, in an order table or as an inline_hymn_key: the
+ *     first of the table's own schema and HYMN_KEY_FALLBACK_SCHEMAS whose
+ *     hymn_titles or hymn_texts has it, then any schema in HYMN_TEXT_SCHEMAS
+ *     that has it (the Procession of the Cross places seasonal_liturgy_hymns'
+ *     etavenNieskhai).
  *
  * A schema that keeps reading_rules reads the Bible by them (Holy Week's
  * hours, the Procession of the Cross's stations). The day's readings (the
@@ -45,6 +48,8 @@ export const SENTINEL_TABLE_ALIASES: Readonly<Record<string, string>> = { THREE_
 const SENTINELS_READING: Readonly<Record<string, readonly string[]>> = { SYNAXARIUM: ['synaxarium', 'calendar'] };
 
 const ALL_CAPS = /^[A-Z][A-Z0-9_]*$/;
+/** A whole table called by its full name (the app's utils/sentinelTables.js, tableCall). */
+const TABLE_CALL = /^([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)$/;
 
 type TableInfo = { schema: string; table: string; columns: { name: string }[] };
 const tables = schema.tables as TableInfo[];
@@ -85,22 +90,32 @@ export function deriveCalls(keys: ContentKeys): Map<string, Set<string>> {
     // The Sermon Planner reads the Gospel rite's framing hymns (getHymnKeyLookupSchemas).
     ...(schemaName === 'liturgy' && table === 'sermon_planner' ? ['gospel_rite'] : []),
   ])];
+  // The order tables by name, for a call in capitals: the list's, and any made in D1 since.
+  const orderTables = new Map(ORDER_TABLES);
+  for (const name of keys.orderKeys.keys()) {
+    const [schemaName, table] = name.split('.');
+    if (!orderTables.has(table)) orderTables.set(table, schemaName);
+  }
   const callTable = (from: string, key: string) => {
+    const named = TABLE_CALL.exec(key);
+    if (named) return call(from, named[1]);
     if (Object.hasOwn(SENTINEL_TABLE_ALIASES, key)) return call(from, SENTINEL_TABLE_ALIASES[key]);
     if (Object.hasOwn(SENTINELS_READING, key)) return SENTINELS_READING[key].forEach((to) => call(from, to));
-    call(from, ORDER_TABLES.get(key.toLowerCase()));
+    call(from, orderTables.get(key.toLowerCase()));
   };
+  const callsTable = (key: string) => ALL_CAPS.test(key) || TABLE_CALL.test(key);
 
   for (const [name, placed] of keys.orderKeys) {
     const [from, table] = name.split('.');
     for (const key of placed) {
-      if (ALL_CAPS.test(key)) callTable(from, key);
-      else call(from, near(from, table).find((lookup) => has(lookup, key)));
+      if (callsTable(key)) { callTable(from, key); continue; }
+      const nearby = near(from, table);
+      call(from, nearby.find((lookup) => has(lookup, key)) ?? HYMN_TEXT_SCHEMAS.find((lookup) => !nearby.includes(lookup) && has(lookup, key)));
     }
   }
   for (const [from, inline] of keys.inlineKeys) {
     for (const key of inline) {
-      if (ALL_CAPS.test(key)) { callTable(from, key); continue; }
+      if (callsTable(key)) { callTable(from, key); continue; }
       const nearby = near(from);
       call(from, nearby.find((lookup) => has(lookup, key)) ?? HYMN_TEXT_SCHEMAS.find((lookup) => !nearby.includes(lookup) && has(lookup, key)));
     }
@@ -109,12 +124,17 @@ export function deriveCalls(keys: ContentKeys): Map<string, Set<string>> {
   return calls;
 }
 
-/** The content's keys, read from D1 in one batch of small queries (no compound SELECTs: D1 caps them). */
-export async function readContentKeys(context: ContentContext): Promise<ContentKeys> {
+/**
+ * The content's keys, read from D1 in one batch of small queries (no compound
+ * SELECTs: D1 caps them), from the given tables (content.ts, allContentTables:
+ * the list's and the order tables made in D1 since).
+ */
+export async function readContentKeys(context: ContentContext, contentTables: readonly TableInfo[] = tables): Promise<ContentKeys> {
   const db = context.db;
-  const orderTables = tables.filter((table) => hasColumns(table, ['item_order', 'hymn_key', 'item_type']));
-  const textTables = tables.filter((table) => table.table === 'hymn_texts');
-  const titleTables = tables.filter((table) => table.table === 'hymn_titles');
+  // An order table made in D1 since the list has item_order and hymn_key, and may lack item_type.
+  const orderTables = contentTables.filter((table) => hasColumns(table, ['item_order', 'hymn_key']));
+  const textTables = contentTables.filter((table) => table.table === 'hymn_texts');
+  const titleTables = contentTables.filter((table) => table.table === 'hymn_titles');
   const inlineTables = textTables.filter((table) => hasColumns(table, ['inline_hymn_key']));
   const distinct = (table: TableInfo, column: string) =>
     db.prepare(`SELECT DISTINCT ${col(column)} AS "key" FROM ${t(table.schema, table.table)} WHERE ${col(column)} IS NOT NULL`);

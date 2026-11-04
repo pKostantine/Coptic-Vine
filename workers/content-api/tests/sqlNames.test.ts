@@ -90,6 +90,8 @@ export function unquotedNames(text: string): string[] {
     const before = text[match.index - 1];
     const after = text[match.index + name.length];
     if (before === '"' && after === '"') continue;
+    // A value, not a name: a call's key is the table it calls ('fractions.fractions', migrations/0042).
+    if (before === "'" && after === "'") continue;
     if (before && /[\w.]/.test(before)) continue;
     found.push(name);
   }
@@ -108,6 +110,7 @@ test('the check itself finds unquoted names, in SQL and in code strings', () => 
   assert.deepEqual(unquotedNames('SELECT * FROM liturgy.hymn_texts WHERE x'), ['liturgy.hymn_texts']);
   assert.deepEqual(unquotedNames('SELECT * FROM "liturgy.hymn_texts" t JOIN bible.verses v'), ['bible.verses']);
   assert.deepEqual(unquotedNames('e.entry_key, b.book_key, liturgy.not_a_table'), []);
+  assert.deepEqual(unquotedNames(`UPDATE "liturgy.liturgy_of_st_basil" SET "hymn_key" = 'fractions.fractions'`), []);
   const code = 'const a = `SELECT * FROM ${t("bible", "verses")} JOIN calendar.season_ranges`; // bible.books is fine here\nconst b = "x";';
   assert.deepEqual(stringContents(code).flatMap(unquotedNames), ['calendar.season_ranges']);
 });
