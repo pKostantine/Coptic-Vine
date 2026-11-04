@@ -527,6 +527,56 @@ export const HYPERLINK_TARGETS: Record<string, HyperlinkTarget> = {
 };
 
 /**
+ * Every service the menu opens, by the name a Hyperlink row calls its table
+ * by: a row whose hymn_key is "schema.table" goes by the table's name in
+ * capitals (utils/sentinelTables.js, callName), so liturgy.lectionary_liturgy
+ * is LECTIONARY_LITURGY. A table only one entry opens is found here with
+ * nothing listed for it; one several entries open (Vespers and Matins both
+ * open liturgy.raising_of_incense, the Holy Week hours pascha_hour) can't
+ * say which, and is linked to by the names above (VESPERS, MATINS, HW_…).
+ */
+function hyperlinkTargetsByTable(): Record<string, HyperlinkTarget> {
+  const entries: { schema: string; table: string; target: HyperlinkTarget }[] = [];
+  const add = (schema: string | undefined, table: string | undefined, target: HyperlinkTarget) => {
+    if (schema && table) entries.push({ schema, table, target });
+  };
+  for (const category of CATEGORIES) {
+    if (category.kind === 'direct') add(category.schema, category.table, { href: `/${category.id}`, title: category.title, arabic: category.arabic, french: category.french });
+  }
+  for (const [categoryId, services] of Object.entries(SERVICES_BY_CATEGORY)) {
+    for (const service of services) add(service.schema, service.table, hyperlinkTarget(`/${categoryId}/${service.id}`, services, service.id));
+  }
+  for (const option of RAISING_OF_INCENSE_OPTIONS) add(option.schema, option.table, hyperlinkTarget(`/liturgy/raising-of-incense/${option.id}`, RAISING_OF_INCENSE_OPTIONS, option.id));
+  for (const service of DIVINE_LITURGY_SERVICES) add(service.schema, service.table, hyperlinkTarget(`/liturgy/divine-liturgy/${service.id}`, DIVINE_LITURGY_SERVICES, service.id));
+  for (const hour of HOLY_WEEK_HOURS) add(hour.schema, hour.table, { href: holyWeekHourHref(hour), title: hour.title, arabic: hour.arabic, french: hour.french });
+
+  // One entry a name, or none: two entries on one table, or two tables of one name, can't say which.
+  const byName = new Map<string, Set<string>>();
+  for (const { schema, table } of entries) {
+    const name = table.toUpperCase();
+    if (!byName.has(name)) byName.set(name, new Set());
+    byName.get(name)!.add(`${schema}.${table}`);
+  }
+  const targets: Record<string, HyperlinkTarget> = {};
+  for (const { schema, table, target } of entries) {
+    const name = table.toUpperCase();
+    const opened = entries.filter((entry) => entry.schema === schema && entry.table === table).length;
+    if (byName.get(name)!.size === 1 && opened === 1) targets[name] = target;
+  }
+  return targets;
+}
+
+const HYPERLINK_TARGETS_BY_TABLE = hyperlinkTargetsByTable();
+
+/** Where a Hyperlink row's key sends the reader: a name above, or the one service that opens the table it names. */
+export function findHyperlinkTarget(hyperlinkKey?: string | null): HyperlinkTarget | undefined {
+  if (!hyperlinkKey) return undefined;
+  return Object.prototype.hasOwnProperty.call(HYPERLINK_TARGETS, hyperlinkKey)
+    ? HYPERLINK_TARGETS[hyperlinkKey]
+    : Object.prototype.hasOwnProperty.call(HYPERLINK_TARGETS_BY_TABLE, hyperlinkKey) ? HYPERLINK_TARGETS_BY_TABLE[hyperlinkKey] : undefined;
+}
+
+/**
  * Bookmark keys.
  *
  * A bookmark is normally identified by the document it points at,

@@ -28,7 +28,7 @@ import { AntiphonaryModal, SubdocumentModal } from './DocumentModal';
 import { BookSettingsSheet } from './SettingsScreen';
 import { documentInitialColors, documentOrnamentColor } from '../../../constants/documentOrnaments';
 import { getDocumentTheme } from '../../../constants/documentThemes';
-import { bookmarkKeyFor, HYPERLINK_TARGETS } from '../../../constants/manifest';
+import { bookmarkKeyFor, findHyperlinkTarget } from '../../../constants/manifest';
 import { getDayThemeKey, type SeasonThemeKey } from '../../../constants/seasonAppearance';
 import { COLORS } from '../../../constants/theme';
 import { useReadingPreferences } from '../../../context/ReadingPreferencesContext';
@@ -103,7 +103,7 @@ interface ServiceDocumentProps {
 const DATE_BAR_TABLES = new Set(['lectionary_vespers', 'lectionary_matins', 'lectionary_liturgy', 'sermon_planner']);
 
 function withAppendedHyperlink(sections: DocumentSection[], hyperlinkKey?: string): DocumentSection[] {
-  const destination = hyperlinkKey ? HYPERLINK_TARGETS[hyperlinkKey] : undefined;
+  const destination = findHyperlinkTarget(hyperlinkKey);
   if (!hyperlinkKey || !destination) return sections;
   return [
     ...sections,
@@ -824,7 +824,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // the destination's own submenu above it. Reached from both the document
   // button and the content selector's hyperlink row.
   const openHyperlink = (hyperlinkKey?: string | null, options?: { fromSelector?: boolean }) => {
-    const destination = hyperlinkKey ? HYPERLINK_TARGETS[hyperlinkKey] : undefined;
+    const destination = findHyperlinkTarget(hyperlinkKey);
     if (!destination) return;
     // isCoveredByModal counts the content selector as covering this screen,
     // which is right for anything the DOCUMENT initiates while it sits behind

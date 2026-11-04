@@ -7,13 +7,14 @@
  *   order=a.asc,b.desc[.nullsfirst|.nullslast]   limit, offset
  *   Accept: application/vnd.pgrst.object+json   (supabase-js .single())
  *
- * Only tables the anon role can read in Supabase are served. Rows come back
+ * Only tables the anon role can read in Supabase are served, and the order
+ * tables made in D1 since (content.ts, findContentTable). Rows come back
  * in Postgres's order: text sorts by ICU en-US as the database collates it,
  * enums by their declared order, nulls last ascending and first descending.
  * like and ilike are matched here rather than in SQLite, whose LIKE folds
  * case for ASCII only.
  */
-import { contentTable, enumOrder, hasSchema, type Column, type Table } from '../content.ts';
+import { enumOrder, findContentTable, hasSchema, type Column, type Table } from '../content.ts';
 import { col, t } from '../db/names.ts';
 import { compareText, PgError } from '../pg.ts';
 import type { ContentContext, Row } from '../types.ts';
@@ -212,7 +213,7 @@ function outputValue(column: Column, value: unknown): unknown {
 
 export async function readRows(context: ContentContext, schemaName: string, tableName: string, url: URL, accept: string): Promise<{ body: unknown; range: string }> {
   if (!hasSchema(schemaName)) throw new PgError('PGRST106', 'Invalid schema: ' + schemaName, 406, null, 'Only the content schemas are exposed');
-  const table = contentTable(schemaName, tableName);
+  const table = await findContentTable(context.db, schemaName, tableName);
   if (!table || !table.public) {
     throw new PgError('PGRST205', `Could not find the table '${schemaName}.${tableName}' in the schema cache`, 404);
   }

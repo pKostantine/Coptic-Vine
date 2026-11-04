@@ -130,3 +130,51 @@ test('St Basil\'s hymns after the commemoration move into their own table, opene
   assert.ok(!contentSchema.tables.some((table) => table.table === 'commemoration_of_the_saints_hymns'));
   assert.ok(!read('migrations/0003_content_revision.sql').includes('commemoration_of_the_saints_hymns'));
 });
+
+test('every call to a whole table names it in full, and a line may call one so (migrations/0042)', () => {
+  const db = new DatabaseSync(':memory:');
+  for (const migration of ['0001_content_schema.sql', '0002_bible_search.sql', '0003_content_revision.sql', '0032_drop_cap.sql', '0034_inline_hymn_keys.sql']) {
+    db.exec(read(`migrations/${migration}`));
+  }
+  db.exec(read('migrations/0035_commemoration_of_the_saints_hymns.sql').match(/CREATE TABLE "liturgy\.commemoration_of_the_saints_hymns" \([^;]*;/)![0]);
+  const place = (table: string, order: number, key: string, itemType: string | null) =>
+    db.prepare(`INSERT INTO "${table}" ("item_order", "hymn_key", "item_type") VALUES (?, ?, ?)`).run(order, key, itemType);
+  place('liturgy.raising_of_incense', 31, 'PROCESSION_OF_THE_CROSS', 'Inline');
+  place('liturgy.raising_of_incense', 31.1, 'VESPERS_PROCESSION', 'Inline');
+  place('liturgy.liturgy_of_st_basil', 60, 'FRACTIONS', 'Subdocument');
+  place('liturgy.liturgy_of_st_basil', 120, 'DISTRIBUTION', 'Hyperlink');
+  place('psalmody.vespers_praises', 50, 'VESPERS', 'Hyperlink');
+  place('liturgy.lectionary_liturgy', 10, 'PAULINE_EPISTLE_WITHOUT_COPTIC', 'Inline');
+  place('holy_week.bright_saturday', 5, 'PAULINE_EPISTLE', null);
+  db.exec(`INSERT INTO "liturgy.hymn_titles" ("hymn_key", "title_english", "title_arabic") VALUES ('PROCESSION_OF_THE_CROSS', 'Procession of the Cross', 'دورة الصليب'), ('FRACTIONS', 'Fractions', NULL)`);
+  db.exec(`INSERT INTO "public.hymn_titles" ("hymn_key", "title_english") VALUES ('DISTRIBUTION', 'Distribution'), ('VESPERS', 'Vespers')`);
+  db.exec(`INSERT INTO "holy_week.hymn_titles" ("hymn_key", "title_english") VALUES ('PAULINE_EPISTLE', 'Pauline Epistle')`);
+
+  db.exec(read('migrations/0042_calls_by_table_name.sql'));
+  const keys = (table: string) => (db.prepare(`SELECT "hymn_key" FROM "${table}" ORDER BY "item_order"`).all() as { hymn_key: string }[]).map((row) => row.hymn_key);
+  assert.deepEqual(keys('liturgy.raising_of_incense'), ['procession_of_the_cross.procession_of_the_cross', 'procession_of_the_cross.vespers_procession']);
+  assert.deepEqual(keys('liturgy.liturgy_of_st_basil'), ['fractions.fractions', 'liturgy.distribution']);
+  // A key that names no table keeps its name: the Raising of Incense's Vespers, the day's readings, a heading.
+  assert.deepEqual(keys('psalmody.vespers_praises'), ['VESPERS']);
+  assert.deepEqual(keys('liturgy.lectionary_liturgy'), ['PAULINE_EPISTLE_WITHOUT_COPTIC']);
+  assert.deepEqual(keys('holy_week.bright_saturday'), ['PAULINE_EPISTLE']);
+  // Each call keeps its title; the Procession at Vespers is titled as at Matins; a heading keeps its own.
+  const titles = (schemaName: string) => Object.fromEntries((db.prepare(`SELECT "hymn_key", "title_english" FROM "${schemaName}.hymn_titles"`).all() as { hymn_key: string; title_english: string }[]).map((row) => [row.hymn_key, row.title_english]));
+  assert.deepEqual(titles('liturgy'), {
+    'procession_of_the_cross.procession_of_the_cross': 'Procession of the Cross',
+    'procession_of_the_cross.vespers_procession': 'Procession of the Cross',
+    'fractions.fractions': 'Fractions',
+  });
+  assert.deepEqual(titles('public'), { 'liturgy.distribution': 'Distribution', VESPERS: 'Vespers' });
+  assert.deepEqual(titles('holy_week'), { PAULINE_EPISTLE: 'Pauline Epistle' });
+
+  // A hymn line may call a whole table by its full name; a misspelt hymn is still refused.
+  db.exec(`INSERT INTO "liturgy.hymn_titles" ("hymn_key") VALUES ('host')`);
+  const line = (lineId: number, key: string) =>
+    db.exec(`INSERT INTO "liturgy.hymn_texts" ("line_id", "hymn_key", "item_type", "inline_hymn_key") VALUES (${lineId}, 'host', 'Inline', '${key}')`);
+  line(1, 'procession_of_the_cross.vespers_procession');
+  line(2, 'GOSPEL_RITE');
+  assert.throws(() => line(3, 'tenousht'), /inline_hymn_key is no hymn_key in any hymn_texts table/);
+  const guards = (db.prepare(`SELECT "name" FROM sqlite_master WHERE "type" = 'trigger' AND "name" LIKE '%inline_hymn_key%'`).all() as { name: string }[]);
+  assert.equal(guards.length, 38);
+});

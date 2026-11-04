@@ -1,8 +1,10 @@
 /**
- * Rebuilds src/constants/contentOrderTables.ts, every order table the content
- * API serves, by name, with the schema it is in. The reader finds the table
- * an ALL_CAPS Subdocument or Inline row calls from it (utils/sentinelTables.js):
- * FRACTIONS is fractions.fractions wherever that table is.
+ * Rebuilds src/constants/contentOrderTables.ts, every order table in the
+ * content API's list, by name, with the schema it is in. A Subdocument,
+ * Inline or Hyperlink row names the table it calls in full
+ * (fractions.fractions) and the reader needs no list for it; one in capitals
+ * (FRACTIONS), as offline books packed before 4 Nov 2026 have it, is found
+ * here (utils/sentinelTables.js).
  *
  * Run it after the content Worker's table list changes:
  *   node scripts/build-content-order-tables.mjs
@@ -58,8 +60,10 @@ export function renderContentOrderTables(contentTables) {
     '// workers/content-api/schema/content-tables.json. Do not edit by hand.',
     '',
     '/**',
-    ' * Every order table the content API serves, by name, with the schema it is',
-    " * in: the tables an ALL_CAPS Subdocument or Inline row can call (utils/sentinelTables.js).",
+    ' * Every order table in the content API\'s list, by name, with the schema it',
+    ' * is in. A call names its table in full (fractions.fractions) and needs none',
+    ' * of this; a call in capitals (FRACTIONS), as offline books packed before',
+    ' * 4 Nov 2026 have it, is found here (utils/sentinelTables.js).',
     ' */',
     'export const CONTENT_ORDER_TABLES: Readonly<Record<string, string>> = Object.freeze({',
     ...lines,

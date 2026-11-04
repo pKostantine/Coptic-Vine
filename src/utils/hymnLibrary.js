@@ -6,17 +6,23 @@ import { resolveBibleReadingReference } from "./readingReferenceResolver";
 import { contentDataClient as supabase, isContentSchemaInstalled } from "../services/contentDataClient";
 import { formatArabicDigits } from "./displayText";
 import { formatVerses } from "./verseFormatting";
-import { isSentinelKey as isAllCapsKey, sentinelTable } from "./sentinelTables";
+import { callName, isSentinelKey as isAllCapsKey, sentinelTable, tableCall } from "./sentinelTables";
 import { INLINE_READING_RULE_SCHEMAS } from "../constants/contentOrderTables";
 
-// ─── ALL_CAPS sentinel → schema.table ────────────────────────────────────────
-// A Subdocument or Inline row whose hymn_key is in capitals calls another
-// whole order table by that table's own name, found wherever it is
-// (utils/sentinelTables.js): FRACTIONS is fractions.fractions, GOSPEL_RITE
-// gospel_rite.gospel_rite, ADAM_ASPASMOS aspasmos.adam_aspasmos. A new call
-// needs only its row in the content, never an entry here. This is NOT a
+// ─── schema.table → the table it calls ────────────────────────────────────────
+// A Subdocument, Inline or Hyperlink row calls another whole order table by
+// its full name (utils/sentinelTables.js): fractions.fractions,
+// gospel_rite.gospel_rite, procession_of_the_cross.vespers_procession. A new
+// call needs only its row in the content, never an entry here. This is NOT a
 // hymn_key lookup within that schema's hymn_texts (the key isn't a row
 // there): the table is hydrated whole, recursively, as a document of its own.
+// Offline books packed before the full names call by the table's name in
+// capitals (FRACTIONS), which is understood too.
+//
+// A section goes by the call's name (callName: FRACTIONS for
+// fractions.fractions) -- its id, the subdocument a bookmark opens, and the
+// keys below -- and keeps the key as written in `callKey`, which is what
+// finds the table and its title.
 //
 // The keys the reader resolves its own way never stand for the table of
 // their name: the reading sentinels (PAULINE_EPISTLE_WITH_COPTIC, *_WITH_COPTIC
@@ -29,7 +35,7 @@ function isResolvedOtherwise(hymnKey) {
   return SENTINELS_RESOLVED_OTHERWISE.has(hymnKey) || isReadingSentinel(hymnKey) || PASCHA_READING_SENTINELS.has(hymnKey);
 }
 
-/** The whole order table an ALL_CAPS Subdocument or Inline key calls, or null (sentinelTable). */
+/** The whole order table a Subdocument or Inline key calls, or null (sentinelTable). */
 function resolveWholeTableInlineTarget(hymnKey) {
   return sentinelTable(hymnKey, isResolvedOtherwise);
 }
@@ -1303,13 +1309,31 @@ export async function fetchServiceRows(schema, table) {
   if (!orderRows.length) return [];
 
   const hymnKeys = uniqueNonEmpty(orderRows.map((row) => row.hymn_key));
-  const lookupSchemas = await getHymnKeyLookupSchemas(schema, table);
+  const nearSchemas = await getHymnKeyLookupSchemas(schema, table);
   const [titleRowsBySchema, textRowsBySchema] = await Promise.all([
-    Promise.all(lookupSchemas.map((lookupSchema) => fetchSchemaTitlesByKeys(lookupSchema, hymnKeys))),
-    Promise.all(lookupSchemas.map((lookupSchema) => fetchSchemaTextRowsByKeys(lookupSchema, hymnKeys))),
+    Promise.all(nearSchemas.map((lookupSchema) => fetchSchemaTitlesByKeys(lookupSchema, hymnKeys))),
+    Promise.all(nearSchemas.map((lookupSchema) => fetchSchemaTextRowsByKeys(lookupSchema, hymnKeys))),
   ]);
 
-  return flattenServiceRows(orderRows, { lookupSchemas, titleRowsBySchema, textRowsBySchema });
+  // A hymn's own key that none of those schemas has is looked for in every
+  // other schema with hymns, as an inline key is (findInlineHymn): the
+  // Procession of the Cross places etavenNieskhai and evlogimenos, which are
+  // seasonal_liturgy_hymns', and Holy Thursday a fraction of fractions'.
+  // Those are asked of the server only for such a key, and failing
+  // (offline), the row is as it was, empty, rather than the document lost.
+  const found = new Set([...titleRowsBySchema.flat(), ...textRowsBySchema.flat()].map((row) => normalizeText(row.hymn_key)));
+  const elsewhere = hymnKeys.filter((key) => !found.has(key) && !isAllCapsKey(key) && !tableCall(key));
+  const farSchemas = elsewhere.length ? HYMN_TEXT_SCHEMAS.filter((lookupSchema) => !nearSchemas.includes(lookupSchema)) : [];
+  const [farTitles, farTexts] = await Promise.all([
+    Promise.all(farSchemas.map((lookupSchema) => fetchSchemaTitlesByKeys(lookupSchema, elsewhere).catch(() => []))),
+    Promise.all(farSchemas.map((lookupSchema) => fetchSchemaTextRowsByKeys(lookupSchema, elsewhere).catch(() => []))),
+  ]);
+
+  return flattenServiceRows(orderRows, {
+    lookupSchemas: [...nearSchemas, ...farSchemas],
+    titleRowsBySchema: [...titleRowsBySchema, ...farTitles],
+    textRowsBySchema: [...textRowsBySchema, ...farTexts],
+  });
 }
 
 async function fetchOrderRows(schema, table) {
@@ -1463,6 +1487,7 @@ export function assembleServiceSections(rawRows) {
 
   for (const row of [...(rawRows || [])].sort(compareFlatServiceRows)) {
     const key = `${row.item_order}::${row.hymn_key}`;
+    const name = callName(row.hymn_key);
     const placementItemType = normalizeText(row.placement_item_type);
     const isSubdoc = placementItemType === "Subdocument";
     const isInlinePlacement = placementItemType === "Inline";
@@ -1471,8 +1496,9 @@ export function assembleServiceSections(rawRows) {
 
     if (!sectionMap.has(key)) {
       sectionMap.set(key, {
-        id: `${row.hymn_key}-${row.item_order}`,
-        hymn_key: row.hymn_key,
+        id: `${name}-${row.item_order}`,
+        hymn_key: name,
+        callKey: row.hymn_key,
         condition: normalizeText(row.placement_condition),
         implyingConditions: normalizeText(row.implying_conditions) || null,
         minimization: minimization || null,
@@ -1492,7 +1518,8 @@ export function assembleServiceSections(rawRows) {
     if (row.inline_hymn_key) {
       sectionMap.get(key).verses.push({
         type: "inlinePlaceholder",
-        inlineHymnKey: row.inline_hymn_key,
+        inlineHymnKey: callName(row.inline_hymn_key),
+        inlineCallKey: row.inline_hymn_key,
         inlineItemType: normalizeText(row.line_item_type),
         condition: normalizeText(row.line_condition),
         // The destination line's own person_type/prayer_type (if any)
@@ -2086,8 +2113,8 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
     // service, so — unlike a Subdocument, whose content is prefetched here and
     // stashed for its modal — there is nothing to hydrate: the destination
     // builds itself when its own screen mounts. The section carries just the
-    // all-caps key; which route that resolves to is a presentation concern
-    // (HYPERLINK_TARGETS in constants/manifest.ts), kept out of here so this
+    // call's name; which route that resolves to is a presentation concern
+    // (findHyperlinkTarget in constants/manifest.ts), kept out of here so this
     // module stays free of routing.
     if (section.isHyperlink) {
       hydrated.push({
@@ -2099,6 +2126,8 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         },
         verses: [],
         isHyperlinkButton: true,
+        // The call's name (LECTIONARY_LITURGY for liturgy.lectionary_liturgy):
+        // constants/manifest.ts finds the service that opens it (findHyperlinkTarget).
         hyperlinkKey: section.hymn_key,
         alternateEvery: null,
         forceWhiteVerses: true,
@@ -2109,7 +2138,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
     }
 
     if (section.isSubdocumentPlaceholder) {
-      const target = resolveWholeTableInlineTarget(section.hymn_key);
+      const target = resolveWholeTableInlineTarget(section.callKey);
       if (!target) {
         // A Subdocument row naming one hymn rather than a whole table
         // (mournful_4_gospels_rite's mournful4CopticGospels, the four Coptic
@@ -2118,7 +2147,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         if (!isAllCapsKey(section.hymn_key)) {
           if (depth >= 3) continue;
           const hymnRows = rawRows
-            .filter((row) => `${row.hymn_key}-${row.item_order}` === section.id)
+            .filter((row) => `${callName(row.hymn_key)}-${row.item_order}` === section.id)
             .map((row) => ({
               ...row,
               placement_item_type: null,
@@ -2296,7 +2325,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
         }
       }
 
-      const target = resolveWholeTableInlineTarget(section.hymn_key);
+      const target = resolveWholeTableInlineTarget(section.callKey);
       if (target) {
         if (depth >= 3) continue;
         const nestedSections = await hydrateWholeTableInlineNested(section.hymn_key, target, flags, depth + 1, isoDate);
@@ -2399,7 +2428,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           continue;
         }
 
-        const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineHymnKey);
+        const wholeTableTarget = resolveWholeTableInlineTarget(verse.inlineCallKey);
         if (wholeTableTarget) {
           flushVerses();
           const nestedSections = await hydrateWholeTableInlineNested(verse.inlineHymnKey, wholeTableTarget, flags, depth + 1, isoDate);
@@ -2408,7 +2437,7 @@ async function hydrateWithFlags(schema, table, documentFlags, depth, isoDate, se
           // Inline placeholder above, just sourced from this line's own
           // inline_hymn_title_shown/inline_hymn_minimization (the type-2
           // table's per-line equivalent) instead of a top-level order row.
-          const inlineSentinelTitle = await fetchInlineHymnTitle(schema, verse.inlineHymnKey);
+          const inlineSentinelTitle = await fetchInlineHymnTitle(schema, verse.inlineCallKey);
           const hasOwnSentinelTitle =
             Boolean(verse.inlineHymnTitleShown) &&
             Boolean(inlineSentinelTitle?.title_english || inlineSentinelTitle?.title_arabic);
