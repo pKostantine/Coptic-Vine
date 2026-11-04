@@ -27,8 +27,10 @@ import {
   hasRenderableSlideshowLanguageBody,
   hashSlideshowText,
   isKeyKeptByFocusedControl,
+  isSameSlideStart,
   joinRenderedLines,
   paginateItems,
+  startsWithWholeItem,
   TITLE_PAIRED_VERSE_COUNTS,
 } from "../src/components/vine/slideshowLayout.js";
 import {
@@ -1182,6 +1184,103 @@ test("turned back to the verse after a tall one, the page holds the tall verse's
   const apart = paginateItems(items, tallerNext, metrics, budget, 34, languages, 750, { itemId: "v6", offsets: {}, direction: "backward" });
   const apartLanding = findSlideIndexForAnchor(apart, { sourceItemId: "v6", direction: "backward", offsets: {} });
   assert.deepEqual(ids(apart[apartLanding]), ["v6"]);
+});
+
+// The opening of Matins on an iPad held sideways at 47px (a slide 776px
+// tall): the MATINS headpiece, the Introduction's title (no text of its own,
+// sharing the headpiece's slide), "Have mercy on us, O God, the Father" (its
+// Priest label, then 6 English, 5 Coptic and 4 Arabic lines), "O Lord, God of
+// hosts" (7, 7, 5), and the Lord's Prayer.
+function matinsOpening() {
+  const lines = (prefix, count) => Array.from({ length: count }, (_, index) => ({ text: `${prefix}${index}`, isParagraphEnd: index === count - 1 }));
+  const verse = (id, sectionId, hasSpeakerLabel, english, coptic, arabic) => ({ ...verseItem({ id, sectionId, hasSpeakerLabel }), counts: [english, coptic, arabic] });
+  const items = [
+    { id: "matins-title", sectionId: "matins", type: "title", title: { english: "MATINS" }, ornament: "stepped" },
+    { id: "intro-title", sectionId: "intro", type: "title", title: { english: "" } },
+    verse("have-mercy", "intro", true, 6, 5, 4),
+    verse("o-lord", "intro", false, 7, 7, 5),
+    { id: "prayer-title", sectionId: "prayer", type: "title", title: { english: "The Lord's Prayer" } },
+    verse("our-father", "prayer", true, 5, 6, 4),
+    verse("thy-kingdom", "prayer", false, 4, 5, 3),
+  ];
+  const heights = { "matins-title": 428, "intro-title": 0, "prayer-title": 80 };
+  const metrics = {};
+  items.filter((item) => item.counts).forEach((item) => {
+    const [english, coptic, arabic] = item.counts;
+    heights[item.id] = 16 + (item.hasSpeakerLabel ? 75 : 0) + Math.max(english * 61, coptic * 61, arabic * 75);
+    metrics[item.id] = { english: { lines: lines("E", english) }, coptic: { lines: lines("C", coptic) }, arabic: { lines: lines("A", arabic) } };
+  });
+  const pages = (breakAt) => paginateItems(items, heights, metrics, getSlideContentBudget(776), 47, ALL_LANGUAGES, 1100, breakAt);
+  // Each entry by its item and, for a piece turned over, the English lines it holds.
+  const ids = (slide) => slide.map((entry) => {
+    const english = entry.slideshowLineRanges?.english;
+    return `${entry.sourceItemId || entry.id}${english && english.start > 0 ? ` E${english.start}-${english.end}` : ""}`;
+  });
+  return { pages, ids };
+}
+
+test("turned back past a verse divided beneath a headpiece, the page keeps its last lines with what follows", () => {
+  const { pages, ids } = matinsOpening();
+  const forward = pages({ itemId: "matins-title", offsets: {} });
+  assert.deepEqual(forward.map(ids), [
+    ["matins-title", "intro-title", "have-mercy"],
+    ["have-mercy E4-6", "o-lord"],
+    ["prayer-title", "our-father"],
+    ["thy-kingdom"],
+  ]);
+  // Back from the Lord's Prayer: "Holy Trinity, have mercy on us" with "O Lord, God of hosts", as going forward --
+  // not "O Lord" alone and then "Holy Trinity" alone.
+  const back = pages({ itemId: "o-lord", offsets: {}, direction: "backward" });
+  const landing = findSlideIndexForAnchor(back, { sourceItemId: "o-lord", direction: "backward", offsets: {} });
+  assert.deepEqual(ids(back[landing]), ["have-mercy E4-6", "o-lord"]);
+  // And back from there, the headpiece's slide.
+  const offsets = Object.fromEntries(Object.entries(back[landing][0].slideshowLineRanges).map(([language, range]) => [language, range.start - 1]));
+  const toTop = pages({ itemId: "have-mercy", offsets, direction: "backward" });
+  assert.deepEqual(ids(toTop[findSlideIndexForAnchor(toTop, { sourceItemId: "have-mercy", direction: "backward", offsets })]), ["matins-title", "intro-title", "have-mercy"]);
+});
+
+test("turned back, the reader returns to the very slide they turned forward from", () => {
+  const { pages, ids } = matinsOpening();
+  // Forward from the top, as goToNextSlide does: each turn remembers the slide left and the one turned to.
+  let anchor = { sourceItemId: "matins-title", offsets: {} };
+  let deck = pages(anchor);
+  let index = findSlideIndexForAnchor(deck, anchor);
+  const trail = [];
+  const seen = [ids(deck[index])];
+  while (index < deck.length - 1) {
+    const to = deck[index + 1];
+    trail.push({ from: createSlideAnchor(deck[index]), to: createSlideAnchor(to), endsBeforeItemId: startsWithWholeItem(to) ? createSlideAnchor(to).sourceItemId : undefined });
+    anchor = createSlideAnchor(to);
+    deck = pages({ itemId: anchor.sourceItemId, offsets: anchor.offsets });
+    index = findSlideIndexForAnchor(deck, anchor);
+    seen.push(ids(deck[index]));
+  }
+  // Back, as goToPreviousSlide does: the slide turned from, ending where it ended then.
+  const back = [ids(deck[index])];
+  while (trail.length) {
+    const turned = trail.pop();
+    assert.ok(isSameSlideStart(turned.to, createSlideAnchor(deck[index])));
+    anchor = { ...turned.from, endsBeforeItemId: turned.endsBeforeItemId };
+    deck = pages({ itemId: anchor.sourceItemId, offsets: anchor.offsets, endsBeforeItemId: anchor.endsBeforeItemId });
+    index = findSlideIndexForAnchor(deck, anchor);
+    back.push(ids(deck[index]));
+  }
+  assert.deepEqual(back.reverse(), seen);
+  // The container keeps that trail, and turns back by it before packing a page from its foot.
+  const container = fs.readFileSync(new URL("../src/components/vine/SlideshowContainer.js", import.meta.url), "utf8");
+  assert.match(container, /forwardTrailRef\.current\.push\(\{\s+from: fromAnchor,\s+to: toAnchor,/);
+  assert.match(container, /isSameSlideStart\(turnedFrom\.to, createSlideAnchor\(current\)\)[\s\S]*?setCurrentAnchor\(\{ \.\.\.turnedFrom\.from, endsBeforeItemId: turnedFrom\.endsBeforeItemId \}\)/);
+  assert.match(container, /endsBeforeItemId: currentAnchor\.endsBeforeItemId/);
+});
+
+test("a slide's start is its item and the line each column starts at", () => {
+  assert.ok(isSameSlideStart({ sourceItemId: "v", offsets: { english: 4, coptic: 0 } }, { sourceItemId: "v", offsets: { english: 4 } }));
+  assert.ok(!isSameSlideStart({ sourceItemId: "v", offsets: { english: 4 } }, { sourceItemId: "v", offsets: { english: 5 } }));
+  assert.ok(!isSameSlideStart({ sourceItemId: "v", offsets: {} }, { sourceItemId: "w", offsets: {} }));
+  assert.ok(!isSameSlideStart(null, { sourceItemId: "v", offsets: {} }));
+  assert.ok(startsWithWholeItem([{ id: "t", type: "title" }]));
+  assert.ok(startsWithWholeItem([{ id: "v", slideshowLineRanges: { english: { start: 0, end: 4 } } }]));
+  assert.ok(!startsWithWholeItem([{ id: "v-segment-1", sourceItemId: "v", slideshowLineRanges: { english: { start: 4, end: 6 }, coptic: { start: 5, end: 5 } } }]));
 });
 
 test("turned back from the second piece of a tall verse, the page is the piece before it, not the slide before the verse", () => {
