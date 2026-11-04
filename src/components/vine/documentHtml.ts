@@ -497,6 +497,15 @@ export function buildDocumentHtml(
         text-align: justify;
         text-justify: inter-word;
       }
+      /* A line opening on its decorated initial keeps its words whole: one
+         that doesn't fit on the short line beside the initial goes below it.
+         break-word splits it there instead, with no hyphen ("Adorn / ment"),
+         as it does the first word of any short line beside a float. Only a
+         word wider than its whole column may still break, for it would run
+         over into the next one: the page script (fitOpeningWords) wraps each
+         such word in .opening-long-word. */
+      .verse-text.opens { overflow-wrap: normal; }
+      .verse-text.opens .opening-long-word { overflow-wrap: break-word; }
       .english, .french { font-family: Georgia, serif !important; }
       .coptic {
         font-family: CopticVine, Georgia, serif !important;
@@ -1759,14 +1768,14 @@ function renderVerse(
       : englishInitial
         ? renderEnglishInitial(englishInitial, fontSize, englishLineHeight) + renderOpeningRest(englishInitial.rest, highlightMetropolitanBrackets, 'english-small-caps')
         : arabicWord
-          ? `<span class="opening-word arabic-opening">${escapeHtml(arabicWord.word)}</span>${highlightMetropolitanBrackets(arabicWord.rest)}`
+          ? `${arabicWord.count ? `<span class="opening-verse-number">${escapeHtml(arabicWord.count)} </span>` : ''}<span class="opening-word arabic-opening">${escapeHtml(arabicWord.word)}</span>${highlightMetropolitanBrackets(arabicWord.rest)}`
           : highlightMetropolitanBrackets(language.text);
     const renderedBody = sermonPlannerMode && !labelOnly
       ? `<span class="sermon-annotatable-text" data-sermon-section-id="${escapeAttribute(section.id)}" data-sermon-verse-id="${escapeAttribute(verseId)}" data-sermon-language="${escapeAttribute(language.key)}">${bodyText}</span>`
       : bodyText;
     return `
         <div class="cell" data-language="${escapeAttribute(language.key)}"${spansRow ? ' style="grid-column: 1 / -1;"' : ''}>
-          <p class="verse-text ${language.className} ${centered ? 'centered' : ''}" style="${textStyle}">${
+          <p class="verse-text ${language.className} ${centered ? 'centered' : ''}${cellInitial || englishInitial || arabicWord ? ' opens' : ''}" style="${textStyle}">${
             speakerLabel ? `<span class="speaker-label ${language.speakerClass}">${escapeHtml(speakerLabel)}</span><br/>` : ''
           }${verseNumberText ? `<span class="bible-verse-number${opens ? ' opening-verse-number' : ''}" data-copy-text="${escapeAttribute(verseNumberText)}">${escapeHtml(verseNumberText)}</span>${opens ? '' : '<span class="bible-verse-number-gap"></span>'}` : ''}${renderedBody}</p>
         </div>

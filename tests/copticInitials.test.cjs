@@ -209,7 +209,8 @@ test('initials are fitted in one layout: all set a line tall, all measured, then
       getClientRects: () => Array.from({ length: start.paragraph.lines }, (_, line) => ({ width: 10, top: line * 20 })),
     };
   };
-  const document = { querySelectorAll: () => all, createRange: range };
+  // Only the initials: no opening line here has a word wider than its column (fitOpeningWords).
+  const document = { querySelectorAll: (selector) => (selector.includes('coptic-initial') ? all : []), createRange: range };
   const fit = new Function('document', 'getComputedStyle', `${FIT_COPTIC_INITIALS_SCRIPT}; return fitCopticInitials;`)(document, () => ({ lineHeight: '20px' }));
   fit({ length: 1 }); // what fonts.load hands it: the whole page
   assert.equal(wraps.classList.has('one-line'), false, 'a paragraph of two lines or more keeps the tall initial');
@@ -222,7 +223,7 @@ test('initials are fitted in one layout: all set a line tall, all measured, then
   assert.ok(log.slice(0, firstRead).every((entry) => entry.startsWith('write')));
   assert.ok(log.slice(firstRead, lastRead + 1).every((entry) => entry.startsWith('read')));
   // Handed a hymn, only its own initials are fitted.
-  const section = { nodeType: 1, querySelectorAll: () => [short] };
+  const section = { nodeType: 1, querySelectorAll: (selector) => (selector.includes('coptic-initial') ? [short] : []) };
   log.length = 0;
   fit(section);
   assert.deepEqual([...new Set(log.map((entry) => entry.split(' ')[1]))], ['short']);
@@ -278,7 +279,38 @@ test('the Arabic first word is stretched once with kashida, only between letters
   assert.equal(openings.stretchArabicWord('لا'), 'لا');
   // Its vowel marks stay on their letter, ahead of the stretch.
   assert.equal(openings.stretchArabicWord('بَارَك'), 'بَـــارَك');
-  assert.deepEqual(openings.splitArabicOpening('مبارك أنت'), { word: 'مبـــارك', rest: ' أنت' });
+  assert.deepEqual(openings.splitArabicOpening('مبارك أنت'), { word: 'مبـــارك', rest: ' أنت', count: '' });
+});
+
+test("a long melody's first stanza opens past its count, which stays in the text unseen as a verse number does", () => {
+  // doxologies.hymn_texts: the Melody for Vespers of the Great Fast, the Matins melodies, Palm Sunday's.
+  assert.deepEqual(openings.splitEnglishOpening('(1/42) Lord, grant all my plea'), { letter: 'L', source: '(1/42) L', rest: 'ord, grant all my plea' });
+  assert.deepEqual(openings.splitEnglishOpening('(1/17) “Glory'), { letter: 'G', source: '(1/17) “G', rest: 'lory' });
+  assert.deepEqual(openings.splitArabicOpening('(١/٤٢) أنتَ ياربُ'), { word: 'أنـــتَ', rest: ' ياربُ', count: '(١/٤٢)' });
+  // A bracket that isn't a count is still only a mark before the letter.
+  assert.deepEqual(openings.splitEnglishOpening('(Now'), { letter: 'N', source: '(N', rest: 'ow' });
+  const html = body(build([hymn([verse('', { english: '(1/42) Lord, grant all my plea', arabic: '(١/٤٢) أنتَ ياربُ تُعطينِي', dropCap: true }), verse('', { english: '(2/42) Dawn with holy light', arabic: '(٢/٤٢) باكرٌ' })])], { ...OPTIONS, visibleColumns: { english: true, french: false, coptic: false, arabic: true } }));
+  assert.ok(html.includes('<span class="english-initial-text">(1/42) L</span></span><span class="opening-word english-small-caps">ord,</span> grant all my plea'));
+  assert.ok(html.includes('<span class="opening-verse-number">(١/٤٢) </span><span class="opening-word arabic-opening">أنـــتَ</span> ياربُ تُعطينِي'));
+  // The stanzas after it keep their count where it is.
+  assert.ok(html.includes('(2/42) Dawn with holy light'));
+});
+
+test("an opening line keeps its words whole beside the initial; only a word wider than its column may break", () => {
+  const html = build([hymn([verse('Ϣⲁϣϥ ⲛ̀ⲁⲣⲭⲏⲁⲅⲅⲉⲗⲟⲥ', { english: 'Seven archangels', arabic: 'سبعة رؤساء', dropCap: true }), verse('Ⲙⲓⲭⲁⲏⲗ', { english: 'Michael is the first', arabic: 'ميخائيل' })])], OPTIONS);
+  const page = body(html);
+  // The opening line in each column, and only it.
+  assert.equal((page.match(/<p class="verse-text [^"]* opens"/g) || []).length, 3);
+  assert.ok(page.includes('>Michael is the first<') && !/<p class="verse-text english [^"]*opens"[^>]*>Michael/.test(page));
+  // break-word splits a word on the short line beside the initial ("Adorn / ment"); an opening keeps it whole.
+  assert.match(html, /\.verse-text\.opens \{ overflow-wrap: normal; \}/);
+  assert.match(html, /\.verse-text\.opens \.opening-long-word \{ overflow-wrap: break-word; \}/);
+  // The page wraps a word wider than its whole column so it alone may break, and measures again when the text reflows.
+  assert.match(html, /function fitOpeningWords\(scope\) \{/);
+  assert.match(html, /function fitCopticInitials\(root\) \{\n\s+var scope = root && root\.nodeType === 1 \? root : document;\n\s+fitOpeningWords\(scope\);/);
+  assert.match(html, /var words = \/\\S\+\/g;/);
+  assert.match(html, /if \(range\.getBoundingClientRect\(\)\.width > opening\.clientWidth \+ 1\) long\.push\(range\);/);
+  assert.match(html, /span\.className = 'opening-long-word';\n\s+long\[l\]\.surroundContents\(span\);/);
 });
 
 test('the English initial is the first capital: an Old English letter, its capitals from line 1\'s to line 2\'s baseline, as wide as its own letter', () => {

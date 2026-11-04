@@ -136,7 +136,7 @@ export function buildBibleChapterHtml({
     }
     if (isArabicLanguage(language)) {
       const opening = splitArabicOpening(text);
-      return opening ? `<span class="opening-word arabic-opening">${escapeHtml(opening.word)}</span>${escapeHtml(opening.rest)}` : null;
+      return opening ? `${opening.count ? `<span class="opening-verse-number">${escapeHtml(opening.count)} </span>` : ''}<span class="opening-word arabic-opening">${escapeHtml(opening.word)}</span>${escapeHtml(opening.rest)}` : null;
     }
     if (language === 'greek') return null;
     const initial = splitEnglishOpening(text);
