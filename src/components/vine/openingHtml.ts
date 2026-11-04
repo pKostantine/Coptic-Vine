@@ -176,6 +176,12 @@ export function renderOpeningRest(rest: string, html: (text: string) => string, 
  * it's back, leaving the short initial over two lines the tall one would
  * fill.) The page calls it once it is laid out, and again whenever the text
  * reflows.
+ *
+ * It first lets a word of an opening line (.verse-text.opens, whose words
+ * are kept whole so none is split beside the initial) break again where it
+ * is wider than its whole column, as a long Coptic word can be: kept whole,
+ * it would run over into the next column. Only that word, so the rest of
+ * its line still keeps whole beside the initial.
  */
 export const FIT_COPTIC_INITIALS_SCRIPT = `
       // Within \`root\` (a hymn just opened) or the whole page; anything else
@@ -183,8 +189,42 @@ export const FIT_COPTIC_INITIALS_SCRIPT = `
       // Set in three passes, every initial on one line, then every paragraph
       // measured, then each initial settled: one layout for the lot, where
       // measuring each in turn laid the page out again for every initial.
+      function fitOpeningWords(scope) {
+        // Last fit's long words back into their text, to be measured afresh
+        // (a column is narrower on a phone held upright than sideways).
+        var wrapped = scope.querySelectorAll('.verse-text.opens .opening-long-word');
+        for (var u = 0; u < wrapped.length; u += 1) {
+          var parent = wrapped[u].parentNode;
+          parent.replaceChild(document.createTextNode(wrapped[u].textContent), wrapped[u]);
+          parent.normalize();
+        }
+        // Every word wider than its column, in a line that runs over it.
+        var openings = scope.querySelectorAll('.verse-text.opens');
+        var long = [];
+        for (var o = 0; o < openings.length; o += 1) {
+          var opening = openings[o];
+          if (!opening.getClientRects().length || opening.scrollWidth <= opening.clientWidth + 1) continue;
+          var walker = document.createTreeWalker(opening, NodeFilter.SHOW_TEXT);
+          for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+            var words = /\\S+/g;
+            for (var match = words.exec(node.data); match; match = words.exec(node.data)) {
+              var range = document.createRange();
+              range.setStart(node, match.index);
+              range.setEnd(node, match.index + match[0].length);
+              if (range.getBoundingClientRect().width > opening.clientWidth + 1) long.push(range);
+            }
+          }
+        }
+        // Wrapped last to first, so the words before each are where they were measured.
+        for (var l = long.length - 1; l >= 0; l -= 1) {
+          var span = document.createElement('span');
+          span.className = 'opening-long-word';
+          long[l].surroundContents(span);
+        }
+      }
       function fitCopticInitials(root) {
         var scope = root && root.nodeType === 1 ? root : document;
+        fitOpeningWords(scope);
         var initials = scope.querySelectorAll('.coptic-initial[data-fit]');
         var fits = [];
         for (var i = 0; i < initials.length; i += 1) {

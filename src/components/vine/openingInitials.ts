@@ -35,6 +35,13 @@ const FIRST_WORD_NEARER = 8 / 22;
  * does to a display initial (the page keeps them in the text unseen).
  */
 const OPENING_MARKS = /^[\s"'`“‘«‹„‚([{–—]*/u;
+/**
+ * A stanza's count at the head of its line, "(1/17)" or "(١/١٧)", as a long
+ * melody's stanzas are numbered. On the line that opens with the initial it
+ * stays in the text unseen, as a Bible verse number does, and the initial
+ * takes the first letter after it.
+ */
+const STANZA_COUNT = /^\s*\(\s*[0-9٠-٩]+\s*\/\s*[0-9٠-٩]+\s*\)\s*/u;
 /** Ligatures there's no Old English capital for: the initial they open on, and what follows it. */
 const LIGATURES: Record<string, [string, string]> = { Æ: ['A', 'e'], æ: ['A', 'e'], Œ: ['O', 'e'], œ: ['O', 'e'] };
 
@@ -54,12 +61,14 @@ export interface EnglishOpeningSplit {
  * past any marks before it.
  */
 export function splitEnglishOpening(text: string): EnglishOpeningSplit | null {
-  const marks = OPENING_MARKS.exec(text)![0];
-  const first = text.charAt(marks.length);
+  const count = STANZA_COUNT.exec(text)?.[0] ?? '';
+  const marks = OPENING_MARKS.exec(text.slice(count.length))![0];
+  const start = count.length + marks.length;
+  const first = text.charAt(start);
   const ligature = LIGATURES[first];
   const letter = ligature ? ligature[0] : first.normalize('NFD').charAt(0).toUpperCase();
   if (!ENGLISH_INITIALS[letter]) return null;
-  const after = text.slice(marks.length + 1).replace(/^\p{M}+/u, '');
+  const after = text.slice(start + 1).replace(/^\p{M}+/u, '');
   return { letter, source: text.slice(0, text.length - after.length).trim(), rest: (ligature ? ligature[1] : '') + after };
 }
 
@@ -171,11 +180,15 @@ export function stretchArabicWord(word: string, length = 3): string {
   return [...clusters.slice(0, best + 1), TATWEEL.repeat(length), ...clusters.slice(best + 1)].join('');
 }
 
-/** An Arabic paragraph's first word, stretched, and the text after it. */
-export function splitArabicOpening(text: string): { word: string; rest: string } | null {
-  const match = /^(\s*)(\S+)/.exec(text);
+/**
+ * An Arabic paragraph's first word, stretched, and the text after it; past a
+ * stanza's count, which is kept apart (`count`) to stay in the text unseen.
+ */
+export function splitArabicOpening(text: string): { word: string; rest: string; count: string } | null {
+  const count = STANZA_COUNT.exec(text)?.[0] ?? '';
+  const match = /^(\s*)(\S+)/.exec(text.slice(count.length));
   if (!match) return null;
-  return { word: stretchArabicWord(match[2]), rest: text.slice(match[0].length) };
+  return { word: stretchArabicWord(match[2]), rest: text.slice(count.length + match[0].length), count: count.trim() };
 }
 
 /** The rest of a paragraph's first word once its first letter has gone to an initial, if the word goes on after it. */
