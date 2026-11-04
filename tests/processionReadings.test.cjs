@@ -123,6 +123,9 @@ test("a station reads each reading's introduction, then its citation, then the r
   assert.deepEqual(shown(second.verses).slice(0, 2), ['Deacon: A reading from the Gospel according to our teacher Saint Luke the Evangelist, and the pure disciple.', '[cites 42.1:39-56]']);
   // The Gospel in every language, Coptic too; the Psalm wasn't read from the Bible.
   assert.deepEqual(bible, [{ reference: '43.1:43-51', withCoptic: true, isPsalm: false }]);
+  // The Gospel is a Recited Prayer, its Coptic shown as Coptic Recited Prayers says; the sung Psalm is as its hymn has it.
+  assert.equal(section.verses.at(-1).type, 'recitedPrayer');
+  assert.ok(section.verses.slice(0, 3).every((verse) => verse.type !== 'recitedPrayer'));
   // Never taken for one of the day's readings.
   assert.ok(section.verses.filter((verse) => verse.type === 'readingReference').every((verse) => !verse.reading));
 });
@@ -131,7 +134,7 @@ test('a Psalm with no hymn of its own is read from the Bible, a Gospel with no i
   const { resolve, bible } = stationReader({ rules: firstStation });
   const section = await resolve('procession_of_the_cross', station, {});
   assert.deepEqual(bible.map((reading) => [reading.reference, reading.isPsalm]), [['19.103:4@19.137:1-2', true], ['43.1:43-51', false]]);
-  assert.deepEqual(section.verses.map((verse) => verse.type || 'text'), ['readingReference', 'text', 'readingReference', 'text']);
+  assert.deepEqual(section.verses.map((verse) => verse.type || 'text'), ['readingReference', 'recitedPrayer', 'readingReference', 'recitedPrayer']);
   assert.equal(await resolve('procession_of_the_cross', { ...station, hymn_key: 'THIRTEENTH_GOSPEL' }, {}), null);
 });
 

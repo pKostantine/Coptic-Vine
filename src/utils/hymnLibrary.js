@@ -1038,7 +1038,8 @@ function getGospelIntroductionRows(schema) {
  *   - a Gospel introduced by the schema's gospelIntroduction hymn, its line
  *     for this Gospel's evangelist ("A reading from the Gospel according to
  *     our teacher Saint Luke the Evangelist…"), then read from the Bible in
- *     every language, its Coptic too.
+ *     every language as a Recited Prayer: its Coptic shows only with
+ *     Coptic Recited Prayers on.
  *
  * Null when nothing is filed under the key.
  */
@@ -1068,7 +1069,9 @@ async function resolveInlineReadingRuleSection(schema, section, flags) {
       const evangelist = { ...flags, ...gospelAuthorFlagsOf([row]) };
       introduction = (await getGospelIntroductionRows(schema)).flatMap((textRow) => verse(textRow, evangelist));
     }
-    if (!lines.length) lines = buildReadingVerses(reading, true, isPsalm);
+    // Read from the Bible, a reading is recited: its Coptic shows as Coptic
+    // Recited Prayers says, as every recited prayer's does.
+    if (!lines.length) lines = buildReadingVerses(reading, true, isPsalm).map((line) => ({ ...line, type: "recitedPrayer" }));
     if (!lines.length) continue;
     // Not tagged as one of the day's readings (readingIdentity): a station's
     // Gospel is the Procession's own, never the day's that a list of the
