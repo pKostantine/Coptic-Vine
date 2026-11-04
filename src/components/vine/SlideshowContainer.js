@@ -21,6 +21,8 @@ import {
   getReadingItemIndex,
   getSettleStart,
   isKeyKeptByFocusedControl,
+  isSameSlideStart,
+  startsWithWholeItem,
   getPageTurnForSwipe,
   getPageTurnForTap,
   getPageTurnForViewportTap,
@@ -402,7 +404,7 @@ export default function SlideshowContainer({
       visibleLanguages,
       slideTableWidth,
       currentAnchor?.sourceItemId && currentAnchor.breaks !== false
-        ? { itemId: currentAnchor.sourceItemId, offsets: currentAnchor.offsets, direction: currentAnchor.direction }
+        ? { itemId: currentAnchor.sourceItemId, offsets: currentAnchor.offsets, direction: currentAnchor.direction, endsBeforeItemId: currentAnchor.endsBeforeItemId }
         : null,
     );
 
@@ -773,13 +775,42 @@ export default function SlideshowContainer({
     setCurrentAnchor(createSlideAnchor(deck[nextIndex]));
   }, [slides]);
 
-  // Turned back, the page is packed from its foot up, ending exactly where
-  // the page on screen begins (see paginateItems' backward break): what the
-  // reader turns back to is a whole page.
+  // The slides turned forward through, the latest last: each the slide the
+  // reader left, the one they turned to, and the layout both were laid out
+  // in (measuredKey: font, width, languages and the items shown).
+  const forwardTrailRef = useRef([]);
+
+  // Turned back, the reader returns to the very slide they turned forward
+  // from, so going back shows the pages going forward showed. Packed from
+  // its foot up, a page could group the verses otherwise -- at the opening
+  // of Matins, "O Lord, God of hosts" on a slide of its own and the last
+  // lines of "Have mercy on us" on another, where going forward they had
+  // shared one.
   const goToPreviousSlide = useCallback(() => {
     const deck = shownDeckRef.current?.slides?.length ? shownDeckRef.current.slides : slides;
     const index = navigationIndexRef.current;
     const current = deck[index];
+    const trail = forwardTrailRef.current;
+    const turnedFrom = trail[trail.length - 1];
+    if (
+      turnedFrom &&
+      index > 0 &&
+      turnedFrom.key === measuredKey &&
+      itemIndexById.has(turnedFrom.from.sourceItemId) &&
+      isSameSlideStart(turnedFrom.to, createSlideAnchor(current))
+    ) {
+      trail.pop();
+      navigationIndexRef.current = index - 1;
+      setCurrentSlideIndex(index - 1);
+      // It ends where it ended then: before the slide it was turned from.
+      setCurrentAnchor({ ...turnedFrom.from, endsBeforeItemId: turnedFrom.endsBeforeItemId });
+      return;
+    }
+    // Arrived some other way (a jump, a restore, the document's opening):
+    // the page is packed from its foot up, ending exactly where the page on
+    // screen begins (see paginateItems' backward break), so what the reader
+    // turns back to is a whole page.
+    forwardTrailRef.current = [];
     const first = current?.[0];
     const firstIndex = first ? itemIndexById.get(first.sourceItemId || first.id) : -1;
     if (firstIndex == null || index <= 0) {
@@ -820,11 +851,27 @@ export default function SlideshowContainer({
       offsets: {},
       direction: "backward",
     });
-  }, [goToSlide, itemIndexById, items, slides]);
+  }, [goToSlide, itemIndexById, items, measuredKey, slides]);
 
   const goToNextSlide = useCallback(() => {
-    goToSlide(navigationIndexRef.current + 1);
-  }, [goToSlide]);
+    const deck = shownDeckRef.current?.slides?.length ? shownDeckRef.current.slides : slides;
+    const index = navigationIndexRef.current;
+    const from = deck[index];
+    const to = deck[index + 1];
+    const fromAnchor = from ? createSlideAnchor(from) : null;
+    const toAnchor = to ? createSlideAnchor(to) : null;
+    if (fromAnchor && toAnchor) {
+      forwardTrailRef.current.push({
+        from: fromAnchor,
+        to: toAnchor,
+        // A slide turned from ends before the whole item opening the next;
+        // one ending partway down a verse ends at its own last line anyway.
+        endsBeforeItemId: startsWithWholeItem(to) ? toAnchor.sourceItemId : undefined,
+        key: measuredKey,
+      });
+    }
+    goToSlide(index + 1);
+  }, [goToSlide, measuredKey, slides]);
 
   useEffect(() => {
     if (

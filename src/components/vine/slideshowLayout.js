@@ -498,17 +498,28 @@ function packBackwardFromItem(items, units, heights, languageHeights, availableH
   const heightOf = (index) => Math.ceil((heights[items[index].id] ?? 0) + 2);
   const measured = (item) => item.type === "verse" && hasEveryMeasuredColumn(item, languageHeights[item.id], visibleLanguages);
   const keepsWithNext = (item) => item?.type === "title" || item?.type === "gospelRiteToggle";
+  // Where the slide holding a title begins: the title, or the headpiece and
+  // titles it shares its slide with. A service's headpiece is a title of its
+  // own, and its first hymn's title -- with no text of its own -- shares the
+  // headpiece's slide: Matins opens with the MATINS headpiece, then the
+  // Introduction's title, then "Have mercy on us, O God, the Father".
+  const slideStartOf = (titleIndex) => {
+    let start = titleIndex;
+    while (start > 0 && !units[start].breakBefore && keepsWithNext(items[start - 1])) start -= 1;
+    return start;
+  };
   // A verse its title keeps on its slide, or one taller than a slide, is
-  // laid out as a forward turn lays it out -- from the title, or from a
-  // fresh slide -- and the page ending at the line asked for (else at the
-  // verse's last piece) is the one of those pages holding it. A verse
+  // laid out as a forward turn lays it out -- from its title's slide, or
+  // from a fresh slide -- and the page ending at the line asked for (else
+  // at the verse's last piece) is the one of those pages holding it. A verse
   // divided beneath its title is not divided as a fresh slide would divide
   // it, and its page is then the title's, or the one its earlier pieces
   // leave it on.
   const titleIndex = pairedTitleIndex(items, last);
   const underTitle = titleIndex >= 0;
+  const titleSlideStart = underTitle ? slideStartOf(titleIndex) : -1;
   if (measured(items[last]) && (underTitle || heightOf(last) > availableHeight)) {
-    const pages = paginateItems(items.slice(underTitle ? titleIndex : last, last + 1), heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0);
+    const pages = paginateItems(items.slice(underTitle ? titleSlideStart : last, last + 1), heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0);
     const pieceOf = (page) => page.find((entry) => (entry.sourceItemId || entry.id) === itemId && Object.keys(entry.slideshowLineRanges || {}).length > 0);
     const holding = pages.map((page, index) => (pieceOf(page) ? index : -1)).filter((index) => index >= 0);
     const wanted = lineOffsets && Object.entries(lineOffsets).find(([, line]) => Number.isFinite(line) && line >= 0);
@@ -520,7 +531,7 @@ function packBackwardFromItem(items, units, heights, languageHeights, availableH
     const pageIndex = wantedPage ?? lastHolding;
     const first = pageIndex != null ? pages[pageIndex][0] : null;
     // Whole beneath its title, the verse is packed back like any other (below).
-    const wholeBeneathTitle = underTitle && holding.length === 1 && first === items[titleIndex];
+    const wholeBeneathTitle = underTitle && holding.length === 1 && first === items[titleSlideStart];
     if (first && !wholeBeneathTitle) {
       // The page ends at the verse's end only when it holds its last piece;
       // any other piece fills its page on its own.
@@ -530,15 +541,15 @@ function packBackwardFromItem(items, units, heights, languageHeights, availableH
     }
   }
   // The last piece of a verse turned over the page, as a forward turn lays
-  // the verse out (from its title, if the title keeps it, else from a fresh
-  // slide): its height and where its lines begin. None for a verse placed
-  // whole.
+  // the verse out (from its title's slide, if the title keeps it, else from
+  // a fresh slide): its height and where its lines begin. None for a verse
+  // placed whole.
   const lastPieceOf = (index) => {
     const item = items[index];
     if (!measured(item)) return null;
     const title = pairedTitleIndex(items, index);
     if (title < 0 && heightOf(index) <= availableHeight) return null;
-    const pages = paginateItems(items.slice(title >= 0 ? title : index, index + 1), heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0);
+    const pages = paginateItems(items.slice(title >= 0 ? slideStartOf(title) : index, index + 1), heights, languageHeights, availableHeight, fontSize, visibleLanguages, 0);
     const pieces = pages
       .map((page) => page.find((entry) => (entry.sourceItemId || entry.id) === item.id && Object.keys(entry.slideshowLineRanges || {}).length > 0))
       .filter(Boolean);
@@ -1323,6 +1334,26 @@ function anchorDistance(item, anchor) {
     );
 
   return primaryDistance * 1000000 + secondaryDistance;
+}
+
+/**
+ * Whether two anchors name the same start of a slide: the same item, from
+ * the same line in every column (a column at its top, named or not, is at 0).
+ */
+export function isSameSlideStart(a, b) {
+  if (!a || !b || a.sourceItemId !== b.sourceItemId) return false;
+  const lines = (anchor) => Object.entries(anchor.offsets || {})
+    .filter(([, line]) => Number(line) > 0)
+    .map(([language, line]) => `${language}:${line}`)
+    .sort()
+    .join(",");
+  return lines(a) === lines(b);
+}
+
+/** Whether a slide opens with a whole item rather than partway down a verse. */
+export function startsWithWholeItem(slide = []) {
+  const first = slide.find((candidate) => candidate && getSourceItemId(candidate));
+  return Boolean(first) && !Object.values(first.slideshowLineRanges || {}).some((range) => range.start > 0);
 }
 
 export function findSlideIndexForAnchor(slides = [], anchor) {

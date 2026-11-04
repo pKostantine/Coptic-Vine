@@ -212,7 +212,8 @@ offsets, primaryLanguage, direction, breaks}` (`createSlideAnchor`), where
   within a tall verse, at its lines. The lines before fill the slides
   before. The slide on screen therefore depends on nothing before it and
   settles from its own items alone, however long the psalm.
-- Backward (`direction: "backward"`, set by a page turn back): the slide is
+- Backward (`direction: "backward"`, set by a page turn back with no slide
+  remembered to return to; see section 6): the slide is
   the one *ending* at the anchor, packed from the foot up as full as it
   can be (`packBackwardFromItem`): a title keeps with its verse; an item
   that opens a slide ends the walk; ending at a tall verse, the slide is
@@ -222,7 +223,9 @@ offsets, primaryLanguage, direction, breaks}` (`createSlideAnchor`), where
   page the reader left appears again. Walking back past a verse turned over
   the page, the slide takes that verse's last piece if it fits, as a forward
   turn sets it with what follows, rather than leave the piece on a slide of
-  its own.
+  its own. A verse divided beneath its title is laid out from where that
+  title's slide begins: a service's headpiece is a title of its own, and
+  the first hymn's title (no text of its own) shares its slide.
 - `breaks: false` (the Settings/Calendar "end" restore): the anchor only
   names the item; the page is not made to begin at it.
 
@@ -305,8 +308,14 @@ slides before one does not remount it.
 - Stylus events are left to the document.
 
 Turns act on the deck on screen (`shownDeckRef`), not the live one: next
-anchors to the next slide's first item, forward; previous sets a backward
-anchor at the item (or line) before the current slide's first.
+anchors to the next slide's first item, forward, and remembers the slide it
+left (`forwardTrailRef`: that slide's anchor, the next slide's start, and
+the layout key). Previous returns to the slide remembered for the one on
+screen, forward from its start and ending where it ended
+(`endsBeforeItemId`), so going back shows the very pages going forward
+showed. With nothing remembered for it (the reader jumped or was restored
+there, or the layout changed), previous sets a backward anchor at the item
+(or line) before the current slide's first.
 
 `getSlideRenderLayers` keeps the current slide in flex flow (Yoga does not
 size a parent from absolute children) and pre-renders its neighbours as
