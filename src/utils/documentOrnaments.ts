@@ -39,6 +39,26 @@ const ANAPHORA_KEYS = new Set([
  */
 const GOSPEL_RITE_KEYS = new Set(['GOSPEL_RITE', 'PALM_SUNDAY_LITURGY_GOSPEL_RITE', 'MOURNFUL_GOSPEL_RITE', 'MOURNFUL_4_GOSPELS_RITE']);
 
+/** Hymns of their own set in the Three Roundels, with a Divider after them: the Enactment of the Resurrection. */
+const ROUNDELS_HYMN_KEYS = new Set(['theResurrectionEnactment']);
+const DIVIDER_AFTER_KEYS = new Set(['theResurrectionEnactment']);
+
+/** The Divider after a hymn, shown and hidden with it. */
+function dividerAfter(section: DocumentSection): DocumentSection {
+  return {
+    id: `divider-${section.id}`,
+    title: { english: '', arabic: '' },
+    verses: [],
+    ornament: 'divider',
+    alternateEvery: null,
+    forceWhiteVerses: true,
+    bishopOnly: section.bishopOnly,
+    priestOnly: section.priestOnly,
+    copticGospelRiteOnly: section.copticGospelRiteOnly,
+    nonCopticGospelRiteOnly: section.nonCopticGospelRiteOnly,
+  };
+}
+
 /** A section's hymn key: its own, or for a title spliced in ahead of its import, the key its id is named after. */
 function sectionKey(section: DocumentSection): string {
   return section.hymnKey ?? section.id.replace(/-[^-]*$/, '');
@@ -81,7 +101,8 @@ function followingTheotokiaDay(sections: DocumentSection[], from: number): Weekd
  * headpiece at the start, each Hoos's title in a Lintel, and the
  * anaphoras' Anaphora, Sanctus and Confession, the Theotokia of
  * the day announced in the Interlace just before the Psali's conclusion that
- * leads into it, the Psalm and Gospel in the Three Roundels, and the
+ * leads into it, the Psalm and Gospel and the Enactment of the Resurrection
+ * in the Three Roundels, a Divider after the Enactment's last line, and the
  * Medallion closing the service -- before the buttons that leave for the
  * next one, which are no longer part of it.
  */
@@ -95,7 +116,14 @@ export function withDocumentOrnaments(sections: DocumentSection[], title: Docume
     forceWhiteVerses: true,
   }];
 
+  // A hymn the Divider follows, until its last piece (its own continuations
+  // and what it splices in are named after it: <id>-cont1, <id>-inline-...).
+  let dividerPending: DocumentSection | null = null;
   sections.forEach((section, index) => {
+    if (dividerPending && !section.id.startsWith(`${dividerPending.id}-`)) {
+      dressed.push(dividerAfter(dividerPending));
+      dividerPending = null;
+    }
     if (section.hymnKey && PSALI_CONCLUSION_KEYS.has(section.hymnKey) && hasTitle(section)) {
       const day = followingTheotokiaDay(sections, index);
       if (day) {
@@ -117,9 +145,11 @@ export function withDocumentOrnaments(sections: DocumentSection[], title: Docume
     const key = sectionKey(section);
     dressed.push(!hasTitle(section) ? section
       : HOOS_KEYS.has(key) || ANAPHORA_KEYS.has(key) ? { ...section, ornament: 'lintel' }
-        : GOSPEL_RITE_KEYS.has(key) ? { ...section, ornament: 'roundels' }
+        : GOSPEL_RITE_KEYS.has(key) || ROUNDELS_HYMN_KEYS.has(key) ? { ...section, ornament: 'roundels' }
           : section);
+    if (hasTitle(section) && DIVIDER_AFTER_KEYS.has(key)) dividerPending = section;
   });
+  if (dividerPending) dressed.push(dividerAfter(dividerPending));
 
   let end = dressed.length;
   while (end > 1 && dressed[end - 1].isHyperlinkButton) end -= 1;

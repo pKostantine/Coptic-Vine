@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 
-import { HEADPIECES, MEDALLION, type HeadpieceOrnament } from '../../../constants/documentOrnaments';
+import { DIVIDER, HEADPIECES, MEDALLION, type HeadpieceOrnament } from '../../../constants/documentOrnaments';
 import type { OrnamentArt } from '../../../constants/ornamentArt';
 import { fitHeadpieceTitle, HEADPIECE_LINE_HEIGHT, HEADPIECE_MIN_SCALE } from '../../../utils/headpieceFit';
 
@@ -67,6 +67,13 @@ export const Headpiece = memo(function Headpiece({ kind, availableWidth, color, 
       </View>
     </View>
   );
+});
+
+/** The Divider set after a piece: the full width of the page, its height following the art. */
+export const Divider = memo(function Divider({ width, color }: { width: number; color: string }) {
+  const xml = useMemo(() => ornamentXml(DIVIDER, color), [color]);
+  const drawn = Math.max(1, width);
+  return <SvgXml xml={xml} width={drawn} height={(drawn * DIVIDER.height) / DIVIDER.width} />;
 });
 
 /** The cross roundel that closes a service. */

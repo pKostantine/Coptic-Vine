@@ -1,4 +1,4 @@
-import { HEADPIECES, isHeadpiece, MEDALLION, type DocumentOrnament, type HeadpieceOrnament, type InitialColors } from '../../constants/documentOrnaments';
+import { DIVIDER, HEADPIECES, isHeadpiece, MEDALLION, type DocumentOrnament, type HeadpieceOrnament, type InitialColors } from '../../constants/documentOrnaments';
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 import { SPACING } from '../../constants/theme';
 import type {
@@ -338,7 +338,7 @@ export function buildDocumentHtml(
   const ornamentKinds = [...new Set(visibleSections.map((section) => section.ornament).filter(Boolean))] as DocumentOrnament[];
   const ornamentDefs = ornamentKinds.length
     ? `<svg class="ornament-defs" aria-hidden="true"><defs>${ornamentKinds.map((kind) => {
-      const art = kind === 'medallion' ? MEDALLION : HEADPIECES[kind].art;
+      const art = kind === 'medallion' ? MEDALLION : kind === 'divider' ? DIVIDER : HEADPIECES[kind].art;
       return `<symbol id="cv-ornament-${kind}" viewBox="0 0 ${art.width} ${art.height}">${art.body}</symbol>`;
     }).join('')}</defs></svg>`
     : '';
@@ -560,7 +560,7 @@ export function buildDocumentHtml(
         position: relative;
         width: 100%;
       }
-      .headpiece-art, .medallion-art {
+      .headpiece-art, .medallion-art, .divider-art {
         display: block;
         height: auto;
         width: 100%;
@@ -590,6 +590,10 @@ export function buildDocumentHtml(
       }
       .headpiece .collapse-button {
         left: 0;
+      }
+      .ornament-divider {
+        color: ${ornamentColor};
+        margin: ${SPACING.md}px 0;
       }
       .medallion {
         color: ${ornamentColor};
@@ -1395,6 +1399,16 @@ function renderSection(
 
   if (section.isSubdocumentButton || section.isAntiphonaryButton) {
     return toggleHtml + renderDocumentButtonSection(section, appLanguage);
+  }
+
+  if (section.ornament === 'divider') {
+    return `
+    <section class="section" id="${escapeAttribute(section.id)}" data-section-id="${escapeAttribute(section.id)}">
+      <div class="ornament-divider" aria-hidden="true">
+        <svg class="divider-art" viewBox="0 0 ${DIVIDER.width} ${DIVIDER.height}"><use href="#cv-ornament-divider"></use></svg>
+      </div>
+    </section>
+  `;
   }
 
   if (section.ornament === 'medallion') {
