@@ -50,6 +50,8 @@ interface DocumentSurfaceProps {
   keyboardNavigationEnabled?: boolean;
   sermonPlannerMode?: boolean;
   sermonHighlights?: SermonHighlight[];
+  /** The planner's "Add to …" in the highlight toolbar: its label, or null for none. */
+  sermonPlaceLabel?: string | null;
   /** The colour the document's ornaments are drawn in; by default the page's own (documentOrnamentColor, Night and Paper in the Annual green). */
   ornamentColor?: string;
   /** The decorated initials' vine and letter; by default the page's own (documentInitialColors, Night in the Annual pair). */
@@ -158,6 +160,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
       keyboardNavigationEnabled = true,
       sermonPlannerMode = false,
       sermonHighlights = [],
+      sermonPlaceLabel = null,
       ornamentColor: ornamentColorProp,
       initialColors: initialColorsProp,
       topContentInset = 0,
@@ -422,6 +425,7 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
         swipeExitsInPage={swipeExitsInPage}
         sermonPlannerMode={sermonPlannerMode}
         sermonHighlights={sermonHighlights}
+        sermonPlaceLabel={sermonPlaceLabel}
         theme={theme}
         ornamentColor={ornamentColor}
         initialColors={initialColors}

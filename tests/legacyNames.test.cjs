@@ -128,10 +128,10 @@ test('every store keeps its things under the new name and moves the old one firs
   const downloads = read('src/services/downloadPreferences.ts');
   assert.match(downloads, /const WEB_KEY = 'cv-download-preferences-v1'; const NATIVE_URI = `\$\{FileSystem\.documentDirectory\}cv-download-preferences\.json`;/);
   assert.match(downloads, /try \{ await moveLegacy\(\); const raw/);
-  // A sermon plan's key, per document and date: moved as it's worked out, so every read and write finds it moved.
+  // A day's plan from before there could be several, per date: moved as it's worked out, so every read finds it moved.
   const sermons = read('src/services/sermonPlannerService.ts');
-  assert.match(sermons, /const LOCAL_STORAGE_PREFIX = 'cv\.sermon-plans\.v1';\n[^\n]*\nconst LEGACY_STORAGE_PREFIX = 'chc\.sermon-plans\.v1';/);
-  assert.match(sermons, /moveLegacyStorageKey\(`\$\{LEGACY_STORAGE_PREFIX\}:\$\{encodeURIComponent\(documentKey\)\}:\$\{serviceDate\}`, key\);\n\s+return key;/);
+  assert.match(sermons, /const V1_PREFIX = 'cv\.sermon-plans\.v1';\n[^\n]*\nconst LEGACY_V1_PREFIX = 'chc\.sermon-plans\.v1';/);
+  assert.match(sermons, /moveLegacyStorageKey\(`\$\{LEGACY_V1_PREFIX\}:\$\{encodeURIComponent\(LEGACY_SERMON_DOCUMENT_KEY\)\}:\$\{serviceDate\}`, key\);\n\s+return key;/);
 });
 
 test('notifications: the marks kept under the new names, and the Android channel and web worker renamed', () => {

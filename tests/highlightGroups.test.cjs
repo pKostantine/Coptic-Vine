@@ -68,8 +68,8 @@ test('a colour, style or note given to one segment is the whole highlight\'s; re
 });
 
 test('stored highlights keep their group and underline, and purple is a colour', () => {
-  const planner = load('src/types/sermonPlanner.ts');
-  assert.deepEqual([...planner.SERMON_HIGHLIGHT_COLORS], ['gold', 'green', 'blue', 'rose', 'purple']);
+  const types = load('src/types/sermonPlanner.ts');
+  assert.deepEqual([...types.SERMON_HIGHLIGHT_COLORS], ['gold', 'green', 'blue', 'rose', 'purple']);
   const page = fs.readFileSync('src/components/vine/textHighlights.ts', 'utf8');
   // The Pencil stroke runs down its column across verses: no root lock left.
   assert.doesNotMatch(page, /closestRoot\(caret\.node\) !== pencilStart\.root/);
@@ -78,8 +78,8 @@ test('stored highlights keep their group and underline, and purple is a colour',
   // A stroke cut short after it moved still counts; a tap after a finger selection doesn't commit it.
   assert.match(page, /if \(stroke\) endStroke\(null, null, !stroke\.moved\);/);
   assert.match(page, /\/\/ A selection made earlier is not what this stroke highlights\.\n\s+savedRange = null;/);
-  const service = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
-  assert.match(service, /sermonPlanner\.createHighlightGroup\(/);
+  const planner = fs.readFileSync('src/components/vine/sermon/SermonPlannerScreen.tsx', 'utf8');
+  assert.match(planner, /controller\.createHighlightGroup\(/);
   const chapter = fs.readFileSync('src/app/bible/[bookKey]/[chapter].tsx', 'utf8');
   assert.match(chapter, /bibleHighlights\.createHighlightGroup\(/);
 });

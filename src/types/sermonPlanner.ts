@@ -1,4 +1,9 @@
-// Apple Books' five: yellow (gold), green, blue, pink (rose) and purple.
+/**
+ * The five highlight colours, kept under the names they have always been
+ * stored by. In the Sermon Planner each colour means something (see
+ * SERMON_HIGHLIGHT_LABELS): gold a key verse, green an illustration, blue a
+ * cross-reference, rose an application and purple a question.
+ */
 export const SERMON_HIGHLIGHT_COLORS = ['gold', 'green', 'blue', 'rose', 'purple'] as const;
 
 export type SermonHighlightColor = (typeof SERMON_HIGHLIGHT_COLORS)[number];
@@ -27,20 +32,61 @@ export interface SermonHighlight extends SermonHighlightAnchor {
   updatedAt: string;
 }
 
+/** The parts an outline is made of, in the order a sermon usually takes them. */
+export const SERMON_PART_KINDS = ['opening', 'point', 'application', 'closing'] as const;
+export type SermonPartKind = (typeof SERMON_PART_KINDS)[number];
+
+export interface SermonPart {
+  id: string;
+  kind: SermonPartKind;
+  title: string;
+  body: string;
+  /** The highlights placed in this part, by group (utils/highlightGroups.ts), in the order placed. */
+  highlightIds: string[];
+}
+
+/**
+ * What the preacher has said of a plan. Not started is never stored: a plan
+ * marked as a draft that nothing has been written in yet reads as not started.
+ */
+export type SermonPlanStatus = 'draft' | 'ready' | 'preached';
+export type SermonPlanState = 'notStarted' | SermonPlanStatus;
+
+/**
+ * One sermon, for one day. A day can hold several (a Liturgy and a meeting),
+ * each its own row: the plans made before there could be several, one per
+ * day under the document key `liturgy.sermon_planner`, keep theirs, and every
+ * plan made since is keyed `sermon-plan:<id>` (see sermonPlanDocumentKey).
+ */
 export interface SermonPlan {
-  version: 1;
+  version: 2;
+  id: string;
   documentKey: string;
   serviceDate: string;
-  generalNotes: string;
+  /** What it is called: the day's feast, "Weekday Liturgy", or the preacher's own ("Youth meeting"). */
+  title: string;
+  status: SermonPlanStatus;
+  /** "The one sentence": the sermon's big idea. */
+  bigIdea: string;
+  parts: SermonPart[];
+  /** How long it took to preach, once preached in Preach mode. */
+  preachedSeconds: number | null;
   highlights: SermonHighlight[];
   highlightDeletions: Record<string, string>;
+  createdAt: string;
   updatedAt: string;
 }
 
-export interface SermonReadingReference {
+/** A plan as the list of plans shows it, without its highlights' text. */
+export interface SermonPlanSummary {
   id: string;
-  label: string;
-  sectionId: string;
-  verseId: string;
-  kind: 'scripture' | 'synaxarium';
+  documentKey: string;
+  serviceDate: string;
+  title: string;
+  state: SermonPlanState;
+  writtenParts: number;
+  totalParts: number;
+  preachedSeconds: number | null;
+  highlightCount: number;
+  updatedAt: string;
 }

@@ -113,7 +113,7 @@ test('the drawer is a breath lighter than its page, and a light page is dimmed w
   }
 });
 
-test('the content list, the verse selector and the Sermon Planner are drawn in the page they open over', () => {
+test('the content list and the verse selector are drawn in the page they open over', () => {
   const literal = /'#[0-9A-Fa-f]{3,8}'|"#[0-9A-Fa-f]{3,8}"|'rgba\(/;
 
   const contents = read('src/components/vine/ui/ContentSelectorDrawer.tsx');
@@ -137,27 +137,15 @@ test('the content list, the verse selector and the Sermon Planner are drawn in t
   assert.match(sheet, /backgroundColor: colors\.scrim/);
   assert.match(sheet, /backgroundColor: colors\.panel/);
 
-  const planner = read('src/components/vine/ui/SermonPlannerDrawer.tsx');
-  assert.match(planner, /theme = NIGHT_DOCUMENT_THEME,/);
-  assert.match(planner, /if \(theme\.id === 'night'\) return NIGHT_PLANNER_COLORS;/, 'Night keeps the planner its own slate');
-  assert.match(planner, /panel: '#080A0C',/);
-  const plannerBody = planner.slice(planner.indexOf('export default function SermonPlannerDrawer'));
-  assert.doesNotMatch(plannerBody, literal, 'the planner draws only from its palette');
-  // The highlight swatches keep their own colours: they are the reader's highlights.
-  assert.doesNotMatch(plannerBody, /(?<!HIGHLIGHT_)COLORS\./, 'and none of the app chrome');
-
   // Each drawer is handed the page its reader is on.
   const element = (source, name) => source.match(new RegExp(`<${name}\\b[^]*?/>`))[0];
   const service = read('src/components/vine/screens/ServiceDocument.tsx');
   assert.match(element(service, 'ContentSelectorDrawer'), /theme=\{documentTheme\}/);
-  assert.match(element(service, 'SermonPlannerDrawer'), /theme=\{documentTheme\}/);
   assert.match(element(read('src/components/vine/screens/DocumentModal.tsx'), 'ContentSelectorDrawer'), /theme=\{documentTheme\}/);
   assert.match(element(chapter, 'BibleVersePanel'), /theme=\{theme\}/);
   assert.match(contents, /<ReaderPanel\b[^]*?\n\s*theme=\{theme\}\n/);
   assert.match(verseSelector, /<ReaderPanel\b[^]*?\n\s*theme=\{theme\}\n/);
 
   // The drawers run up under the status bar, so its clock turns dark over a light page.
-  for (const source of [sheet, planner]) {
-    assert.match(source, /<StatusBar style=\{theme\.dark \? 'light' : 'dark'\} \/>/);
-  }
+  assert.match(sheet, /<StatusBar style=\{theme\.dark \? 'light' : 'dark'\} \/>/);
 });

@@ -14,7 +14,6 @@ import InterpretationPicker from '../ui/InterpretationPicker';
 import { INTERPRETATION_CHOOSER_SECTION_ID, INTERPRETATION_CHOOSER_TITLE, withInterpretationChoices } from '../../../utils/kiahkInterpretations';
 import ContentSelectorDrawer from '../ui/ContentSelectorDrawer';
 import { ReaderPanelSheet, useReaderPanelLayout } from '../ui/ReaderPanel';
-import SermonPlannerDrawer from '../ui/SermonPlannerDrawer';
 import LoadFailure from '../ui/LoadFailure';
 import LoadingScreen from '../ui/LoadingScreen';
 import DocumentSurface, { type SlideJumpRequest } from '../DocumentSurface';
@@ -35,7 +34,6 @@ import { useReadingPreferences } from '../../../context/ReadingPreferencesContex
 import { useCalendar } from '../../../context/CalendarContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useReportDocumentTheme } from '../../../context/BottomChromeContext';
-import { useSermonPlanner } from '../../../hooks/useSermonPlanner';
 import { useBrowserFullscreen } from '../../../utils/useBrowserFullscreen';
 import { useReadingKeepAwake } from '../../../utils/useReadingKeepAwake';
 import { MOBILE_WEB_BREAKPOINT } from '../../../utils/useIsMobileWeb';
@@ -56,13 +54,6 @@ import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
 import { useReaderSwipes } from '../../../hooks/useReaderSwipes';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
-import {
-  getSermonPlannerReferences,
-  getSermonHighlightVerseReferences,
-  isSermonHighlightAnchor,
-  isSermonHighlightColor,
-} from '../../../utils/sermonPlanner';
-import { groupHighlights } from '../../../utils/highlightGroups';
 
 interface ServiceDocumentProps {
   schema: string;
@@ -99,8 +90,8 @@ interface ServiceDocumentProps {
 }
 
 /** Appends a hyperlink button to the next service, labelled with that service's own name, after a hydrated document. The same section shape hymnLibrary builds for an order row whose item_type is Hyperlink. */
-/** The documents read for a day, which carry a date bar: the Lectionary's three services and the Sermon Planner. */
-const DATE_BAR_TABLES = new Set(['lectionary_vespers', 'lectionary_matins', 'lectionary_liturgy', 'sermon_planner']);
+/** The documents read for a day, which carry a date bar: the Lectionary's three services. */
+const DATE_BAR_TABLES = new Set(['lectionary_vespers', 'lectionary_matins', 'lectionary_liturgy']);
 
 function withAppendedHyperlink(sections: DocumentSection[], hyperlinkKey?: string): DocumentSection[] {
   const destination = findHyperlinkTarget(hyperlinkKey);
@@ -153,38 +144,16 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     toggleBookmark,
     toggleBishopPresent,
     toggleCopticGospelRite,
-    toggleSermonPlannerLanguage,
   } = useReadingPreferences();
   const calendar = useCalendar();
   const calendarEffectiveDate = calendar.effectiveDate;
   const effectiveDate = conditionDate ?? calendarEffectiveDate;
-  const isSermonPlanner = schema === 'liturgy' && table === 'sermon_planner';
   // Read for a day, and often for another day than today: the day is changed
   // from a bar across the top (DocumentDateBar) rather than the content list.
   const showDateBar = schema === 'liturgy' && DATE_BAR_TABLES.has(table);
   // The Antiphonary read as a book of its own keeps the Introduction/Adam/Vatos
   // pills it has when a service opens it.
   const isAntiphonary = schema === 'psalmody' && table === 'antiphonary';
-  const documentPreferences = useMemo(() => {
-    if (!isSermonPlanner) return preferences;
-    return {
-      ...preferences,
-      visibleLanguages: {
-        ...preferences.visibleLanguages,
-        english: preferences.sermonPlannerVisibleLanguages.english,
-        coptic: false,
-        copticRecitedPrayers: false,
-        arabic: preferences.sermonPlannerVisibleLanguages.arabic,
-      },
-    };
-  }, [isSermonPlanner, preferences]);
-  const sermonServiceDate = effectiveDate.toISOString().slice(0, 10);
-  const sermonPlanner = useSermonPlanner(
-    `${schema}.${table}`,
-    sermonServiceDate,
-    user?.id,
-    isSermonPlanner,
-  );
   const weekdayConditionDate = useMemo(
     () =>
       getServiceWeekdayConditionDate({
@@ -285,7 +254,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const [loadedConditionsKey, setLoadedConditionsKey] = useState<string | null>(null);
   const readySections = loadedConditionsKey === conditionsKey ? sections : null;
   const restoreSettingsSignature = JSON.stringify([
-    documentPreferences.visibleLanguages, preferences.fontScale, preferences.orientationMode,
+    preferences.visibleLanguages, preferences.fontScale, preferences.orientationMode,
     preferences.selectText, preferences.slideshowMode, preferences.displayComments,
     preferences.displaySilentPrayers, preferences.displayNowPlayingBar,
     preferences.bishopPresent, preferences.copticGospelRite, preferences.inMonastery, preferences.saintPsalies,
@@ -309,7 +278,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // The choice of the Kiahk Theotokias' interpretations, opened from its
   // button in the document or its row in the content list.
   const [interpretationsOpen, setInterpretationsOpen] = useState(false);
-  const [activeSermonHighlightId, setActiveSermonHighlightId] = useState<string | null>(null);
   // Open: its position is remembered while it stays open -- through Settings,
   // the Calendar, the Seasons, a date or a setting changed -- and forgotten
   // the moment it is left (below), so it next opens at the top.
@@ -443,14 +411,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   const bookmarked = isBookmarked(bookmarkId);
   // A document read by loadDocument is in no book's menu, so a bookmark could open nothing.
   const bookmarkable = !loadDocument;
-  const sermonReferences = useMemo(
-    () => isSermonPlanner && readySections ? getSermonPlannerReferences(readySections) : [],
-    [isSermonPlanner, readySections],
-  );
-  const sermonVerseReferences = useMemo(
-    () => isSermonPlanner && readySections ? getSermonHighlightVerseReferences(readySections) : {},
-    [isSermonPlanner, readySections],
-  );
   // ?sub=SUBDOCUMENT_KEY in the URL (written by bookmarks.tsx when navigating
   // to a saved subdocument bookmark) and ?reading=Psalm (lectionaryHref, from
   // a list of the day's readings) — each acted on once, when sections first load.
@@ -491,15 +451,14 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     // function always hydrates both states itself, so it's fixed too and
     // the persisted copticGospelRite preference isn't a dep below either.
     //
-    // The Liturgy of the Word, Lectionary Liturgy, and Sermon Planner reference
+    // The Liturgy of the Word and the Lectionary Liturgy reference
     // the readings schema's Pauline/Catholic Epistle inline splices. These need today's
     // PaulineEpistleRomans/CatholicEpistle1Peter-style condition flags (see
     // getEpistleConditionFlags) to pick the right introduction line, resolved
     // here and merged into extraContext before hydrating.
     const needsEpistleFlags =
       (schema === 'liturgy' && table === 'liturgy_of_the_word') ||
-      (schema === 'liturgy' && table === 'lectionary_liturgy') ||
-      (schema === 'liturgy' && table === 'sermon_planner');
+      (schema === 'liturgy' && table === 'lectionary_liturgy');
     const epistleFlagsPromise = needsEpistleFlags ? getEpistleConditionFlags(effectiveDate) : Promise.resolve({});
     const seasonPromise: Promise<SeasonThemeKey | null> = fixedOrnamentSeason
       ? Promise.resolve(fixedOrnamentSeason)
@@ -531,9 +490,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       .then(([result, season]) => {
         if (!cancelled) {
           const hydrated = withAppendedHyperlink(result as DocumentSection[], appendHyperlinkKey);
-          // A service opens on its own name and closes on the Medallion; the
-          // Sermon Planner is a working page, not a service, and stays bare.
-          const newSections = isSermonPlanner ? hydrated : withDocumentOrnaments(hydrated, ownTitle ?? { english: title, arabic, french });
+          // A service opens on its own name and closes on the Medallion.
+          const newSections = withDocumentOrnaments(hydrated, ownTitle ?? { english: title, arabic, french });
           setLoadedTitle(ownTitle);
           setOrnamentSeason(season);
           setHydratedSections(newSections);
@@ -597,7 +555,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     return () => {
       cancelled = true;
     };
-  }, [schema, table, title, arabic, french, isSermonPlanner, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, openAtHymnKey, documentPositionKey, conditionDate, calendarEffectiveDate, loadDocument]);
+  }, [schema, table, title, arabic, french, fixedOrnamentSeason, effectiveDate, weekdayConditionDate, extraContext, userConditionFlags, conditionsKey, appendHyperlinkKey, reloadToken, openAtReading, openAtHymnKey, documentPositionKey, conditionDate, calendarEffectiveDate, loadDocument]);
 
   // A single post-change request is issued only when the new document has
   // hydrated AND the reader has focus again. No intermediate settings toggle
@@ -843,48 +801,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     router.replace(destination.href as Href);
   };
 
-  const pencilGestureActiveRef = useRef(false);
   const handleAction = (action: DocumentAction) => {
-    if (isSermonPlanner && action.type === 'sermonPencilGesture') {
-      pencilGestureActiveRef.current = Boolean(action.active);
-      return;
-    }
-    if (isSermonPlanner && action.type === 'createSermonHighlights') {
-      // One highlight, a verse at a time, taking in the ones it covers
-      // (textHighlights.ts, utils/highlightGroups.ts).
-      const leadId = sermonPlanner.createHighlightGroup({
-        anchors: (action.anchors || []).filter(isSermonHighlightAnchor),
-        color: isSermonHighlightColor(action.color) ? action.color : 'gold',
-        style: action.style === 'underline' ? 'underline' : undefined,
-        replaces: Array.isArray(action.replaces) ? action.replaces.filter((id): id is string => typeof id === 'string') : [],
-      });
-      if (leadId) setActiveSermonHighlightId(leadId);
-      // Made from the toolbar's Note: the note opens to be written.
-      if (leadId && action.openNote) setSelectorOpen(true);
-      return;
-    }
-
-    if (isSermonPlanner && action.type === 'recolorSermonHighlight' && action.highlightId) {
-      sermonPlanner.updateHighlight(action.highlightId, {
-        color: isSermonHighlightColor(action.color) ? action.color : 'gold',
-        style: action.style === 'underline' ? 'underline' : null,
-      });
-      return;
-    }
-
-    if (isSermonPlanner && action.type === 'removeSermonHighlight' && action.highlightId) {
-      sermonPlanner.deleteHighlight(action.highlightId);
-      return;
-    }
-
-    if (isSermonPlanner && action.type === 'openSermonNote' && action.highlightId) {
-      // The note is the whole highlight's, kept on its first segment.
-      const group = groupHighlights(sermonPlanner.plan.highlights).find((entry) => entry.segments.some((segment) => segment.id === action.highlightId));
-      setActiveSermonHighlightId(group?.lead.id ?? action.highlightId);
-      setSelectorOpen(true);
-      return;
-    }
-
     if (action.type === 'toggleCopticGospelRite') {
       // The toggle button lives inside the first Gospel Rite section. Pre-set
       // the preserved section to the always-visible section immediately before
@@ -1070,10 +987,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // finger (hooks/useReaderSwipes.ts). To the right it leaves: on iOS by the
   // system's own back swipe, which shows the page beneath as it goes, and is
   // on only while nothing covers the document -- over a subdocument it would
-  // take the document out from under it -- and never in the Sermon Planner,
-  // where a pencil's strokes across the page highlight. Elsewhere the page
-  // slides away with the finger, then goes without a second slide.
-  const nativeBackSwipe = Platform.OS === 'ios' && !isSermonPlanner;
+  // take the document out from under it. Elsewhere the page slides away with
+  // the finger, then goes without a second slide.
+  const nativeBackSwipe = Platform.OS === 'ios';
   const [leavingBySwipe, setLeavingBySwipe] = useState(false);
   const [selectorOpenFrom, setSelectorOpenFrom] = useState(0);
   const panelLayout = useReaderPanelLayout();
@@ -1083,12 +999,12 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     contentsWidth: panelLayout.width,
     onExit: () => setLeavingBySwipe(true),
     onOpenContents: (from) => {
-      setSelectorOpenFrom(isSermonPlanner ? 0 : from);
+      setSelectorOpenFrom(from);
       setSelectorOpen(true);
     },
-    ignores: () => pencilGestureActiveRef.current || touchOnPillBarRef.current,
+    ignores: () => touchOnPillBarRef.current,
     // As the page's own (DocumentSurface's effectiveSelectText).
-    selectsText: isSermonPlanner || (preferences.selectText && !preferences.slideshowMode),
+    selectsText: preferences.selectText && !preferences.slideshowMode,
   });
   // One object while nothing in it changes: a new one sets the navigator's
   // options again at every render of the reader. iOS's own back swipe is off
@@ -1176,7 +1092,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
           <DocumentSurface
             ref={documentRef}
             sections={readySections}
-            preferences={documentPreferences}
+            preferences={preferences}
             restoreRequest={restoreRequest}
             collapseMemoryScope={documentPositionKey}
             onAction={handleAction}
@@ -1208,8 +1124,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             initialScrollVerseIndex={restoreRequest ? restoreRequest.target.verseIndex ?? null : currentVerseIndexRef.current}
             onCollapseToggle={setSelectedSlideSectionId}
             keyboardNavigationEnabled={!isCoveredByModal}
-            sermonPlannerMode={isSermonPlanner}
-            sermonHighlights={sermonPlanner.plan.highlights}
             ornamentColor={documentOrnamentColor(documentTheme, ornamentSeason)}
             initialColors={initialColors}
             topContentInset={controlsOverText ? floatingLayout.contentTop : 0}
@@ -1217,35 +1131,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             swipeExitsInPage={!nativeBackSwipe}
           />
           </View>
-          {isSermonPlanner ? (
-            <SermonPlannerDrawer
-              visible={selectorOpen}
-              references={sermonReferences}
-              highlights={sermonPlanner.plan.highlights}
-              verseReferences={sermonVerseReferences}
-              generalNotes={sermonPlanner.plan.generalNotes}
-              activeHighlightId={activeSermonHighlightId}
-              syncStatus={sermonPlanner.syncStatus}
-              signedIn={Boolean(user)}
-              visibleLanguages={preferences.sermonPlannerVisibleLanguages}
-              onToggleLanguage={toggleSermonPlannerLanguage}
-              onClose={() => setSelectorOpen(false)}
-              onSelectReference={(reference) => documentRef.current?.scrollToVerse(reference.verseId)}
-              onJumpToHighlight={(highlight) => documentRef.current?.scrollToSermonHighlight(highlight.id)}
-              onChangeGeneralNotes={sermonPlanner.setGeneralNotes}
-              onChangeHighlightNote={(id, note) => sermonPlanner.updateHighlight(id, { note })}
-              onChangeHighlightColor={sermonPlanner.setHighlightColor}
-              onDeleteHighlight={(id) => {
-                sermonPlanner.deleteHighlight(id);
-                if (activeSermonHighlightId === id) setActiveSermonHighlightId(null);
-              }}
-              bookmarked={bookmarked}
-              onToggleBookmark={() => toggleBookmark(bookmarkId)}
-              onOpenCalendar={openCalendar}
-              onOpenSettings={openSettings}
-              theme={documentTheme}
-            />
-          ) : (
           <ContentSelectorDrawer
             visible={selectorOpen}
             openFrom={selectorOpenFrom}
@@ -1280,7 +1165,6 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
             theme={documentTheme}
             title={documentTitle}
           />
-          )}
         </>
       )}
       {/* Deliberately outside the branch above. Changing the date clears
@@ -1311,8 +1195,8 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
               }]
               : []),
             {
-              icon: isSermonPlanner ? 'document-text-outline' as const : 'list-outline' as const,
-              accessibilityLabel: isSermonPlanner ? 'Open sermon notes' : 'Open content list',
+              icon: 'list-outline' as const,
+              accessibilityLabel: 'Open content list',
               onPress: () => setSelectorOpen(true),
             },
           ]}
@@ -1339,7 +1223,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
       <BookSettingsSheet inDocument visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <InterpretationPicker inline visible={interpretationsOpen} onClose={() => setInterpretationsOpen(false)} />
       {/* The contents coming in under a finger, until the panel is up over them. */}
-      {readerSwipes.sheetShown && !isSermonPlanner ? <ReaderPanelSheet progress={readerSwipes.contentsIn} theme={documentTheme} /> : null}
+      {readerSwipes.sheetShown ? <ReaderPanelSheet progress={readerSwipes.contentsIn} theme={documentTheme} /> : null}
     </SafeAreaView>
     </Animated.View>
   );

@@ -7,6 +7,7 @@ import { sectionRestoreCandidates, type DocumentRestoreRequest } from '../../uti
 import { useCopticFontDataUri, useCopticItalicFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
 import type { SermonHighlight } from '../../types/sermonPlanner';
+import { sermonHighlightPalette } from '../../constants/sermonPlanner';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 import type { InitialColors } from '../../constants/documentOrnaments';
@@ -55,6 +56,8 @@ interface DocumentWebViewProps {
   /** Whether the page reports a swipe to the right as the reader's way out (documentHtml.ts's swipeExitsInPage): not where iOS's own back swipe leaves. */
   swipeExitsInPage?: boolean;
   sermonHighlights?: SermonHighlight[];
+  /** The planner's "Add to …" in the highlight toolbar (textHighlights.ts's place): its label, or null for none. */
+  sermonPlaceLabel?: string | null;
   /** The page the document is read on — see constants/documentThemes.ts. */
   theme?: DocumentTheme;
   /** The colour its ornaments are drawn in (documentOrnamentColor). */
@@ -103,6 +106,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       sermonPlannerMode = false,
       swipeExitsInPage = true,
       sermonHighlights = [],
+      sermonPlaceLabel = null,
       theme = NIGHT_DOCUMENT_THEME,
       ornamentColor,
       initialColors,
@@ -192,7 +196,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     const syncSermonHighlights = () => {
       if (!sermonPlannerMode) return;
       webviewRef.current?.injectJavaScript(
-        `window.setSermonHighlights && window.setSermonHighlights(${JSON.stringify(sermonHighlights)}); true;`,
+        `window.setSermonHighlights && window.setSermonHighlights(${JSON.stringify(sermonHighlights)}); window.setHighlightPlaceLabel && window.setHighlightPlaceLabel(${JSON.stringify(sermonPlaceLabel)}); true;`,
       );
     };
 
@@ -200,7 +204,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       syncSermonHighlights();
       // The serialized highlight payload is the actual renderer dependency.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sermonPlannerMode, JSON.stringify(sermonHighlights)]);
+    }, [sermonPlannerMode, JSON.stringify(sermonHighlights), sermonPlaceLabel]);
 
     const handleAction = (action: DocumentAction) => {
       if (action?.type === 'headpieceInView') {
@@ -339,6 +343,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               bottomContentInset: 0,
               topContentInset,
               sermonPlannerMode,
+              sermonPalette: sermonPlannerMode ? sermonHighlightPalette(Boolean(visibleColumns?.arabic && !visibleColumns.english)) : undefined,
               theme,
               ornamentColor,
               initialColors: initialVine && initialVineInBlue && initialLetter && titleColor
