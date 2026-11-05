@@ -88,36 +88,39 @@ export function documentOrnamentColor(theme: DocumentTheme, season?: SeasonTheme
 }
 
 /**
- * The decorated initials' two colours on the Night page, by season (Coptic
- * Vine Design, "Season colours - Night initials and titles"): the vine and its
- * grapes, and the letter, which the opening words of the English and Arabic
- * take too.
+ * The season's colours on the Night page (Coptic Vine Design, Seasons,
+ * "Season colours - Night initials and titles", final): the decorated
+ * initials' vine and its grapes, and their letter, which the opening words of
+ * the English and Arabic take too; and the section titles. Rubrics stay red
+ * in every season.
  */
-const NIGHT_INITIALS: Record<SeasonThemeKey, { vine: string; letter: string }> = {
-  annual: { vine: '#E3B53B', letter: '#5FAE68' },
-  gold: { vine: '#5FAE68', letter: '#EDBE45' },
-  natfast: { vine: '#D9B36A', letter: '#E2668A' },
-  nativity: { vine: '#3E8A52', letter: '#B5232B' },
-  theophany: { vine: '#2F6E92', letter: '#7FD3FA' },
-  lent: { vine: '#3E5E48', letter: '#8FC7A0' },
-  palm: { vine: '#96D35F', letter: '#F2D27A' },
-  holyweek: { vine: '#3E3333', letter: '#D63A40' },
-  resurrection: { vine: '#8BD08F', letter: '#EDBE45' },
-  apostles: { vine: '#12396B', letter: '#3B74C4' },
-  marian: { vine: '#2B3F9E', letter: '#6F8BE6' },
+const NIGHT_SEASON_COLORS: Record<SeasonThemeKey, InitialColors> = {
+  annual: { vine: '#E3B53B', letter: '#5FAE68', title: '#E3B53B' },
+  gold: { vine: '#5FAE68', letter: '#EDBE45', title: '#EDBE45' },
+  natfast: { vine: '#D9B36A', letter: '#E2668A', title: '#EC86A2' },
+  nativity: { vine: '#3E8A52', letter: '#B5232B', title: '#DE4B40' },
+  theophany: { vine: '#2F6E92', letter: '#7FD3FA', title: '#74C9F0' },
+  lent: { vine: '#3E5E48', letter: '#8FC7A0', title: '#84B595' },
+  palm: { vine: '#96D35F', letter: '#F2D27A', title: '#AEDD7F' },
+  holyweek: { vine: '#3E3333', letter: '#D63A40', title: '#D24A42' },
+  resurrection: { vine: '#8BD08F', letter: '#EDBE45', title: '#FFFFFF' },
+  apostles: { vine: '#12396B', letter: '#3B74C4', title: '#84B1EA' },
+  marian: { vine: '#2B3F9E', letter: '#6F8BE6', title: '#93A8F6' },
 };
 
+/** A page's season colours: its decorated initials' two, and its section titles'. */
 export interface InitialColors {
   vine: string;
   letter: string;
+  title: string;
 }
 
 /**
- * The colours a decorated initial is drawn in: on Night the season's own
- * pair; on every other page the titles' gold for the vine and the ornaments'
- * colour for the letter.
+ * The colours a decorated initial and a section title are drawn in: on
+ * Night the season's own; on every other page the titles' gold for the vine
+ * and the titles, and the ornaments' colour for the letter.
  */
 export function documentInitialColors(theme: DocumentTheme, season?: SeasonThemeKey | null): InitialColors {
-  if (theme.id === 'night') return NIGHT_INITIALS[season ?? 'annual'];
-  return { vine: theme.colors.accent, letter: documentOrnamentColor(theme, season) };
+  if (theme.id === 'night') return NIGHT_SEASON_COLORS[season ?? 'annual'];
+  return { vine: theme.colors.accent, letter: documentOrnamentColor(theme, season), title: theme.colors.accent };
 }
