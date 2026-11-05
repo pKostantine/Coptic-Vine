@@ -204,3 +204,15 @@ test('the versions are named: English is the SAAS in the Old Testament and the N
   assert.match(searchScreen, /bibleSearchLanguageLabel\(language, testament\)/, 'the filter chips by the search\'s scope');
   assert.match(searchScreen, /bibleSearchLanguageLabel\(language, result\.testament\)/, 'each result by its own testament');
 });
+
+test("the calendar's month and year picker scrolls without pulling the calendar shut", () => {
+  // The picker is a modal of the calendar's own, and React Native hands its touches to the sheet's
+  // pull-down too: a finger on it holds that off, as on the text size slider (useSheetDragToClose).
+  const sheet = fs.readFileSync('src/components/vine/ui/CalendarSheet.tsx', 'utf8');
+  assert.match(sheet, /<SheetDragHoldContext\.Provider value=\{sheetDrag\.hold\}>\s+<CalendarPanel/);
+  const panel = fs.readFileSync('src/components/vine/ui/CalendarPanel.tsx', 'utf8');
+  assert.match(panel, /const sheetHold = useContext\(SheetDragHoldContext\);/);
+  assert.match(panel, /visible=\{pickerOpen\}.*navigationBarTranslucent>\s+<View\s+style=\{styles\.pickerLayer\}\s+onTouchStart=\{\(\) => sheetHold\?\.hold\(\)\}\s+onTouchEnd=\{\(\) => sheetHold\?\.release\(\)\}\s+onTouchCancel=\{\(\) => sheetHold\?\.release\(\)\}/);
+  // Nor does a sideways scroll there turn the month underneath.
+  assert.match(panel, /onMoveShouldSetPanResponderCapture: \(_, gesture\) => !pickerOpenRef\.current && sideways\(gesture\),/);
+});
