@@ -14,7 +14,7 @@ import { splitCopticInitial } from './copticInitial';
 import { FIT_COPTIC_INITIALS_SCRIPT, openingInitialDefs, openingInitialStyles, renderCopticInitial, renderEnglishInitial, renderOpening, renderOpeningRest } from './openingHtml';
 import { splitArabicOpening, splitEnglishOpening } from './openingInitials';
 import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
-import { textHighlightScript, textHighlightStyles } from './textHighlights';
+import { textHighlightScript, textHighlightStyles, type HighlightPalette } from './textHighlights';
 
 export interface DocumentVerse {
   /** Set by the slideshow's section builder: this verse's index in the hymn's own rows, kept through the display filters so the reader's verse stays the same verse. */
@@ -150,6 +150,8 @@ export interface DocumentAction {
   replaces?: string[];
   /** A new highlight made from the toolbar's Note: its note opens. */
   openNote?: boolean;
+  /** A new highlight made from the toolbar's "Add to …": it goes in the planner's part as well. */
+  place?: boolean;
   highlightId?: string;
   /** Native WebView stylus gesture state, used to suspend edge navigation. */
   active?: boolean;
@@ -226,6 +228,7 @@ export function buildDocumentHtml(
     bottomContentInset = 0,
     topContentInset = 0,
     sermonPlannerMode = false,
+    sermonPalette,
     nativeSwipeNavigation = false,
     swipeExitsInPage = true,
     theme = NIGHT_DOCUMENT_THEME,
@@ -260,6 +263,8 @@ export function buildDocumentHtml(
     topContentInset?: number;
     /** Adds persistent range highlighting and Pencil-aware annotation controls. */
     sermonPlannerMode?: boolean;
+    /** The planner's named highlight colours (constants/sermonPlanner.ts's sermonHighlightPalette); the plain five without. */
+    sermonPalette?: HighlightPalette;
     /** The reader's swipes, reported to the app as they go: on a phone or tablet only, never on a website. */
     nativeSwipeNavigation?: boolean;
     /** With them, whether a swipe to the right is the page's to report: not where the platform's own back swipe leaves (iOS's). */
@@ -293,6 +298,8 @@ export function buildDocumentHtml(
   const verseLineHeight = Math.round(fontSize * 1.3);
   const arabicVerseLineHeight = Math.round(fontSize * 1.6);
   const effectiveSelectText = Boolean(selectText || sermonPlannerMode);
+  // The planner reads in English or in Arabic; its toolbar speaks the same.
+  const plannerArabic = visibleColumns.arabic && !visibleColumns.english;
 
   const visibleSections = sections.filter((section) => {
     if (!displaySilentPrayers && section.titlePrayerType === 'Silent Prayer') return false;
@@ -531,7 +538,7 @@ export function buildDocumentHtml(
       }
       .metropolitan { color: ${colors.metropolitan}; }
       ${openingInitialStyles(verseLineHeight, fontSize, initialColors)}
-      ${sermonPlannerMode ? sermonPlannerStyles() : ''}
+      ${sermonPlannerMode ? sermonPlannerStyles(sermonPalette) : ''}
       .section-title {
         color: ${initialColors.title};
         font-family: Georgia, serif;
@@ -1322,7 +1329,7 @@ export function buildDocumentHtml(
         }, { passive: false });
         document.addEventListener('touchcancel', function () { if (swipe) finish(0); start = null; });
       })();
-      ${sermonPlannerMode ? sermonPlannerScript() : ''}
+      ${sermonPlannerMode ? sermonPlannerScript(plannerArabic, sermonPalette) : ''}
       (function () {
         var restore = ${JSON.stringify(initialRestore).replace(/</g, '\\u003c')};
         if (restore.length && window.scrollToSection(restore)) enforceHeldJump();
@@ -1805,21 +1812,27 @@ function renderVerse(
   const tuneAttribute = verse.tune ? ` data-tune="${escapeAttribute(verse.tune)}"` : '';
   const verseId = `${section.id}::v${index}`;
 
-  return `<div class="verse-row" data-verse-id="${escapeAttribute(verseId)}"${tuneAttribute} style="grid-template-columns: ${gridTemplateColumns};">${cells}</div>`;
+  // The planner names each reading over the page itself (SermonReadingsPane).
+  const plannerCitation = sermonPlannerMode && verse.type === 'readingReference' ? ' data-planner-citation="true"' : '';
+
+  return `<div class="verse-row" data-verse-id="${escapeAttribute(verseId)}"${tuneAttribute}${plannerCitation} style="grid-template-columns: ${gridTemplateColumns};">${cells}</div>`;
 }
 
-function sermonPlannerStyles() {
+function sermonPlannerStyles(palette: HighlightPalette | undefined) {
   // A selection or a Pencil stroke keeps to the column it began in.
-  return textHighlightStyles(['english', 'coptic', 'arabic', 'french']);
+  return `${textHighlightStyles(['english', 'coptic', 'arabic', 'french'], palette)}
+      .verse-row[data-planner-citation] { display: none; }`;
 }
 
 /**
  * The shared highlighting layer (textHighlights.ts), posting the Sermon
- * Planner's own actions: a tapped highlight offers its colours, underline,
- * note, copy and removal, as Apple Books does, and Note opens it in the
- * planner's notes.
+ * Planner's own actions. Its five colours are named for what they mark (Key
+ * verse, Illustration, Cross-reference, Application, Question); a selection
+ * or a tapped highlight offers them, a Note, and "Add to" the part being
+ * written (the planner names it: setHighlightPlaceLabel); a tapped one,
+ * Remove as well.
  */
-function sermonPlannerScript() {
+function sermonPlannerScript(arabic: boolean, palette: HighlightPalette | undefined) {
   return textHighlightScript({
     emit: 'function (type, payload) { postAction(type, payload); }',
     actions: {
@@ -1828,11 +1841,15 @@ function sermonPlannerScript() {
       pencil: 'sermonPencilGesture',
       recolor: 'recolorSermonHighlight',
       remove: 'removeSermonHighlight',
+      place: 'placeSermonHighlight',
     },
     tapToEdit: true,
-    copy: true,
     notes: true,
     singleLanguage: true,
+    palette,
+    underline: false,
+    place: true,
+    labels: arabic ? { note: 'ملاحظة', remove: 'إزالة' } : undefined,
   });
 }
 

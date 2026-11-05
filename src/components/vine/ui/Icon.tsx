@@ -24,6 +24,7 @@ export type IconName =
   | 'remove'
   | 'book'
   | 'library-outline'
+  | 'albums-outline'
   | 'school-outline'
   | 'list-outline'
   | 'document-text-outline'
@@ -253,6 +254,14 @@ export default function Icon({ name, size = 24, color = '#FFFFFF', style }: Icon
             fill={color}
           />
           <Path d="M256 112v336" fill="none" stroke="#0B1C10" strokeWidth={28} strokeLinecap="round" />
+        </Svg>
+      );
+    case 'albums-outline':
+      // A stack of cards: the Sermon Planner's plans.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 512 512" style={style}>
+          <Rect x={64} y={176} width={384} height={256} rx={28.87} ry={28.87} fill="none" stroke={color} strokeWidth={32} strokeLinejoin="round" />
+          <Path d="M144 80h224M112 128h288" fill="none" stroke={color} strokeWidth={32} strokeLinecap="round" strokeMiterlimit={10} />
         </Svg>
       );
     case 'library-outline':

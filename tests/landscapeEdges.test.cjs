@@ -105,9 +105,9 @@ test('the drawers run to the edge with their rows and buttons clear of the notch
   for (const file of ['src/components/vine/ui/ContentSelectorDrawer.tsx', 'src/components/vine/ui/BibleVersePanel.tsx']) {
     assert.match(read(file), /<ReaderPanel\b/, file);
   }
-  const sermon = read('src/components/vine/ui/SermonPlannerDrawer.tsx');
-  assert.match(sermon, /<View style=\{\[styles\.header, \{ paddingRight: SPACING\.md \+ insets\.right \}\]\}>/);
-  assert.match(sermon, /paddingRight: SPACING\.xl \+ insets\.right, paddingBottom: Math\.max\(insets\.bottom, SPACING\.sm\)/);
+  // The Sermon Planner's Preach mode keeps all four edges clear; its sheets keep above the home indicator.
+  assert.match(read('src/components/vine/sermon/SermonPreachMode.tsx'), /<SafeAreaView edges=\{\['top', 'bottom', 'left', 'right'\]\}/);
+  assert.match(read('src/components/vine/sermon/SermonHighlights.tsx'), /marginBottom: Math\.max\(16, insets\.bottom \+ 8\)/);
   // The document's date bar bleeds its strip as the pill bar does.
   const dateBar = read('src/components/vine/ui/DocumentDateBar.tsx');
   assert.match(dateBar, /marginLeft: -insets\.left,\n\s+marginRight: -insets\.right,\n\s+paddingLeft: SPACING\.md \+ insets\.left,\n\s+paddingRight: SPACING\.md \+ insets\.right,/);
@@ -125,7 +125,9 @@ test('every full-screen modal draws to the edges on Android as on iOS, and pads 
   const files = [
     'src/components/vine/screens/DocumentModal.tsx',
     'src/components/vine/ui/ReaderPanel.tsx',
-    'src/components/vine/ui/SermonPlannerDrawer.tsx',
+    'src/components/vine/sermon/SermonPreachMode.tsx',
+    'src/components/vine/sermon/SermonHighlights.tsx',
+    'src/components/vine/sermon/SermonPlannerScreen.tsx',
     'src/components/vine/ui/SaintHymnPicker.tsx',
     'src/components/vine/ui/SheetFrame.tsx',
     'src/components/vine/ui/CalendarSheet.tsx',

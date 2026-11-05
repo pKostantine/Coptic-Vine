@@ -187,8 +187,8 @@ test('the documents and subdocuments take both swipes from anywhere, following t
   assert.doesNotMatch(hook, /swipeEdge|EDGE_SWIPE_ZONE|rightEdgeSwipeZone/, 'no edge or half decides it');
 
   const service = read('src/components/vine/screens/ServiceDocument.tsx');
-  // iOS leaves by its own back swipe, from anywhere, while nothing covers the document; never in the Sermon Planner.
-  assert.match(service, /const nativeBackSwipe = Platform\.OS === 'ios' && !isSermonPlanner;/);
+  // iOS leaves by its own back swipe, from anywhere, while nothing covers the document.
+  assert.match(service, /const nativeBackSwipe = Platform\.OS === 'ios';/);
   assert.match(service, /gestureEnabled: nativeBackSwipe && !isCoveredByModal && !textSelected,\s+fullScreenGestureEnabled: true,/);
   assert.match(service, /exitsByDrag: !nativeBackSwipe,/);
   assert.match(service, /swipeExitsInPage=\{!nativeBackSwipe\}/);

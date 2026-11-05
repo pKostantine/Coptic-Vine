@@ -76,7 +76,9 @@ test('every sheet, drawer and overlay transition asks before animating', () => {
     'src/components/playback/GlobalNowPlayingOverlay.tsx',
     'src/components/vine/ui/CalendarSheet.tsx',
     'src/components/vine/ui/ReaderPanel.tsx',
-    'src/components/vine/ui/SermonPlannerDrawer.tsx',
+    'src/components/vine/sermon/SermonPreachMode.tsx',
+    'src/components/vine/sermon/SermonHighlights.tsx',
+    'src/components/vine/sermon/SermonPlannerScreen.tsx',
     'src/components/vine/ui/TodayCard.tsx',
   ]) {
     const source = fs.readFileSync(file, 'utf8');

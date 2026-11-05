@@ -34,7 +34,7 @@ interface ReadingPreferencesContextValue {
   ready: boolean;
   toggleLanguage: (key: keyof VisibleLanguages) => void;
   setBibleVisibleLanguages: (updater: SetStateAction<BibleVisibleLanguages>) => void;
-  toggleSermonPlannerLanguage: (key: keyof SermonPlannerVisibleLanguages) => void;
+  setSermonPlannerLanguage: (key: keyof SermonPlannerVisibleLanguages) => void;
   setFontScale: (delta: number) => void;
   /** Sets the font scale outright rather than nudging it — what the slider needs. */
   setFontScaleValue: (value: number) => void;
@@ -294,13 +294,12 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
     });
   }, []);
 
-  const toggleSermonPlannerLanguage = useCallback((key: keyof SermonPlannerVisibleLanguages) => {
+  // The planner reads in one language at a time: English or Arabic.
+  const setSermonPlannerLanguage = useCallback((key: keyof SermonPlannerVisibleLanguages) => {
     setPreferences((prev) => {
-      const next = {
-        ...prev.sermonPlannerVisibleLanguages,
-        [key]: !prev.sermonPlannerVisibleLanguages[key],
-      };
-      if (!Object.values(next).some(Boolean)) return prev;
+      const current = prev.sermonPlannerVisibleLanguages;
+      if (current[key] && Object.entries(current).every(([language, on]) => language === key || !on)) return prev;
+      const next = Object.fromEntries(Object.keys(current).map((language) => [language, language === key])) as unknown as SermonPlannerVisibleLanguages;
       return { ...prev, sermonPlannerVisibleLanguages: next };
     });
   }, []);
@@ -440,7 +439,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       ready,
       toggleLanguage,
       setBibleVisibleLanguages,
-      toggleSermonPlannerLanguage,
+      setSermonPlannerLanguage,
       setFontScale,
       setFontScaleValue,
       setOrientationMode,
@@ -473,7 +472,7 @@ export function ReadingPreferencesProvider({ children }: { children: React.React
       ready,
       toggleLanguage,
       setBibleVisibleLanguages,
-      toggleSermonPlannerLanguage,
+      setSermonPlannerLanguage,
       setFontScale,
       setFontScaleValue,
       setOrientationMode,

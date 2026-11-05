@@ -5,6 +5,7 @@ import { sectionRestoreCandidates, type DocumentRestoreRequest } from '../../uti
 import { useCopticFontDataUri, useCopticItalicFontDataUri } from '../../utils/useCopticFontDataUri';
 import type { AppLanguage } from '../../utils/preferencesStorage';
 import type { SermonHighlight } from '../../types/sermonPlanner';
+import { sermonHighlightPalette } from '../../constants/sermonPlanner';
 import { buildDocumentHtml, DocumentAction, DocumentSection, VisibleColumns, withRememberedCollapse } from './documentHtml';
 import { NIGHT_DOCUMENT_THEME, type DocumentTheme } from '../../constants/documentThemes';
 import type { InitialColors } from '../../constants/documentOrnaments';
@@ -51,6 +52,8 @@ interface DocumentWebViewProps {
   onHeadpieceInViewChange?: (inView: boolean) => void;
   sermonPlannerMode?: boolean;
   sermonHighlights?: SermonHighlight[];
+  /** The planner's "Add to …" in the highlight toolbar (textHighlights.ts's place): its label, or null for none. */
+  sermonPlaceLabel?: string | null;
   /** The page the document is read on — see constants/documentThemes.ts. */
   theme?: DocumentTheme;
   /** The colour its ornaments are drawn in (documentOrnamentColor). */
@@ -93,6 +96,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       collapsedSectionIds,
       sermonPlannerMode = false,
       sermonHighlights = [],
+      sermonPlaceLabel = null,
       theme = NIGHT_DOCUMENT_THEME,
       ornamentColor,
       initialColors,
@@ -179,6 +183,12 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       const win = iframeRef.current?.contentWindow as (Window & { setSermonHighlights?: (value: SermonHighlight[]) => void }) | null | undefined;
       win?.setSermonHighlights?.(sermonHighlights);
     }, [sermonHighlights, sermonPlannerMode]);
+
+    useEffect(() => {
+      if (!sermonPlannerMode) return;
+      const win = iframeRef.current?.contentWindow as (Window & { setHighlightPlaceLabel?: (label: string | null) => void }) | null | undefined;
+      win?.setHighlightPlaceLabel?.(sermonPlaceLabel);
+    }, [sermonPlaceLabel, sermonPlannerMode]);
 
     const handleAction = (action: DocumentAction) => {
       if (action?.type === 'headpieceInView') {
@@ -268,8 +278,9 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
       // it away unless it is where the restore is headed.
       if (keptReport) handleAction(keptReport);
       if (sermonPlannerMode) {
-        const annotationWindow = win as typeof win & { setSermonHighlights?: (value: SermonHighlight[]) => void };
+        const annotationWindow = win as typeof win & { setSermonHighlights?: (value: SermonHighlight[]) => void; setHighlightPlaceLabel?: (label: string | null) => void };
         annotationWindow?.setSermonHighlights?.(sermonHighlights);
+        annotationWindow?.setHighlightPlaceLabel?.(sermonPlaceLabel);
       }
     };
 
@@ -336,6 +347,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               // own first jump has to land below the controls.
               topContentInset,
               sermonPlannerMode,
+              sermonPalette: sermonPlannerMode ? sermonHighlightPalette(Boolean(visibleColumns?.arabic && !visibleColumns.english)) : undefined,
               theme,
               ornamentColor,
               initialColors: initialVine && initialVineInBlue && initialLetter && titleColor

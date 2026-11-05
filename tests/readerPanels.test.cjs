@@ -257,14 +257,6 @@ test('the panels go as they came, under the finger: a swipe to the right takes t
   assert.match(sheet, /if \(!swipeRef\.current\.visible \|\| heldRef\.current \|\| gestureState\.numberActiveTouches > 1\) return false;/);
 });
 
-test('the sermon notes drawer opens from off the right edge every time, as the sheet does', () => {
-  const drawer = fs.readFileSync('src/components/vine/ui/SermonPlannerDrawer.tsx', 'utf8');
-  assert.match(drawer, /useState\(\(\) => new Animated\.Value\(1\)\)/);
-  assert.match(drawer, /visible=\{mounted\}/);
-  assert.match(drawer, /if \(finished && !visible\) setMounted\(false\);/);
-  assert.match(drawer, /style=\{\[styles\.overlay, \{ minWidth: screenWidth \}\]\}/);
-});
-
 test('the Contents fold St Basil\'s seven short litanies under their heading, through the Litany of the Oblations', () => {
   const { gatherUnderDividers, isDividerSection } = load('src/utils/sectionDividers.ts');
   const section = (id, hymnKey, titled = true) => ({ id, hymnKey, titled });

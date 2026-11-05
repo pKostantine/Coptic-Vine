@@ -25,6 +25,8 @@ const BOOK_SUBPAGE_ROOTS: ReadonlySet<string> = new Set<string>([
  * instead.
  */
 export function keepsWholeWindow(segments: string[]): boolean {
+  // The Sermon Planner is a workspace, not a reader: it sits beside the sidebar, its plans beside it.
+  if (segments[0] === 'lectionary' && segments[1] === 'sermon_planner') return false;
   // A saint's Synaxarium entry ([entryKey]) is read in the reader too.
   if (segments.some((segment) => segment === '[serviceId]' || segment === '[chapter]' || segment === '[hourId]' || segment === '[entryKey]' || segment === 'now-playing')) {
     return true;

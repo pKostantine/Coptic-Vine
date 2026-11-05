@@ -41,6 +41,8 @@ export interface TextHighlightScriptOptions {
     remove?: string;
     /** Payload `{ text, html? }` — only when the page's own copy command is refused. */
     copy?: string;
+    /** Payload `{ highlightId }` — put that highlight in the host's current place (the Sermon Planner's part); see `place`. */
+    place?: string;
   };
   /** Tapping a highlight selects the whole of it and offers recolour/underline/note/copy/remove in the toolbar. */
   tapToEdit?: boolean;
@@ -53,7 +55,25 @@ export interface TextHighlightScriptOptions {
   /** A selection only highlights within the language column it started in. */
   singleLanguage?: boolean;
   labels?: { copy?: string; remove?: string; note?: string; underline?: string };
+  /**
+   * The colours as the host names them (the Sermon Planner's Key verse,
+   * Illustration…): the toolbar sets them out as labelled choices over a row
+   * of its actions, and the page paints them in these washes. The keys are
+   * the five colours the highlights are stored by.
+   */
+  palette?: HighlightPalette;
+  /** Leaves out the underline button. */
+  underline?: boolean;
+  /**
+   * Adds the host's "Add to …" action: a new selection is highlighted and put
+   * there, a tapped highlight put there. Its label is set, or the action
+   * hidden, by the page's `window.setHighlightPlaceLabel(label | null)`.
+   */
+  place?: boolean;
 }
+
+/** A colour's look, and for a labelled palette its name. */
+export type HighlightPalette = Record<string, { wash: string; swatch: string; label?: string }>;
 
 /** The colours, in Apple Books' order: yellow, green, blue, pink, purple. */
 const MARK_COLORS: Record<string, { wash: string; swatch: string }> = {
@@ -74,12 +94,17 @@ export function highlightWash(color: string | null | undefined): string {
  * by side: while a selection is made in one, the others can't be selected,
  * so the selection (and what it highlights) keeps to the column it began in.
  */
-export function textHighlightStyles(columns: readonly string[] = []) {
-  const colorRules = Object.entries(MARK_COLORS).map(([color, { wash, swatch }]) => `
-      mark.sermon-highlight[data-sermon-color="${color}"] { background: ${wash}; }
-      mark.sermon-highlight[data-style="underline"][data-sermon-color="${color}"] { background: transparent; text-decoration-color: ${swatch}; }
+export function textHighlightStyles(columns: readonly string[] = [], palette?: HighlightPalette) {
+  // A labelled palette's highlights carry a line under them in their colour, as its design marks them.
+  const colorRules = Object.entries(MARK_COLORS).map(([color, fallback]) => {
+    const { wash, swatch } = palette?.[color] ?? fallback;
+    return `
+      mark.sermon-highlight[data-sermon-color="${color}"] { background: ${wash};${palette ? ` box-shadow: inset 0 -2px ${swatch};` : ''} }
+      mark.sermon-highlight[data-style="underline"][data-sermon-color="${color}"] { background: transparent; box-shadow: none; text-decoration-color: ${swatch}; }
       .sermon-color-button[data-color="${color}"] { background: ${swatch}; }
-      ::highlight(vine-preview-${color}) { background-color: ${wash}; }`).join('');
+      #sermon-highlight-tools.is-labelled .sermon-color-button[data-color="${color}"] i { background: ${swatch}; }
+      ::highlight(vine-preview-${color}) { background-color: ${wash}; }`;
+  }).join('');
   const columnRules = columns.map((language) => `
       body[data-highlight-column="${language}"] .sermon-annotatable-text:not([data-sermon-language="${language}"]),
       body[data-highlight-column="${language}"] .cell[data-language]:not([data-language="${language}"]),
@@ -191,6 +216,66 @@ export function textHighlightStyles(columns: readonly string[] = []) {
       }
       .text-highlight-action:active { background: rgba(235, 190, 52, 0.22); }
       .text-highlight-action[hidden], .text-highlight-divider[hidden] { display: none; }
+      /* The labelled palette (the Sermon Planner's): its colours named in a
+         row of five, its actions under them. */
+      #sermon-highlight-tools.is-labelled {
+        background: #1a2a1e;
+        border: 0;
+        border-radius: 18px;
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+        width: min(346px, calc(100vw - 24px));
+        box-sizing: border-box;
+      }
+      #sermon-highlight-tools.is-labelled .text-highlight-colors {
+        display: grid;
+        gap: 4px;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        width: 100%;
+      }
+      #sermon-highlight-tools.is-labelled .sermon-color-button {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        border-radius: 10px;
+        color: rgba(205, 216, 203, 0.72);
+        display: flex;
+        flex-direction: column;
+        font: 600 10.5px/1.15 -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        gap: 5px;
+        height: auto;
+        padding: 6px 0;
+        text-align: center;
+        width: auto;
+      }
+      #sermon-highlight-tools.is-labelled .sermon-color-button i {
+        border-radius: 999px;
+        display: block;
+        height: 22px;
+        width: 22px;
+      }
+      #sermon-highlight-tools.is-labelled .sermon-color-button.is-current { background: rgba(255, 255, 255, 0.07); box-shadow: none; color: #fff; }
+      #sermon-highlight-tools.is-labelled .sermon-color-button.is-current i { box-shadow: 0 0 0 2px #1a2a1e, 0 0 0 4px #fff; }
+      #sermon-highlight-tools.is-labelled .text-highlight-acts { display: flex; gap: 8px; width: 100%; }
+      #sermon-highlight-tools.is-labelled .text-highlight-action {
+        align-items: center;
+        background: rgba(255, 255, 255, 0.07);
+        border-radius: 12px;
+        display: flex;
+        flex: 1 1 0;
+        font-size: 13px;
+        font-weight: 600;
+        height: 36px;
+        justify-content: center;
+        min-width: 0;
+        overflow: hidden;
+        padding: 0 8px;
+        text-overflow: ellipsis;
+      }
+      #sermon-highlight-tools.is-labelled .text-highlight-action[data-action="place"] { background: #E3B53B; color: #14301b; font-weight: 700; }
+      #sermon-highlight-tools.is-labelled .text-highlight-action[hidden] { display: none; }
   `;
 }
 
@@ -205,6 +290,9 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
         var NOTES = ${JSON.stringify(Boolean(options.notes))};
         var SINGLE_LANGUAGE = ${JSON.stringify(Boolean(options.singleLanguage))};
         var COLORS = ${JSON.stringify(Object.keys(MARK_COLORS))};
+        var PALETTE_LABELS = ${JSON.stringify(options.palette ? Object.fromEntries(Object.entries(options.palette).map(([color, entry]) => [color, entry.label || color])) : null)};
+        var UNDERLINE = ${JSON.stringify(options.underline !== false)};
+        var PLACE = ${JSON.stringify(Boolean(options.place && options.actions.place))};
         var currentHighlights = [];
         // Highlights that arrived mid-stroke, painted once the Pencil lifts.
         var pendingHighlights = null;
@@ -245,33 +333,72 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
           button.className = 'sermon-color-button';
           button.type = 'button';
           button.setAttribute('data-color', color);
-          button.setAttribute('aria-label', 'Highlight ' + color);
+          if (PALETTE_LABELS) {
+            // The colour as a dot over its name: "Key verse".
+            button.appendChild(document.createElement('i'));
+            var name = document.createElement('span');
+            name.textContent = PALETTE_LABELS[color] || color;
+            button.appendChild(name);
+            button.setAttribute('aria-label', PALETTE_LABELS[color] || color);
+          } else {
+            button.setAttribute('aria-label', 'Highlight ' + color);
+          }
           colorRow.appendChild(button);
         });
         palette.appendChild(colorRow);
+        if (PALETTE_LABELS) palette.classList.add('is-labelled');
         var underlineButton = document.createElement('button');
         underlineButton.className = 'text-highlight-underline';
         underlineButton.type = 'button';
         underlineButton.setAttribute('data-action', 'underline');
         underlineButton.setAttribute('aria-label', ${JSON.stringify(labels.underline)});
         underlineButton.textContent = 'A';
-        palette.appendChild(underlineButton);
+        if (UNDERLINE) palette.appendChild(underlineButton);
+        // A labelled palette sets its actions in a row of their own, under the colours.
+        var actionRow = palette;
+        if (PALETTE_LABELS) {
+          actionRow = document.createElement('span');
+          actionRow.className = 'text-highlight-acts';
+          palette.appendChild(actionRow);
+        }
         function addAction(action, label) {
           var divider = document.createElement('span');
           divider.className = 'text-highlight-divider';
-          palette.appendChild(divider);
+          if (!PALETTE_LABELS) actionRow.appendChild(divider);
           var button = document.createElement('button');
           button.className = 'text-highlight-action';
           button.type = 'button';
           button.setAttribute('data-action', action);
           button.textContent = label;
-          palette.appendChild(button);
+          actionRow.appendChild(button);
           return { button: button, divider: divider };
         }
         var noteAction = NOTES ? addAction('note', ${JSON.stringify(labels.note)}) : null;
         var copyAction = COPY ? addAction('copy', ${JSON.stringify(labels.copy)}) : null;
         var removeAction = TAP_TO_EDIT && ACTIONS.remove ? addAction('remove', ${JSON.stringify(labels.remove)}) : null;
+        // Only a highlight already made can be removed.
+        if (removeAction) {
+          removeAction.button.hidden = true;
+          removeAction.divider.hidden = true;
+        }
+        // A labelled palette stays up on the highlight a label has just made,
+        // so it can go straight into the host's part ("Add to Point 2").
+        var reopenAfterCreate = null;
+        // "Add to Point 2": hidden until the host names where (setHighlightPlaceLabel).
+        var placeAction = PLACE ? addAction('place', '') : null;
+        if (placeAction) {
+          placeAction.button.hidden = true;
+          placeAction.divider.hidden = true;
+        }
+        window.setHighlightPlaceLabel = function (label) {
+          if (!placeAction) return;
+          placeAction.button.textContent = label ? String(label) : '';
+          placeAction.button.hidden = !label;
+          placeAction.divider.hidden = !label;
+        };
         document.body.appendChild(palette);
+        // The palette's first look: nothing being edited.
+        setEditing(null);
 
         function closestRoot(node) {
           var element = node && node.nodeType === 1 ? node : node && node.parentElement;
@@ -423,6 +550,16 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
           applyHighlights();
           if (arrived) clearPreview();
           refreshEditing();
+          if (arrived && reopenAfterCreate) {
+            var wanted = reopenAfterCreate;
+            reopenAfterCreate = null;
+            var made = Date.now() < wanted.until ? list.filter(function (highlight) {
+              return !known[highlight.id] && highlight.verseId === wanted.verseId && highlight.language === wanted.language
+                && Number(highlight.startOffset) <= Number(wanted.start) && Number(wanted.start) < Number(highlight.endOffset);
+            })[0] : null;
+            var madeMark = made && document.querySelector('mark[data-sermon-highlight-id="' + CSS.escape(String(made.id)) + '"]');
+            if (madeMark) openGroupMenu(madeMark);
+          }
         };
 
         window.scrollToSermonHighlight = function (highlightId) {
@@ -702,7 +839,10 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
           palette.classList.toggle('is-editing', Boolean(editing));
           var resizing = Boolean(editing && editing.resizing);
           Array.prototype.forEach.call(colorRow.children, function (button) {
-            button.classList.toggle('is-current', Boolean(editing && !resizing && !editing.style && button.getAttribute('data-color') === editing.color));
+            var color = button.getAttribute('data-color');
+            // A labelled palette shows, for a new selection, the label its actions would use: the last one chosen.
+            var current = editing && !resizing ? !editing.style && color === editing.color : Boolean(PALETTE_LABELS) && color === pen.color;
+            button.classList.toggle('is-current', Boolean(current));
           });
           underlineButton.classList.toggle('is-on', Boolean(editing && !resizing && editing.style === 'underline'));
           if (removeAction) {
@@ -890,7 +1030,7 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
           placePalette(selection.getRangeAt(0));
         }
 
-        function commitSelection(color, style, openNote) {
+        function commitSelection(color, style, openNote, place) {
           var selection = selectionForToolbar();
           if (editing && !editing.resizing) {
             if (ACTIONS.recolor) emit(ACTIONS.recolor, { highlightId: editing.highlightId, color: color, style: style || null });
@@ -899,7 +1039,11 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
             var segments = selectionSegments(selection);
             if (segments.length) {
               var creation = buildCreation(segments, color, editing && editing.resizing ? editing.groupId : null);
-              emit(ACTIONS.create, { anchors: creation.anchors, color: color, style: style || null, replaces: creation.replaces, openNote: Boolean(openNote) });
+              emit(ACTIONS.create, { anchors: creation.anchors, color: color, style: style || null, replaces: creation.replaces, openNote: Boolean(openNote), place: Boolean(place) });
+              var firstAnchor = creation.anchors[0];
+              reopenAfterCreate = PALETTE_LABELS && !openNote && !place && firstAnchor
+                ? { verseId: firstAnchor.verseId, language: firstAnchor.language, start: firstAnchor.startOffset, until: Date.now() + 4000 }
+                : null;
               rememberPen(color, style);
               // Painted at once, until the page hears it back.
               paintPreview(creation.segments, color);
@@ -982,6 +1126,14 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
             } else {
               commitSelection(editing ? editing.color : pen.color, editing ? editing.style : pen.style, true);
             }
+          } else if (action === 'place') {
+            if (editing && !resizing) {
+              if (ACTIONS.place) emit(ACTIONS.place, { highlightId: editing.highlightId });
+              clearSelection();
+              hidePalette();
+            } else {
+              commitSelection(editing ? editing.color : pen.color, editing ? editing.style : pen.style, false, true);
+            }
           } else if (action === 'copy') copySelection();
           else if (action === 'remove') removeEditingHighlight();
         }
@@ -1055,9 +1207,18 @@ export function textHighlightScript(options: TextHighlightScriptOptions) {
           // The handles of a tapped highlight moved: the next colour resizes it.
           // (Compared as the range's own text: the selection's adds a line
           // break between verses, the range's doesn't.)
+          // A selection somewhere else altogether is a new one, not this highlight resized.
           if (editing && !editing.resizing && selection.getRangeAt(0).toString() !== editing.text) {
-            editing.resizing = true;
-            setEditing(editing);
+            var selected = selection.getRangeAt(0);
+            var touchesGroup = groupMarks(editing.groupId).some(function (mark) {
+              try { return selected.intersectsNode(mark); } catch (error) { return false; }
+            });
+            if (touchesGroup) {
+              editing.resizing = true;
+              setEditing(editing);
+            } else {
+              setEditing(null);
+            }
           }
           // A phone selects with a long press and drag handles, which the page
           // never sees as a finger lifting — so the toolbar also follows the
