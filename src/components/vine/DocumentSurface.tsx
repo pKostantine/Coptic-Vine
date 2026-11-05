@@ -175,8 +175,18 @@ const DocumentSurface = forwardRef<DocumentWebViewHandle, DocumentSurfaceProps>(
     const initialColors = initialColorsProp ?? documentInitialColors(theme);
     const slideshowTheme = useMemo(() => {
       const base = slideshowThemeFor(theme);
-      return { ...base, colors: { ...base.colors, ornament: ornamentColor, initialVine: initialColors.vine, initialLetter: initialColors.letter, title: initialColors.title } };
-    }, [theme, ornamentColor, initialColors.vine, initialColors.letter, initialColors.title]);
+      return {
+        ...base,
+        colors: {
+          ...base.colors,
+          ornament: ornamentColor,
+          initialVine: initialColors.vine,
+          initialVineInBlue: initialColors.vineInBlue,
+          initialLetter: initialColors.letter,
+          title: initialColors.title,
+        },
+      };
+    }, [theme, ornamentColor, initialColors.vine, initialColors.vineInBlue, initialColors.letter, initialColors.title]);
     const effectiveSlideshowMode = preferences.slideshowMode && !sermonPlannerMode;
     const effectiveSelectText = sermonPlannerMode || (preferences.selectText && !effectiveSlideshowMode);
     // section.id already includes hymn_key + item_order. Combining it with

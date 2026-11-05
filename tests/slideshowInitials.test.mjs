@@ -126,8 +126,9 @@ test("the Coptic column measures and sets its text around the initial, in the or
   // The letter is the initial's: the column's own text starts after it, unless pagination handed the lines in.
   assert.match(verse, /const copticRest = initial \? copticText\.trimStart\(\)\.slice\(initial\.letter\.length \+ initial\.marks\.length\) : "";/);
   assert.match(verse, /text: initial && !verse\.slideshowForcedLines\?\.coptic \? copticRest : copticText,/);
-  // In the initials' colours (documentInitialColors), the page's gold and ornament colour where none are given.
-  assert.match(verse, /const initialVineColor = theme\.colors\.initialVine \|\| theme\.colors\.gold;/);
+  // In the initials' colours (documentInitialColors), the page's gold and ornament colour where none are given;
+  // opening a blue alternate verse, the vine takes the season's colour for one.
+  assert.match(verse, /const initialVineColor = \(rowTextColor === theme\.colors\.rowBlue && theme\.colors\.initialVineInBlue\) \|\| theme\.colors\.initialVine \|\| theme\.colors\.gold;/);
   assert.match(verse, /const initialLetterColor = theme\.colors\.initialLetter \|\| theme\.colors\.ornament \|\| theme\.colors\.gold;/);
   assert.match(verse, /vineColor=\{initialVineColor\}\s+letterColor=\{initialLetterColor\}/);
   const justified = source("components/vine/JustifiedText.js");

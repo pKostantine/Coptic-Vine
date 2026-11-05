@@ -317,6 +317,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
     // object afresh at each render would rebuild the whole document with it.
     const initialVine = initialColors?.vine;
     const initialLetter = initialColors?.letter;
+    const initialVineInBlue = initialColors?.vineInBlue;
     const titleColor = initialColors?.title;
     const html = useMemo(
       () =>
@@ -340,7 +341,9 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
               sermonPlannerMode,
               theme,
               ornamentColor,
-              initialColors: initialVine && initialLetter && titleColor ? { vine: initialVine, letter: initialLetter, title: titleColor } : undefined,
+              initialColors: initialVine && initialVineInBlue && initialLetter && titleColor
+                ? { vine: initialVine, vineInBlue: initialVineInBlue, letter: initialLetter, title: titleColor }
+                : undefined,
               // Gone to before the page is first drawn; the load's own restore follows it there.
               initialRestore: restoreCandidates(),
               nativeSwipeNavigation: true,
@@ -368,6 +371,7 @@ const DocumentWebView = forwardRef<DocumentWebViewHandle, DocumentWebViewProps>(
         ornamentColor,
         initialVine,
         initialLetter,
+        initialVineInBlue,
         titleColor,
       ],
     );
