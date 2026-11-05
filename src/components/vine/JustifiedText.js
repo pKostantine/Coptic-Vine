@@ -293,17 +293,21 @@ function computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle
 
 /**
  * A paragraph opened by an initial (ui/CopticInitial.tsx, ui/EnglishInitial.tsx):
- * one line tall beside it if the whole of it fits there and the initial has a
- * one-line form, else its first two lines narrowed beside the initial two
- * lines tall -- line 1 by `firstRoom`, line 2 by `room`, the gap stepping
- * between them -- and the rest at full width. An initial with no one-line
- * form (the English) keeps two lines beside it, the second blank if its
- * paragraph fits on one. Each line beside it says which ("one" or "two"),
- * which is how pagination keeps those lines together and the render knows to
- * set it beside them.
+ * if the whole of it fits on one line beside the initial, the lockup (Coptic
+ * Vine Reader, "One-line verses: the lockup"): the initial two lines tall
+ * and the line centred beside it, set tight to the letter -- its one line
+ * and a blank one beside it, so it keeps two lines' height. Else its first
+ * two lines narrowed beside the initial two lines tall -- line 1 by
+ * `firstRoom`, line 2 by `room`, the gap stepping between them -- and the
+ * rest at full width. Each line beside it says which ("lockup", "one" or
+ * "two"), which is how pagination keeps those lines together and the render
+ * knows to set it beside them.
  */
 function computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, width, initial, firstWord = fontWeight) {
-  if (initial.one) {
+  if (initial.lockup) {
+    const short = computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, () => width - initial.lockup.room, firstWord);
+    if (short.length <= 1) return lockupLines(short);
+  } else if (initial.one) {
     const short = computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, () => width - initial.one.room, firstWord);
     if (short.length <= 1) return short.map((line) => ({ ...line, initial: "one" }));
   }
@@ -311,6 +315,11 @@ function computeInitialLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyl
   const lines = computeShapedLinesWeb(text, fontSize, fontFamily, fontWeight, fontStyle, (index) => width - (index === 0 ? firstRoom : index === 1 ? initial.two.room : 0), firstWord)
     .map((line, index) => (index < 2 ? { ...line, initial: "two" } : line));
   return withBlankLineBesideInitial(lines);
+}
+
+/** A lockup's lines: its one line, and a blank one, so the two-line initial keeps its height beside it. */
+function lockupLines(lines) {
+  return [...lines.map((line) => ({ ...line, initial: "lockup" })), { words: [], isBlank: true, isParagraphEnd: true, initial: "lockup" }];
 }
 
 /** Two lines beside a two-line initial, whatever its paragraph: one that fits on a line leaves the second blank. */
@@ -432,11 +441,13 @@ function useNativeLines(text, style, fontSize, fontFamily, fontWeight, fontStyle
  */
 function useNativeInitialLines(text, style, fontSize, fontFamily, fontWeight, fontStyle, width, initial, firstWordStyle) {
   const active = Boolean(initial);
-  const hasOneLine = Boolean(initial?.one);
+  // A paragraph of one line beside the initial: the lockup, or (on a form with no lockup) the one-line initial.
+  const shortRoom = initial?.lockup?.room ?? initial?.one?.room;
+  const hasOneLine = shortRoom !== undefined;
   const room = initial?.two.room ?? 0;
   const firstRoom = initial?.two.firstRoom ?? room;
   const stepped = firstRoom !== room;
-  const short = useNativeLines(active && hasOneLine ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - (initial?.one?.room ?? 0), firstWordStyle, false);
+  const short = useNativeLines(active && hasOneLine ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - (shortRoom ?? 0), firstWordStyle, false);
   const narrow = useNativeLines(active ? text : "", style, fontSize, fontFamily, fontWeight, fontStyle, width - firstRoom, firstWordStyle, false);
   const fitsBesideShort = hasOneLine && Boolean(short.lines && short.lines.length <= 1);
   const decided = Boolean(narrow.lines) && (!hasOneLine || Boolean(short.lines)) && !fitsBesideShort;
@@ -450,7 +461,7 @@ function useNativeInitialLines(text, style, fontSize, fontFamily, fontWeight, fo
   if (!active) return null;
 
   const probes = [short.measuringNode, narrow.measuringNode, lineTwo.measuringNode, rest.measuringNode];
-  if (fitsBesideShort) return { lines: short.lines.map((line) => ({ ...line, initial: "one" })), probes: [] };
+  if (fitsBesideShort) return { lines: initial.lockup ? lockupLines(short.lines) : short.lines.map((line) => ({ ...line, initial: "one" })), probes: [] };
   if (!besideTall || !rest.lines) return { lines: null, probes };
   return { lines: withBlankLineBesideInitial([...besideTall.map((line) => ({ ...line, initial: "two" })), ...rest.lines]), probes: [] };
 }
@@ -523,7 +534,7 @@ export default function JustifiedText({
   const fallbackAlign = rtl ? "right" : "left";
   const reportedLinesForRef = useRef(null);
   const firstWordKey = firstWordLayoutKey(firstWordStyle, fontWeight);
-  const initialRoom = initial ? `${initial.one?.room ?? "-"}/${initial.two.firstRoom ?? initial.two.room}/${initial.two.room}` : "";
+  const initialRoom = initial ? `${initial.lockup?.room ?? "-"}/${initial.one?.room ?? "-"}/${initial.two.firstRoom ?? initial.two.room}/${initial.two.room}` : "";
 
   const webLines = useMemo(
     () => {
@@ -694,6 +705,19 @@ export default function JustifiedText({
   const lineTwoInset = besideCount && lines[0].initial === "two"
     ? Math.max(0, initial.two.room - (initial.two.firstRoom ?? initial.two.room))
     : 0;
+
+  // The lockup: its one line centred in the two lines' height beside the initial.
+  if (besideCount && lines[0].initial === "lockup") {
+    return (
+      <View style={[{ width }, selectionStyle]} onLayout={onLayout}>
+        <View style={INITIAL_ROW_STYLE}>
+          {initial.render("lockup")}
+          <View style={[BESIDE_INITIAL_STYLE, { height: initial.lockup.height, justifyContent: "center" }]}>{renderLine(lines[0], 0)}</View>
+        </View>
+        {lines.slice(besideCount).map((line, index) => renderLine(line, besideCount + index))}
+      </View>
+    );
+  }
 
   return (
     <View style={[{ width }, selectionStyle]} onLayout={onLayout}>

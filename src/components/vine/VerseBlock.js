@@ -3,7 +3,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { SPACING, TYPOGRAPHY } from "../../constants/theme";
 import { speakerRole } from "../../utils/verseRubric";
-import { copticInitialMetrics } from "./copticInitial";
+import { copticInitialMetrics, copticLockupRoom } from "./copticInitial";
 import JustifiedText, { glyphRoomStyle, measureJustifiedLinesWeb } from "./JustifiedText";
 import { CopticInitial } from "./ui/CopticInitial";
 import { EnglishInitial } from "./ui/EnglishInitial";
@@ -325,8 +325,11 @@ export default function VerseBlock({
     // lines tall and drawn in either; or the English (and French) one, two
     // lines tall.
     const englishMetrics = language.englishInitial ? englishInitialMetrics(language.englishInitial, language.fontSize, language.lineHeight, language.englishOpensWord) : null;
+    // A paragraph of one line beside it is the lockup (JustifiedText.js): the
+    // initial two lines tall and the line centred beside it, set tight to the letter.
     const initial = language.initial ? {
       ...copticInitialMetrics(language.lineHeight),
+      lockup: { room: copticLockupRoom(language.initial.letter, language.lineHeight), height: language.lineHeight * 2 },
       render: (mode) => (
         <CopticInitial
           letter={language.initial.letter}
@@ -338,6 +341,7 @@ export default function VerseBlock({
       ),
     } : englishMetrics ? {
       two: { room: englishMetrics.room, firstRoom: englishMetrics.firstRoom },
+      lockup: { room: englishMetrics.firstRoom, height: englishMetrics.height },
       render: () => <EnglishInitial letter={language.englishInitial} metrics={englishMetrics} color={initialLetterColor} />,
     } : null;
     const textStyle = [

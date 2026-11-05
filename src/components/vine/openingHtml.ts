@@ -1,6 +1,6 @@
 import { COPTIC_INITIAL_VIEWBOX, COPTIC_INITIAL_VINE_PIECES, COPTIC_INITIALS } from '../../constants/copticInitialArt';
 import { ENGLISH_INITIALS } from '../../constants/englishInitialArt';
-import { copticInitialMetrics } from './copticInitial';
+import { copticInitialMetrics, copticLockupGap, hasWideLockupGap } from './copticInitial';
 import { ENGLISH_FIRST_WORD_NEARER, type EnglishOpeningSplit, englishInitialMetrics, splitRestOfFirstWord } from './openingInitials';
 
 /**
@@ -102,6 +102,31 @@ export function openingInitialStyles(lineHeight: number, fontSize: number, color
         height: ${cssPx(englishInitialBox.drawingHeight)};
         margin: ${cssPx(englishInitialBox.top)} ${cssPx(englishInitialBox.room - englishInitialBox.width)} 0 0;
       }
+      /* A paragraph of one line beside its initial is the lockup (Coptic
+         Vine Reader, "One-line verses: the lockup"): the initial keeps its
+         two lines, unfloated, and the line is centred beside them, set tight
+         to the letter -- never a tall initial hanging into empty space. The
+         page decides after layout (fitCopticInitials); each column on its own. */
+      .lockup {
+        align-items: center;
+        display: flex;
+      }
+      .lockup > .coptic-initial {
+        flex: 0 0 auto;
+        float: none;
+        margin: ${initialBox.two.top}px ${copticLockupGap('Ⲁ', lineHeight)}px ${cssPx(2 * lineHeight - initialBox.two.height - initialBox.two.top)} ${initialBox.two.left}px;
+        shape-outside: none;
+      }
+      .lockup > .coptic-initial.wide-gap { margin-right: ${copticLockupGap('Ⲙ', lineHeight)}px; }
+      .lockup > .english-initial {
+        flex: 0 0 auto;
+        float: none;
+        margin-bottom: ${cssPx(2 * lineHeight - englishInitialBox.drawingHeight - englishInitialBox.top)};
+      }
+      .lockup > .opening-rest {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
       .english-initial-art {
         display: block;
         height: 100%;
@@ -140,7 +165,8 @@ export function openingInitialStyles(lineHeight: number, fontSize: number, color
  */
 export function renderCopticInitial(initial: { letter: string; marks: string }, centered: boolean, inBlueVerse = false) {
   const key = initialKey(initial.letter);
-  return `<span class="coptic-initial${centered ? ' one-line' : ''}${inBlueVerse ? ' in-blue' : ''}"${centered ? '' : ' data-fit'}>`
+  const wideGap = hasWideLockupGap(initial.letter);
+  return `<span class="coptic-initial${centered ? ' one-line' : ''}${inBlueVerse ? ' in-blue' : ''}${wideGap ? ' wide-gap' : ''}"${centered ? '' : ' data-fit'}>`
     + `<svg class="coptic-initial-art" viewBox="${COPTIC_INITIAL_VIEWBOX}" aria-hidden="true">`
     + `<use class="coptic-initial-vine" href="#cv-initial-vine-${key}"></use><use class="coptic-initial-letter" href="#cv-initial-${key}"></use>`
     + `</svg><span class="coptic-initial-text">${escapeText(initial.letter + initial.marks)}</span></span>`;
@@ -154,7 +180,7 @@ export function renderCopticInitial(initial: { letter: string; marks: string }, 
  */
 export function renderEnglishInitial(initial: Pick<EnglishOpeningSplit, 'letter' | 'source'>, fontSize: number, lineHeight: number) {
   const metrics = englishInitialMetrics(initial.letter, fontSize, lineHeight);
-  return `<span class="english-initial" style="width: ${cssPx(metrics.width)};"><svg class="english-initial-art" viewBox="${metrics.art.viewBox}" aria-hidden="true">`
+  return `<span class="english-initial" style="width: ${cssPx(metrics.width)};" data-fit><svg class="english-initial-art" viewBox="${metrics.art.viewBox}" aria-hidden="true">`
     + `<use class="english-initial-letter" href="#en-initial-${initialKey(initial.letter)}"></use>`
     + `</svg><span class="english-initial-text">${escapeText(initial.source)}</span></span>`;
 }
@@ -164,20 +190,32 @@ export function renderEnglishInitial(initial: Pick<EnglishOpeningSplit, 'letter'
  * colour (and in English and French, small capitals), then the paragraph,
  * each written out by `html`.
  */
+/**
+ * An opening -- its initial and the text after it -- in a span of its own,
+ * apart from the speaker's label or verse number before it in the
+ * paragraph: what a lockup sets as one row (fitCopticInitials).
+ */
+export function renderOpening(initialHtml: string, restHtml: string) {
+  return `<span class="opening">${initialHtml}${restHtml}</span>`;
+}
+
 export function renderOpeningRest(rest: string, html: (text: string) => string, className = '') {
   const first = splitRestOfFirstWord(rest);
-  if (!first) return html(rest);
-  return `<span class="opening-word${className ? ` ${className}` : ''}">${escapeText(first.word)}</span>${html(first.after)}`;
+  // In a span of its own, so a lockup can set it beside the initial as one piece.
+  if (!first) return `<span class="opening-rest">${html(rest)}</span>`;
+  return `<span class="opening-rest"><span class="opening-word${className ? ` ${className}` : ''}">${escapeText(first.word)}</span>${html(first.after)}</span>`;
 }
 
 /**
- * The page script's fitCopticInitials(). A decorated initial stands two lines
- * tall, but never beside a paragraph too short to wrap around it: one that
- * fits on a single line with the initial a line tall keeps it so, inline.
- * (Measured without the initial at all, a line that only just fits wraps once
- * it's back, leaving the short initial over two lines the tall one would
- * fill.) The page calls it once it is laid out, and again whenever the text
- * reflows.
+ * The page script's fitCopticInitials(). A decorated initial, Coptic or
+ * English, stands two lines tall, but never hangs beside a paragraph too
+ * short to wrap around it: one whose text fits on a single line beside the
+ * initial is the lockup (Coptic Vine Reader, "One-line verses: the lockup"),
+ * the initial kept two lines tall and unfloated and the line centred beside
+ * it; a longer one floats the initial. Each column decides on its own, set
+ * as a lockup and measured there, at the width the initial leaves it. The
+ * page calls it once it is laid out, and again whenever the text reflows (a
+ * rotation, the text size).
  *
  * It first lets a word of an opening line (.verse-text.opens, whose words
  * are kept whole so none is split beside the initial) break again where it
@@ -227,25 +265,26 @@ export const FIT_COPTIC_INITIALS_SCRIPT = `
       function fitCopticInitials(root) {
         var scope = root && root.nodeType === 1 ? root : document;
         fitOpeningWords(scope);
-        var initials = scope.querySelectorAll('.coptic-initial[data-fit]');
+        var initials = scope.querySelectorAll('.coptic-initial[data-fit], .english-initial[data-fit]');
         var fits = [];
         for (var i = 0; i < initials.length; i += 1) {
-          var paragraph = initials[i].closest('.verse-text');
-          if (!paragraph) continue;
-          fits.push({ initial: initials[i], paragraph: paragraph, was: initials[i].classList.contains('one-line') });
-          initials[i].classList.add('one-line');
+          var holder = initials[i].parentElement;
+          var rest = initials[i].nextElementSibling;
+          if (!holder || !rest || !rest.classList.contains('opening-rest')) continue;
+          fits.push({ holder: holder, rest: rest, was: holder.classList.contains('lockup') });
+          holder.classList.add('lockup');
         }
         for (var f = 0; f < fits.length; f += 1) {
           var fit = fits[f];
-          if (!fit.paragraph.getClientRects().length) {
-            fit.oneLine = fit.was;
+          if (!fit.holder.getClientRects().length) {
+            fit.lockup = fit.was;
             continue;
           }
+          // The text's lines as the lockup sets them, beside the whole initial.
           var range = document.createRange();
-          range.setStartBefore(fit.initial);
-          range.setEndAfter(fit.paragraph.lastChild);
+          range.selectNodeContents(fit.rest);
           var rects = range.getClientRects();
-          var lineHeight = parseFloat(getComputedStyle(fit.paragraph).lineHeight) || 1;
+          var lineHeight = parseFloat(getComputedStyle(fit.rest).lineHeight) || 1;
           var lines = 0;
           var lineTop = null;
           for (var r = 0; r < rects.length && lines < 2; r += 1) {
@@ -253,7 +292,7 @@ export const FIT_COPTIC_INITIALS_SCRIPT = `
             lines += 1;
             lineTop = rects[r].top;
           }
-          fit.oneLine = lines < 2;
+          fit.lockup = lines < 2;
         }
-        for (var s = 0; s < fits.length; s += 1) fits[s].initial.classList.toggle('one-line', fits[s].oneLine);
+        for (var s = 0; s < fits.length; s += 1) fits[s].holder.classList.toggle('lockup', fits[s].lockup);
       }`;
