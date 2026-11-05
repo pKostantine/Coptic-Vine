@@ -110,13 +110,15 @@ test('ornaments follow the season on Night and Paper and keep to the page on the
   // On Night, the season's headpiece colour (Coptic Vine Design, Seasons, "Season colours - Night").
   assert.equal(documentOrnamentColor(page('night', '#FFFFFF'), 'lent'), '#9A72C8');
   assert.equal(documentOrnamentColor(page('night', '#FFFFFF')), '#5FAE68');
-  assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'holyweek'), '#A0202A');
-  // The Resurrection's ornaments are gold on either page, as its glow is.
-  assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'resurrection'), '#966D00');
+  // Paper's are Night's, season by season (asked on 5 Nov 2026).
+  assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'holyweek'), '#B5272E');
+  assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'lent'), '#9A72C8');
+  // The Resurrection's ornaments are gold, as its glow is.
+  assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'resurrection'), '#E3B53B');
   assert.equal(documentOrnamentColor(page('night', '#FFFFFF'), 'resurrection'), '#E3B53B');
-  // St Mary's fast and feast and the Annunciation: a lapis on black, a cobalt on white.
+  // St Mary's fast and feast and the Annunciation: a lapis.
   assert.equal(documentOrnamentColor(page('night', '#FFFFFF'), 'marian'), '#5A82E0');
-  assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'marian'), '#1D60BC');
+  assert.equal(documentOrnamentColor(page('paper', '#1C1C1C'), 'marian'), '#5A82E0');
   for (const [id, text] of [['walnut', '#F3E7D3'], ['vine', '#F1EAD6'], ['sepia', '#2F2219']]) {
     assert.equal(documentOrnamentColor(page(id, text), 'holyweek'), text, id);
   }

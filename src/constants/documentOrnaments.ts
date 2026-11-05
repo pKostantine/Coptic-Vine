@@ -59,35 +59,21 @@ const ON_BLACK: Record<SeasonThemeKey, string> = {
 };
 
 /**
- * The same seasons deepened to read on white paper, each at least 4.5:1. The
- * Resurrection takes the white day block's gold, as on black.
+ * The pages whose ornaments, titles and drop caps follow the season of the
+ * day being prayed, all in Night's colours (asked on 5 Nov 2026: Paper takes
+ * Night's season colours too); Walnut, Vine and Sepia keep to their own page.
  */
-const ON_WHITE: Record<SeasonThemeKey, string> = {
-  annual: '#3A8444',
-  gold: '#966D00',
-  natfast: '#B03A6E',
-  nativity: '#BB2F27',
-  theophany: '#247BA2',
-  lent: '#2F6E50',
-  palm: '#5B8000',
-  holyweek: '#A0202A',
-  resurrection: '#966D00',
-  apostles: '#2F62A6',
-  // A cobalt in the azure's hue, oklch(0.50 0.16 258): 6.1:1 on white.
-  marian: '#1D60BC',
-};
+function followsSeason(theme: DocumentTheme) {
+  return theme.id === 'night' || theme.id === 'paper';
+}
 
 /**
- * The colour a page's ornaments are drawn in. Night and Paper follow the
- * season of the day being prayed; Walnut, Vine and Sepia keep to their own
- * page, in its white or its black -- the page's text colour -- whatever the
- * season.
+ * The colour a page's ornaments are drawn in: the season's headpiece colour
+ * on Night and Paper; on Walnut, Vine and Sepia the page's own white or
+ * black -- its text colour -- whatever the season.
  */
 export function documentOrnamentColor(theme: DocumentTheme, season?: SeasonThemeKey | null): string {
-  const key = season ?? 'annual';
-  if (theme.id === 'night') return ON_BLACK[key];
-  if (theme.id === 'paper') return ON_WHITE[key];
-  return theme.colors.text;
+  return followsSeason(theme) ? ON_BLACK[season ?? 'annual'] : theme.colors.text;
 }
 
 /**
@@ -121,16 +107,14 @@ export interface InitialColors {
 }
 
 /**
- * The colours a decorated initial and a section title are drawn in. Every
- * section title is the colour of the season's headpiece ornaments on a page
- * whose ornaments follow the season (Night and Paper: the Holy Fifty Days'
- * gold, Nativity's holly green), and the page's gold on the others. On
- * Night the initials take the season's own colours; elsewhere the titles'
- * gold for the vine and the ornaments' colour for the letter.
+ * The colours a decorated initial and a section title are drawn in. On Night
+ * and Paper, the season's own: the initials' vine (and vine in a blue verse)
+ * and letter, and every section title in the colour of the season's
+ * headpiece ornaments (the Holy Fifty Days' gold, Nativity's holly green).
+ * On the other pages, the titles' gold for the vine and the titles, and the
+ * ornaments' colour for the letter.
  */
 export function documentInitialColors(theme: DocumentTheme, season?: SeasonThemeKey | null): InitialColors {
-  const seasonal = theme.id === 'night' || theme.id === 'paper';
-  const title = seasonal ? documentOrnamentColor(theme, season) : theme.colors.accent;
-  if (theme.id === 'night') return { ...NIGHT_INITIALS[season ?? 'annual'], title };
-  return { vine: theme.colors.accent, vineInBlue: theme.colors.accent, letter: documentOrnamentColor(theme, season), title };
+  if (followsSeason(theme)) return { ...NIGHT_INITIALS[season ?? 'annual'], title: documentOrnamentColor(theme, season) };
+  return { vine: theme.colors.accent, vineInBlue: theme.colors.accent, letter: documentOrnamentColor(theme, season), title: theme.colors.accent };
 }

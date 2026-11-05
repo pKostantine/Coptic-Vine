@@ -374,7 +374,7 @@ test('beside the Coptic initial line 2 starts at its edge and line 1 a quarter e
   assert.match(twoLine, /shape-outside: polygon\(0 0, calc\(100% - [\d.]+px\) 0, calc\(100% - [\d.]+px\) 55%, 100% 55%, 100% 100%, 0 100%\);/);
 });
 
-test('on Night the initials take the season\'s own colours and the titles its headpiece colour; elsewhere the titles\' gold and the ornaments\' colour', () => {
+test('on Night and Paper the initials take the season\'s own colours and the titles its headpiece colour; elsewhere the titles\' gold and the ornaments\' colour', () => {
   const night = themes.DOCUMENT_THEMES.night ?? Object.values(themes.DOCUMENT_THEMES).find((page) => page.id === 'night');
   // Coptic Vine Design, Seasons, "Tokens for Claude Code" (Night, all seasons final):
   // vine, vine in blue verses, letter, title, headpiece.
@@ -400,10 +400,14 @@ test('on Night the initials take the season\'s own colours and the titles its he
   }
   assert.equal(ornaments.documentInitialColors(night, 'resurrection').title, '#E3B53B');
   assert.deepEqual(ornaments.documentInitialColors(night), ornaments.documentInitialColors(night, 'annual'));
-  // Paper's ornaments follow the season too, and so its titles; the other pages keep their gold.
-  for (const page of Object.values(themes.DOCUMENT_THEMES).filter((entry) => entry.id !== 'night')) {
-    const title = page.id === 'paper' ? ornaments.documentOrnamentColor(page, 'nativity') : page.colors.accent;
-    assert.deepEqual(ornaments.documentInitialColors(page, 'nativity'), { vine: page.colors.accent, vineInBlue: page.colors.accent, letter: ornaments.documentOrnamentColor(page, 'nativity'), title });
+  // Paper takes Night's season colours, every one (asked on 5 Nov 2026); the other pages keep their gold.
+  const paper = Object.values(themes.DOCUMENT_THEMES).find((page) => page.id === 'paper');
+  for (const season of Object.keys(design)) {
+    assert.deepEqual(ornaments.documentInitialColors(paper, season), ornaments.documentInitialColors(night, season), season);
+    assert.equal(ornaments.documentOrnamentColor(paper, season), ornaments.documentOrnamentColor(night, season), season);
+  }
+  for (const page of Object.values(themes.DOCUMENT_THEMES).filter((entry) => entry.id !== 'night' && entry.id !== 'paper')) {
+    assert.deepEqual(ornaments.documentInitialColors(page, 'nativity'), { vine: page.colors.accent, vineInBlue: page.colors.accent, letter: ornaments.documentOrnamentColor(page, 'nativity'), title: page.colors.accent });
   }
   const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], { ...OPTIONS, initialColors: { vine: '#5FAE68', vineInBlue: '#5D8FE6', letter: '#EDBE45', title: '#DE4B40' } });
   // Section titles take the season's title colour; a silent prayer's keeps its own.
