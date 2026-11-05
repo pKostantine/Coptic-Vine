@@ -350,15 +350,26 @@ test('beside the Coptic initial line 2 starts at its edge and line 1 a quarter e
   assert.match(twoLine, /shape-outside: polygon\(0 0, calc\(100% - [\d.]+px\) 0, calc\(100% - [\d.]+px\) 55%, 100% 55%, 100% 100%, 0 100%\);/);
 });
 
-test('on Night the initials take the season\'s own vine and letter; elsewhere the titles\' gold and the ornaments\' colour', () => {
+test('on Night the initials and the titles take the season\'s own colours; elsewhere the titles\' gold and the ornaments\' colour', () => {
   const night = themes.DOCUMENT_THEMES.night ?? Object.values(themes.DOCUMENT_THEMES).find((page) => page.id === 'night');
-  assert.deepEqual(ornaments.documentInitialColors(night, 'annual'), { vine: '#E3B53B', letter: '#5FAE68' });
-  assert.deepEqual(ornaments.documentInitialColors(night, 'gold'), { vine: '#5FAE68', letter: '#EDBE45' });
-  assert.deepEqual(ornaments.documentInitialColors(night, 'holyweek'), { vine: '#3E3333', letter: '#D63A40' });
-  for (const page of Object.values(themes.DOCUMENT_THEMES).filter((entry) => entry.id !== 'night')) {
-    assert.deepEqual(ornaments.documentInitialColors(page, 'lent'), { vine: page.colors.accent, letter: ornaments.documentOrnamentColor(page, 'lent') });
+  // Coptic Vine Design, Seasons, "Tokens for Claude Code" (Night, all seasons final): vine, letter, title.
+  const design = {
+    annual: ['#E3B53B', '#5FAE68', '#E3B53B'], gold: ['#5FAE68', '#EDBE45', '#EDBE45'], natfast: ['#D9B36A', '#E2668A', '#EC86A2'],
+    nativity: ['#3E8A52', '#B5232B', '#DE4B40'], theophany: ['#2F6E92', '#7FD3FA', '#74C9F0'], lent: ['#3E5E48', '#8FC7A0', '#84B595'],
+    palm: ['#96D35F', '#F2D27A', '#AEDD7F'], holyweek: ['#3E3333', '#D63A40', '#D24A42'], resurrection: ['#8BD08F', '#EDBE45', '#FFFFFF'],
+    apostles: ['#12396B', '#3B74C4', '#84B1EA'], marian: ['#2B3F9E', '#6F8BE6', '#93A8F6'],
+  };
+  for (const [season, [vine, letter, title]] of Object.entries(design)) {
+    assert.deepEqual(ornaments.documentInitialColors(night, season), { vine, letter, title }, season);
   }
-  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], { ...OPTIONS, initialColors: { vine: '#5FAE68', letter: '#EDBE45' } });
+  assert.deepEqual(ornaments.documentInitialColors(night), ornaments.documentInitialColors(night, 'annual'));
+  for (const page of Object.values(themes.DOCUMENT_THEMES).filter((entry) => entry.id !== 'night')) {
+    assert.deepEqual(ornaments.documentInitialColors(page, 'nativity'), { vine: page.colors.accent, letter: ornaments.documentOrnamentColor(page, 'nativity'), title: page.colors.accent });
+  }
+  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], { ...OPTIONS, initialColors: { vine: '#5FAE68', letter: '#EDBE45', title: '#DE4B40' } });
+  // Section titles take the season's title colour; a silent prayer's keeps its own.
+  assert.match(html, /\.section-title \{\s+color: #DE4B40;/);
+  assert.doesNotMatch(html, /\.section-title\.silent-prayer \{\s+color: #DE4B40;/);
   assert.ok(html.includes('.coptic-initial-vine { fill: #5FAE68; }'));
   assert.ok(html.includes('.coptic-initial-art .coptic-initial-letter { fill: #EDBE45; }'));
   assert.ok(html.includes('.opening-word { color: #EDBE45; }'));
@@ -463,4 +474,16 @@ test('the Praxis and Gospel Responses open on the first verse they show, whateve
   assert.equal(sections[1].verses[1].coptic, 'Ⲁⲩⲥⲓⲟⲩ ⲉϥϣⲁⲓ');
   assert.equal(sections[2].verses[0].coptic, 'ⲫⲁⲓ ⲉ̀ⲣⲉ');
   assert.deepEqual(openResponseOnFirstVerse([]), []);
+});
+
+test('the slideshow and both web views carry the season\'s title colour as the scroll does', () => {
+  const surface = fs.readFileSync('src/components/vine/DocumentSurface.tsx', 'utf8');
+  assert.match(surface, /initialLetter: initialColors\.letter, title: initialColors\.title \}/);
+  const slideshow = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
+  assert.match(slideshow, /color: isSilentPrayerHymn \? theme\.colors\.silent : theme\.colors\.title \|\| theme\.colors\.gold,/);
+  for (const view of ['src/components/vine/DocumentWebView.tsx', 'src/components/vine/DocumentWebView.web.tsx']) {
+    const source = fs.readFileSync(view, 'utf8');
+    assert.match(source, /initialColors: initialVine && initialLetter && titleColor \? \{ vine: initialVine, letter: initialLetter, title: titleColor \} : undefined,/, view);
+    assert.match(source, /\n\s+titleColor,\n/, `${view} rebuilds when the season's title colour changes`);
+  }
 });

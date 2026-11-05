@@ -1463,7 +1463,8 @@ const SlideItem = memo(function SlideItem({
                       styles.sectionTitle,
                       language.key === "arabic" && styles.sectionTitleArabic,
                       {
-                        color: isSilentPrayerHymn ? theme.colors.silent : theme.colors.gold,
+                        // The season's title colour on Night (constants/documentOrnaments.ts), the page's gold elsewhere.
+                        color: isSilentPrayerHymn ? theme.colors.silent : theme.colors.title || theme.colors.gold,
                         fontStyle: isSilentPrayerHymn ? "italic" : "normal",
                         fontSize: chrome.titleFontSize,
                         lineHeight: chrome.titleLineHeight,

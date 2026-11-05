@@ -230,7 +230,7 @@ export function buildDocumentHtml(
     swipeExitsInPage = true,
     theme = NIGHT_DOCUMENT_THEME,
     ornamentColor = theme.colors.accent,
-    initialColors = { vine: theme.colors.accent, letter: ornamentColor },
+    initialColors = { vine: theme.colors.accent, letter: ornamentColor, title: theme.colors.accent },
     initialRestore = [],
   }: {
     copticFontDataUri: string;
@@ -533,7 +533,7 @@ export function buildDocumentHtml(
       ${openingInitialStyles(verseLineHeight, fontSize, initialColors)}
       ${sermonPlannerMode ? sermonPlannerStyles() : ''}
       .section-title {
-        color: ${colors.accent};
+        color: ${initialColors.title};
         font-family: Georgia, serif;
         font-size: ${sectionTitleFontSize}px;
         font-weight: 700;
