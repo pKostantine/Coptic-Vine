@@ -134,8 +134,9 @@ export default function VerseBlock({
   const initial = copticInitial || null;
   const formattedCoptic = formatCopticNumbers(verse.coptic, verse.preserveCopticDigits).trimEnd();
   const copticText = formattedCoptic;
-  // The initials' colours (documentInitialColors): the letter's is the opening words' too.
-  const initialVineColor = theme.colors.initialVine || theme.colors.gold;
+  // The initials' colours (documentInitialColors): the letter's is the opening words' too. Opening a
+  // blue alternate verse, the Coptic initial's vine takes the season's colour for one; the English doesn't change.
+  const initialVineColor = (rowTextColor === theme.colors.rowBlue && theme.colors.initialVineInBlue) || theme.colors.initialVine || theme.colors.gold;
   const initialLetterColor = theme.colors.initialLetter || theme.colors.ornament || theme.colors.gold;
   const startsParagraph = (language) => (lineRanges?.[language]?.start ?? 0) === 0;
   // The opening: the rest of each column's first word in the letter's colour,

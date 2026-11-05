@@ -230,7 +230,7 @@ export function buildDocumentHtml(
     swipeExitsInPage = true,
     theme = NIGHT_DOCUMENT_THEME,
     ornamentColor = theme.colors.accent,
-    initialColors = { vine: theme.colors.accent, letter: ornamentColor, title: theme.colors.accent },
+    initialColors = { vine: theme.colors.accent, vineInBlue: theme.colors.accent, letter: ornamentColor, title: theme.colors.accent },
     initialRestore = [],
   }: {
     copticFontDataUri: string;
@@ -1764,7 +1764,7 @@ function renderVerse(
     const bodyText = labelOnly
       ? ''
       : cellInitial
-      ? renderCopticInitial(cellInitial, centered) + renderOpeningRest(cellInitial.rest, highlightMetropolitanBrackets)
+      ? renderCopticInitial(cellInitial, centered, color === theme.colors.alternate) + renderOpeningRest(cellInitial.rest, highlightMetropolitanBrackets)
       : englishInitial
         ? renderEnglishInitial(englishInitial, fontSize, englishLineHeight) + renderOpeningRest(englishInitial.rest, highlightMetropolitanBrackets, 'english-small-caps')
         : arabicWord

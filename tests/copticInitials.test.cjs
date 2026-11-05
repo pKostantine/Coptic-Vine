@@ -352,21 +352,31 @@ test('beside the Coptic initial line 2 starts at its edge and line 1 a quarter e
 
 test('on Night the initials and the titles take the season\'s own colours; elsewhere the titles\' gold and the ornaments\' colour', () => {
   const night = themes.DOCUMENT_THEMES.night ?? Object.values(themes.DOCUMENT_THEMES).find((page) => page.id === 'night');
-  // Coptic Vine Design, Seasons, "Tokens for Claude Code" (Night, all seasons final): vine, letter, title.
+  // Coptic Vine Design, Seasons, "Tokens for Claude Code" (Night, all seasons final):
+  // vine, vine in blue verses, letter, title, headpiece.
   const design = {
-    annual: ['#E3B53B', '#5FAE68', '#E3B53B'], gold: ['#5FAE68', '#EDBE45', '#EDBE45'], natfast: ['#D9B36A', '#E2668A', '#EC86A2'],
-    nativity: ['#3E8A52', '#B5232B', '#DE4B40'], theophany: ['#2F6E92', '#7FD3FA', '#74C9F0'], lent: ['#3E5E48', '#8FC7A0', '#84B595'],
-    palm: ['#96D35F', '#F2D27A', '#AEDD7F'], holyweek: ['#3E3333', '#D63A40', '#D24A42'], resurrection: ['#8BD08F', '#EDBE45', '#FFFFFF'],
-    apostles: ['#12396B', '#3B74C4', '#84B1EA'], marian: ['#2B3F9E', '#6F8BE6', '#93A8F6'],
+    annual: ['#E3B53B', '#4FA3C0', '#5FAE68', '#E3B53B', '#5FAE68'],
+    gold: ['#5FAE68', '#5D8FE6', '#EDBE45', '#EDBE45', '#E3B53B'],
+    natfast: ['#C2416F', '#C2416F', '#45A85B', '#EC86A2', '#D9578C'],
+    nativity: ['#EB4A3E', '#5D8FE6', '#45A85B', '#45A85B', '#45A85B'],
+    theophany: ['#2E7A72', '#3E9BD6', '#7FCDBD', '#8FD5C6', '#7FCDBD'],
+    lent: ['#6B3E91', '#6B3E91', '#C9A45C', '#B79BDB', '#9A72C8'],
+    palm: ['#E3B53B', '#66B3EE', '#B2D682', '#B2D682', '#B2D682'],
+    holyweek: ['#3E3333', '#3E3333', '#D63A40', '#D24A42', '#B5272E'],
+    resurrection: ['#8BD08F', '#5D8FE6', '#EDBE45', '#FFFFFF', '#E3B53B'],
+    apostles: ['#3E8A52', '#3F92C6', '#EE9F55', '#EE9F55', '#EE9F55'],
+    marian: ['#3558C8', '#5D8FE6', '#F6D46A', '#8FB0F2', '#5A82E0'],
   };
-  for (const [season, [vine, letter, title]] of Object.entries(design)) {
-    assert.deepEqual(ornaments.documentInitialColors(night, season), { vine, letter, title }, season);
+  for (const [season, [vine, vineInBlue, letter, title, headpiece]] of Object.entries(design)) {
+    assert.deepEqual(ornaments.documentInitialColors(night, season), { vine, vineInBlue, letter, title }, season);
+    // The headpiece and the title inside it, and every other ornament on the page.
+    assert.equal(ornaments.documentOrnamentColor(night, season), headpiece, `${season} headpiece`);
   }
   assert.deepEqual(ornaments.documentInitialColors(night), ornaments.documentInitialColors(night, 'annual'));
   for (const page of Object.values(themes.DOCUMENT_THEMES).filter((entry) => entry.id !== 'night')) {
-    assert.deepEqual(ornaments.documentInitialColors(page, 'nativity'), { vine: page.colors.accent, letter: ornaments.documentOrnamentColor(page, 'nativity'), title: page.colors.accent });
+    assert.deepEqual(ornaments.documentInitialColors(page, 'nativity'), { vine: page.colors.accent, vineInBlue: page.colors.accent, letter: ornaments.documentOrnamentColor(page, 'nativity'), title: page.colors.accent });
   }
-  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], { ...OPTIONS, initialColors: { vine: '#5FAE68', letter: '#EDBE45', title: '#DE4B40' } });
+  const html = build([hymn([verse('Ⲙⲁⲣⲉⲛ')])], { ...OPTIONS, initialColors: { vine: '#5FAE68', vineInBlue: '#5D8FE6', letter: '#EDBE45', title: '#DE4B40' } });
   // Section titles take the season's title colour; a silent prayer's keeps its own.
   assert.match(html, /\.section-title \{\s+color: #DE4B40;/);
   assert.doesNotMatch(html, /\.section-title\.silent-prayer \{\s+color: #DE4B40;/);
@@ -478,12 +488,27 @@ test('the Praxis and Gospel Responses open on the first verse they show, whateve
 
 test('the slideshow and both web views carry the season\'s title colour as the scroll does', () => {
   const surface = fs.readFileSync('src/components/vine/DocumentSurface.tsx', 'utf8');
-  assert.match(surface, /initialLetter: initialColors\.letter, title: initialColors\.title \}/);
+  assert.match(surface, /initialLetter: initialColors\.letter,\n\s+title: initialColors\.title,/);
   const slideshow = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
   assert.match(slideshow, /color: isSilentPrayerHymn \? theme\.colors\.silent : theme\.colors\.title \|\| theme\.colors\.gold,/);
   for (const view of ['src/components/vine/DocumentWebView.tsx', 'src/components/vine/DocumentWebView.web.tsx']) {
     const source = fs.readFileSync(view, 'utf8');
-    assert.match(source, /initialColors: initialVine && initialLetter && titleColor \? \{ vine: initialVine, letter: initialLetter, title: titleColor \} : undefined,/, view);
-    assert.match(source, /\n\s+titleColor,\n/, `${view} rebuilds when the season's title colour changes`);
+    assert.match(source, /\? \{ vine: initialVine, vineInBlue: initialVineInBlue, letter: initialLetter, title: titleColor \}/, view);
+    assert.match(source, /\n\s+initialVineInBlue,\n\s+titleColor,\n/, `${view} rebuilds when the season's colours change`);
   }
+  assert.match(surface, /initialVineInBlue: initialColors\.vineInBlue,/);
+});
+
+test("in a blue alternate verse the Coptic initial's vine takes the season's colour for one; a white verse's, the English initial and the opening words don't change", () => {
+  const colors = { vine: '#EB4A3E', vineInBlue: '#5D8FE6', letter: '#45A85B', title: '#45A85B' };
+  const html = build([{ ...hymn([verse('Ⲟⲩⲱⲛϩ', { english: 'O give thanks', dropCap: true })]), alternateEvery: 1 }], { ...OPTIONS, initialColors: colors });
+  assert.ok(html.includes('.coptic-initial-vine { fill: #EB4A3E; }'));
+  assert.ok(html.includes('.coptic-initial.in-blue .coptic-initial-vine { fill: #5D8FE6; }'));
+  assert.ok(html.includes('.english-initial-art .english-initial-letter { fill: #45A85B; }'));
+  assert.ok(html.includes('.opening-word { color: #45A85B; }'));
+  // The first verse of an alternating hymn is white; a verse marked Blue is blue.
+  const page = body(html);
+  assert.equal((page.match(/class="coptic-initial in-blue"/g) || []).length, 0);
+  const blue = body(build([hymn([verse('Ⲟⲩⲱⲛϩ', { english: 'O give thanks', dropCap: true, prayerType: 'Blue' })])], { ...OPTIONS, initialColors: colors }));
+  assert.equal((blue.match(/class="coptic-initial in-blue"/g) || []).length, 1);
 });

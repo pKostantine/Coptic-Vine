@@ -53,7 +53,7 @@ export function openingInitialDefs(copticLetters: Set<string>, englishLetters: S
  * from copticInitial.ts), the English one, the first words after them, and
  * what the opening keeps in the text unseen.
  */
-export function openingInitialStyles(lineHeight: number, fontSize: number, colors: { vine: string; letter: string }) {
+export function openingInitialStyles(lineHeight: number, fontSize: number, colors: { vine: string; vineInBlue?: string; letter: string }) {
   const initialBox = copticInitialMetrics(lineHeight);
   const englishInitialBox = englishInitialMetrics('A', fontSize, lineHeight);
   return `
@@ -89,6 +89,8 @@ export function openingInitialStyles(lineHeight: number, fontSize: number, color
         width: 100%;
       }
       .coptic-initial-vine { fill: ${colors.vine}; }
+      /* Opening a blue alternate verse, the vine takes the season's colour for one (documentInitialColors). */
+      .coptic-initial.in-blue .coptic-initial-vine { fill: ${colors.vineInBlue ?? colors.vine}; }
       .coptic-initial-art .coptic-initial-letter { fill: ${colors.letter}; }
       /* The English (and French) opening: its first letter an Old English
          capital, its capitals from line 1's to line 2's baseline and as wide
@@ -136,9 +138,9 @@ export function openingInitialStyles(lineHeight: number, fontSize: number, color
  * (fitCopticInitials); a centred line has no side to hang it from, so it
  * keeps it a line tall from the start.
  */
-export function renderCopticInitial(initial: { letter: string; marks: string }, centered: boolean) {
+export function renderCopticInitial(initial: { letter: string; marks: string }, centered: boolean, inBlueVerse = false) {
   const key = initialKey(initial.letter);
-  return `<span class="coptic-initial${centered ? ' one-line' : ''}"${centered ? '' : ' data-fit'}>`
+  return `<span class="coptic-initial${centered ? ' one-line' : ''}${inBlueVerse ? ' in-blue' : ''}"${centered ? '' : ' data-fit'}>`
     + `<svg class="coptic-initial-art" viewBox="${COPTIC_INITIAL_VIEWBOX}" aria-hidden="true">`
     + `<use class="coptic-initial-vine" href="#cv-initial-vine-${key}"></use><use class="coptic-initial-letter" href="#cv-initial-${key}"></use>`
     + `</svg><span class="coptic-initial-text">${escapeText(initial.letter + initial.marks)}</span></span>`;
