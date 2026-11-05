@@ -10,7 +10,7 @@ import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import { useLayoutMode } from '../../../utils/useLayoutMode';
 import { motionDuration, useReducedMotion } from '../../../utils/useReducedMotion';
 import CalendarPanel from './CalendarPanel';
-import { useSheetDragToClose } from './useSheetDragToClose';
+import { SheetDragHoldContext, useSheetDragToClose } from './useSheetDragToClose';
 import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 interface CalendarSheetProps {
@@ -87,17 +87,20 @@ export default function CalendarSheet({ visible, onClose, onOpenSeasons, inline 
 
   const panel = (
     <ScrollView scrollEnabled={!sheetDrag.scrollLocked} bounces={false} showsVerticalScrollIndicator={false} onScroll={sheetDrag.onScroll} scrollEventThrottle={16}>
-      <CalendarPanel
-        onOpenSeasons={() => {
-          onClose();
-          onOpenSeasons();
-        }}
-        header={dialog ? undefined : (
-          <View style={styles.grabArea} {...sheetDrag.grabHandlers}>
-            <View style={styles.grab} />
-          </View>
-        )}
-      />
+      {/* The month and year picker scrolls on its own: a finger on it holds the sheet's pull down off (CalendarPanel). */}
+      <SheetDragHoldContext.Provider value={sheetDrag.hold}>
+        <CalendarPanel
+          onOpenSeasons={() => {
+            onClose();
+            onOpenSeasons();
+          }}
+          header={dialog ? undefined : (
+            <View style={styles.grabArea} {...sheetDrag.grabHandlers}>
+              <View style={styles.grab} />
+            </View>
+          )}
+        />
+      </SheetDragHoldContext.Provider>
     </ScrollView>
   );
 

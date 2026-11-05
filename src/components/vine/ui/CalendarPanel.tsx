@@ -1,5 +1,5 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,6 +17,7 @@ import DayControls from './DayControls';
 import Icon from './Icon';
 import { VineDivider } from './Ornaments';
 import { useLiturgicalDay } from './useLiturgicalDay';
+import { SheetDragHoldContext } from './useSheetDragToClose';
 import { useModalOrientations } from '@/hooks/useModalOrientations';
 
 const WEEKDAY_LETTERS = {
@@ -252,14 +253,23 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   // clearly gone sideways, so a tap on a day still picks it and the sheet's
   // own drag down still closes it.
   const monthTurn = useRef({ next: goNextMonth, previous: goPreviousMonth });
+  // The picker is a modal of this panel's own, so its touches reach the panel's
+  // (and the sheet's) gestures too: while it is open neither takes them.
+  const pickerOpenRef = useRef(false);
   useEffect(() => {
     monthTurn.current = { next: goNextMonth, previous: goPreviousMonth };
+    pickerOpenRef.current = pickerOpen;
   });
+  // The sheet the calendar sits in closes on a pull down anywhere on it, and
+  // React Native hands it the picker's touches as well: a finger on the
+  // picker holds that off, so scrolling the months or years down scrolls them
+  // rather than pulling the calendar shut (useSheetDragToClose).
+  const sheetHold = useContext(SheetDragHoldContext);
   // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
   const [monthSwipe] = useState(() => {
     const sideways = (gesture: { dx: number; dy: number }) => Math.abs(gesture.dx) > 16 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5;
     return PanResponder.create({
-      onMoveShouldSetPanResponderCapture: (_, gesture) => sideways(gesture),
+      onMoveShouldSetPanResponderCapture: (_, gesture) => !pickerOpenRef.current && sideways(gesture),
       onPanResponderTerminationRequest: () => false,
       onPanResponderRelease: (_, gesture) => {
         if (!sideways(gesture) || (Math.abs(gesture.dx) < 40 && Math.abs(gesture.vx) < 0.4)) return;
@@ -447,76 +457,83 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
       )}
 
       <Modal supportedOrientations={modalOrientations} visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)} statusBarTranslucent navigationBarTranslucent>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')}
-          style={[styles.pickerBackdrop, {
-            paddingTop: SPACING.lg + insets.top,
-            paddingBottom: SPACING.lg + insets.bottom,
-            paddingLeft: SPACING.lg + insets.left,
-            paddingRight: SPACING.lg + insets.right,
-          }, DISABLED_TEXT_SELECTION_STYLE]}
-          onPress={() => setPickerOpen(false)}
+        <View
+          style={styles.pickerLayer}
+          onTouchStart={() => sheetHold?.hold()}
+          onTouchEnd={() => sheetHold?.release()}
+          onTouchCancel={() => sheetHold?.release()}
         >
-          <Pressable accessible={false} style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
-            <View style={[styles.pickerColumns, { maxHeight: pickerListsHeight }]}>
-              <View style={styles.pickerColumn}>
-                <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>{tr('Month', 'Mois', 'الشهر')}</Text>
-                <ScrollView ref={monthListRef} style={styles.pickerList} showsVerticalScrollIndicator={false} snapToInterval={PICKER_ROW_HEIGHT} decelerationRate="fast">
-                  {pickerMonths.map((value) => {
-                    const isSelected = value === displayedMonth;
-                    const label = mode === 'gregorian' ? gregorianMonthName(value) : formatCopticMonthName(COPTIC_MONTHS[value - 1], isArabic);
-                    return (
-                      <Pressable accessibilityRole="button" accessibilityState={{ selected: isSelected }}
-                        key={value}
-                        style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
-                        onPress={() => {
-                          if (mode === 'gregorian') {
-                            setGregorianMonth(value);
-                          } else {
-                            setCopticMonth(value);
-                            setCopticMonthName(COPTIC_MONTHS[value - 1]);
-                          }
-                        }}
-                      >
-                        <Text numberOfLines={1} style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextSelected, isArabic && styles.arabicText]}>{label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tr('Close', 'Fermer', 'إغلاق')}
+            style={[styles.pickerBackdrop, {
+              paddingTop: SPACING.lg + insets.top,
+              paddingBottom: SPACING.lg + insets.bottom,
+              paddingLeft: SPACING.lg + insets.left,
+              paddingRight: SPACING.lg + insets.right,
+            }, DISABLED_TEXT_SELECTION_STYLE]}
+            onPress={() => setPickerOpen(false)}
+          >
+            <Pressable accessible={false} style={styles.pickerPanel} onPress={(event) => event.stopPropagation()}>
+              <View style={[styles.pickerColumns, { maxHeight: pickerListsHeight }]}>
+                <View style={styles.pickerColumn}>
+                  <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>{tr('Month', 'Mois', 'الشهر')}</Text>
+                  <ScrollView ref={monthListRef} style={styles.pickerList} showsVerticalScrollIndicator={false} snapToInterval={PICKER_ROW_HEIGHT} decelerationRate="fast">
+                    {pickerMonths.map((value) => {
+                      const isSelected = value === displayedMonth;
+                      const label = mode === 'gregorian' ? gregorianMonthName(value) : formatCopticMonthName(COPTIC_MONTHS[value - 1], isArabic);
+                      return (
+                        <Pressable accessibilityRole="button" accessibilityState={{ selected: isSelected }}
+                          key={value}
+                          style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                          onPress={() => {
+                            if (mode === 'gregorian') {
+                              setGregorianMonth(value);
+                            } else {
+                              setCopticMonth(value);
+                              setCopticMonthName(COPTIC_MONTHS[value - 1]);
+                            }
+                          }}
+                        >
+                          <Text numberOfLines={1} style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextSelected, isArabic && styles.arabicText]}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                <View style={styles.pickerColumnDivider} />
+
+                <View style={styles.pickerColumn}>
+                  <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>{tr('Year', 'Année', 'السنة')}</Text>
+                  <ScrollView ref={yearListRef} style={styles.pickerList} showsVerticalScrollIndicator={false} snapToInterval={PICKER_ROW_HEIGHT} decelerationRate="fast">
+                    {pickerYears.map((value) => {
+                      const isSelected = value === displayedYear;
+                      return (
+                        <Pressable accessibilityRole="button" accessibilityState={{ selected: isSelected }}
+                          key={value}
+                          style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                          onPress={() => {
+                            if (mode === 'gregorian') setGregorianYear(value);
+                            else setCopticYear(value);
+                          }}
+                        >
+                          <Text numberOfLines={1} style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextSelected, isArabic && styles.arabicText]}>
+                            {formatCalendarDay(value, isArabic)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
               </View>
 
-              <View style={styles.pickerColumnDivider} />
-
-              <View style={styles.pickerColumn}>
-                <Text style={[styles.pickerColumnLabel, isArabic && styles.arabicText]}>{tr('Year', 'Année', 'السنة')}</Text>
-                <ScrollView ref={yearListRef} style={styles.pickerList} showsVerticalScrollIndicator={false} snapToInterval={PICKER_ROW_HEIGHT} decelerationRate="fast">
-                  {pickerYears.map((value) => {
-                    const isSelected = value === displayedYear;
-                    return (
-                      <Pressable accessibilityRole="button" accessibilityState={{ selected: isSelected }}
-                        key={value}
-                        style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
-                        onPress={() => {
-                          if (mode === 'gregorian') setGregorianYear(value);
-                          else setCopticYear(value);
-                        }}
-                      >
-                        <Text numberOfLines={1} style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextSelected, isArabic && styles.arabicText]}>
-                          {formatCalendarDay(value, isArabic)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </View>
-
-            <Pressable accessibilityRole="button" style={styles.pickerDone} onPress={() => setPickerOpen(false)}>
-              <Text style={[styles.pickerDoneText, isArabic && styles.arabicText]}>{tr('Done', 'Terminé', 'تم')}</Text>
+              <Pressable accessibilityRole="button" style={styles.pickerDone} onPress={() => setPickerOpen(false)}>
+                <Text style={[styles.pickerDoneText, isArabic && styles.arabicText]}>{tr('Done', 'Terminé', 'تم')}</Text>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </View>
       </Modal>
     </View>
   );
@@ -580,6 +597,8 @@ const styles = StyleSheet.create({
   arabicText: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicLetter: { fontFamily: TYPOGRAPHY.arabic },
   // Centred over a scrim rather than pinned under whichever word was tapped.
+  // The picker's whole layer, so a finger anywhere on it holds the sheet's drag off.
+  pickerLayer: { flex: 1 },
   pickerBackdrop: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.66)', flex: 1, justifyContent: 'center', padding: SPACING.lg },
   pickerPanel: {
     backgroundColor: COLORS.surface,

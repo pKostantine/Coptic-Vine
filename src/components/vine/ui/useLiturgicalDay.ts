@@ -89,7 +89,7 @@ export function useLiturgicalDay(): LiturgicalDay {
     coptic: coptic?.value ?? null,
     copticDate: coptic ? new Date(`${coptic.raw}T00:00:00Z`) : rawDate,
     overview: dayOverview,
-    theme: getDayTheme(dayOverview?.indicatorKey, dayOverview?.activeKeys),
+    theme: getDayTheme(dayOverview?.indicatorKey),
     seasonLabel: getSeasonIndicatorShortName(dayOverview?.indicatorKey),
     loading: coptic?.key !== riteIso || coptic.raw !== isoDate || overview?.key !== riteIso,
   };

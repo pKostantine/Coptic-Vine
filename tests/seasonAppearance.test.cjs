@@ -21,6 +21,17 @@ const nextSeason = load('src/utils/nextSeason.ts');
 // tables are read from the source text rather than imported.
 const seasonNamesSource = fs.readFileSync('src/constants/seasonNames.ts', 'utf8');
 
+/** The day's indicator as seasonNames.ts picks it: its priority tables and getSeasonIndicatorKey, lifted out. */
+function loadSeasonNames() {
+  const start = seasonNamesSource.indexOf('const SEASON_INDICATOR_PRIORITIES');
+  const end = seasonNamesSource.indexOf('/** The short name for the calendar screen', start);
+  assert.ok(start >= 0 && end > start, 'the indicator priorities not found in seasonNames.ts');
+  const javascript = ts.transpileModule(seasonNamesSource.slice(start, end).replace('export function', 'function'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  return new Function(`${javascript}\nreturn { getSeasonIndicatorKey };`)();
+}
+
 function block(constName) {
   const start = seasonNamesSource.indexOf(`const ${constName}`);
   assert.notEqual(start, -1, `${constName} not found in seasonNames.ts`);
@@ -53,7 +64,7 @@ test('every season or feast that can name the day has a colour and a chip name',
 });
 
 test('each season wears the colour the spec gives it', () => {
-  const theme = (key, active) => appearance.getDayThemeKey(key, active);
+  const theme = (key) => appearance.getDayThemeKey(key);
   const expected = {
     annual: 'annual',
     'lazarus-saturday': 'annual',
@@ -97,23 +108,26 @@ test('each season wears the colour the spec gives it', () => {
     'entry-into-egypt': 'gold',
     transfiguration: 'gold',
   };
-  for (const [key, colour] of Object.entries(expected)) assert.equal(theme(key, [key]), colour, key);
+  for (const [key, colour] of Object.entries(expected)) assert.equal(theme(key), colour, key);
   assert.equal(theme(null), 'annual');
   assert.equal(theme('something-new'), 'annual');
 });
 
-test('a lesser feast inside a fast keeps the fast colour; a great one does not', () => {
-  const theme = appearance.getDayThemeKey;
-  assert.equal(theme('joyful-29', ['nativity-fast', 'joyful-29']), 'natfast');
-  assert.equal(theme('joyful-29', ['lent', 'joyful-29']), 'lent');
-  assert.equal(theme('joyful-29', ['apostles-fast', 'joyful-29']), 'apostles');
-  assert.equal(theme('transfiguration', ['st-mary-fast', 'transfiguration']), 'marian');
-  assert.equal(theme('entry-into-temple', ['jonahs-fast', 'entry-into-temple']), 'lent');
-  // The second Feast of the Cross, in Lent, is Lent's.
-  assert.equal(theme('feast-of-the-cross-paremhotep', ['lent', 'feast-of-the-cross-paremhotep']), 'lent');
-  // The Annunciation keeps its own blue in Lent.
-  assert.equal(theme('annunciation', ['lent', 'annunciation']), 'marian');
-  assert.equal(theme('feast-of-the-cross', ['nayrouz-period', 'feast-of-the-cross']), 'palm');
+test('a feast that outranks the fast around it wears its own colour, as it names the day', () => {
+  const { getSeasonIndicatorKey } = loadSeasonNames();
+  const day = (seasons, events) => appearance.getDayThemeKey(getSeasonIndicatorKey(seasons.map((key) => ({ key })), events.map((key) => ({ key }))));
+  // The seasonal priorities put these feasts above the fasts, so the colours follow them.
+  assert.equal(day(['st-mary-fast'], ['transfiguration']), 'gold');
+  assert.equal(day(['apostles-fast'], ['entry-into-egypt']), 'gold');
+  assert.equal(day(['jonahs-fast'], ['entry-into-temple']), 'gold');
+  assert.equal(day(['nativity-fast'], ['joyful-29']), 'gold');
+  assert.equal(day(['lent'], ['feast-of-the-cross-paremhotep']), 'palm');
+  assert.equal(day(['lent'], ['annunciation']), 'marian');
+  // The fasts themselves, and their own feasts, keep their colours.
+  assert.equal(day(['st-mary-fast'], []), 'marian');
+  assert.equal(day(['apostles-fast'], ['apostles-feast']), 'apostles');
+  assert.equal(day(['nayrouz-period'], ['feast-of-the-cross']), 'palm');
+  assert.equal(appearance.getDayThemeKey('transfiguration'), 'gold');
 });
 
 test('the themes carry the Coptic Vine season colours', () => {

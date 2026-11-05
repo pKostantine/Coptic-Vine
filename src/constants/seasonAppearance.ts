@@ -193,45 +193,21 @@ const THEME_BY_INDICATOR_KEY: Record<string, SeasonThemeKey> = {
   'joyful-29': 'gold',
 };
 
-/** The fasts, and the colour a lesser feast inside one keeps. */
-const FAST_THEMES: Record<string, SeasonThemeKey> = {
-  lent: 'lent',
-  'jonahs-fast': 'lent',
-  'nativity-fast': 'natfast',
-  'apostles-fast': 'apostles',
-  'st-mary-fast': 'marian',
-};
-
 /**
- * Feasts that name the day but, inside a fast, leave it the fast's colour
- * (§2 C10, C19–D21): the Joyful 29th, the lesser feasts of the Lord, and the
- * second Feast of the Cross in Lent.
+ * The day's colour: the colour of what the day is named after
+ * (`indicatorKey`, the season or feast that ranks highest that day,
+ * seasonNames.ts's priorities). A feast that outranks the fast around it
+ * wears its own colour inside it, as it names the day: the Transfiguration
+ * in St Mary's Fast and the Entry into Egypt in the Apostles' are gold, the
+ * Feast of the Cross on Paremhotep 10 in Lent its palm green. An unmapped or
+ * absent key is an ordinary day.
  */
-const KEEPS_FAST_COLOUR = new Set([
-  'joyful-29',
-  'circumcision',
-  'wedding-at-cana',
-  'entry-into-temple',
-  'transfiguration',
-  'entry-into-egypt',
-  'feast-of-the-cross-paremhotep',
-]);
-
-/**
- * The day's colour. `indicatorKey` is what the day is named after; `activeKeys`
- * is every season and feast running that day, so a lesser feast can find the
- * fast around it. An unmapped or absent key is an ordinary day.
- */
-export function getDayThemeKey(indicatorKey: string | null | undefined, activeKeys: readonly string[] = []): SeasonThemeKey {
-  if (indicatorKey && KEEPS_FAST_COLOUR.has(indicatorKey)) {
-    const fast = activeKeys.find((key) => FAST_THEMES[key]);
-    if (fast) return FAST_THEMES[fast];
-  }
+export function getDayThemeKey(indicatorKey: string | null | undefined): SeasonThemeKey {
   return (indicatorKey ? THEME_BY_INDICATOR_KEY[indicatorKey] : undefined) ?? 'annual';
 }
 
-export function getDayTheme(indicatorKey: string | null | undefined, activeKeys: readonly string[] = []): DayBlockTheme {
-  return DAY_BLOCK_THEMES[getDayThemeKey(indicatorKey, activeKeys)];
+export function getDayTheme(indicatorKey: string | null | undefined): DayBlockTheme {
+  return DAY_BLOCK_THEMES[getDayThemeKey(indicatorKey)];
 }
 
 /** Where the 160° gradient runs, as expo-linear-gradient's unit-square points. */

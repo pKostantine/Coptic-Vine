@@ -504,7 +504,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     const seasonPromise: Promise<SeasonThemeKey | null> = fixedOrnamentSeason
       ? Promise.resolve(fixedOrnamentSeason)
       : getDayOverview(effectiveDate.toISOString().slice(0, 10))
-        .then((overview) => getDayThemeKey(overview?.indicatorKey, overview?.activeKeys))
+        .then((overview) => getDayThemeKey(overview?.indicatorKey))
         .catch(() => null);
 
     // A document read by loadDocument brings the name it opens on; a service's is its menu's.
