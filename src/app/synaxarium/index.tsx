@@ -334,7 +334,7 @@ export default function SynaxariumBrowserScreen() {
   useEffect(() => {
     let active = true;
     getDayOverview(liveIso).then((overview) => {
-      if (active) setTodayTheme(getDayTheme(overview?.indicatorKey, overview?.activeKeys));
+      if (active) setTodayTheme(getDayTheme(overview?.indicatorKey));
     });
     return () => { active = false; };
   }, [liveIso]);
