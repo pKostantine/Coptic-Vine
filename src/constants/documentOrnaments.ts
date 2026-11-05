@@ -1,5 +1,5 @@
 import type { DocumentTheme } from './documentThemes';
-import { INTERLACE_ART, LINTEL_ART, MEDALLION_ART, ROUNDELS_ART, STEPPED_ART, type OrnamentArt } from './ornamentArt';
+import { DIVIDER_ART, INTERLACE_ART, LINTEL_ART, MEDALLION_ART, ROUNDELS_ART, STEPPED_ART, type OrnamentArt } from './ornamentArt';
 import type { SeasonThemeKey } from './seasonAppearance';
 
 /**
@@ -7,10 +7,11 @@ import type { SeasonThemeKey } from './seasonAppearance';
  * headpiece a title is set inside -- the Lintel over each Hoos, the Stepped
  * frame over a service's own name at its start, the
  * Interlace over the Theotokia of the day, the Three Roundels over the Psalm
- * and Gospel -- and the Medallion that closes a service.
+ * and Gospel -- the Divider set after a piece, and the Medallion that closes
+ * a service.
  */
-export type DocumentOrnament = 'lintel' | 'stepped' | 'interlace' | 'roundels' | 'medallion';
-export type HeadpieceOrnament = Exclude<DocumentOrnament, 'medallion'>;
+export type DocumentOrnament = 'lintel' | 'stepped' | 'interlace' | 'roundels' | 'divider' | 'medallion';
+export type HeadpieceOrnament = Exclude<DocumentOrnament, 'divider' | 'medallion'>;
 
 export interface HeadpieceFrame {
   art: OrnamentArt;
@@ -30,6 +31,7 @@ export const HEADPIECES: Record<HeadpieceOrnament, HeadpieceFrame> = {
 };
 
 export const MEDALLION = MEDALLION_ART;
+export const DIVIDER = DIVIDER_ART;
 
 export function isHeadpiece(ornament: DocumentOrnament | undefined): ornament is HeadpieceOrnament {
   return ornament === 'lintel' || ornament === 'stepped' || ornament === 'interlace' || ornament === 'roundels';

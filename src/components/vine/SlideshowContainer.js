@@ -5,7 +5,7 @@ import { getAlternatingVerseColorIndex } from "../../utils/versePresentation";
 import { computeGlobalSuppressSpeakerLabelFlags, shouldUsePeopleLineColor, speakerRole } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 import { arabicItalicStyle } from "../../utils/arabicItalic";
-import { Headpiece, headpieceSize, Medallion, medallionSize } from "./ui/DocumentOrnaments";
+import { Divider, Headpiece, headpieceSize, Medallion, medallionSize } from "./ui/DocumentOrnaments";
 import { DOCUMENT_CONTROL_METRICS, getLanguageColumnGap } from "./documentPresentationMetrics";
 import { sectionRestoreCandidates } from "../../utils/sectionRestore";
 import { isStylusGestureEvent } from "../../utils/isStylusGestureEvent";
@@ -1380,12 +1380,13 @@ const SlideItem = memo(function SlideItem({
   }
 
   if (item.type === "ornament") {
+    const color = theme.colors.ornament || theme.colors.gold;
     return (
       <View
-        style={styles.medallionRow}
+        style={item.ornament === "divider" ? styles.dividerRow : styles.medallionRow}
         onLayout={(event) => onMeasured?.(event.nativeEvent.layout.height, measurementSignature)}
       >
-        <Medallion size={medallionSize(tableWidth)} color={theme.colors.ornament || theme.colors.gold} />
+        {item.ornament === "divider" ? <Divider width={tableWidth} color={color} /> : <Medallion size={medallionSize(tableWidth)} color={color} />}
       </View>
     );
   }
@@ -1577,9 +1578,9 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visi
   const suppressMap = computeGlobalSuppressSpeakerLabelFlags(sections, bishopPresent, suppressAllSpeakerLabels);
 
   return sections.flatMap((section, sectionIndex) => {
-    // The Medallion closing a service: a slide item of its own, with no title.
-    if (section.ornament === "medallion") {
-      return [{ id: `${section.id}-medallion`, sectionId: section.id, type: "ornament", ornament: "medallion" }];
+    // The Medallion closing a service, and a Divider after a piece: slide items of their own, with no title.
+    if (section.ornament === "medallion" || section.ornament === "divider") {
+      return [{ id: `${section.id}-${section.ornament}`, sectionId: section.id, type: "ornament", ornament: section.ornament }];
     }
 
     // The choice of the Kiahk Theotokias' interpretations: a violet button
@@ -1923,6 +1924,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexShrink: 0,
     paddingVertical: SPACING.lg,
+  },
+  dividerRow: {
+    alignItems: "center",
+    flexShrink: 0,
+    paddingVertical: SPACING.md,
   },
   titleRow: {
     alignItems: "center",

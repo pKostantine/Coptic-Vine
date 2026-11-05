@@ -170,3 +170,32 @@ test("a subdocument, the Antiphonary and a subdocument opened from one wear the 
   const antiphonary = modal.slice(modal.indexOf('export function AntiphonaryModal'));
   assert.match(antiphonary, /isAntiphonary\n\s+collapseMemoryScope=\{collapseMemoryScope\}\n\s+ornamentSeason=\{ornamentSeason\}/);
 });
+
+test('the Enactment of the Resurrection is set in the Three Roundels, with a Divider after its last line', () => {
+  const dressed = withDocumentOrnaments([
+    section('ourFather-10', 'ourFather', 'Our Father'),
+    section('theResurrectionEnactment-12', 'theResurrectionEnactment', 'The Enactment of the Resurrection', { bishopOnly: false, copticGospelRiteOnly: false }),
+    // Its own continuation and what it splices in are its pieces too.
+    section('theResurrectionEnactment-12-cont1', 'theResurrectionEnactment'),
+    section('theResurrectionEnactment-12-inline-alleluia', 'alleluia'),
+    section('praxisResponse-13', 'praxisResponse', 'Praxis Response'),
+  ], TITLE);
+  const at = (id) => dressed.findIndex((entry) => entry.id === id);
+  assert.equal(dressed[at('theResurrectionEnactment-12')].ornament, 'roundels');
+  const divider = dressed[at('theResurrectionEnactment-12-inline-alleluia') + 1];
+  assert.deepEqual([divider.id, divider.ornament, divider.verses.length], ['divider-theResurrectionEnactment-12', 'divider', 0]);
+  assert.equal(dressed[at('divider-theResurrectionEnactment-12') + 1].id, 'praxisResponse-13');
+  // Last in the document, it still gets its Divider, before the Medallion.
+  const last = withDocumentOrnaments([section('theResurrectionEnactment-12', 'theResurrectionEnactment', 'The Enactment of the Resurrection')], TITLE);
+  assert.deepEqual(last.map((entry) => entry.ornament || entry.id), ['stepped', 'roundels', 'divider', 'medallion']);
+  // The divider art is drawn in currentColor, as every ornament is, at the sheet's 1200 by 90.
+  assert.match(art.DIVIDER_ART.body, /currentColor/);
+  assert.doesNotMatch(art.DIVIDER_ART.body, /<svg|#[0-9A-Fa-f]{6}/);
+  assert.deepEqual([art.DIVIDER_ART.width, art.DIVIDER_ART.height], [1200, 90]);
+  // Both renderers draw it.
+  const scroll = fs.readFileSync('src/components/vine/documentHtml.ts', 'utf8');
+  assert.match(scroll, /if \(section\.ornament === 'divider'\) \{[\s\S]*?<use href="#cv-ornament-divider"><\/use>/);
+  const slides = fs.readFileSync('src/components/vine/SlideshowContainer.js', 'utf8');
+  assert.match(slides, /item\.ornament === "divider" \? <Divider width=\{tableWidth\} color=\{color\} \/>/);
+  assert.match(slides, /if \(section\.ornament === "medallion" \|\| section\.ornament === "divider"\)/);
+});

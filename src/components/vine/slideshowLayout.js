@@ -1050,12 +1050,14 @@ export function getPaginationItemHeight(item, measuredHeight, languageMetric, fo
  * Medallion's size.
  */
 const HEADPIECE_ASPECT = { lintel: 230 / 1200, stepped: 400 / 1200, interlace: 460 / 1200, roundels: 400 / 1200 };
+const DIVIDER_ASPECT = 90 / 1200;
 
 export function estimateItemHeight(item, fontSize, visibleLanguages, tableWidth) {
   const chrome = getSlideshowChromeMetrics(fontSize);
   if (item.type === "title" && HEADPIECE_ASPECT[item.ornament]) {
     return Math.max(tableWidth, 1) * HEADPIECE_ASPECT[item.ornament] + SPACING_SM * 2;
   }
+  if (item.type === "ornament" && item.ornament === "divider") return Math.max(tableWidth, 1) * DIVIDER_ASPECT + SPACING_SM * 4;
   if (item.type === "ornament") return Math.min(Math.max(tableWidth * 0.28, 96), 150) + SPACING_SM * 6;
   if (item.type === "title") return chrome.titleLineHeight + SPACING_SM * 2;
   if (item.type === "button") {
