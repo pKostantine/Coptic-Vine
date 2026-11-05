@@ -195,16 +195,16 @@ test('a chapter opens on its verse 1 with the drop cap and decorated first words
   const body = html.slice(html.indexOf('<body'), html.indexOf('<script>'));
   // Verse 1, past the Psalm's introduction: the Coptic on its capital's decorated initial, drawn once with its vine.
   assert.match(body, /<span class="coptic-initial" data-fit><svg class="coptic-initial-art"[^>]*><use class="coptic-initial-vine" href="#cv-initial-vine-2cb0"><\/use>/);
-  assert.ok(body.includes('<span class="coptic-initial-text">Ⲱ</span></span><span class="opening-word">ⲟⲩⲙⲁⲕⲁⲣⲓⲟⲥ</span> ⲡⲉ'));
+  assert.ok(body.includes('<span class="coptic-initial-text">Ⲱ</span></span><span class="opening-rest"><span class="opening-word">ⲟⲩⲙⲁⲕⲁⲣⲓⲟⲥ</span> ⲡⲉ'));
   assert.equal((html.match(/id="cv-initial-2cb0"/g) || []).length, 1);
   // Every English column and the French on an Old English capital; the Arabic on its stretched word; the Greek as it is.
-  assert.equal((body.match(/<span class="english-initial-text">B<\/span><\/span><span class="opening-word english-small-caps">lessed<\/span> is the man/g) || []).length, 2);
-  assert.ok(body.includes('<span class="english-initial-text">H</span></span><span class="opening-word english-small-caps">eureux</span> l’homme'));
+  assert.equal((body.match(/<span class="english-initial-text">B<\/span><\/span><span class="opening-rest"><span class="opening-word english-small-caps">lessed<\/span> is the man/g) || []).length, 2);
+  assert.ok(body.includes('<span class="english-initial-text">H</span></span><span class="opening-rest"><span class="opening-word english-small-caps">eureux</span> l’homme'));
   assert.ok(body.includes('<span class="opening-word arabic-opening">طوبـــى</span> للرجل'));
   assert.ok(body.includes('>Μακάριος ἀνήρ<'));
   // It shows no number, in any column: the number stays in the text unseen, for copying.
-  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="1">1<\/span><span class="verse-text"><span class="english-initial"/);
-  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="ⲁ̅">ⲁ̅<\/span><span class="verse-text"><span class="coptic-initial" data-fit>/);
+  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="1">1<\/span><span class="verse-text"><span class="opening"><span class="english-initial"/);
+  assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="ⲁ̅">ⲁ̅<\/span><span class="verse-text"><span class="opening"><span class="coptic-initial" data-fit>/);
   assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="١">١<\/span><span class="verse-text"><span class="opening-word arabic-opening">/);
   assert.match(body, /<span class="verse-number opening-verse-number" data-copy-text="Αʹ">Αʹ<\/span><span class="verse-text">Μακάριος/);
   assert.equal((body.match(/opening-verse-number/g) || []).length, 6);

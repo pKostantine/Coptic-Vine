@@ -4,7 +4,7 @@ import { formatCopticNumber, formatGreekNumber } from '../../utils/bibleNumerals
 import { formatEnglishDisplayText } from '../../utils/displayText';
 import { splitCopticInitial } from './copticInitial';
 import { getLanguageColumnGap } from './documentPresentationMetrics';
-import { FIT_COPTIC_INITIALS_SCRIPT, openingInitialDefs, openingInitialStyles, renderCopticInitial, renderEnglishInitial, renderOpeningRest } from './openingHtml';
+import { FIT_COPTIC_INITIALS_SCRIPT, openingInitialDefs, openingInitialStyles, renderCopticInitial, renderEnglishInitial, renderOpening, renderOpeningRest } from './openingHtml';
 import { splitArabicOpening, splitEnglishOpening } from './openingInitials';
 import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
@@ -132,7 +132,7 @@ export function buildBibleChapterHtml({
       const initial = splitCopticInitial(text);
       if (!initial) return null;
       copticInitialsUsed.add(initial.letter);
-      return renderCopticInitial(initial, false) + renderOpeningRest(initial.rest, escapeHtml);
+      return renderOpening(renderCopticInitial(initial, false), renderOpeningRest(initial.rest, escapeHtml));
     }
     if (isArabicLanguage(language)) {
       const opening = splitArabicOpening(text);
@@ -142,7 +142,7 @@ export function buildBibleChapterHtml({
     const initial = splitEnglishOpening(text);
     if (!initial) return null;
     englishInitialsUsed.add(initial.letter);
-    return renderEnglishInitial(initial, safeFontSize, verseLineHeight) + renderOpeningRest(initial.rest, escapeHtml, 'english-small-caps');
+    return renderOpening(renderEnglishInitial(initial, safeFontSize, verseLineHeight), renderOpeningRest(initial.rest, escapeHtml, 'english-small-caps'));
   };
 
   const rowHtml = verses

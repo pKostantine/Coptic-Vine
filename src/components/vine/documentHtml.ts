@@ -11,7 +11,7 @@ import { getAlternatingVerseColorIndex } from '../../utils/versePresentation';
 import { computeGlobalSuppressSpeakerLabelFlags, resolveVerseRubricType, shouldUsePeopleLineColor } from '../../utils/verseRubric';
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics, getLanguageColumnGap } from './documentPresentationMetrics';
 import { splitCopticInitial } from './copticInitial';
-import { FIT_COPTIC_INITIALS_SCRIPT, openingInitialDefs, openingInitialStyles, renderCopticInitial, renderEnglishInitial, renderOpeningRest } from './openingHtml';
+import { FIT_COPTIC_INITIALS_SCRIPT, openingInitialDefs, openingInitialStyles, renderCopticInitial, renderEnglishInitial, renderOpening, renderOpeningRest } from './openingHtml';
 import { splitArabicOpening, splitEnglishOpening } from './openingInitials';
 import { readerChromeFadeCss, readerChromeFadeHtml } from './readerChromeFade';
 import { textHighlightScript, textHighlightStyles } from './textHighlights';
@@ -1778,9 +1778,9 @@ function renderVerse(
     const bodyText = labelOnly
       ? ''
       : cellInitial
-      ? renderCopticInitial(cellInitial, centered, color === theme.colors.alternate) + renderOpeningRest(cellInitial.rest, highlightMetropolitanBrackets)
+      ? renderOpening(renderCopticInitial(cellInitial, centered, color === theme.colors.alternate), renderOpeningRest(cellInitial.rest, highlightMetropolitanBrackets))
       : englishInitial
-        ? renderEnglishInitial(englishInitial, fontSize, englishLineHeight) + renderOpeningRest(englishInitial.rest, highlightMetropolitanBrackets, 'english-small-caps')
+        ? renderOpening(renderEnglishInitial(englishInitial, fontSize, englishLineHeight), renderOpeningRest(englishInitial.rest, highlightMetropolitanBrackets, 'english-small-caps'))
         : arabicWord
           ? `${arabicWord.count ? `<span class="opening-verse-number">${escapeHtml(arabicWord.count)} </span>` : ''}<span class="opening-word arabic-opening">${escapeHtml(arabicWord.word)}</span>${highlightMetropolitanBrackets(arabicWord.rest)}`
           : highlightMetropolitanBrackets(language.text);

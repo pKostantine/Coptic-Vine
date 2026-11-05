@@ -50,5 +50,28 @@ export function copticInitialMetrics(lineHeight: number) {
   return {
     two: { ...two, right: Math.round((firstRoom - two.width - two.left) * 100) / 100, room, firstRoom },
     one: { width: em(1.67), height: lineHeight, right: em(0.14), left: em(-0.02), room: oneRoom, firstRoom: oneRoom },
+    // The lockup (Coptic Vine Reader, "One-line verses: the lockup"): a
+    // paragraph of one line keeps the two-line initial and is centred beside
+    // it, starting 0.02em after the initial's box (Ⲙ 0.04em, copticLockupGap).
+    lockup: { gap: em(0.02), wideGap: em(0.04) },
   };
+}
+
+/** The letters whose lockup line keeps a little further off (the design's Ⲙ). */
+const WIDE_LOCKUP_LETTERS = new Set(['Ⲙ']);
+
+export function hasWideLockupGap(letter: string) {
+  return WIDE_LOCKUP_LETTERS.has(letter);
+}
+
+/** How far after the initial's box a lockup's line starts, for this letter. */
+export function copticLockupGap(letter: string, lineHeight: number) {
+  const { lockup } = copticInitialMetrics(lineHeight);
+  return WIDE_LOCKUP_LETTERS.has(letter) ? lockup.wideGap : lockup.gap;
+}
+
+/** How much of a line's width a lockup's initial takes: its box (pulled left as the two-line one is) and the gap after it. */
+export function copticLockupRoom(letter: string, lineHeight: number) {
+  const { two } = copticInitialMetrics(lineHeight);
+  return Math.round((two.width + two.left + copticLockupGap(letter, lineHeight)) * 100) / 100;
 }
