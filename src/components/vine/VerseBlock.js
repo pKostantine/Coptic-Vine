@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { SPACING, TYPOGRAPHY } from "../../constants/theme";
-import { resolveRubricKey } from "../../utils/verseRubric";
+import { speakerRole } from "../../utils/verseRubric";
 import { copticInitialMetrics } from "./copticInitial";
 import JustifiedText, { glyphRoomStyle, measureJustifiedLinesWeb } from "./JustifiedText";
 import { CopticInitial } from "./ui/CopticInitial";
@@ -915,6 +915,7 @@ function getSpeakerLabel(type, language, bishopPresent) {
       people: "الشعب:",
       priest: "الكاهن:",
       reader: "القارئ:",
+      refrain: "قرار:",
     }[role] || "";
   }
 
@@ -925,6 +926,7 @@ function getSpeakerLabel(type, language, bishopPresent) {
       people: "People:",
       priest: "Priest:",
       reader: "Reader:",
+      refrain: "Refrain:",
     }[role] || "";
   }
 
@@ -935,6 +937,7 @@ function getSpeakerLabel(type, language, bishopPresent) {
       people: "L’assemblée :",
       priest: "Le prêtre :",
       reader: "Le lecteur :",
+      refrain: "Refrain :",
     }[role] || "";
   }
 
@@ -958,21 +961,15 @@ function getSpeakerColor(type, bishopPresent, theme) {
     people: theme.colors.people,
     priest: theme.colors.priest,
     reader: theme.colors.deacon,
+    refrain: theme.colors.refrain,
   }[getSpeakerRole(type, bishopPresent)] || theme.colors.people;
 }
 
-// "Bishop/Priest" (verse.type === "bishopOrPriest") resolves to "bishop" or
-// "priest" via the shared resolveRubricKey (same logic the WebView reader
-// uses) — see src/utils/verseRubric.js. Every other speaker verse type
-// ("priest", "deacon", "reader", "people") already matches its role exactly,
-// since hymnLibrary.js's getServiceVerseType only ever produces those exact
-// strings — no more prefix-guessing needed.
+// The speaker a label names (verseRubric.js, speakerRole), as the WebView
+// reader names it: "Bishop/Priest" resolves to "bishop" or "priest", and a
+// refrain is labelled "Refrain:" as in scroll mode (its Coptic place blank).
 function getSpeakerRole(type, bishopPresent) {
-  const resolved = resolveRubricKey(type, bishopPresent);
-  if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader") {
-    return resolved;
-  }
-  return "";
+  return speakerRole(type, bishopPresent);
 }
 
 function isCommentVerseType(type) {

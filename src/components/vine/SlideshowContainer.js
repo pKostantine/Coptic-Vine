@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { PanResponder, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SPACING } from "../../constants/theme";
 import { getAlternatingVerseColorIndex } from "../../utils/versePresentation";
-import { computeGlobalSuppressSpeakerLabelFlags, resolveRubricKey, shouldUsePeopleLineColor } from "../../utils/verseRubric";
+import { computeGlobalSuppressSpeakerLabelFlags, shouldUsePeopleLineColor, speakerRole } from "../../utils/verseRubric";
 import VerseBlock from "./VerseBlock";
 import { arabicItalicStyle } from "../../utils/arabicItalic";
 import { Headpiece, headpieceSize, Medallion, medallionSize } from "./ui/DocumentOrnaments";
@@ -1669,7 +1669,7 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visi
         verse,
         colorIndex: getAlternatingVerseColorIndex(section, verseIndex, bishopPresent),
         suppressSpeakerLabel: Boolean(verse.suppressSpeakerLabel) || Boolean(suppressMap.get(verse)),
-        hasSpeakerLabel: Boolean(getSpeakerRole(verse.personRole || verse.type, bishopPresent)),
+        hasSpeakerLabel: Boolean(speakerRole(verse.personRole || verse.type, bishopPresent)),
         // Computed here rather than in VerseBlock because the decision needs
         // the section (its title) as well as the verse — see
         // shouldUsePeopleLineColor, the one definition the WebView renderer
@@ -1687,14 +1687,6 @@ function flattenSections(sections, bishopPresent, suppressAllSpeakerLabels, visi
       })),
     ];
   });
-}
-
-function getSpeakerRole(type, bishopPresent) {
-  const resolved = resolveRubricKey(type, bishopPresent);
-  if (resolved === "priest" || resolved === "bishop" || resolved === "people" || resolved === "deacon" || resolved === "reader") {
-    return resolved === "bishop" ? "priest" : resolved;
-  }
-  return "";
 }
 
 // Recited Prayer is a per-verse type (a verse's own effective type after

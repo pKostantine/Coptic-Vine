@@ -9,6 +9,7 @@
 
 import { DOCUMENT_CONTROL_METRICS, getDocumentChromeMetrics } from "./documentPresentationMetrics.js";
 import { countInitialLines } from "./textLines.js";
+import { speakerRole } from "../../utils/verseRubric.js";
 
 const SPACING_XS = 4;
 const SPACING_SM = 8;
@@ -97,6 +98,8 @@ export function getSpeakerRowHeight(item = {}, fontSize = 18, visibleLanguages =
 // labels' row wherever Coptic is shown.
 function showsCopticSpeakerLabel(item, visibleLanguages) {
   const verse = item.verse || {};
+  // A refrain's label has no Coptic: its place there stays blank (VerseBlock).
+  if (speakerRole(verse.personRole || verse.type, item.bishopPresent) === "refrain") return false;
   if (copticStandsAlone(verse)) {
     return Boolean(visibleLanguages.coptic) && getVisibleVerseLanguages(item, visibleLanguages).includes("coptic");
   }
