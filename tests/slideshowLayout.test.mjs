@@ -1450,3 +1450,35 @@ test("a slide's Coptic line standing alone keeps its label's place in the labels
   // As tall as the labels it shows.
   assert.match(block, /const speakerLanguages = spanningLanguage \? labelLanguages : rowLanguages;/);
 });
+
+test("a refrain is labelled \"Refrain:\" in the slideshow as in scroll mode, its Coptic place blank", async () => {
+  const { speakerRole } = await import("../src/utils/verseRubric.js");
+  const { getSpeakerRowHeight } = await import("../src/components/vine/slideshowLayout.js");
+  assert.equal(speakerRole("refrain", false), "refrain");
+  assert.equal(speakerRole("bishopOrPriest", true), "bishop");
+  assert.equal(speakerRole("comment", false), "");
+  // The label row is as tall as the labels it shows: a refrain's has none in Coptic.
+  const visible = { english: false, french: false, coptic: true, arabic: false };
+  const refrain = { hasSpeakerLabel: true, verse: { type: "refrain", english: "Hosanna", coptic: "Ⲱⲥⲁⲛⲛⲁ" } };
+  const people = { hasSpeakerLabel: true, verse: { type: "people", english: "Amen", coptic: "Ⲁⲙⲏⲛ" } };
+  assert.equal(getSpeakerRowHeight(refrain, 18, visible), 0);
+  assert.ok(getSpeakerRowHeight(people, 18, visible) > 0);
+
+  // Both renderers name every speaker alike, in every language (documentHtml.ts's RUBRIC, VerseBlock's getSpeakerLabel).
+  const scroll = fs.readFileSync("src/components/vine/documentHtml.ts", "utf8");
+  const slides = fs.readFileSync("src/components/vine/VerseBlock.js", "utf8");
+  const labels = slides.slice(slides.indexOf("function getSpeakerLabel("), slides.indexOf("function getSpeakerColor("));
+  for (const role of ["priest", "bishop", "deacon", "reader", "people", "refrain"]) {
+    const row = new RegExp(`  ${role}: \\{ english: '([^']*)', french: '([^']*)', arabic: '([^']*)'`).exec(scroll);
+    assert.ok(row, role);
+    const [, english, french, arabic] = row;
+    for (const [language, label] of [["english", english], ["french", french], ["arabic", arabic]]) {
+      const block = labels.slice(labels.indexOf(`if (language === "${language}")`));
+      assert.match(block.slice(0, block.indexOf("}[role]")), new RegExp(`${role}: "${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `${role} in ${language}`);
+    }
+  }
+  assert.doesNotMatch(labels.slice(labels.indexOf('if (language === "coptic")')), /refrain:/, "no Coptic Refrain label, as in scroll mode");
+  assert.match(slides, /refrain: theme\.colors\.refrain,/);
+  const container = fs.readFileSync("src/components/vine/SlideshowContainer.js", "utf8");
+  assert.match(container, /hasSpeakerLabel: Boolean\(speakerRole\(verse\.personRole \|\| verse\.type, bishopPresent\)\),/);
+});

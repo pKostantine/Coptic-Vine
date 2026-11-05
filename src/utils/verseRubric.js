@@ -56,6 +56,17 @@ export function isRubricType(resolvedType) {
 }
 
 /**
+ * The speaker a verse's label names, or "" for none: Priest, Bishop, Deacon,
+ * Reader, People, and Refrain (a refrain is labelled "Refrain:" in every
+ * language but Coptic, whose place stays blank). Both renderers label from
+ * this one list.
+ */
+export function speakerRole(verseType, bishopPresent) {
+  const resolved = resolveRubricKey(verseType, bishopPresent);
+  return isRubricType(resolved) ? resolved : "";
+}
+
+/**
  * Whole-document version of speaker-label suppression: walks every section
  * in document order (not each section in isolation), so a person-type
  * indicator only re-shows where the reader would actually perceive a new

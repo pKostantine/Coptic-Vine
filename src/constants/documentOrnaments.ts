@@ -38,8 +38,9 @@ export function isHeadpiece(ornament: DocumentOrnament | undefined): ornament is
 /**
  * Each season's ornament colour on the Night page: the headpiece colour of
  * the Coptic Vine Design's season colours (Seasons, "Season colours - Night",
- * final), which the service's headpiece and the title inside it take, and so
- * every headpiece and the closing medallion.
+ * final), which the service's headpiece and the title inside it take, every
+ * other headpiece and the closing medallion, and every section title
+ * (documentInitialColors).
  */
 const ON_BLACK: Record<SeasonThemeKey, string> = {
   annual: '#5FAE68',
@@ -88,25 +89,24 @@ export function documentOrnamentColor(theme: DocumentTheme, season?: SeasonTheme
 }
 
 /**
- * The season's colours on the Night page (Coptic Vine Design, Seasons,
- * "Season colours - Night", final): the decorated initials' vine and its
+ * The decorated initials' colours on the Night page, by season (Coptic Vine
+ * Design, Seasons, "Season colours - Night", final): the vine and its
  * grapes, and in a blue alternate verse the Coptic initial's vine instead
- * (the English initials don't change); their letter, which the opening words
- * of every column take too; and the section titles. The headpieces' colour is
- * ON_BLACK's. Rubrics stay red in every season.
+ * (the English initials don't change); and their letter, which the opening
+ * words of every column take too. Rubrics stay red in every season.
  */
-const NIGHT_SEASON_COLORS: Record<SeasonThemeKey, InitialColors> = {
-  annual: { vine: '#E3B53B', vineInBlue: '#4FA3C0', letter: '#5FAE68', title: '#E3B53B' },
-  gold: { vine: '#5FAE68', vineInBlue: '#5D8FE6', letter: '#EDBE45', title: '#EDBE45' },
-  natfast: { vine: '#C2416F', vineInBlue: '#C2416F', letter: '#45A85B', title: '#EC86A2' },
-  nativity: { vine: '#EB4A3E', vineInBlue: '#5D8FE6', letter: '#45A85B', title: '#45A85B' },
-  theophany: { vine: '#2E7A72', vineInBlue: '#3E9BD6', letter: '#7FCDBD', title: '#8FD5C6' },
-  lent: { vine: '#6B3E91', vineInBlue: '#6B3E91', letter: '#C9A45C', title: '#B79BDB' },
-  palm: { vine: '#E3B53B', vineInBlue: '#66B3EE', letter: '#B2D682', title: '#B2D682' },
-  holyweek: { vine: '#3E3333', vineInBlue: '#3E3333', letter: '#D63A40', title: '#D24A42' },
-  resurrection: { vine: '#8BD08F', vineInBlue: '#5D8FE6', letter: '#EDBE45', title: '#FFFFFF' },
-  apostles: { vine: '#3E8A52', vineInBlue: '#3F92C6', letter: '#EE9F55', title: '#EE9F55' },
-  marian: { vine: '#3558C8', vineInBlue: '#5D8FE6', letter: '#F6D46A', title: '#8FB0F2' },
+const NIGHT_INITIALS: Record<SeasonThemeKey, Omit<InitialColors, 'title'>> = {
+  annual: { vine: '#E3B53B', vineInBlue: '#4FA3C0', letter: '#5FAE68' },
+  gold: { vine: '#5FAE68', vineInBlue: '#5D8FE6', letter: '#EDBE45' },
+  natfast: { vine: '#C2416F', vineInBlue: '#C2416F', letter: '#45A85B' },
+  nativity: { vine: '#EB4A3E', vineInBlue: '#5D8FE6', letter: '#45A85B' },
+  theophany: { vine: '#2E7A72', vineInBlue: '#3E9BD6', letter: '#7FCDBD' },
+  lent: { vine: '#6B3E91', vineInBlue: '#6B3E91', letter: '#C9A45C' },
+  palm: { vine: '#E3B53B', vineInBlue: '#66B3EE', letter: '#B2D682' },
+  holyweek: { vine: '#3E3333', vineInBlue: '#3E3333', letter: '#D63A40' },
+  resurrection: { vine: '#8BD08F', vineInBlue: '#5D8FE6', letter: '#EDBE45' },
+  apostles: { vine: '#3E8A52', vineInBlue: '#3F92C6', letter: '#EE9F55' },
+  marian: { vine: '#3558C8', vineInBlue: '#5D8FE6', letter: '#F6D46A' },
 };
 
 /** A page's season colours: its decorated initials' (the vine, in a blue verse too, and the letter), and its section titles'. */
@@ -119,12 +119,16 @@ export interface InitialColors {
 }
 
 /**
- * The colours a decorated initial and a section title are drawn in: on
- * Night the season's own; on every other page the titles' gold for the vine
- * (in a blue verse too) and the titles, and the ornaments' colour for the
- * letter.
+ * The colours a decorated initial and a section title are drawn in. Every
+ * section title is the colour of the season's headpiece ornaments on a page
+ * whose ornaments follow the season (Night and Paper: the Holy Fifty Days'
+ * gold, Nativity's holly green), and the page's gold on the others. On
+ * Night the initials take the season's own colours; elsewhere the titles'
+ * gold for the vine and the ornaments' colour for the letter.
  */
 export function documentInitialColors(theme: DocumentTheme, season?: SeasonThemeKey | null): InitialColors {
-  if (theme.id === 'night') return NIGHT_SEASON_COLORS[season ?? 'annual'];
-  return { vine: theme.colors.accent, vineInBlue: theme.colors.accent, letter: documentOrnamentColor(theme, season), title: theme.colors.accent };
+  const seasonal = theme.id === 'night' || theme.id === 'paper';
+  const title = seasonal ? documentOrnamentColor(theme, season) : theme.colors.accent;
+  if (theme.id === 'night') return { ...NIGHT_INITIALS[season ?? 'annual'], title };
+  return { vine: theme.colors.accent, vineInBlue: theme.colors.accent, letter: documentOrnamentColor(theme, season), title };
 }
