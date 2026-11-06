@@ -75,6 +75,8 @@ interface SermonReadingsPaneProps {
   placeLabel: string | null;
   /** Phone: the chips scroll in one line. */
   compact: boolean;
+  /** The side margin of the tabs, chips and title; the reading's own page keeps its own, running to the pane's edges. */
+  gutter: number;
   onAction: (action: DocumentAction) => void;
 }
 
@@ -84,7 +86,7 @@ interface SermonReadingsPaneProps {
  * reading itself, highlighted where it has been.
  */
 const SermonReadingsPane = forwardRef<DocumentWebViewHandle, SermonReadingsPaneProps>(function SermonReadingsPane(
-  { readings, error, onRetry, service, onServiceChange, reading, onReadingChange, highlights, preferences, arabic, ornament, season, placeLabel, compact, onAction },
+  { readings, error, onRetry, service, onServiceChange, reading, onReadingChange, highlights, preferences, arabic, ornament, season, placeLabel, compact, gutter, onAction },
   ref,
 ) {
   const counts = useMemo(() => highlightCountsByReading(readings, highlights), [readings, highlights]);
@@ -125,7 +127,7 @@ const SermonReadingsPane = forwardRef<DocumentWebViewHandle, SermonReadingsPaneP
 
   return (
     <View style={styles.pane}>
-      <View style={[styles.tabs, arabic && styles.rtl]} accessibilityRole="tablist">
+      <View style={[styles.tabs, { marginHorizontal: gutter }, arabic && styles.rtl]} accessibilityRole="tablist">
         {SERVICES.map((entry) => {
           const on = entry.key === service;
           return (
@@ -142,11 +144,11 @@ const SermonReadingsPane = forwardRef<DocumentWebViewHandle, SermonReadingsPaneP
         })}
       </View>
       {compact ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={[styles.chipsRow, arabic && styles.rtl]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={[styles.chipsRow, { paddingHorizontal: gutter }, arabic && styles.rtl]}>
           {chips}
         </ScrollView>
       ) : (
-        <View style={[styles.chipsWrap, arabic && styles.rtl]}>{chips}</View>
+        <View style={[styles.chipsWrap, { marginHorizontal: gutter }, arabic && styles.rtl]}>{chips}</View>
       )}
       {error ? (
         <LoadFailure error={error.message} onRetry={onRetry} />
@@ -154,9 +156,13 @@ const SermonReadingsPane = forwardRef<DocumentWebViewHandle, SermonReadingsPaneP
         <View style={styles.waiting} />
       ) : reading ? (
         <>
-          <View style={styles.title}>
+          <View style={[styles.title, { marginHorizontal: gutter }]}>
             <Text style={styles.kicker}>{kicker}</Text>
             {citation ? <Text style={[styles.citation, { color: ornament }]}>{citation}</Text> : null}
+            {/* A phone has no room to float the hint over the text: it sits under the title. */}
+            {compact && !readingHighlights.length ? (
+              <Text style={styles.hintInline}>{pick(arabic, 'Select a verse to highlight it into the plan', 'حدّد آية لتضيفها إلى الخطة')}</Text>
+            ) : null}
           </View>
           <View style={styles.text}>
             <DocumentSurface
@@ -173,7 +179,7 @@ const SermonReadingsPane = forwardRef<DocumentWebViewHandle, SermonReadingsPaneP
               initialColors={documentInitialColors(pageTheme, season)}
               swipeExitsInPage={false}
             />
-            {!readingHighlights.length ? (
+            {!compact && !readingHighlights.length ? (
               <View pointerEvents="none" style={styles.hint}>
                 <Icon name="create-outline" size={16} color={SERMON_COLORS.gold} />
                 <Text style={styles.hintText}>{pick(arabic, 'Select a verse to highlight it into the plan', 'حدّد آية لتضيفها إلى الخطة')}</Text>
@@ -228,4 +234,5 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   hintText: { color: SERMON_COLORS.muted, fontSize: 13 },
+  hintInline: { color: SERMON_COLORS.muted, fontSize: 12.5, marginTop: 4 },
 });
