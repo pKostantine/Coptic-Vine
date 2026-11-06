@@ -6,7 +6,6 @@ import {
   isAbstinenceFast,
   normalizeCanonDayMarks,
   normalizeCanonDocument,
-  newCanonId,
   normalizeCanonItem,
   type CanonDayMarks,
   type CanonDocument,
@@ -271,87 +270,152 @@ export async function saveCloudCanonInstructions(value: CanonInstructions): Prom
   return fromAccount(data);
 }
 
-// ─── Sharing parts of the canon ─────────────────────────────────────────────
+// ─── Support people ─────────────────────────────────────────────────────────
 
 /**
- * A copy of some of the canon's items under a link the believer hands out
- * (cv-api's create_canon_share and the rest, workers/api/src/rpc/canonShares.ts),
- * for a friend or a support group to read and take into their own canon.
+ * An invite link a believer sends to the friends, the support group, who keep
+ * them in prayer (cv-api's create_canon_support_invite and the rest,
+ * workers/api/src/rpc/canonSupport.ts). Anyone who accepts it while signed in
+ * becomes one of their support people and sees their canon and its ticks in
+ * their own app, until the believer removes them or they stop.
  */
-export interface CanonShare {
+export interface CanonSupportInvite {
   id: string;
   sharerName: string | null;
   message: string | null;
-  items: CanonItem[];
-  instructions: string | null;
+  withInstructions: boolean;
   createdAt: string;
 }
 
-/**
- * An item as it is shared: its own reminders left behind (each keeps their
- * own), and nothing of when it was set down.
- */
-export function sharedCanonItem(item: CanonItem): CanonItem {
-  const stamp = new Date(0).toISOString();
-  const base = { ...item, createdAt: stamp, updatedAt: stamp };
-  if (base.kind === 'agpeya') {
-    const quiet = (plans: typeof base.hours) => plans.map((plan) => ({ ...plan, remind: false }));
-    return { ...base, hours: quiet(base.hours), days: base.days.map(quiet) };
-  }
-  return { ...base, remind: false } as CanonItem;
+/** An invite as whoever opens its link reads it: whether it is their own, and whether they already support its maker. */
+export interface CanonSupportInviteView extends CanonSupportInvite {
+  own: boolean;
+  supporting: string | null;
 }
 
-/** A shared item taken into one's own canon: an item of its own, with a new id and written now. */
-export function adoptedCanonItem(item: CanonItem, now = new Date()): CanonItem {
-  const stamp = now.toISOString();
-  return { ...sharedCanonItem(item), id: newCanonId(), createdAt: stamp, updatedAt: stamp };
+/** One of the believer's support people, or someone the account supports. */
+export interface CanonSupportPerson {
+  id: string;
+  name: string;
+  withInstructions: boolean;
+  since: string;
+}
+
+/** The canon of someone the account supports: as it is now, with its marks for the days read. */
+export interface SupportedCanon {
+  id: string;
+  name: string;
+  items: CanonItem[];
+  days: Record<string, CanonDayMarks>;
+  instructions: string | null;
 }
 
 /**
- * The link to a shared canon, to send. It carries the sharer's App Language,
- * so the preview a chat shows of it (workers/web-app) speaks as they do.
+ * The invite link, to send. It carries the sharer's App Language, so the
+ * preview a chat shows of it (workers/web-app) speaks as they do.
  */
-export function canonShareUrl(id: string, language: AppLanguage = getCurrentAppLanguage()): string {
-  const path = `/canon/shared/${encodeURIComponent(id)}`;
+export function canonInviteUrl(id: string, language: AppLanguage = getCurrentAppLanguage()): string {
+  const path = `/canon/invite/${encodeURIComponent(id)}`;
   return publicUrl(language === 'en' ? path : `${path}?lang=${language}`);
 }
 
-function shareFromAccount(data: unknown): CanonShare {
-  const row = (data ?? {}) as Record<string, unknown>;
+function record(data: unknown): Record<string, unknown> {
+  return (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+}
+
+function inviteFromAccount(data: unknown): CanonSupportInviteView {
+  const row = record(data);
   return {
     id: String(row.id ?? ''),
-    sharerName: typeof row.sharerName === 'string' ? row.sharerName : null,
-    message: typeof row.message === 'string' ? row.message : null,
-    items: (Array.isArray(row.items) ? row.items : []).map((item) => normalizeCanonItem(item)).filter((item): item is CanonItem => Boolean(item)),
-    instructions: typeof row.instructions === 'string' ? row.instructions : null,
+    sharerName: typeof row.sharerName === 'string' && row.sharerName.trim() ? row.sharerName : null,
+    message: typeof row.message === 'string' && row.message.trim() ? row.message : null,
+    withInstructions: row.withInstructions === true,
     createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(0).toISOString(),
+    own: row.own === true,
+    supporting: typeof row.supporting === 'string' ? row.supporting : null,
   };
 }
 
-export async function createCanonShare(share: { items: CanonItem[]; name: string; message: string; instructions: string | null }): Promise<CanonShare> {
-  const { data, error } = await api.rpc('create_canon_share', {
-    p_items: share.items.map(sharedCanonItem),
-    p_name: share.name.trim() || null,
-    p_message: share.message.trim() || null,
-    p_instructions: share.instructions?.trim() || null,
+function personFromAccount(data: unknown): CanonSupportPerson {
+  const row = record(data);
+  return {
+    id: String(row.id ?? ''),
+    name: typeof row.name === 'string' ? row.name : '',
+    withInstructions: row.withInstructions === true,
+    since: typeof row.since === 'string' ? row.since : new Date(0).toISOString(),
+  };
+}
+
+function list<T>(data: unknown, each: (row: unknown) => T): T[] {
+  return (Array.isArray(data) ? data : []).map(each);
+}
+
+export async function createCanonSupportInvite(invite: { name: string; message: string; withInstructions: boolean }): Promise<CanonSupportInvite> {
+  const { data, error } = await api.rpc('create_canon_support_invite', {
+    p_name: invite.name.trim() || null,
+    p_message: invite.message.trim() || null,
+    p_with_instructions: invite.withInstructions,
   });
-  if (error) throw new Error(error.message || 'Unable to share your canon.');
-  return shareFromAccount(data);
+  if (error) throw new Error(error.message || 'Unable to make the invite link.');
+  return inviteFromAccount(data);
 }
 
-export async function loadCanonShare(id: string): Promise<CanonShare> {
-  const { data, error } = await api.rpc('get_canon_share', { p_id: id });
-  if (error) throw new Error(error.message || 'Unable to open this shared canon.');
-  return shareFromAccount(data);
+export async function listMyCanonSupportInvites(): Promise<CanonSupportInvite[]> {
+  const { data, error } = await api.rpc('list_my_canon_support_invites');
+  if (error) throw new Error(error.message || 'Unable to load your invite links.');
+  return list(data, inviteFromAccount);
 }
 
-export async function listMyCanonShares(): Promise<CanonShare[]> {
-  const { data, error } = await api.rpc('list_my_canon_shares');
-  if (error) throw new Error(error.message || 'Unable to load your shared links.');
-  return (Array.isArray(data) ? data : []).map(shareFromAccount);
+export async function deleteMyCanonSupportInvite(id: string): Promise<void> {
+  const { error } = await api.rpc('delete_my_canon_support_invite', { p_id: id });
+  if (error) throw new Error(error.message || 'Unable to turn the link off.');
 }
 
-export async function deleteMyCanonShare(id: string): Promise<void> {
-  const { error } = await api.rpc('delete_my_canon_share', { p_id: id });
-  if (error) throw new Error(error.message || 'Unable to stop sharing.');
+export async function loadCanonSupportInvite(id: string): Promise<CanonSupportInviteView> {
+  const { data, error } = await api.rpc('get_canon_support_invite', { p_id: id });
+  if (error) throw new Error(error.message || 'Unable to open this invite.');
+  return inviteFromAccount(data);
+}
+
+export async function acceptCanonSupportInvite(id: string): Promise<CanonSupportPerson> {
+  const { data, error } = await api.rpc('accept_canon_support_invite', { p_id: id });
+  if (error) throw new Error(error.message || 'Unable to accept the invite.');
+  return personFromAccount(data);
+}
+
+export async function listMyCanonSupporters(): Promise<CanonSupportPerson[]> {
+  const { data, error } = await api.rpc('list_my_canon_supporters');
+  if (error) throw new Error(error.message || 'Unable to load your support people.');
+  return list(data, personFromAccount);
+}
+
+export async function removeMyCanonSupporter(id: string): Promise<void> {
+  const { error } = await api.rpc('remove_my_canon_supporter', { p_id: id });
+  if (error) throw new Error(error.message || 'Unable to remove them.');
+}
+
+export async function listCanonsISupport(): Promise<CanonSupportPerson[]> {
+  const { data, error } = await api.rpc('list_canons_i_support');
+  if (error) throw new Error(error.message || 'Unable to load those you support.');
+  return list(data, personFromAccount);
+}
+
+export async function stopSupportingCanon(id: string): Promise<void> {
+  const { error } = await api.rpc('stop_supporting_canon', { p_id: id });
+  if (error) throw new Error(error.message || 'Unable to stop supporting.');
+}
+
+/** Their canon with its marks from one day to another (a week, as the page shows it). */
+export async function loadSupportedCanon(id: string, fromDay: string, toDay: string): Promise<SupportedCanon> {
+  const { data, error } = await api.rpc('get_supported_canon', { p_id: id, p_from_day: fromDay, p_to_day: toDay });
+  if (error) throw new Error(error.message || 'Unable to open their canon.');
+  const row = record(data);
+  const days = record(row.days);
+  return {
+    id: String(row.id ?? id),
+    name: typeof row.name === 'string' ? row.name : '',
+    items: list(row.items, normalizeCanonItem).filter((item): item is CanonItem => Boolean(item)),
+    days: Object.fromEntries(Object.entries(days).map(([day, marks]) => [day, normalizeCanonDayMarks(marks)])),
+    instructions: typeof row.instructions === 'string' && row.instructions.trim() ? row.instructions : null,
+  };
 }

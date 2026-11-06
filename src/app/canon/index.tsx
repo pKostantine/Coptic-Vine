@@ -1,15 +1,15 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
 import Head from 'expo-router/head';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import CanonInstructions from '@/components/canon/CanonInstructions';
-import { CanonProgressBar, CanonSkippedRow, CanonTaskRow, CanonWeekStrip, type CanonDayState } from '@/components/canon/CanonParts';
+import { CanonProgressBar, CanonSkippedRow, CanonTaskRow, CanonWeekCard, type CanonDayState } from '@/components/canon/CanonParts';
 import { dayProgressLabel, paschaAgpeyaNote } from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { PageGlow } from '@/components/vine/screens/BookPage';
+import { PageGlow, SectionHeading } from '@/components/vine/screens/BookPage';
 import BleedPage from '@/components/vine/ui/BleedPage';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
@@ -18,8 +18,9 @@ import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
 import { useCanonInstructions } from '@/hooks/useCanonInstructions';
+import { listCanonsISupport, type CanonSupportPerson } from '@/services/spiritualCanonService';
 import { tr } from '@/utils/appText';
-import { formatDayMonthDate, formatDayMonthRange } from '@/utils/localeFormat';
+import { formatDayMonthDate } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
 import { addCanonDays, canonDayDate, canonDayProgress, canonNeedsCalendar, canonTaskRoute, canonWeekStart } from '@/utils/spiritualCanon';
 
@@ -39,9 +40,20 @@ export default function CanonScreen() {
   // A father of confession's instructions, kept at the top of the canon to read beside it.
   const instructions = useCanonInstructions();
   const [chosen, setChosen] = useState<string | null>(null);
+  // Those whose canon this account sees as their support person, read again each time the page is opened.
+  const [supporting, setSupporting] = useState<CanonSupportPerson[]>([]);
+  const { signedIn } = canon;
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    if (signedIn) {
+      listCanonsISupport()
+        .then((people) => { if (live) setSupporting(people); })
+        .catch(() => undefined);
+    }
+    return () => { live = false; };
+  }, [signedIn]));
   const day = chosen ?? canon.today;
   const weekStart = canonWeekStart(day);
-  const weekDays = Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset));
   // Metanias kept by the calendar, and the Agpeya (Pascha): the week shown is read from the calendar.
   const keepsApplicableDays = canonNeedsCalendar(canon.items);
   const { ensureCalendarDays } = canon;
@@ -87,12 +99,12 @@ export default function CanonScreen() {
     <View style={styles.headerButtons}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={tr('Share parts of your canon', 'Partager une partie de votre canon', 'شارك أجزاء من قانونك')}
+        accessibilityLabel={tr('Support people', 'Personnes de soutien', 'الأشخاص الداعمون')}
         hitSlop={6}
-        onPress={() => router.push('/canon/share' as never)}
+        onPress={() => router.push('/canon/supporters' as never)}
         style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
       >
-        <Icon name="share-outline" size={18} color={COLORS.gold} />
+        <Icon name="people-outline" size={19} color={COLORS.gold} />
       </Pressable>
       {editButton}
     </View>
@@ -118,30 +130,7 @@ export default function CanonScreen() {
             <EmptyCanon arabic={arabic} onStart={() => router.push('/canon/edit' as never)} />
           ) : (
             <>
-              <View style={styles.weekCard}>
-                <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-                <View style={styles.weekHead}>
-                  <WeekArrow
-                    direction="back"
-                    label={tr('The week before', 'La semaine précédente', 'الأسبوع السابق')}
-                    onPress={() => setChosen(addCanonDays(day, -7))}
-                  />
-                  <Text style={[styles.weekRange, arabic && styles.arabicCentered]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                    {formatDayMonthRange(canonDayDate(weekDays[0]), canonDayDate(weekDays[6]), arabic)}
-                  </Text>
-                  <WeekArrow
-                    direction="forward"
-                    label={tr('The week after', 'La semaine suivante', 'الأسبوع التالي')}
-                    onPress={() => setChosen(addCanonDays(day, 7))}
-                  />
-                </View>
-                <CanonWeekStrip days={weekDays} selected={day} today={canon.today} arabic={arabic} stateOf={stateOf} onSelect={setChosen} />
-                {day !== canon.today ? (
-                  <Pressable accessibilityRole="button" onPress={() => setChosen(null)} style={({ pressed }) => [styles.todayLink, pressed && styles.pressed]}>
-                    <Text style={[styles.todayLinkText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Back to today', 'Revenir à aujourd’hui', 'العودة إلى اليوم')}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
+              <CanonWeekCard day={day} today={canon.today} arabic={arabic} stateOf={stateOf} onChoose={setChosen} />
 
               <View style={styles.dayHead}>
                 {dayKicker ? <Text style={[styles.kicker, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{dayKicker}</Text> : null}
@@ -205,6 +194,30 @@ export default function CanonScreen() {
             </>
           )}
 
+          {signedIn && supporting.length ? (
+            <View style={styles.supporting}>
+              <SectionHeading size="page" title={tr('People You Support', 'Ceux que vous soutenez', 'من تدعمهم')} arabic={arabic} />
+              <View style={styles.rows}>
+                {supporting.map((person) => (
+                  <Pressable
+                    key={person.id}
+                    accessibilityRole="button"
+                    onPress={() => router.push(`/canon/supporting/${encodeURIComponent(person.id)}` as never)}
+                    style={({ pressed }) => [styles.personRow, pressed && styles.pressed]}
+                  >
+                    <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+                    {/* Icons in Views of their own: beside the absolute gradient, a bare icon paints under it on the web. */}
+                    <View><Icon name="person-circle-outline" size={22} color={COLORS.gold} /></View>
+                    <Text style={[styles.personName, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                      {person.name || tr('Someone you support', 'Une personne que vous soutenez', 'شخص تدعمه')}
+                    </Text>
+                    <View><Icon name="chevron-forward" size={16} color={COLORS.muted} /></View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           {canon.loaded && !canon.signedIn ? (
             <Pressable accessibilityRole="button" onPress={() => router.push('/account' as never)} style={({ pressed }) => [styles.account, pressed && styles.pressed]}>
               <Icon name="person-circle-outline" size={22} color={COLORS.gold} />
@@ -226,14 +239,6 @@ export default function CanonScreen() {
         </View>
       </NowPlayingAwareScrollView>
     </BleedPage>
-  );
-}
-
-function WeekArrow({ direction, label, onPress }: { direction: 'back' | 'forward'; label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={6} onPress={onPress} style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}>
-      <Icon name={direction === 'back' ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
-    </Pressable>
   );
 }
 
@@ -266,19 +271,15 @@ const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', gap: 8 },
   roundButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
 
-  weekCard: { borderRadius: 20, gap: 12, overflow: 'hidden', paddingBottom: 12, paddingHorizontal: 12, paddingTop: 12 },
-  weekHead: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  weekRange: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  arrow: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
-  todayLink: { alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 2 },
-  todayLinkText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
-
   dayHead: { gap: 4, paddingHorizontal: 4, paddingTop: 4 },
   kicker: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12, fontWeight: '700', letterSpacing: 1.7, textTransform: 'uppercase' },
   dayTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 23, fontWeight: '700' },
   progress: { gap: 6, marginTop: 6 },
   progressText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13 },
   rows: { gap: 8 },
+  supporting: { marginTop: 10 },
+  personRow: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, minHeight: 56, overflow: 'hidden', paddingHorizontal: 14 },
+  personName: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '600' },
   note: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
   noteText: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14.5 },
   skipped: { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },

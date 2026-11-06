@@ -73,6 +73,8 @@ interface SpiritualCanonValue {
   /** The device's calendar day, "YYYY-MM-DD"; it turns at midnight. */
   today: string;
   tasksFor: (day: string) => CanonTask[];
+  /** What the calendar says of the days read so far: for a canon other than one's own, a support person's (canonTasksForDay). */
+  calendar: CanonCalendar;
   /** Reads from the calendar whether metanias are made on these days (the week the canon page shows). */
   ensureCalendarDays: (days: string[]) => void;
   /** Ticks a task off for a day, or unticks it. A day still to come can't be ticked. */
@@ -465,6 +467,7 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     items: document.items,
     today,
     tasksFor,
+    calendar,
     ensureCalendarDays,
     setTaskDone,
     skippedFor,
@@ -477,7 +480,7 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     reminderPermission,
     requestReminderPermission,
     syncFailed,
-  }), [agpeyaOn, deleteItem, document.items, ensureCalendarDays, loaded, setTaskSkipped, skippedFor, reminderPermission, remindersEnabled, requestReminderPermission, saveItem, setRemindersEnabled, setTaskDone, syncFailed, tasksFor, today, userId]);
+  }), [agpeyaOn, calendar, deleteItem, document.items, ensureCalendarDays, loaded, setTaskSkipped, skippedFor, reminderPermission, remindersEnabled, requestReminderPermission, saveItem, setRemindersEnabled, setTaskDone, syncFailed, tasksFor, today, userId]);
 
   return <SpiritualCanonContext.Provider value={value}>{children}</SpiritualCanonContext.Provider>;
 }

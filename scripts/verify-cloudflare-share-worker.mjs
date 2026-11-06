@@ -11,7 +11,7 @@ const requiredRoutes = [
   '/learn/cantor/*',
   '/learn/album/*',
   '/learn/lesson/*',
-  '/canon/shared/*',
+  '/canon/invite/*',
 ];
 
 const [worker, configSource, appShell] = await Promise.all([
@@ -28,7 +28,7 @@ if (!appShell.includes('COPTIC_VINE_SHARE_META_START')) {
   throw new Error('Expo app shell is missing the replaceable share metadata block.');
 }
 
-for (const marker of ['X-Coptic-Vine-Share-Preview', '/__share-image', 'get_share_preview', 'get_canon_share', 'Content-Profile']) {
+for (const marker of ['X-Coptic-Vine-Share-Preview', '/__share-image', 'get_share_preview', 'get_canon_support_invite', 'Content-Profile']) {
   if (!worker.includes(marker)) {
     throw new Error(`Cloudflare share worker is missing required marker: ${marker}`);
   }
@@ -66,8 +66,8 @@ if (!/^\/\*\s*\n(?:\s+[\w-]+: .+\n?)+/m.test(headersFile) || !headersFile.includ
   throw new Error('dist/_headers is missing or does not harden every asset response (see public/_headers).');
 }
 
-// The card a shared canon's link previews with (scripts/build-share-card.mjs).
-for (const card of ['../dist/coptic-vine-share.png', '../dist/coptic-vine-canon-share.png']) {
+// The cards links preview with: the app's, and a canon invite's (scripts/build-share-card.mjs).
+for (const card of ['../dist/coptic-vine-share.png', '../dist/coptic-vine-canon-invite.png']) {
   await access(new URL(card, import.meta.url)).catch(() => {
     throw new Error(`The export is missing a link preview card: ${card.slice('../'.length)} (node scripts/build-share-card.mjs).`);
   });

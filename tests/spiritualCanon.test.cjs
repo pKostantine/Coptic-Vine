@@ -298,7 +298,7 @@ test('Home shows today’s canon in every layout, after the prayer of the hour',
   assert.match(page, /onSkip=\{\(\) => canon\.setTaskSkipped\(day, task\.key, true\)\}/);
   // The tick and the way into the prayer are side by side, never one inside the other (a button may not hold a button on the web).
   const parts = read('src/components/canon/CanonParts.tsx');
-  assert.match(parts, /<CanonCheck done=\{task\.done\} disabled=\{disabled\} label=\{checkLabel\} onPress=\{\(\) => onToggle\(!task\.done\)\} \/>\n\s+\{opens \? \(/);
+  assert.match(parts, /<CanonCheck done=\{task\.done\} disabled=\{disabled\} label=\{checkLabel\} onPress=\{toggle\} \/>\n\s+\{opens \? \(/);
   // So on Home's timeline: the dot on the rail, then the task and its Pray or Read.
   assert.match(parts, /onPress=\{\(\) => onToggle\(!task\.done\)\}[^]*?<\/Pressable>\n\s+<\/View>\n\s+<Pressable\n\s+accessibilityRole="button"/);
 });
