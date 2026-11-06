@@ -45,6 +45,7 @@ import {
   sermonPlanState,
   unplacedHighlightGroups,
 } from '@/utils/sermonPlanner';
+import { READING_FONT_BASE_PX } from '@/utils/readingFontSize';
 import { useContentWidth, useLayoutMode } from '@/utils/useLayoutMode';
 import type { DocumentAction, DocumentWebViewHandle } from '../DocumentWebView';
 import BleedPage from '../ui/BleedPage';
@@ -470,9 +471,14 @@ function Workspace({ planId, isoDate, plans, rail, pickDay, onPickDayHandled, on
       reading={reading}
       onReadingChange={(next) => setReadingKey(next.key)}
       highlights={plan.highlights}
+      // The readings are set as the planner's own page: black, as Night is,
+      // whatever page the reader reads on, and no larger than the design's
+      // working size (a smaller choice of the reader's stays smaller).
       preferences={{
         ...preferences,
         slideshowMode: false,
+        documentTheme: 'night',
+        fontScale: Math.min(preferences.fontScale, (phone ? 18 : 19) / READING_FONT_BASE_PX),
         visibleLanguages: {
           ...preferences.visibleLanguages,
           english: !arabic,
@@ -486,6 +492,7 @@ function Workspace({ planId, isoDate, plans, rail, pickDay, onPickDayHandled, on
       season={day.seasonKey}
       placeLabel={placeLabel}
       compact={!twoPane}
+      gutter={twoPane ? 28 : 16}
       onAction={handleAction}
     />
   );
@@ -560,8 +567,13 @@ function Workspace({ planId, isoDate, plans, rail, pickDay, onPickDayHandled, on
   ) : (
     <View style={styles.narrow}>
       <View style={styles.narrowHead}>
-        {titleInput(22)}
-        {metaLine(false)}
+        {/* The plan's name over the plan; the readings and highlights keep the room for themselves. */}
+        {phoneTab === 'plan' ? (
+          <>
+            {titleInput(22)}
+            {metaLine(false)}
+          </>
+        ) : null}
         <View style={styles.tabs}>
           <Segmented
             stretch
@@ -872,7 +884,7 @@ const styles = StyleSheet.create({
   topPhone: { gap: 8, paddingBottom: 8, paddingHorizontal: 14 },
   topMiddle: { alignItems: 'center', flex: 1, minWidth: 0 },
   body: { flex: 1, flexDirection: 'row', minHeight: 0 },
-  readingsColumn: { flex: 1, minWidth: 0, paddingHorizontal: 28, paddingTop: 14 },
+  readingsColumn: { flex: 1, minWidth: 0, paddingTop: 14 },
   planColumn: { backgroundColor: SERMON_COLORS.surface, minHeight: 0 },
   planHead: { paddingBottom: 10, paddingHorizontal: 22, paddingTop: 18 },
   titleInput: { color: SERMON_COLORS.text, fontFamily: TYPOGRAPHY.title, fontWeight: '700', margin: 0, padding: 0 },
@@ -887,7 +899,7 @@ const styles = StyleSheet.create({
   narrow: { flex: 1, minHeight: 0 },
   narrowHead: { paddingHorizontal: 16, paddingTop: 6 },
   tabs: { marginBottom: 12, marginTop: 10 },
-  narrowReadings: { flex: 1, minHeight: 0, paddingHorizontal: 16 },
+  narrowReadings: { flex: 1, minHeight: 0 },
   // The menu
   menuBackdrop: { flex: 1 },
   menuBackdropCentred: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', padding: 24 },
