@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import CanonInstructions from '@/components/canon/CanonInstructions';
 import { CanonProgressBar, CanonSkippedRow, CanonTaskRow, CanonWeekStrip, type CanonDayState } from '@/components/canon/CanonParts';
 import { dayProgressLabel, paschaAgpeyaNote } from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
@@ -16,6 +17,7 @@ import SubPageHeader from '@/components/vine/ui/SubPageHeader';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
+import { useCanonInstructions } from '@/hooks/useCanonInstructions';
 import { tr } from '@/utils/appText';
 import { formatDayMonthDate, formatDayMonthRange } from '@/utils/localeFormat';
 import { goBack } from '@/utils/navigation';
@@ -34,6 +36,8 @@ export default function CanonScreen() {
   const { preferences } = useReadingPreferences();
   const arabic = preferences.appLanguage === 'ar';
   const canon = useSpiritualCanon();
+  // A father of confession's instructions, kept at the top of the canon to read beside it.
+  const instructions = useCanonInstructions();
   const [chosen, setChosen] = useState<string | null>(null);
   const day = chosen ?? canon.today;
   const weekStart = canonWeekStart(day);
@@ -94,6 +98,7 @@ export default function CanonScreen() {
       />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.column}>
+          {instructions.loaded ? <CanonInstructions text={instructions.text} arabic={arabic} onChange={instructions.setText} /> : null}
           {canon.loaded && !canon.items.length ? (
             <EmptyCanon arabic={arabic} onStart={() => router.push('/canon/edit' as never)} />
           ) : (
@@ -194,7 +199,7 @@ export default function CanonScreen() {
               <Icon name="chevron-forward" size={16} color={COLORS.gold} />
             </Pressable>
           ) : null}
-          {canon.signedIn && canon.syncFailed ? (
+          {canon.signedIn && (canon.syncFailed || instructions.syncFailed) ? (
             <Text style={[styles.quiet, arabic && styles.arabic]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
               {tr(
                 'Saved on this device. It will reach your account once you are back online.',
