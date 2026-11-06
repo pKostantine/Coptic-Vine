@@ -32,7 +32,9 @@ test('shared items leave their reminders behind; taken in, they are items of one
   assert.match(service, /api\.rpc\('create_canon_share'/);
   assert.match(service, /api\.rpc\('get_canon_share', \{ p_id: id \}\)/);
   assert.match(service, /api\.rpc\('delete_my_canon_share', \{ p_id: id \}\)/);
-  assert.match(service, /publicUrl\(`\/canon\/shared\/\$\{encodeURIComponent\(id\)\}`\)/);
+  assert.match(service, /const path = `\/canon\/shared\/\$\{encodeURIComponent\(id\)\}`;/);
+  // The sharer's App Language rides along, for the link's preview (workers/web-app).
+  assert.match(service, /publicUrl\(language === 'en' \? path : `\$\{path\}\?lang=\$\{language\}`\)/);
 });
 
 test('the canon page leads to sharing; a shared canon is never indexed', () => {

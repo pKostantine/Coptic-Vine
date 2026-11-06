@@ -16,7 +16,8 @@
       "/music/track/*",
       "/learn/cantor/*",
       "/learn/album/*",
-      "/learn/lesson/*"
+      "/learn/lesson/*",
+      "/canon/shared/*"
     ]
   },
   "observability": {
