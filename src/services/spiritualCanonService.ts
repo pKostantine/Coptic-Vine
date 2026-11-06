@@ -185,3 +185,85 @@ export async function saveCloudCanonDays(userId: string, days: Record<string, Ca
   const { error } = await api.from('spiritual_canon_days').upsert(rows, { onConflict: 'user_id,day' });
   if (error) throw new Error(error.message || 'Unable to save the spiritual canon’s days.');
 }
+
+// ─── The canon's instructions ───────────────────────────────────────────────
+
+/**
+ * What a believer's father of confession told them of their canon, written
+ * down beside it: kept on the device for each account (and for no account),
+ * and in the account through cv-api (get_my_canon_instructions,
+ * save_my_canon_instructions), the later copy kept.
+ */
+export interface CanonInstructions {
+  text: string;
+  /** When it was last written; null for none written. */
+  updatedAt: string | null;
+}
+
+const INSTRUCTIONS_PREFIX = 'cv-spiritual-canon-instructions-v1';
+
+function instructionsKey(identity: string) {
+  return `${INSTRUCTIONS_PREFIX}-${encodeURIComponent(identity)}`;
+}
+
+/** When a copy was written, as a time; the beginning of time for one never written. */
+function writtenTime(value: CanonInstructions): number {
+  const time = value.updatedAt ? Date.parse(value.updatedAt) : Number.NaN;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+/** The later of two copies; the first when they were written at once. */
+export function laterCanonInstructions(a: CanonInstructions, b: CanonInstructions): CanonInstructions {
+  return writtenTime(b) > writtenTime(a) ? b : a;
+}
+
+export async function loadLocalCanonInstructions(identity: string): Promise<CanonInstructions> {
+  try {
+    const raw = await readText(instructionsKey(identity));
+    const parsed = raw ? JSON.parse(raw) as Partial<CanonInstructions> : null;
+    return {
+      text: typeof parsed?.text === 'string' ? parsed.text : '',
+      updatedAt: typeof parsed?.updatedAt === 'string' && !Number.isNaN(Date.parse(parsed.updatedAt)) ? parsed.updatedAt : null,
+    };
+  } catch {
+    return { text: '', updatedAt: null };
+  }
+}
+
+export async function saveLocalCanonInstructions(identity: string, value: CanonInstructions): Promise<void> {
+  try {
+    await writeText(instructionsKey(identity), JSON.stringify(value));
+  } catch {
+    // The account's copy (when signed in) still holds it.
+  }
+}
+
+/** Forgets the signed-out copy once it has gone into an account. */
+export async function clearLocalCanonInstructions(identity: string): Promise<void> {
+  try {
+    await removeText(instructionsKey(identity));
+  } catch {
+    // Nothing to forget.
+  }
+}
+
+function fromAccount(data: unknown): CanonInstructions {
+  const row = (data ?? {}) as { instructions?: unknown; updatedAt?: unknown };
+  return {
+    text: typeof row.instructions === 'string' ? row.instructions : '',
+    updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : null,
+  };
+}
+
+export async function loadCloudCanonInstructions(): Promise<CanonInstructions> {
+  const { data, error } = await api.rpc('get_my_canon_instructions');
+  if (error) throw new Error(error.message || 'Unable to load the canon’s instructions.');
+  return fromAccount(data);
+}
+
+/** Sends a copy; the account keeps the later of its own and this one, and returns what it kept. */
+export async function saveCloudCanonInstructions(value: CanonInstructions): Promise<CanonInstructions> {
+  const { data, error } = await api.rpc('save_my_canon_instructions', { p_instructions: value.text, p_written_at: value.updatedAt });
+  if (error) throw new Error(error.message || 'Unable to save the canon’s instructions.');
+  return fromAccount(data);
+}
