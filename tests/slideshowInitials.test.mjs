@@ -115,7 +115,7 @@ test("a verse opens with the initial only where it is marked to, as in the scrol
   assert.doesNotMatch(verseBlock, /leadNumber|verseNumberLeadWidth|withLead|LEAD_ROW_STYLE/);
   // The scrolling reader's rule, for the two to agree.
   const page = source("components/vine/documentHtml.ts");
-  assert.match(page, /const opens = Boolean\(verse\.dropCap\);/);
+  assert.match(page, /const opens = Boolean\(verse\.dropCap\) && !sermonPlannerMode;/);
   assert.match(page, /const initial = opens && copticCell \? splitCopticInitial\(copticCell\.text\) : null;/);
   assert.match(page, /const frenchOpening = opens && !isCentered \? splitEnglishOpening\(verse\.french \|\| ''\) : null;/);
   assert.doesNotMatch(page, /initialPending|opensInTranslation|openingRefrain/);

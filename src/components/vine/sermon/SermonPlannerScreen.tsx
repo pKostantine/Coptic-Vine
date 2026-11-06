@@ -28,7 +28,8 @@ import { sermonDayName, useSermonDay, type SermonDay } from '@/hooks/useSermonDa
 import { useSermonPlan, type SermonPlanSyncStatus } from '@/hooks/useSermonPlanner';
 import { useSermonPlans } from '@/hooks/useSermonPlans';
 import { useSermonReadings, type SermonReading } from '@/hooks/useSermonReadings';
-import type { SermonPlanSummary } from '@/types/sermonPlanner';
+import type { SermonPlan, SermonPlanSummary } from '@/types/sermonPlanner';
+import { loadLocalSermonPlan } from '@/services/sermonPlannerService';
 import { groupHighlights, highlightGroupId } from '@/utils/highlightGroups';
 import { goBack } from '@/utils/navigation';
 import type { LectionaryService } from '@/utils/readingsService';
@@ -40,6 +41,7 @@ import {
   isSermonHighlightColor,
   isSermonPartWritten,
   newSermonPlanId,
+  sermonPlanGroups,
   sermonPlanState,
   unplacedHighlightGroups,
 } from '@/utils/sermonPlanner';
@@ -62,6 +64,7 @@ import {
   SermonDatePill,
   SermonPlanCard,
 } from './SermonPieces';
+import SermonCarryOver from './SermonCarryOver';
 import SermonPreachMode from './SermonPreachMode';
 import SermonReadingsPane, { readingOfHighlight } from './SermonReadingsPane';
 
@@ -93,17 +96,6 @@ function syncLabel(status: SermonPlanSyncStatus, signedIn: boolean, arabic: bool
   return pick(arabic, 'Synced', 'متزامنة');
 }
 
-/** The plans by when they are: still to come, earlier ones not yet preached, and those preached. */
-function groupPlans(plans: SermonPlanSummary[], todayIso: string) {
-  const upcoming = plans.filter((plan) => plan.state !== 'preached' && plan.serviceDate >= todayIso)
-    .sort((a, b) => a.serviceDate.localeCompare(b.serviceDate) || a.updatedAt.localeCompare(b.updatedAt));
-  const earlier = plans.filter((plan) => plan.state !== 'preached' && plan.serviceDate < todayIso)
-    .sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
-  const preached = plans.filter((plan) => plan.state === 'preached')
-    .sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
-  return { upcoming, earlier, preached };
-}
-
 // ─── The list of plans ──────────────────────────────────────────────────────
 
 function GroupHeading({ title, count, compact, arabic }: { title: string; count?: number; compact: boolean; arabic: boolean }) {
@@ -115,21 +107,32 @@ function GroupHeading({ title, count, compact, arabic }: { title: string; count?
   );
 }
 
+/** A day of the week still to be planned, as a plan card shows it: its untouched plan, or `new:<date>`. */
+function dayPlaceholder(isoDate: string, untouched: SermonPlanSummary | null): SermonPlanSummary {
+  return untouched ?? {
+    id: `new:${isoDate}`, documentKey: '', serviceDate: isoDate, title: '', state: 'notStarted',
+    writtenParts: 0, totalParts: 6, preachedSeconds: null, highlightCount: 0, updatedAt: '',
+  };
+}
+
 function PlanList({
-  plans, todayIso, selectedId, arabic, compact, onOpen, onPlanDay, onRemove,
+  plans, todayIso, selectedId, arabic, compact, onOpen, onPlanDay, onMenu, onCarryOver,
 }: {
   plans: SermonPlanSummary[];
   todayIso: string;
   selectedId?: string | null;
   arabic: boolean;
   compact: boolean;
+  /** A plan, or a day of the week to plan (`new:<date>`). */
   onOpen: (plan: SermonPlanSummary) => void;
   onPlanDay: () => void;
-  onRemove: (plan: SermonPlanSummary) => void;
+  /** A long press on a plan: Carry over, Remove. */
+  onMenu: (plan: SermonPlanSummary) => void;
+  onCarryOver: (plan: SermonPlanSummary) => void;
 }) {
-  const { upcoming, earlier, preached } = groupPlans(plans, todayIso);
+  const { week, later, earlier } = sermonPlanGroups(plans, todayIso);
   const name = (day: SermonDay) => sermonDayName(day, arabic);
-  const card = (plan: SermonPlanSummary) => (
+  const card = (plan: SermonPlanSummary, carryOver = false) => (
     <SermonPlanCard
       key={plan.id}
       plan={plan}
@@ -138,33 +141,32 @@ function PlanList({
       selected={plan.id === selectedId}
       fallbackTitle={name}
       onPress={() => onOpen(plan)}
-      onLongPress={() => onRemove(plan)}
+      onLongPress={plan.id.startsWith('new:') ? undefined : () => onMenu(plan)}
+      action={carryOver ? { icon: 'repeat', label: pick(arabic, 'Carry over to another day', 'انقلها إلى يوم آخر'), onPress: () => onCarryOver(plan) } : undefined}
     />
   );
   const planDay = (
     <Pressable accessibilityRole="button" onPress={onPlanDay} style={({ pressed }) => [styles.planDay, compact && styles.planDayRail, pressed && styles.pressed]}>
       <Icon name="calendar-outline" size={16} color={SERMON_COLORS.gold} />
-      <Text style={styles.planDayText}>{pick(arabic, 'Plan a day', 'خطط ليوم')}</Text>
+      <Text style={styles.planDayText}>{pick(arabic, 'Plan another day', 'خطط ليوم آخر')}</Text>
     </Pressable>
   );
   return (
     <View style={styles.planList}>
       {compact ? planDay : null}
-      <GroupHeading title={pick(arabic, 'Upcoming', 'القادمة')} count={upcoming.length} compact={compact} arabic={arabic} />
-      {upcoming.length ? upcoming.map(card) : (
-        <Text style={[styles.emptyText, arabic && styles.textRight]}>{pick(arabic, 'No plans yet. Plan any day you preach: a Sunday, a feast, a weekday Liturgy or a meeting.', 'لا خطط بعد. خطط لأي يوم تعظ فيه: أحد أو عيد أو قداس أيام الأسبوع أو اجتماع.')}</Text>
-      )}
+      <GroupHeading title={pick(arabic, 'This week', 'هذا الأسبوع')} compact={compact} arabic={arabic} />
+      {week.map((day) => (day.plans.length ? day.plans.map((plan) => card(plan)) : card(dayPlaceholder(day.isoDate, day.untouched))))}
       {compact ? null : planDay}
+      {later.length ? (
+        <>
+          <GroupHeading title={pick(arabic, 'Later', 'لاحقاً')} count={later.length} compact={compact} arabic={arabic} />
+          {later.map((plan) => card(plan))}
+        </>
+      ) : null}
       {earlier.length ? (
         <>
           <GroupHeading title={pick(arabic, 'Earlier', 'السابقة')} count={earlier.length} compact={compact} arabic={arabic} />
-          {earlier.map(card)}
-        </>
-      ) : null}
-      {preached.length ? (
-        <>
-          <GroupHeading title={pick(arabic, 'Preached', 'أُلقيت')} count={preached.length} compact={compact} arabic={arabic} />
-          {preached.map(card)}
+          {earlier.map((plan) => card(plan, true))}
         </>
       ) : null}
     </View>
@@ -175,14 +177,15 @@ function PlanList({
 
 interface MenuItem { label: string; onPress: () => void; destructive?: boolean }
 
-function Menu({ visible, items, onClose }: { visible: boolean; items: MenuItem[]; onClose: () => void }) {
+function Menu({ visible, items, onClose, title, centred = false }: { visible: boolean; items: MenuItem[]; onClose: () => void; title?: string; centred?: boolean }) {
   const insets = useSafeAreaInsets();
   const modalOrientations = useModalOrientations();
   const reduced = useReducedMotion();
   return (
     <Modal visible={visible} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={onClose} supportedOrientations={modalOrientations} statusBarTranslucent navigationBarTranslucent>
-      <Pressable style={styles.menuBackdrop} onPress={onClose}>
-        <View style={[styles.menu, { top: insets.top + 58, right: Math.max(12, insets.right + 12) }]}>
+      <Pressable style={[styles.menuBackdrop, centred && styles.menuBackdropCentred]} onPress={onClose}>
+        <View style={centred ? [styles.menu, styles.menuCentred] : [styles.menu, { top: insets.top + 58, right: Math.max(12, insets.right + 12) }]}>
+          {title ? <Text numberOfLines={1} style={styles.menuTitle}>{title}</Text> : null}
           {items.map((item) => (
             <Pressable
               key={item.label}
@@ -216,6 +219,8 @@ interface WorkspaceProps {
   pickDay: boolean;
   onPickDayHandled: () => void;
   onRemovePlan: (plan: SermonPlanSummary) => void;
+  /** Carry this plan over to another day (SermonCarryOver). */
+  onCarryOver: (plan: SermonPlan) => void;
   /** A plan becomes this workspace's: another one, or a new one. */
   onSwitch: (planId: string, isoDate: string) => void;
   /** The plan just started has been kept: its id goes in the address. */
@@ -224,7 +229,7 @@ interface WorkspaceProps {
   onNewPlan: (isoDate: string) => void;
 }
 
-function Workspace({ planId, isoDate, plans, rail, pickDay, onPickDayHandled, onRemovePlan, onSwitch, onKept, newPlanId, onNewPlan }: WorkspaceProps) {
+function Workspace({ planId, isoDate, plans, rail, pickDay, onPickDayHandled, onRemovePlan, onCarryOver, onSwitch, onKept, newPlanId, onNewPlan }: WorkspaceProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -391,6 +396,7 @@ function Workspace({ planId, isoDate, plans, rail, pickDay, onPickDayHandled, on
       ? { label: pick(arabic, 'Not preached yet', 'لم تُلقَ بعد'), onPress: () => controller.setStatus('draft') }
       : { label: pick(arabic, 'Mark as preached', 'أُلقيت'), onPress: () => controller.setStatus('preached') },
     { label: pick(arabic, 'Another plan for this day', 'خطة أخرى لهذا اليوم'), onPress: () => onNewPlan(isoDate) },
+    ...(controller.kept ? [{ label: pick(arabic, 'Carry over to another day', 'انقلها إلى يوم آخر'), onPress: () => onCarryOver(plan) }] : []),
     ...(controller.kept ? [{
       label: pick(arabic, 'Remove this plan', 'احذف هذه الخطة'),
       destructive: true,
@@ -705,15 +711,48 @@ export default function SermonPlannerScreen() {
     );
   };
 
-  // A desktop opens the list on a plan: the next one to preach, else the latest.
+  // A desktop opens the list on a plan: the next one this week, else the next started, else today's.
   const defaultPlan = useMemo(() => {
-    const { upcoming, earlier, preached } = groupPlans(plans, todayIso);
-    return upcoming[0] ?? earlier[0] ?? preached[0] ?? null;
+    const { week, later } = sermonPlanGroups(plans, todayIso);
+    return week.flatMap((day) => day.plans)[0] ?? later[0] ?? null;
   }, [plans, todayIso]);
   useEffect(() => {
     if (routePlanId || !rail) return;
-    router.replace(defaultPlan ? planHref(defaultPlan.id, defaultPlan.serviceDate) : planHref('new', isoOf(effectiveDate)));
-  }, [routePlanId, rail, defaultPlan, router, effectiveDate]);
+    router.replace(defaultPlan ? planHref(defaultPlan.id, defaultPlan.serviceDate) : planHref('new', todayIso));
+  }, [routePlanId, rail, defaultPlan, router, todayIso]);
+
+  // A day of the week opens its plan, or a new one for it (`new:<date>`).
+  const isDay = (plan: SermonPlanSummary) => plan.id.startsWith('new:');
+  const openFromPage = (plan: SermonPlanSummary) => router.push(planHref(isDay(plan) ? 'new' : plan.id, plan.serviceDate));
+  const openBeside = (plan: SermonPlanSummary) => (isDay(plan) ? newPlan(plan.serviceDate) : switchTo(plan.id, plan.serviceDate));
+  const selectedId = routePlanId === 'new' ? `new:${planDate}` : planId;
+
+  // Carrying a sermon over: from the list (its card's button or a long press) or from the plan's menu.
+  const [carrySource, setCarrySource] = useState<SermonPlan | null>(null);
+  const [menuFor, setMenuFor] = useState<SermonPlanSummary | null>(null);
+  const carryFromList = (plan: SermonPlanSummary) => {
+    void loadLocalSermonPlan(plan.id, plan.serviceDate).then((full) => { if (full) setCarrySource(full); });
+  };
+  const carried = (plan: SermonPlan) => {
+    setCarrySource(null);
+    if (routePlanId) switchTo(plan.id, plan.serviceDate);
+    else router.push(planHref(plan.id, plan.serviceDate));
+  };
+  const sheets = (
+    <>
+      <SermonCarryOver source={carrySource} arabic={arabic} onClose={() => setCarrySource(null)} onCarried={carried} />
+      <Menu
+        visible={Boolean(menuFor)}
+        centred
+        title={menuFor?.title}
+        onClose={() => setMenuFor(null)}
+        items={menuFor ? [
+          { label: pick(arabic, 'Carry over to another day', 'انقلها إلى يوم آخر'), onPress: () => carryFromList(menuFor) },
+          { label: pick(arabic, 'Remove this plan', 'احذف هذه الخطة'), destructive: true, onPress: () => remove(menuFor) },
+        ] : []}
+      />
+    </>
+  );
 
   // A new plan, for the calendar's day until another is chosen: the calendar opens on it.
   const planDay = () => {
@@ -740,12 +779,14 @@ export default function SermonPlannerScreen() {
               todayIso={todayIso}
               arabic={arabic}
               compact={false}
-              onOpen={(plan) => router.push(planHref(plan.id, plan.serviceDate))}
+              onOpen={openFromPage}
               onPlanDay={planDay}
-              onRemove={remove}
+              onMenu={setMenuFor}
+              onCarryOver={carryFromList}
             />
           </View>
         </ScrollView>
+        {sheets}
       </BleedPage>
     );
   }
@@ -759,6 +800,7 @@ export default function SermonPlannerScreen() {
       pickDay={params.pick === '1'}
       onPickDayHandled={pickHandled}
       onRemovePlan={remove}
+      onCarryOver={setCarrySource}
       onSwitch={switchTo}
       onKept={kept}
       newPlanId={newPlanId}
@@ -774,15 +816,17 @@ export default function SermonPlannerScreen() {
           <PlanList
             plans={plans}
             todayIso={todayIso}
-            selectedId={planId}
+            selectedId={selectedId}
             arabic={arabic}
             compact
-            onOpen={(plan) => switchTo(plan.id, plan.serviceDate)}
+            onOpen={openBeside}
             onPlanDay={planDay}
-            onRemove={remove}
+            onMenu={setMenuFor}
+            onCarryOver={carryFromList}
           />
         </ScrollView>
         <View style={styles.deskMain}>{workspace}</View>
+        {sheets}
       </View>
     );
   }
@@ -790,6 +834,7 @@ export default function SermonPlannerScreen() {
   return (
     <BleedPage footer={layout === 'phone' ? <BottomTabBar active="books" /> : undefined} edges={layout === 'phone' ? [] : ['bottom']}>
       {workspace}
+      {sheets}
     </BleedPage>
   );
 }
@@ -845,6 +890,9 @@ const styles = StyleSheet.create({
   narrowReadings: { flex: 1, minHeight: 0, paddingHorizontal: 16 },
   // The menu
   menuBackdrop: { flex: 1 },
+  menuBackdropCentred: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', padding: 24 },
+  menuCentred: { maxWidth: 360, position: 'relative', width: '100%' },
+  menuTitle: { color: SERMON_COLORS.muted, fontSize: 12.5, fontWeight: '700', paddingBottom: 6, paddingHorizontal: 16, paddingTop: 8 },
   menu: { backgroundColor: '#1A2A1E', borderRadius: 14, minWidth: 220, paddingVertical: 6, position: 'absolute', shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.55, shadowRadius: 30 },
   menuItem: { paddingHorizontal: 16, paddingVertical: 11 },
   menuItemPressed: { backgroundColor: 'rgba(255, 255, 255, 0.06)' },

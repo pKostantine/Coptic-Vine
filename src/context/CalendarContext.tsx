@@ -35,9 +35,14 @@ function addOneDay(date: Date): Date {
   return next;
 }
 
-export function CalendarProvider({ children }: { children: React.ReactNode }) {
+/**
+ * The app's calendar; another can be set up inside it, from a day of its own
+ * (`initialDate`), where a day is chosen apart from the app's (the Sermon
+ * Planner's carry over).
+ */
+export function CalendarProvider({ children, initialDate = null }: { children: React.ReactNode; initialDate?: Date | null }) {
   const clock = useLiturgicalClock();
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(initialDate);
   // The eve toggle's choice; null leaves the period to the clock while live, and to the morning on a chosen day.
   const [manualPeriod, setManualPeriod] = useState<LiturgicalDayPeriod | null>(null);
 

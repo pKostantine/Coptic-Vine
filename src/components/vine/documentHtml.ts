@@ -1746,8 +1746,10 @@ function renderVerse(
   // Arabic on its stretched first word. A column with no letter there is an
   // initial for is left as it is, and so is a centred line's English, French
   // and Arabic, which have no side to hang from. Its verse number, if it has
-  // one, stays in the text unseen (openingHtml.ts), in every column.
-  const opens = Boolean(verse.dropCap);
+  // one, stays in the text unseen (openingHtml.ts), in every column. The
+  // Sermon Planner is a working page: its readings keep their first letters
+  // plain, their verse numbers in view.
+  const opens = Boolean(verse.dropCap) && !sermonPlannerMode;
   const copticCell = languages.find((language) => language.key === 'coptic');
   const initial = opens && copticCell ? splitCopticInitial(copticCell.text) : null;
   const englishOpening = opens && !isCentered ? splitEnglishOpening(verse.english || '') : null;

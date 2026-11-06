@@ -491,3 +491,40 @@ export function getSermonHighlightVerseReferences(sections: DocumentSection[]): 
   }
   return result;
 }
+
+// ─── The plans, by when they are ────────────────────────────────────────────
+
+/** How far the plans list looks ahead: today and the seven days after. */
+export const SERMON_WEEK_DAYS = 8;
+
+function addIsoDays(isoDate: string, days: number): string {
+  return new Date(Date.parse(`${isoDate}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * The plans as the list sets them out:
+ * - the week: today until a week from today, every day of it, with the
+ *   sermons started for it (none, and the day is there to be planned; an
+ *   untouched plan already made for it is the one that opens);
+ * - later: sermons started for a day past the week;
+ * - earlier: sermons started or preached for a day gone by.
+ * A plan nothing has been written in shows only as its day in the week.
+ */
+export function sermonPlanGroups(plans: readonly SermonPlanSummary[], todayIso: string) {
+  const started = plans.filter((plan) => plan.state !== 'notStarted');
+  const byUpdate = (a: SermonPlanSummary, b: SermonPlanSummary) => a.updatedAt.localeCompare(b.updatedAt);
+  const lastDay = addIsoDays(todayIso, SERMON_WEEK_DAYS - 1);
+  const week = Array.from({ length: SERMON_WEEK_DAYS }, (_, index) => {
+    const isoDate = addIsoDays(todayIso, index);
+    return {
+      isoDate,
+      plans: started.filter((plan) => plan.serviceDate === isoDate).sort(byUpdate),
+      untouched: plans.find((plan) => plan.serviceDate === isoDate && plan.state === 'notStarted') ?? null,
+    };
+  });
+  const later = started.filter((plan) => plan.serviceDate > lastDay)
+    .sort((a, b) => a.serviceDate.localeCompare(b.serviceDate) || byUpdate(a, b));
+  const earlier = started.filter((plan) => plan.serviceDate < todayIso)
+    .sort((a, b) => b.serviceDate.localeCompare(a.serviceDate) || byUpdate(b, a));
+  return { week, later, earlier };
+}
