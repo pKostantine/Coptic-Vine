@@ -15,9 +15,15 @@ const FOLDED_LINES = 4;
  * The instructions a father of confession gave for the canon, written down
  * at the top of it to read beside the day's tasks: folded to its first lines
  * when long, opened to be written in place. With none yet, one quiet row
- * offers to write them.
+ * offers to write them. Without onChange they are someone else's, shown to
+ * their support person to read, under a heading of their own.
  */
-export default function CanonInstructions({ text, arabic, onChange }: { text: string; arabic: boolean; onChange: (text: string) => void }) {
+export default function CanonInstructions({ text, arabic, onChange, heading: ownHeading }: {
+  text: string;
+  arabic: boolean;
+  onChange?: (text: string) => void;
+  heading?: string;
+}) {
   const [editing, setEditing] = useState(false);
   const [unfolded, setUnfolded] = useState(false);
   const [folds, setFolds] = useState(false);
@@ -25,8 +31,10 @@ export default function CanonInstructions({ text, arabic, onChange }: { text: st
   // A phone measures the lines it lays out; the web doesn't say, so there it
   // goes by the text's own lines and length.
   const long = folds || (Platform.OS === 'web' && (text.trim().split('\n').length > FOLDED_LINES || text.trim().length > 220));
-  const heading = tr('From your father of confession', 'De votre père de confession', 'من أب اعترافك');
+  const heading = ownHeading ?? tr('From your father of confession', 'De votre père de confession', 'من أب اعترافك');
+  const readOnly = !onChange;
 
+  if (readOnly && !written) return null;
   if (!written && !editing) {
     return (
       <Pressable accessibilityRole="button" onPress={() => setEditing(true)} style={({ pressed }) => [styles.add, pressed && styles.pressed]}>
@@ -43,7 +51,7 @@ export default function CanonInstructions({ text, arabic, onChange }: { text: st
       <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <View style={[styles.head, arabic && styles.rtl]}>
         <Text style={[styles.kicker, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{heading}</Text>
-        <Pressable
+        {readOnly ? null : <Pressable
           accessibilityRole="button"
           accessibilityLabel={editing ? tr('Done', 'Terminé', 'تم') : tr('Edit the instructions', 'Modifier les consignes', 'عدّل الإرشادات')}
           hitSlop={8}
@@ -55,9 +63,9 @@ export default function CanonInstructions({ text, arabic, onChange }: { text: st
           ) : (
             <Icon name="create-outline" size={17} color={COLORS.gold} />
           )}
-        </Pressable>
+        </Pressable>}
       </View>
-      {editing ? (
+      {editing && onChange ? (
         <TextInput
           accessibilityLabel={heading}
           value={text}
@@ -75,7 +83,7 @@ export default function CanonInstructions({ text, arabic, onChange }: { text: st
           style={[styles.input, arabic && styles.arabicText, Platform.OS === 'web' && styles.inputWeb]}
         />
       ) : (
-        <Pressable accessibilityRole="button" accessibilityLabel={heading} onPress={() => setEditing(true)} onLongPress={() => setEditing(true)}>
+        <Pressable accessibilityRole={readOnly ? 'text' : 'button'} accessibilityLabel={heading} disabled={readOnly} onPress={() => setEditing(true)} onLongPress={() => setEditing(true)}>
           <Text
             style={[styles.text, arabic && styles.arabicText]}
             numberOfLines={unfolded ? undefined : FOLDED_LINES}

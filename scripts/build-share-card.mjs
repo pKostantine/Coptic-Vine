@@ -1,9 +1,9 @@
 /**
  * Rebuilds public/coptic-vine-share.png, the image WhatsApp, iMessage and the
  * rest show when a Coptic Vine link is pasted into a chat, and
- * public/coptic-vine-canon-share.png, the one a shared spiritual canon's link
- * shows instead (workers/web-app), so it reads as someone's canon and not as
- * the app.
+ * public/coptic-vine-canon-invite.png, the one an invite to be someone's
+ * support person for their spiritual canon shows instead (workers/web-app),
+ * so it reads as an invitation and not as the app.
  *
  * Run it after the seal or the vine divider changes:  node scripts/build-share-card.mjs
  *
@@ -60,11 +60,11 @@ const sizeKb = checkSize(card, 'Share card');
 await writeFile(OUTPUT, card);
 console.log(`Wrote public/coptic-vine-share.png — ${WIDTH}x${HEIGHT}, ${sizeKb.toFixed(0)}KB`);
 
-// ─── A shared canon's card ──────────────────────────────────────────────────
+// ─── A canon invite's card ──────────────────────────────────────────────────
 // The seal to the left; to its right the design system's gold eyebrow, the
 // title in Georgia bold, and the vine divider the app draws under its heroes
 // (src/components/vine/ui/Ornaments.tsx, read from there so the two agree).
-const CANON_OUTPUT = new URL('../public/coptic-vine-canon-share.png', import.meta.url);
+const CANON_OUTPUT = new URL('../public/coptic-vine-canon-invite.png', import.meta.url);
 const CANON_SEAL = 380;
 const SEAL_LEFT = 92;
 const TEXT_LEFT = 540;
@@ -80,8 +80,8 @@ const placedDivider = divider.replace(
 );
 
 const canonText = Buffer.from(`<svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-  <text x="${TEXT_LEFT}" y="250" fill="#E3B53B" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="4">SHARED WITH YOU</text>
-  <text x="${TEXT_LEFT - 3}" y="330" fill="#FFFFFF" font-family="Georgia, Cormorant Garamond, serif" font-size="68" font-weight="700">Spiritual Canon</text>
+  <text x="${TEXT_LEFT}" y="250" fill="#E3B53B" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="4">AN INVITATION</text>
+  <text x="${TEXT_LEFT - 3}" y="330" fill="#FFFFFF" font-family="Georgia, Cormorant Garamond, serif" font-size="68" font-weight="700">Support Person</text>
   ${placedDivider}
 </svg>`);
 
@@ -98,6 +98,6 @@ const canonCard = await sharp(background)
   .png({ compressionLevel: 9, palette: true, quality: 90 })
   .toBuffer();
 
-const canonKb = checkSize(canonCard, 'Canon share card');
+const canonKb = checkSize(canonCard, 'Canon invite card');
 await writeFile(CANON_OUTPUT, canonCard);
-console.log(`Wrote public/coptic-vine-canon-share.png — ${WIDTH}x${HEIGHT}, ${canonKb.toFixed(0)}KB`);
+console.log(`Wrote public/coptic-vine-canon-invite.png — ${WIDTH}x${HEIGHT}, ${canonKb.toFixed(0)}KB`);

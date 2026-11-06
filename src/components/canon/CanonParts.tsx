@@ -5,21 +5,34 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from '@/components/vine/ui/Icon';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
 import { tr } from '@/utils/appText';
-import { formatDayMonthDate, toEasternArabicDigits } from '@/utils/localeFormat';
-import { canonDayDate, canonWeekday, type CanonTask } from '@/utils/spiritualCanon';
+import { formatDayMonthDate, formatDayMonthRange, toEasternArabicDigits } from '@/utils/localeFormat';
+import { addCanonDays, canonDayDate, canonWeekStart, canonWeekday, type CanonTask } from '@/utils/spiritualCanon';
 
 import { canonTaskDetail, canonTaskTitle, canonTimeParts, weekdayInitial } from './canonText';
 
 const MAX_FONT_SCALE = 1.3;
 
 /** A task's tick: a gold ring, filled gold with a check once done. */
-export function CanonCheck({ done, disabled = false, label, onPress, size = 28 }: {
+export function CanonCheck({ done, disabled = false, readOnly = false, label, onPress, size = 28 }: {
   done: boolean;
   disabled?: boolean;
+  /** Shown as it stands, not to be pressed: someone else's tick. */
+  readOnly?: boolean;
   label: string;
-  onPress: () => void;
+  onPress?: () => void;
   size?: number;
 }) {
+  if (readOnly) {
+    return (
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[styles.check, { borderRadius: size / 2, height: size, width: size }, done && styles.checkDone]}
+      >
+        {done ? <Icon name="checkmark" size={Math.round(size * 0.62)} color={COLORS.greenDeep} /> : null}
+      </View>
+    );
+  }
   return (
     <Pressable
       accessibilityRole="checkbox"
@@ -48,12 +61,14 @@ export function CanonCheck({ done, disabled = false, label, onPress, size = 28 }
  * card of its own on the canon's page; Home sets the day as a timeline
  * (CanonTimelineRow).
  */
-export function CanonTaskRow({ task, arabic, disabled = false, onToggle, onOpen, onSkip }: {
+export function CanonTaskRow({ task, arabic, disabled = false, readOnly = false, onToggle, onOpen, onSkip }: {
   task: CanonTask;
   arabic: boolean;
   /** A day still to come: shown, not yet to be ticked. */
   disabled?: boolean;
-  onToggle: (done: boolean) => void;
+  /** Someone else's canon, as their support person sees it: the tick shown as they left it, not to be changed. */
+  readOnly?: boolean;
+  onToggle?: (done: boolean) => void;
   onOpen?: () => void;
   /** Takes the task off this day's list. Offered until it is ticked. */
   onSkip?: () => void;
@@ -61,7 +76,7 @@ export function CanonTaskRow({ task, arabic, disabled = false, onToggle, onOpen,
   const title = canonTaskTitle(task);
   const detail = canonTaskDetail(task);
   // The Agpeya's hours and the Bible open from their rows; metanias and custom items have no page.
-  const opens = (task.kind === 'agpeya' || task.kind === 'bible') && onOpen;
+  const opens = (task.kind === 'agpeya' || task.kind === 'bible') && onOpen && !readOnly;
   const action = task.kind === 'agpeya' ? tr('Pray', 'Prier', 'صلِّ') : tr('Read', 'Lire', 'اقرأ');
   const body = (
     <>
@@ -81,14 +96,27 @@ export function CanonTaskRow({ task, arabic, disabled = false, onToggle, onOpen,
       ) : null}
     </>
   );
-  const checkLabel = task.done
-    ? `${title}: ${tr('done. Tap to undo', 'accompli. Touchez pour annuler', 'مكتمل. اضغط للتراجع')}`
-    : `${title}: ${tr('mark as done', 'marquer comme accompli', 'علّم كمكتمل')}`;
+  const checkLabel = readOnly
+    ? `${title}: ${task.done ? tr('done', 'accompli', 'مكتمل') : tr('not done', 'pas encore accompli', 'غير مكتمل')}`
+    : task.done
+      ? `${title}: ${tr('done. Tap to undo', 'accompli. Touchez pour annuler', 'مكتمل. اضغط للتراجع')}`
+      : `${title}: ${tr('mark as done', 'marquer comme accompli', 'علّم كمكتمل')}`;
+  const toggle = () => onToggle?.(!task.done);
+
+  if (readOnly) {
+    return (
+      <View style={[styles.row, styles.rowCard]} accessible accessibilityLabel={checkLabel}>
+        <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <CanonCheck done={task.done} readOnly label={checkLabel} />
+        <View style={styles.body}>{body}</View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.row, styles.rowCard]}>
       <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-      <CanonCheck done={task.done} disabled={disabled} label={checkLabel} onPress={() => onToggle(!task.done)} />
+      <CanonCheck done={task.done} disabled={disabled} label={checkLabel} onPress={toggle} />
       {opens ? (
         <Pressable
           accessibilityRole="button"
@@ -104,7 +132,7 @@ export function CanonTaskRow({ task, arabic, disabled = false, onToggle, onOpen,
           accessibilityRole="button"
           accessibilityLabel={checkLabel}
           disabled={disabled}
-          onPress={() => onToggle(!task.done)}
+          onPress={toggle}
           style={({ pressed }) => [styles.body, pressed && styles.pressed]}
         >
           {body}
@@ -131,21 +159,22 @@ export function CanonSkippedRow({ task, arabic, first = false, onRestore }: {
   task: CanonTask;
   arabic: boolean;
   first?: boolean;
-  onRestore: () => void;
+  /** Puts it back on the day's list; left out for someone else's canon. */
+  onRestore?: () => void;
 }) {
   const title = canonTaskTitle(task);
   return (
     <View style={[styles.row, styles.rowSkipped, !first && styles.rowRule]}>
       <Icon name="play-skip-forward" size={14} color={COLORS.muted} />
       <Text style={[styles.skippedTitle, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{title}</Text>
-      <Pressable
+      {onRestore ? <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${tr('Restore', 'Rétablir', 'أعِده')}: ${title}`}
         onPress={onRestore}
         style={({ pressed }) => [styles.restore, pressed && styles.pressed]}
       >
         <Text style={[styles.restoreText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Restore', 'Rétablir', 'أعِده')}</Text>
-      </Pressable>
+      </Pressable> : null}
     </View>
   );
 }
@@ -289,6 +318,49 @@ export function CanonWeekStrip({ days, selected, today, arabic, stateOf, onSelec
   );
 }
 
+/**
+ * The week a canon is seen by, over its day (the canon's page, and someone's
+ * canon as their support person sees it): the weeks either side a tap away,
+ * the days with how each was kept, and the way back to today. `onChoose`
+ * gets the day chosen, or null for today.
+ */
+export function CanonWeekCard({ day, today, arabic, stateOf, onChoose }: {
+  day: string;
+  today: string;
+  arabic: boolean;
+  stateOf: (day: string) => CanonDayState;
+  onChoose: (day: string | null) => void;
+}) {
+  const weekStart = canonWeekStart(day);
+  const weekDays = Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset));
+  return (
+    <View style={styles.weekCard}>
+      <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <View style={styles.weekHead}>
+        <WeekArrow direction="back" label={tr('The week before', 'La semaine précédente', 'الأسبوع السابق')} onPress={() => onChoose(addCanonDays(day, -7))} />
+        <Text style={[styles.weekRange, arabic && styles.arabicCentered]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          {formatDayMonthRange(canonDayDate(weekDays[0]), canonDayDate(weekDays[6]), arabic)}
+        </Text>
+        <WeekArrow direction="forward" label={tr('The week after', 'La semaine suivante', 'الأسبوع التالي')} onPress={() => onChoose(addCanonDays(day, 7))} />
+      </View>
+      <CanonWeekStrip days={weekDays} selected={day} today={today} arabic={arabic} stateOf={stateOf} onSelect={onChoose} />
+      {day !== today ? (
+        <Pressable accessibilityRole="button" onPress={() => onChoose(null)} style={({ pressed }) => [styles.todayLink, pressed && styles.pressed]}>
+          <Text style={[styles.todayLinkText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Back to today', 'Revenir à aujourd’hui', 'العودة إلى اليوم')}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function WeekArrow({ direction, label, onPress }: { direction: 'back' | 'forward'; label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={6} onPress={onPress} style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}>
+      <Icon name={direction === 'back' ? 'chevron-back' : 'chevron-forward'} size={17} color={COLORS.gold} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   check: { alignItems: 'center', borderColor: COLORS.goldLine, borderWidth: 1.5, justifyContent: 'center' },
@@ -354,6 +426,14 @@ const styles = StyleSheet.create({
   weekDotDone: { backgroundColor: COLORS.gold },
   weekDotDoneActive: { backgroundColor: COLORS.greenDeep },
 
+  weekCard: { borderRadius: 20, gap: 12, overflow: 'hidden', paddingBottom: 12, paddingHorizontal: 12, paddingTop: 12 },
+  weekHead: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  weekRange: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  arrow: { alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
+  todayLink: { alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 2 },
+  todayLinkText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
+
   arabic: { fontFamily: TYPOGRAPHY.arabic, textAlign: 'left', writingDirection: 'rtl' },
+  arabicCentered: { fontFamily: TYPOGRAPHY.arabic, writingDirection: 'rtl' },
   arabicTight: { fontFamily: TYPOGRAPHY.arabic, letterSpacing: 0 },
 });

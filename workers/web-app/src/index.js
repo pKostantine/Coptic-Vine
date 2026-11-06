@@ -33,46 +33,36 @@ const ENTITY_PATH_PATTERN = new RegExp(
   '^/(share/)?(music|learn)/([^/]+)/(' + UUID_PATTERN + ')/?$',
 );
 
-// A shared spiritual canon (src/app/canon/shared/[id].tsx): its id is cv-api's
-// 24-character random link id (workers/api/src/rpc/canonShares.ts).
-const CANON_SHARE_PATH_PATTERN = /^\/canon\/shared\/([A-Za-z0-9_-]{16,64})\/?$/;
-const CANON_SHARE_IMAGE = '/coptic-vine-canon-share.png';
-/** How many of a shared canon's items its preview names before "and 3 more". */
-const CANON_PREVIEW_ITEMS = 6;
+// An invite to be someone's support person for their spiritual canon
+// (src/app/canon/invite/[id].tsx): its id is cv-api's 24-character random
+// link id (workers/api/src/rpc/canonSupport.ts).
+const CANON_INVITE_PATH_PATTERN = /^\/canon\/invite\/([A-Za-z0-9_-]{16,64})\/?$/;
+const CANON_INVITE_IMAGE = '/coptic-vine-canon-invite.png';
 const CANON_PREVIEW_MESSAGE = 160;
 
 /**
- * A shared canon's preview in the language of the one who shared it (the
- * link's ?lang=, as the app writes it): whose canon it is and what it holds,
- * so it reads as their canon and not as the app.
+ * An invite's preview in the language of the one who sent it (the link's
+ * ?lang=, as the app writes it): who asks, and what a support person sees,
+ * so it reads as their invitation and not as the app.
  */
 const CANON_WORDS = {
   en: {
-    titleOf: (name) => name + '’s Spiritual Canon',
-    title: 'A Shared Spiritual Canon',
-    sharedWithYou: 'Shared with you',
-    more: (count) => 'and ' + count + ' more',
+    titleOf: (name) => name + ' invites you to be their support person',
+    title: 'An invitation to be a support person',
+    explain: 'See their spiritual canon and how they keep it, to keep them in prayer.',
     quote: (text) => '“' + text + '”',
-    separator: ', ',
-    kinds: { agpeya: 'Agpeya', bible: 'Bible reading', metania: 'Metanias', abstinence: 'Abstinence' },
   },
   fr: {
-    titleOf: (name) => 'Le canon spirituel de ' + name,
-    title: 'Un canon spirituel partagé',
-    sharedWithYou: 'Partagé avec vous',
-    more: (count) => 'et ' + count + ' de plus',
+    titleOf: (name) => name + ' vous invite à être sa personne de soutien',
+    title: 'Une invitation à être une personne de soutien',
+    explain: 'Voyez son canon spirituel et comment il le garde, pour prier pour lui.',
     quote: (text) => '« ' + text + ' »',
-    separator: ', ',
-    kinds: { agpeya: 'Agpia', bible: 'Lecture de la Bible', metania: 'Métanies', abstinence: 'Abstinence' },
   },
   ar: {
-    titleOf: (name) => 'قانون ' + name + ' الروحي',
-    title: 'قانون روحي مُشارَك',
-    sharedWithYou: 'مُشارَك معك',
-    more: (count) => 'و' + count + ' غيرها',
+    titleOf: (name) => 'يدعوك ' + name + ' لتكون الشخص الداعم له',
+    title: 'دعوة لتكون شخصًا داعمًا',
+    explain: 'شاهد قانونه الروحي وكيف يحافظ عليه، لتذكره في صلاتك.',
     quote: (text) => '«' + text + '»',
-    separator: '، ',
-    kinds: { agpeya: 'الأجبية', bible: 'قراءة الكتاب المقدس', metania: 'المطانيات', abstinence: 'الانقطاع' },
   },
 };
 
@@ -148,9 +138,9 @@ async function loadPreview(target, locale, env) {
   return preview;
 }
 
-function parseCanonSharePath(pathname) {
-  const match = CANON_SHARE_PATH_PATTERN.exec(pathname);
-  return match ? { id: match[1], path: '/canon/shared/' + match[1] } : null;
+function parseCanonInvitePath(pathname) {
+  const match = CANON_INVITE_PATH_PATTERN.exec(pathname);
+  return match ? { id: match[1], path: '/canon/invite/' + match[1] } : null;
 }
 
 function canonLocale(url) {
@@ -158,10 +148,10 @@ function canonLocale(url) {
   return lang === 'fr' || lang === 'ar' ? lang : 'en';
 }
 
-/** What a canon link holds, or null when it was stopped or never was (or cv-api can't say). */
-async function loadCanonShare(id, env) {
+/** What an invite link says, or null when it was turned off or never was (or cv-api can't say). */
+async function loadCanonInvite(id, env) {
   try {
-    const response = await fetch(dataApi(env).url + '/rest/v1/rpc/get_canon_share', {
+    const response = await fetch(dataApi(env).url + '/rest/v1/rpc/get_canon_support_invite', {
       method: 'POST',
       headers: {
         'Accept-Profile': 'public',
@@ -171,10 +161,10 @@ async function loadCanonShare(id, env) {
       body: JSON.stringify({ p_id: id }),
     });
     if (!response.ok) return null;
-    const share = await response.json();
-    return share && typeof share === 'object' && Array.isArray(share.items) ? share : null;
+    const invite = await response.json();
+    return invite && typeof invite === 'object' && typeof invite.id === 'string' ? invite : null;
   } catch (error) {
-    console.error('Unable to load canon share preview', error);
+    console.error('Unable to load canon invite preview', error);
     return null;
   }
 }
@@ -185,29 +175,22 @@ function oneLine(value, limit) {
   return text.length > limit ? text.slice(0, limit - 1).trimEnd() + '…' : text;
 }
 
-/** "Mina’s Spiritual Canon" over "“For our Friday group” · Agpeya, Bible reading, Metanias". */
-function canonPreview(share, locale) {
+/** "Mina invites you to be their support person" over "“Will you pray for me?” · See their spiritual canon…". */
+function canonInvitePreview(invite, locale) {
   const words = CANON_WORDS[locale];
-  const name = oneLine(share.sharerName, 80);
-  const names = share.items
-    .map((item) => (item && item.kind === 'custom' ? oneLine(item.title, 60) : words.kinds[item?.kind]))
-    .filter(Boolean)
-    .filter((title, index, all) => all.indexOf(title) === index);
-  const shown = names.slice(0, CANON_PREVIEW_ITEMS);
-  const rest = names.length - shown.length;
-  const items = shown.join(words.separator) + (rest > 0 ? words.separator + words.more(rest) : '');
-  const message = oneLine(share.message, CANON_PREVIEW_MESSAGE);
+  const name = oneLine(invite.sharerName, 80);
+  const message = oneLine(invite.message, CANON_PREVIEW_MESSAGE);
   return {
     title: name ? words.titleOf(name) : words.title,
-    description: [message ? words.quote(message) : words.sharedWithYou, items].filter(Boolean).join(' · '),
+    description: [message ? words.quote(message) : '', words.explain].filter(Boolean).join(' · '),
   };
 }
 
-function canonShareMetadata(url, target, share) {
+function canonInviteMetadata(url, target, invite) {
   const locale = canonLocale(url);
-  const preview = canonPreview(share, locale);
+  const preview = canonInvitePreview(invite, locale);
   const canonicalUrl = url.origin + target.path;
-  const imageUrl = url.origin + CANON_SHARE_IMAGE;
+  const imageUrl = url.origin + CANON_INVITE_IMAGE;
   const metadata = buildMetadata({
     canonicalUrl,
     description: preview.description,
@@ -486,15 +469,15 @@ export default {
       return shareImageResponse(request, url);
     }
 
-    const canonShare = parseCanonSharePath(url.pathname);
-    if (canonShare && (request.method === 'GET' || request.method === 'HEAD')) {
-      const share = await loadCanonShare(canonShare.id, env);
-      // A stopped link previews as the app itself: nothing of what it held.
-      if (!share) return env.ASSETS.fetch(request);
-      // Not kept anywhere, so a link stopped is a preview gone.
-      return entityAppResponse(request, env, canonShareMetadata(url, canonShare, share), {
+    const canonInvite = parseCanonInvitePath(url.pathname);
+    if (canonInvite && (request.method === 'GET' || request.method === 'HEAD')) {
+      const invite = await loadCanonInvite(canonInvite.id, env);
+      // A link turned off previews as the app itself: nothing of who sent it.
+      if (!invite) return env.ASSETS.fetch(request);
+      // Not kept anywhere, so a link turned off is a preview gone.
+      return entityAppResponse(request, env, canonInviteMetadata(url, canonInvite, invite), {
         cacheControl: 'private, no-store',
-        kind: 'canon-share',
+        kind: 'canon-invite',
         noindex: true,
       });
     }

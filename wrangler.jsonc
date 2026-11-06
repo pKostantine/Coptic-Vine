@@ -17,7 +17,7 @@
       "/learn/cantor/*",
       "/learn/album/*",
       "/learn/lesson/*",
-      "/canon/shared/*"
+      "/canon/invite/*"
     ]
   },
   "observability": {
