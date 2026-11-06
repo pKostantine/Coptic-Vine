@@ -249,3 +249,87 @@ test('previews come from cv-api with no key, or from where DATA_API_URL says', a
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Liturgy with Cantor Ibrahim Ayad/);
 });
+
+// ─── A shared spiritual canon (workers/api/src/rpc/canonShares.ts) ──────────
+
+const CANON_SHARE_ID = 'Qm9vdGhIb2xkc1RoZUNhbm9u';
+const CANON_SHARE = {
+  id: CANON_SHARE_ID,
+  sharerName: 'Mina',
+  message: 'For our Friday group, to keep each other in prayer',
+  items: [
+    { id: 'canon-1', kind: 'agpeya', hours: [], days: [], pattern: 'same', frequency: { kind: 'daily' } },
+    { id: 'canon-2', kind: 'bible', goal: { kind: 'chapters', count: 1 }, frequency: { kind: 'daily' } },
+    { id: 'canon-3', kind: 'metania', goal: { kind: 'metanias', count: 50 }, frequency: { kind: 'applicable' } },
+    { id: 'canon-4', kind: 'custom', title: 'Read <the> Synaxarium', goal: { kind: 'none' }, frequency: { kind: 'daily' } },
+  ],
+  instructions: 'Private words from his father of confession',
+  createdAt: '2026-11-06T18:00:00.000Z',
+};
+
+function mockCanonShare(share = CANON_SHARE, status = 200) {
+  const calls = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({ url: String(input), body: JSON.parse(init?.body) });
+    assert.equal(new Headers(init?.headers).get('content-profile'), 'public');
+    return status === 200
+      ? new Response(JSON.stringify(share), { headers: { 'Content-Type': 'application/json' } })
+      : new Response(JSON.stringify({ code: 'P0002', message: 'This shared canon is no longer shared' }), { status });
+  };
+  return calls;
+}
+
+test('a shared canon’s link previews as whose canon it is and what it holds, not as the app', async () => {
+  const calls = mockCanonShare();
+  const { env, requests } = makeEnv();
+
+  const response = await worker.fetch(new Request(`https://copticvine.ca/canon/shared/${CANON_SHARE_ID}`), env);
+  const html = await response.text();
+
+  assert.deepEqual(calls, [{ url: 'https://api.copticvine.ca/rest/v1/rpc/get_canon_share', body: { p_id: CANON_SHARE_ID } }]);
+  assert.equal(response.status, 200);
+  assert.equal(requests.length, 1, 'the app itself still opens at the link');
+  assert.equal(response.headers.get('x-coptic-vine-share-preview'), 'canon-share');
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert.equal(response.headers.get('x-robots-tag'), 'noindex');
+  assert.match(html, /<title>Mina’s Spiritual Canon — Coptic Vine<\/title>/);
+  assert.match(html, /<meta property="og:title" content="Mina’s Spiritual Canon — Coptic Vine" \/>/);
+  assert.match(html, /<meta property="og:description" content="“For our Friday group, to keep each other in prayer” · Agpeya, Bible reading, Metanias, Read &lt;the&gt; Synaxarium" \/>/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/copticvine\.ca\/coptic-vine-canon-share\.png" \/>/);
+  assert.match(html, /<meta name="robots" content="noindex" \/>/);
+  assert.doesNotMatch(html, /<meta property="og:title" content="Coptic Vine" \/>/);
+  assert.doesNotMatch(html, /Private words/, 'the instructions stay inside the page, never in a chat’s preview');
+});
+
+test('a shared canon’s preview speaks the sharer’s language, and says “shared with you” without a name or a word', async () => {
+  mockCanonShare({ ...CANON_SHARE, sharerName: null, message: null });
+  const french = await (await worker.fetch(new Request(`https://copticvine.ca/canon/shared/${CANON_SHARE_ID}?lang=fr`), makeEnv().env)).text();
+  assert.match(french, /<meta property="og:title" content="Un canon spirituel partagé — Coptic Vine" \/>/);
+  assert.match(french, /<meta property="og:description" content="Partagé avec vous · Agpia, Lecture de la Bible, Métanies, Read &lt;the&gt; Synaxarium" \/>/);
+  assert.match(french, /<meta property="og:locale" content="fr_FR" \/>/);
+
+  mockCanonShare();
+  const arabic = await (await worker.fetch(new Request(`https://copticvine.ca/canon/shared/${CANON_SHARE_ID}?lang=ar`), makeEnv().env)).text();
+  assert.match(arabic, /<meta property="og:title" content="قانون Mina الروحي — Coptic Vine" \/>/);
+
+  mockCanonShare({ ...CANON_SHARE, items: Array.from({ length: 9 }, (_, index) => ({ kind: 'custom', title: `Prayer ${index + 1}` })) });
+  const many = await (await worker.fetch(new Request(`https://copticvine.ca/canon/shared/${CANON_SHARE_ID}`), makeEnv().env)).text();
+  assert.match(many, /Prayer 6, and 3 more" \/>/);
+});
+
+test('a stopped canon link previews as the app, with nothing of what it held', async () => {
+  mockCanonShare(null, 400);
+  const { env, requests } = makeEnv();
+  const response = await worker.fetch(new Request(`https://copticvine.ca/canon/shared/${CANON_SHARE_ID}`), env);
+  const html = await response.text();
+  assert.equal(requests.length, 1);
+  assert.equal(html, APP_SHELL);
+
+  globalThis.fetch = async () => {
+    throw new Error('No preview is looked up for what isn’t a canon link.');
+  };
+  const odd = makeEnv();
+  await worker.fetch(new Request('https://copticvine.ca/canon/shared/short'), odd.env);
+  await worker.fetch(new Request(`https://copticvine.ca/canon/shared/${CANON_SHARE_ID}`, { method: 'POST' }), odd.env);
+  assert.equal(odd.requests.length, 2);
+});

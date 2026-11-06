@@ -33,6 +33,49 @@ const ENTITY_PATH_PATTERN = new RegExp(
   '^/(share/)?(music|learn)/([^/]+)/(' + UUID_PATTERN + ')/?$',
 );
 
+// A shared spiritual canon (src/app/canon/shared/[id].tsx): its id is cv-api's
+// 24-character random link id (workers/api/src/rpc/canonShares.ts).
+const CANON_SHARE_PATH_PATTERN = /^\/canon\/shared\/([A-Za-z0-9_-]{16,64})\/?$/;
+const CANON_SHARE_IMAGE = '/coptic-vine-canon-share.png';
+/** How many of a shared canon's items its preview names before "and 3 more". */
+const CANON_PREVIEW_ITEMS = 6;
+const CANON_PREVIEW_MESSAGE = 160;
+
+/**
+ * A shared canon's preview in the language of the one who shared it (the
+ * link's ?lang=, as the app writes it): whose canon it is and what it holds,
+ * so it reads as their canon and not as the app.
+ */
+const CANON_WORDS = {
+  en: {
+    titleOf: (name) => name + '’s Spiritual Canon',
+    title: 'A Shared Spiritual Canon',
+    sharedWithYou: 'Shared with you',
+    more: (count) => 'and ' + count + ' more',
+    quote: (text) => '“' + text + '”',
+    separator: ', ',
+    kinds: { agpeya: 'Agpeya', bible: 'Bible reading', metania: 'Metanias', abstinence: 'Abstinence' },
+  },
+  fr: {
+    titleOf: (name) => 'Le canon spirituel de ' + name,
+    title: 'Un canon spirituel partagé',
+    sharedWithYou: 'Partagé avec vous',
+    more: (count) => 'et ' + count + ' de plus',
+    quote: (text) => '« ' + text + ' »',
+    separator: ', ',
+    kinds: { agpeya: 'Agpia', bible: 'Lecture de la Bible', metania: 'Métanies', abstinence: 'Abstinence' },
+  },
+  ar: {
+    titleOf: (name) => 'قانون ' + name + ' الروحي',
+    title: 'قانون روحي مُشارَك',
+    sharedWithYou: 'مُشارَك معك',
+    more: (count) => 'و' + count + ' غيرها',
+    quote: (text) => '«' + text + '»',
+    separator: '، ',
+    kinds: { agpeya: 'الأجبية', bible: 'قراءة الكتاب المقدس', metania: 'المطانيات', abstinence: 'الانقطاع' },
+  },
+};
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -103,6 +146,82 @@ async function loadPreview(target, locale, env) {
   }
 
   return preview;
+}
+
+function parseCanonSharePath(pathname) {
+  const match = CANON_SHARE_PATH_PATTERN.exec(pathname);
+  return match ? { id: match[1], path: '/canon/shared/' + match[1] } : null;
+}
+
+function canonLocale(url) {
+  const lang = url.searchParams.get('lang');
+  return lang === 'fr' || lang === 'ar' ? lang : 'en';
+}
+
+/** What a canon link holds, or null when it was stopped or never was (or cv-api can't say). */
+async function loadCanonShare(id, env) {
+  try {
+    const response = await fetch(dataApi(env).url + '/rest/v1/rpc/get_canon_share', {
+      method: 'POST',
+      headers: {
+        'Accept-Profile': 'public',
+        'Content-Type': 'application/json',
+        'Content-Profile': 'public',
+      },
+      body: JSON.stringify({ p_id: id }),
+    });
+    if (!response.ok) return null;
+    const share = await response.json();
+    return share && typeof share === 'object' && Array.isArray(share.items) ? share : null;
+  } catch (error) {
+    console.error('Unable to load canon share preview', error);
+    return null;
+  }
+}
+
+function oneLine(value, limit) {
+  const text = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+  if (!text) return '';
+  return text.length > limit ? text.slice(0, limit - 1).trimEnd() + '…' : text;
+}
+
+/** "Mina’s Spiritual Canon" over "“For our Friday group” · Agpeya, Bible reading, Metanias". */
+function canonPreview(share, locale) {
+  const words = CANON_WORDS[locale];
+  const name = oneLine(share.sharerName, 80);
+  const names = share.items
+    .map((item) => (item && item.kind === 'custom' ? oneLine(item.title, 60) : words.kinds[item?.kind]))
+    .filter(Boolean)
+    .filter((title, index, all) => all.indexOf(title) === index);
+  const shown = names.slice(0, CANON_PREVIEW_ITEMS);
+  const rest = names.length - shown.length;
+  const items = shown.join(words.separator) + (rest > 0 ? words.separator + words.more(rest) : '');
+  const message = oneLine(share.message, CANON_PREVIEW_MESSAGE);
+  return {
+    title: name ? words.titleOf(name) : words.title,
+    description: [message ? words.quote(message) : words.sharedWithYou, items].filter(Boolean).join(' · '),
+  };
+}
+
+function canonShareMetadata(url, target, share) {
+  const locale = canonLocale(url);
+  const preview = canonPreview(share, locale);
+  const canonicalUrl = url.origin + target.path;
+  const imageUrl = url.origin + CANON_SHARE_IMAGE;
+  const metadata = buildMetadata({
+    canonicalUrl,
+    description: preview.description,
+    imageUrl,
+    mimeType: 'image/png',
+    ogType: 'website',
+    previewUrl: url.origin + url.pathname + url.search,
+    title: preview.title,
+  });
+  // A link handed to friends, never one for search engines.
+  metadata.tags = '<meta name="robots" content="noindex" />\n'
+    + (locale === 'en' ? '' : '<meta property="og:locale" content="' + (locale === 'fr' ? 'fr_FR' : 'ar_AR') + '" />\n')
+    + metadata.tags;
+  return { metadata };
 }
 
 function resolveDirectImage(asset) {
@@ -255,7 +374,11 @@ async function getAppShell(request, env) {
   return response;
 }
 
-async function entityAppResponse(request, env, entity) {
+async function entityAppResponse(request, env, entity, {
+  cacheControl = 'public, max-age=0, s-maxage=300, stale-while-revalidate=60',
+  kind = 'entity',
+  noindex = false,
+} = {}) {
   const response = await getAppShell(request, env);
   const contentType = response.headers.get('content-type') || '';
   if (!response.ok || !contentType.includes('text/html')) return response;
@@ -276,8 +399,9 @@ async function entityAppResponse(request, env, entity) {
   const headers = new Headers(response.headers);
   headers.delete('content-length');
   headers.delete('etag');
-  headers.set('Cache-Control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=60');
-  headers.set('X-Coptic-Vine-Share-Preview', 'entity');
+  headers.set('Cache-Control', cacheControl);
+  headers.set('X-Coptic-Vine-Share-Preview', kind);
+  if (noindex) headers.set('X-Robots-Tag', 'noindex');
 
   return new Response(request.method === 'HEAD' ? null : transformed, {
     status: response.status,
@@ -360,6 +484,19 @@ export default {
 
     if (url.pathname === '/__share-image') {
       return shareImageResponse(request, url);
+    }
+
+    const canonShare = parseCanonSharePath(url.pathname);
+    if (canonShare && (request.method === 'GET' || request.method === 'HEAD')) {
+      const share = await loadCanonShare(canonShare.id, env);
+      // A stopped link previews as the app itself: nothing of what it held.
+      if (!share) return env.ASSETS.fetch(request);
+      // Not kept anywhere, so a link stopped is a preview gone.
+      return entityAppResponse(request, env, canonShareMetadata(url, canonShare, share), {
+        cacheControl: 'private, no-store',
+        kind: 'canon-share',
+        noindex: true,
+      });
     }
 
     const target = parseEntityPath(url.pathname);

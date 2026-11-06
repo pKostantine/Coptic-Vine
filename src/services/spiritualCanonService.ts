@@ -13,6 +13,7 @@ import {
   type CanonItem,
 } from '@/utils/spiritualCanon';
 import { api } from '@/utils/api';
+import { getCurrentAppLanguage, type AppLanguage } from '@/utils/preferencesStorage';
 import { publicUrl } from '@/utils/publicUrl';
 
 /**
@@ -306,9 +307,13 @@ export function adoptedCanonItem(item: CanonItem, now = new Date()): CanonItem {
   return { ...sharedCanonItem(item), id: newCanonId(), createdAt: stamp, updatedAt: stamp };
 }
 
-/** The link to a shared canon, to send. */
-export function canonShareUrl(id: string): string {
-  return publicUrl(`/canon/shared/${encodeURIComponent(id)}`);
+/**
+ * The link to a shared canon, to send. It carries the sharer's App Language,
+ * so the preview a chat shows of it (workers/web-app) speaks as they do.
+ */
+export function canonShareUrl(id: string, language: AppLanguage = getCurrentAppLanguage()): string {
+  const path = `/canon/shared/${encodeURIComponent(id)}`;
+  return publicUrl(language === 'en' ? path : `${path}?lang=${language}`);
 }
 
 function shareFromAccount(data: unknown): CanonShare {

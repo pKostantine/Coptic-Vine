@@ -1,8 +1,11 @@
 /**
  * Rebuilds public/coptic-vine-share.png, the image WhatsApp, iMessage and the
- * rest show when a Coptic Vine link is pasted into a chat.
+ * rest show when a Coptic Vine link is pasted into a chat, and
+ * public/coptic-vine-canon-share.png, the one a shared spiritual canon's link
+ * shows instead (workers/web-app), so it reads as someone's canon and not as
+ * the app.
  *
- * Run it after the seal changes:  node scripts/build-share-card.mjs
+ * Run it after the seal or the vine divider changes:  node scripts/build-share-card.mjs
  *
  * The constraints the card is built to, which are why it is not simply the
  * seal file served directly:
@@ -13,6 +16,7 @@
  *  - Small. WhatsApp gives up on images past a few hundred KB, and the seal on
  *    its own is ~790KB.
  */
+import { Buffer } from 'node:buffer';
 import { readFile, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
 
@@ -44,10 +48,56 @@ const card = await sharp(background)
   .png({ compressionLevel: 9, palette: true, quality: 90 })
   .toBuffer();
 
-const sizeKb = card.length / 1024;
-if (sizeKb > 300) {
-  throw new Error(`Share card is ${sizeKb.toFixed(0)}KB; WhatsApp may skip it. Lower the palette quality.`);
+function checkSize(buffer, name) {
+  const sizeKb = buffer.length / 1024;
+  if (sizeKb > 300) {
+    throw new Error(`${name} is ${sizeKb.toFixed(0)}KB; WhatsApp may skip it. Lower the palette quality.`);
+  }
+  return sizeKb;
 }
 
+const sizeKb = checkSize(card, 'Share card');
 await writeFile(OUTPUT, card);
 console.log(`Wrote public/coptic-vine-share.png — ${WIDTH}x${HEIGHT}, ${sizeKb.toFixed(0)}KB`);
+
+// ─── A shared canon's card ──────────────────────────────────────────────────
+// The seal to the left; to its right the design system's gold eyebrow, the
+// title in Georgia bold, and the vine divider the app draws under its heroes
+// (src/components/vine/ui/Ornaments.tsx, read from there so the two agree).
+const CANON_OUTPUT = new URL('../public/coptic-vine-canon-share.png', import.meta.url);
+const CANON_SEAL = 380;
+const SEAL_LEFT = 92;
+const TEXT_LEFT = 540;
+
+const ornaments = await readFile(new URL('../src/components/vine/ui/Ornaments.tsx', import.meta.url), 'utf8');
+const divider = /const VINE_DIVIDER = `(<svg[^`]+<\/svg>)`/.exec(ornaments)?.[1];
+if (!divider) throw new Error('VINE_DIVIDER not found in src/components/vine/ui/Ornaments.tsx');
+const DIVIDER_WIDTH = 300;
+const DIVIDER_HEIGHT = Math.round((DIVIDER_WIDTH * 36) / 200);
+const placedDivider = divider.replace(
+  /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/,
+  `<svg x="${TEXT_LEFT - 18}" y="356" width="${DIVIDER_WIDTH}" height="${DIVIDER_HEIGHT}"`,
+);
+
+const canonText = Buffer.from(`<svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+  <text x="${TEXT_LEFT}" y="250" fill="#E3B53B" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="4">SHARED WITH YOU</text>
+  <text x="${TEXT_LEFT - 3}" y="330" fill="#FFFFFF" font-family="Georgia, Cormorant Garamond, serif" font-size="68" font-weight="700">Spiritual Canon</text>
+  ${placedDivider}
+</svg>`);
+
+const canonSeal = await sharp(await readFile(SOURCE))
+  .resize(CANON_SEAL, CANON_SEAL, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .toBuffer();
+
+const canonCard = await sharp(background)
+  .composite([
+    { input: canonSeal, top: Math.round((HEIGHT - CANON_SEAL) / 2), left: SEAL_LEFT },
+    { input: canonText, top: 0, left: 0 },
+  ])
+  .flatten({ background: '#14301B' })
+  .png({ compressionLevel: 9, palette: true, quality: 90 })
+  .toBuffer();
+
+const canonKb = checkSize(canonCard, 'Canon share card');
+await writeFile(CANON_OUTPUT, canonCard);
+console.log(`Wrote public/coptic-vine-canon-share.png — ${WIDTH}x${HEIGHT}, ${canonKb.toFixed(0)}KB`);
