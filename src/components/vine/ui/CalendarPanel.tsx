@@ -47,6 +47,8 @@ interface CalendarPanelProps {
   onOpenSeasons: () => void;
   /** Above the controls: the sheet's grab handle. */
   header?: React.ReactNode;
+  /** Live, the season and the eve toggle over the month; off where only a day is being chosen. */
+  controls?: boolean;
 }
 
 /**
@@ -55,7 +57,7 @@ interface CalendarPanelProps {
  * the month's days, each with its date in the other calendar beneath it and a
  * gold dot on a feast. Shared by the Books sheet and the calendar page.
  */
-export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelProps) {
+export default function CalendarPanel({ onOpenSeasons, header, controls = true }: CalendarPanelProps) {
   const modalOrientations = useModalOrientations();
   // The month and year picker keeps clear of the notch, the status bar and
   // the home indicator, and on a phone on its side its lists shorten to fit.
@@ -317,7 +319,7 @@ export default function CalendarPanel({ onOpenSeasons, header }: CalendarPanelPr
   const topBlock = (
     <View style={styles.top}>
       {header}
-      <DayControls theme={DAY_BLOCK_THEMES.annual} seasonLabel={day.seasonLabel} arabic={isArabic} onOpenSeasons={onOpenSeasons} />
+      {controls ? <DayControls theme={DAY_BLOCK_THEMES.annual} seasonLabel={day.seasonLabel} arabic={isArabic} onOpenSeasons={onOpenSeasons} /> : null}
     </View>
   );
   const monthRow = (

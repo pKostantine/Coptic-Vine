@@ -181,6 +181,7 @@ export function SermonPlanCard({
   fallbackTitle,
   onPress,
   onLongPress,
+  action,
 }: {
   plan: SermonPlanSummary;
   arabic: boolean;
@@ -189,6 +190,8 @@ export function SermonPlanCard({
   fallbackTitle: (day: SermonDay) => string;
   onPress: () => void;
   onLongPress?: () => void;
+  /** A button at the card's end: Carry over. */
+  action?: { icon: IconName; label: string; onPress: () => void };
 }) {
   const day = useSermonDay(plan.serviceDate);
   const light = day.seasonKey === 'resurrection';
@@ -198,47 +201,61 @@ export function SermonPlanCard({
   const progress = plan.totalParts ? plan.writtenParts / plan.totalParts : 0;
   const preachedMinutes = plan.preachedSeconds ? Math.max(1, Math.round(plan.preachedSeconds / 60)) : null;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${title}, ${longGregorian(plan.serviceDate, arabic)}`}
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.card,
         compact && styles.cardCompact,
         compact && !selected && styles.cardBare,
         selected && styles.cardOn,
         arabic && styles.rtl,
-        pressed && styles.pressed,
       ]}
     >
-      <SeasonFill theme={day.theme} style={[styles.tile, compact && styles.tileCompact]}>
-        <View style={styles.tileInner}>
-          <Text numberOfLines={1} style={[styles.tileMonth, compact && styles.tileMonthCompact, { color: tileInk }]}>{month}</Text>
-          <Text style={[styles.tileDay, compact && styles.tileDayCompact, { color: tileInk }]}>
-            {day.coptic ? (arabic ? toEasternArabicDigits(day.coptic.day) : String(day.coptic.day)) : ''}
-          </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, ${longGregorian(plan.serviceDate, arabic)}`}
+        accessibilityState={{ selected }}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        style={({ pressed }) => [styles.cardMain, arabic && styles.rtl, pressed && styles.pressed]}
+      >
+        <SeasonFill theme={day.theme} style={[styles.tile, compact && styles.tileCompact]}>
+          <View style={styles.tileInner}>
+            <Text numberOfLines={1} style={[styles.tileMonth, compact && styles.tileMonthCompact, { color: tileInk }]}>{month}</Text>
+            <Text style={[styles.tileDay, compact && styles.tileDayCompact, { color: tileInk }]}>
+              {day.coptic ? (arabic ? toEasternArabicDigits(day.coptic.day) : String(day.coptic.day)) : ''}
+            </Text>
+          </View>
+        </SeasonFill>
+        <View style={styles.cardBody}>
+          <Text numberOfLines={2} style={[styles.cardTitle, compact && styles.cardTitleCompact, arabic && styles.textRight]}>{title}</Text>
+          <Text numberOfLines={1} style={[styles.cardDate, arabic && styles.textRight]}>{longGregorian(plan.serviceDate, arabic)}</Text>
+          <View style={[styles.cardStatus, arabic && styles.rtl]}>
+            <StateTag state={plan.state} arabic={arabic} />
+            {!compact && plan.state !== 'notStarted' ? (
+              <>
+                <View style={styles.mini}>
+                  <View style={[styles.miniFill, { width: `${Math.round((plan.state === 'preached' ? 1 : progress) * 100)}%` }]} />
+                </View>
+                <Text style={styles.cardMeta}>
+                  {plan.state === 'preached' && preachedMinutes ? minutesLabel(preachedMinutes, arabic) : partsLabel(plan.writtenParts, plan.totalParts, arabic)}
+                </Text>
+              </>
+            ) : null}
+          </View>
         </View>
-      </SeasonFill>
-      <View style={styles.cardBody}>
-        <Text numberOfLines={2} style={[styles.cardTitle, compact && styles.cardTitleCompact, arabic && styles.textRight]}>{title}</Text>
-        <Text numberOfLines={1} style={[styles.cardDate, arabic && styles.textRight]}>{longGregorian(plan.serviceDate, arabic)}</Text>
-        <View style={[styles.cardStatus, arabic && styles.rtl]}>
-          <StateTag state={plan.state} arabic={arabic} />
-          {!compact && plan.state !== 'notStarted' ? (
-            <>
-              <View style={styles.mini}>
-                <View style={[styles.miniFill, { width: `${Math.round((plan.state === 'preached' ? 1 : progress) * 100)}%` }]} />
-              </View>
-              <Text style={styles.cardMeta}>
-                {plan.state === 'preached' && preachedMinutes ? minutesLabel(preachedMinutes, arabic) : partsLabel(plan.writtenParts, plan.totalParts, arabic)}
-              </Text>
-            </>
-          ) : null}
-        </View>
-      </View>
-    </Pressable>
+      </Pressable>
+      {action ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          hitSlop={6}
+          onPress={action.onPress}
+          style={({ pressed }) => [styles.cardAction, pressed && styles.pressed]}
+        >
+          <Icon name={action.icon} size={17} color={SERMON_COLORS.gold} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -278,7 +295,9 @@ const styles = StyleSheet.create({
   segBadge: { color: SERMON_COLORS.gold },
   tag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   tagText: { fontSize: 11, fontWeight: '700' },
-  card: { alignItems: 'center', backgroundColor: SERMON_COLORS.surface, borderRadius: 18, flexDirection: 'row', gap: 12, padding: 12 },
+  card: { alignItems: 'center', backgroundColor: SERMON_COLORS.surface, borderRadius: 18, flexDirection: 'row', gap: 10, marginBottom: 8, padding: 12 },
+  cardMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 12, minWidth: 0 },
+  cardAction: { alignItems: 'center', backgroundColor: SERMON_COLORS.fill, borderRadius: 999, height: 36, justifyContent: 'center', width: 36 },
   cardCompact: { borderRadius: 14, gap: 10, padding: 9 },
   cardBare: { backgroundColor: 'transparent' },
   cardOn: { backgroundColor: SERMON_COLORS.raised },

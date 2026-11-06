@@ -395,3 +395,126 @@ test('The toolbar names the five colours and adds a highlight straight to a part
   const labels = load('src/constants/sermonPlanner.ts', { '@/types/sermonPlanner': types }).sermonHighlightPalette(false);
   assert.deepEqual(Object.values(labels).map((entry) => entry.label), ['Key verse', 'Illustration', 'Cross-ref', 'Application', 'Question']);
 });
+
+// ─── The week, and carrying a sermon over ───────────────────────────────────
+
+const summary = (id, serviceDate, state, extra = {}) => ({
+  id, documentKey: `sermon-plan:${id}`, serviceDate, title: '', state, writtenParts: 0, totalParts: 6,
+  preachedSeconds: null, highlightCount: 0, updatedAt: OLD, ...extra,
+});
+
+test('The list shows today until a week from today; earlier and later only what was started', () => {
+  const { week, later, earlier } = planner.sermonPlanGroups([
+    summary('old-empty', '2026-03-29', 'notStarted'),
+    summary('far-empty', '2027-04-07', 'notStarted'),
+    summary('palm', '2026-04-05', 'preached'),
+    summary('draft-past', '2026-10-01', 'draft'),
+    summary('sunday', '2026-11-08', 'draft'),
+    summary('today-empty', '2026-11-05', 'notStarted'),
+    summary('advent', '2026-12-20', 'ready'),
+  ], '2026-11-05');
+  assert.deepEqual(week.map((day) => day.isoDate), ['2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12']);
+  assert.deepEqual(week[3].plans.map((plan) => plan.id), ['sunday']);
+  assert.equal(week[0].plans.length, 0);
+  assert.equal(week[0].untouched.id, 'today-empty', 'a day\'s untouched plan is the one it opens');
+  assert.deepEqual(later.map((plan) => plan.id), ['advent']);
+  assert.deepEqual(earlier.map((plan) => plan.id), ['draft-past', 'palm']);
+});
+
+/** A calendar for the carry over: Coptic dates counted from Thoout 1 on 11 September (12 September before a leap year). */
+function fakeCalendar({ fixed = [] } = {}) {
+  const DAY = 86400000;
+  const newYear = (copticYear) => {
+    const gregorian = copticYear + 283;
+    return Date.UTC(gregorian, 8, (gregorian + 1) % 4 === 0 ? 12 : 11);
+  };
+  const copticYearOf = (time) => {
+    let year = new Date(time).getUTCFullYear() - 283;
+    while (newYear(year + 1) <= time) year += 1;
+    while (newYear(year) > time) year -= 1;
+    return year;
+  };
+  const dateOf = (isoDate) => {
+    const time = Date.parse(`${isoDate}T00:00:00Z`);
+    const year = copticYearOf(time);
+    const index = Math.round((time - newYear(year)) / DAY);
+    return { year, month: Math.floor(index / 30) + 1, day: (index % 30) + 1 };
+  };
+  return {
+    copticDate: async (isoDate) => dateOf(isoDate),
+    copticMonth: async (year, month) => {
+      const days = month === 13 ? Math.round((newYear(year + 1) - newYear(year)) / DAY) - 360 : 30;
+      return Array.from({ length: days }, (_, index) => {
+        const time = newYear(year) + ((month - 1) * 30 + index) * DAY;
+        return { isoDate: new Date(time).toISOString().slice(0, 10), day: index + 1, sunday: new Date(time).getUTCDay() === 0 };
+      });
+    },
+    fixedFeast: async (isoDate) => fixed.includes(isoDate),
+  };
+}
+
+const carryOver = load('src/utils/sermonCarryOver.ts', {
+  './highlightGroups': highlightGroups,
+  './holyWeekDates': load('src/utils/holyWeekDates.ts', { './dateUtils': {} }),
+  './sermonPlanner': planner,
+});
+
+test('A carry over offers the same day a year on, as the readings count it', async () => {
+  const calendar = fakeCalendar({ fixed: ['2027-04-07'] });
+  // Palm Sunday to Palm Sunday, by Pascha.
+  assert.equal(await carryOver.equivalentDayNextYear('2026-04-05', calendar), '2027-04-25');
+  // A weekday keeps its Coptic date: Hathor 3.
+  const weekday = await calendar.copticDate('2026-11-12');
+  const next = await carryOver.equivalentDayNextYear('2026-11-12', calendar);
+  assert.deepEqual(await calendar.copticDate(next), { ...weekday, year: weekday.year + 1 });
+  // A Sunday outside Pascha's season is the same Sunday of its Coptic month.
+  const sunday = '2026-11-08';
+  const nextSunday = await carryOver.equivalentDayNextYear(sunday, calendar);
+  assert.equal(new Date(`${nextSunday}T00:00:00Z`).getUTCDay(), 0);
+  assert.equal((await calendar.copticDate(nextSunday)).month, (await calendar.copticDate(sunday)).month);
+  // A feast on its Coptic date in Lent keeps that date (the Annunciation).
+  const annunciation = await carryOver.equivalentDayNextYear('2027-04-07', calendar);
+  assert.deepEqual((await calendar.copticDate(annunciation)).day, (await calendar.copticDate('2027-04-07')).day);
+  // One already past goes on to the first that isn't.
+  assert.equal(await carryOver.carryOverDay('2025-04-13', '2026-11-06', calendar), '2027-04-25');
+});
+
+test('A plan carried over keeps its outline and finds its highlights again in that day\'s readings', () => {
+  const source = {
+    ...planner.emptySermonPlan('palm', '2026-04-05', 'Feast of Palm Sunday'),
+    bigIdea: 'The King comes humbly.',
+    status: 'preached',
+    preachedSeconds: 900,
+    highlights: [
+      highlight('a~0', { groupId: 'a', sectionId: 'g', verseId: 'g::v1', quote: 'Hosanna', note: 'Begin here' }),
+      highlight('b~0', { groupId: 'b', sectionId: 'g', verseId: 'g::v2', quote: 'the colt' }),
+      highlight('c~0', { groupId: 'c', sectionId: 'p', verseId: 'p::v1', quote: 'not read this year' }),
+    ],
+  };
+  source.parts[1] = { ...source.parts[1], body: 'The crowd.', highlightIds: ['a', 'c'] };
+  const sections = [
+    { id: 'g2', title: {}, verses: [{ type: 'readingReference', english: 'John 12:12' }, { english: 'They cried Hosanna! Blessed is He', arabic: '' }] },
+    { id: 'g', title: {}, verses: [{ english: '' }, { english: 'a verse that changed', arabic: '' }, { english: 'and found the colt there', arabic: '' }] },
+  ];
+  const { plan, carried, leftBehind } = carryOver.carriedSermonPlan(source, { id: 'p2', isoDate: '2027-04-25', now: NEW }, sections);
+  assert.equal(plan.serviceDate, '2027-04-25');
+  assert.equal(plan.title, 'Feast of Palm Sunday');
+  assert.equal(plan.bigIdea, 'The King comes humbly.');
+  assert.equal(plan.status, 'draft');
+  assert.equal(plan.preachedSeconds, null);
+  assert.equal(carried, 2);
+  assert.equal(leftBehind, 1);
+  const hosanna = plan.highlights.find((entry) => entry.quote === 'Hosanna');
+  assert.equal(hosanna.verseId, 'g2::v1', 'found where the words are read');
+  assert.equal(hosanna.startOffset, 'They cried '.length);
+  assert.equal(hosanna.note, 'Begin here');
+  assert.equal(plan.highlights.find((entry) => entry.quote === 'the colt').verseId, 'g::v2', 'kept in its own verse');
+  assert.deepEqual(plan.parts[1].highlightIds, [highlightGroups.highlightGroupId(hosanna)]);
+  // Offline, the outline goes alone.
+  assert.equal(carryOver.carriedSermonPlan(source, { id: 'p3', isoDate: '2027-04-25', now: NEW }, null).plan.highlights.length, 0);
+});
+
+test('The planner\'s readings have no drop caps', () => {
+  const page = fs.readFileSync('src/components/vine/documentHtml.ts', 'utf8');
+  assert.match(page, /const opens = Boolean\(verse\.dropCap\) && !sermonPlannerMode;/);
+});

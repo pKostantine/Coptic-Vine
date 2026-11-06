@@ -12,6 +12,19 @@ export type { SermonReading, SermonReadingKind, SermonReadingsByService } from '
 
 type Loaded = { key: string; sections: DocumentSection[] | null; error: Error | null };
 
+/** The planner's readings for a day, as the hook below and a carry over read them. */
+export function loadSermonReadings(serviceDate: string, userConditionFlags: Record<string, boolean>): Promise<DocumentSection[]> {
+  const date = new Date(`${serviceDate}T00:00:00Z`);
+  const weekdayDate = getServiceWeekdayConditionDate({ schema: 'liturgy', table: 'sermon_planner', extraContext: undefined, effectiveDate: date });
+  return getEpistleConditionFlags(date).then((epistleFlags) => hydrateSupabaseServiceHymn(
+    'liturgy',
+    'sermon_planner',
+    date,
+    { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...userConditionFlags },
+    weekdayDate,
+  ));
+}
+
 /**
  * The day's readings for the planner, read as the Lectionary reads them: the
  * epistles' introductions for the day, the reader's own Book Settings
@@ -32,16 +45,7 @@ export function useSermonReadings(serviceDate: string) {
 
   useEffect(() => {
     let active = true;
-    const date = new Date(`${serviceDate}T00:00:00Z`);
-    const weekdayDate = getServiceWeekdayConditionDate({ schema: 'liturgy', table: 'sermon_planner', extraContext: undefined, effectiveDate: date });
-    getEpistleConditionFlags(date)
-      .then((epistleFlags) => hydrateSupabaseServiceHymn(
-        'liturgy',
-        'sermon_planner',
-        date,
-        { BishopPresent: true, CopticGospelRite: false, ...epistleFlags, ...userConditionFlags },
-        weekdayDate,
-      ))
+    loadSermonReadings(serviceDate, userConditionFlags)
       .then(
         (sections: DocumentSection[]) => { if (active) setLoaded({ key, sections, error: null }); },
         (error: unknown) => { if (active) setLoaded({ key, sections: null, error: error instanceof Error ? error : new Error(String(error)) }); },
