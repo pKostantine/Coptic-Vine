@@ -7,7 +7,7 @@
  *
  * A few functions are cv-api's own, which Supabase never had (CV-Admin's
  * Users page, src/rpc/admin/users.ts; the beta's feedback, src/rpc/feedback.ts; the spiritual canon's
- * instructions, src/rpc/canonNotes.ts). Their signatures are declared next to
+ * instructions, src/rpc/canonNotes.ts, and its shared links, src/rpc/canonShares.ts). Their signatures are declared next to
  * them in the same form (OWN_FUNCTIONS) and go through the same matching and
  * grants; none may take a Supabase function's name (tests/rpc.test.ts).
  */
@@ -20,6 +20,7 @@ import { USER_FUNCTIONS, userRpcs } from './admin/users.ts';
 import { convert } from './args.ts';
 import { creatorRpcs } from './creator/index.ts';
 import { CANON_NOTE_FUNCTIONS, canonNoteRpcs } from './canonNotes.ts';
+import { CANON_SHARE_FUNCTIONS, canonShareRpcs } from './canonShares.ts';
 import { FEEDBACK_FUNCTIONS, feedbackRpcs } from './feedback.ts';
 import { learningRpcs } from './learning/index.ts';
 import { musicRpcs } from './music/index.ts';
@@ -45,6 +46,7 @@ export const RPCS: Record<string, Rpc> = {
   ...userRpcs,
   ...feedbackRpcs,
   ...canonNoteRpcs,
+  ...canonShareRpcs,
 };
 
 /** cv-api's own functions' signatures. */
@@ -52,6 +54,7 @@ export const OWN_FUNCTIONS: Record<string, FunctionInfo> = {
   ...USER_FUNCTIONS,
   ...FEEDBACK_FUNCTIONS,
   ...CANON_NOTE_FUNCTIONS,
+  ...CANON_SHARE_FUNCTIONS,
   // Supabase's is_chc_admin under Coptic Vine's name (src/rpc/admin/reads.ts); the old name still answers.
   'public.is_cv_admin': { roles: ['authenticated'], returns: 'boolean', params: [] },
 };

@@ -1,3 +1,4 @@
+import type { IconName } from '@/components/vine/ui/Icon';
 import { tr } from '@/utils/appText';
 import { getCurrentAppLanguage } from '@/utils/preferencesStorage';
 import { toEasternArabicDigits, WEEKDAYS_AR, WEEKDAYS_EN, WEEKDAYS_FR } from '@/utils/localeFormat';
@@ -6,6 +7,8 @@ import {
   AGPEYA_PSALM_COUNTS,
   canonAgpeyaPrayer,
   parseCanonTime,
+  sortHourPlans,
+  WEEKDAYS,
   type AbstinenceFast,
   type CanonFrequency,
   type CanonGoal,
@@ -289,4 +292,30 @@ export function canonReminderText(task: CanonTask): { title: string; body: strin
   const lead = tr('Your spiritual canon', 'Votre canon spirituel', 'قانونك الروحي');
   const body = goal ? `${lead} · ${goal}` : task.note ? `${lead} · ${task.note}` : lead;
   return { title, body };
+}
+
+/** Each kind's icon in the canon's lists. */
+export const CANON_KIND_ICONS: Record<CanonKind, IconName> = {
+  agpeya: 'sunrise',
+  bible: 'book-outline',
+  metania: 'arrow-down-circle-outline',
+  abstinence: 'time-outline',
+  custom: 'checkmark-done',
+};
+
+/** The line under an item in the list: what it asks, how often, when. */
+export function canonItemSummary(item: CanonItem): string {
+  if (item.kind === 'agpeya') {
+    if (item.pattern === 'byDay') {
+      // Every hour kept on some day, in the order of the day.
+      const hours = sortHourPlans(WEEKDAYS.flatMap((day) => item.days[day]).filter((plan, index, all) => all.findIndex((other) => other.hourId === plan.hourId) === index));
+      return [canonFrequencyLabel({ kind: 'byDay' }), hours.map((plan) => agpeyaHourName(plan.hourId, 'traditional')).join(', ')].filter(Boolean).join(' · ');
+    }
+    const names = item.hours.map((plan) => agpeyaHourName(plan.hourId, 'traditional')).join(', ');
+    return [names, canonFrequencyLabel(item.frequency)].filter(Boolean).join(' · ');
+  }
+  if (item.kind === 'abstinence') return [canonFrequencyLabel(item.frequency), untilLabel(item.time)].join(' · ');
+  return [canonGoalLabel(item.goal), canonFrequencyLabel(item.frequency), item.time ? canonTimeLabel(item.time) : null]
+    .filter((part): part is string => Boolean(part))
+    .join(' · ');
 }

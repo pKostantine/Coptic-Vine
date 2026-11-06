@@ -692,7 +692,7 @@ test('abstinence speaks each App Language: its fasts, and until when', () => {
 test('abstinence is added from the canon’s list, its fasts chosen from a drop-down of checkboxes, its time required', () => {
   const list = read('src/app/canon/edit.tsx');
   assert.match(list, /kind: 'abstinence',\n\s+title: tr\('Abstinence'/);
-  assert.match(list, /abstinence: 'time-outline',/);
+  assert.match(read('src/components/canon/canonText.ts'), /abstinence: 'time-outline',/);
   const editor = read('src/app/canon/[id].tsx');
   assert.match(editor, /params\.kind === 'abstinence'/);
   assert.match(editor, /<CheckboxDropdown[\s\S]+?options=\{ABSTINENCE_FASTS\.map\(\(fast\) => \(\{ key: fast\.id, label: abstinenceFastName\(fast\.id\) \}\)\)\}/);

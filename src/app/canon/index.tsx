@@ -83,6 +83,21 @@ export default function CanonScreen() {
     </Pressable>
   );
 
+  const headerButtons = (
+    <View style={styles.headerButtons}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={tr('Share parts of your canon', 'Partager une partie de votre canon', 'شارك أجزاء من قانونك')}
+        hitSlop={6}
+        onPress={() => router.push('/canon/share' as never)}
+        style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
+      >
+        <Icon name="share-outline" size={18} color={COLORS.gold} />
+      </Pressable>
+      {editButton}
+    </View>
+  );
+
   const title = tr('Spiritual Canon', 'Canon spirituel', 'القانون الروحي');
 
   return (
@@ -94,7 +109,7 @@ export default function CanonScreen() {
         arabic={arabic}
         onBack={() => goBack(router, '/' as never)}
         backLabel={tr('Back', 'Retour', 'رجوع')}
-        trailing={canon.items.length ? editButton : null}
+        trailing={canon.items.length ? headerButtons : null}
       />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.column}>
@@ -248,6 +263,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 32, paddingHorizontal: 16 },
   column: { alignSelf: 'center', gap: 14, maxWidth: 640, width: '100%' },
   pressed: { opacity: 0.7 },
+  headerButtons: { flexDirection: 'row', gap: 8 },
   roundButton: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
 
   weekCard: { borderRadius: 20, gap: 12, overflow: 'hidden', paddingBottom: 12, paddingHorizontal: 12, paddingTop: 12 },

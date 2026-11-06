@@ -75,7 +75,7 @@
     "test:playback": "node --test tests/playbackEngine.test.cjs tests/playbackQueue.test.cjs tests/trackControls.test.cjs tests/lessonPlayback.test.cjs tests/webPlayback.test.cjs tests/artworkPalette.test.cjs tests/smoothness.test.cjs",
     "test:music-ui": "node --test tests/musicLibraryPlaylistUi.test.cjs tests/searchBack.test.cjs tests/learningSeasonLook.test.cjs tests/learningSeasonDates.test.cjs tests/nowPlayingGestures.test.cjs tests/playerSheets.test.cjs tests/learnAlbumRows.test.cjs",
     "test:share": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/shareWorker.test.mjs tests/notificationDispatcher.test.mjs tests/webManifest.test.cjs tests/screenSeal.test.cjs tests/webHeaders.test.cjs",
-    "test:canon": "node --test tests/spiritualCanon.test.cjs tests/canonNotificationActions.test.cjs tests/canonInstructions.test.cjs",
+    "test:canon": "node --test tests/spiritualCanon.test.cjs tests/canonNotificationActions.test.cjs tests/canonInstructions.test.cjs tests/canonShare.test.cjs",
     "build": "expo export -p web",
     "postbuild": "node scripts/verify-cloudflare-share-worker.mjs",
     "deploy": "npm run build && wrangler deploy",

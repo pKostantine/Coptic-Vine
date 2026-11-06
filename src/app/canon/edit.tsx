@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { InlineSwitch } from '@/components/canon/CanonEditorParts';
-import { agpeyaHourName, canonFrequencyLabel, canonGoalLabel, canonItemTitle, canonTimeLabel, untilLabel } from '@/components/canon/canonText';
+import { CANON_KIND_ICONS, canonItemSummary as itemSummary, canonItemTitle } from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
 import { PageGlow, SectionHeading } from '@/components/vine/screens/BookPage';
 import BleedPage from '@/components/vine/ui/BleedPage';
@@ -17,34 +17,9 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
 import { tr } from '@/utils/appText';
 import { goBack } from '@/utils/navigation';
-import { canonHasReminders, MAX_CANON_ITEMS, sortHourPlans, WEEKDAYS, type CanonItem, type CanonKind } from '@/utils/spiritualCanon';
+import { canonHasReminders, MAX_CANON_ITEMS, type CanonItem, type CanonKind } from '@/utils/spiritualCanon';
 
 const MAX_FONT_SCALE = 1.3;
-
-const CANON_KIND_ICONS: Record<CanonKind, IconName> = {
-  agpeya: 'sunrise',
-  bible: 'book-outline',
-  metania: 'arrow-down-circle-outline',
-  abstinence: 'time-outline',
-  custom: 'checkmark-done',
-};
-
-/** The line under an item in the list: what it asks, how often, when. */
-function itemSummary(item: CanonItem): string {
-  if (item.kind === 'agpeya') {
-    if (item.pattern === 'byDay') {
-      // Every hour kept on some day, in the order of the day.
-      const hours = sortHourPlans(WEEKDAYS.flatMap((day) => item.days[day]).filter((plan, index, all) => all.findIndex((other) => other.hourId === plan.hourId) === index));
-      return [canonFrequencyLabel({ kind: 'byDay' }), hours.map((plan) => agpeyaHourName(plan.hourId, 'traditional')).join(', ')].filter(Boolean).join(' · ');
-    }
-    const names = item.hours.map((plan) => agpeyaHourName(plan.hourId, 'traditional')).join(', ');
-    return [names, canonFrequencyLabel(item.frequency)].filter(Boolean).join(' · ');
-  }
-  if (item.kind === 'abstinence') return [canonFrequencyLabel(item.frequency), untilLabel(item.time)].join(' · ');
-  return [canonGoalLabel(item.goal), canonFrequencyLabel(item.frequency), item.time ? canonTimeLabel(item.time) : null]
-    .filter((part): part is string => Boolean(part))
-    .join(' · ');
-}
 
 /**
  * Editing the spiritual canon: what it holds, each opening its own editor;

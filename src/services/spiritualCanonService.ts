@@ -6,12 +6,14 @@ import {
   isAbstinenceFast,
   normalizeCanonDayMarks,
   normalizeCanonDocument,
+  newCanonId,
   normalizeCanonItem,
   type CanonDayMarks,
   type CanonDocument,
   type CanonItem,
 } from '@/utils/spiritualCanon';
 import { api } from '@/utils/api';
+import { publicUrl } from '@/utils/publicUrl';
 
 /**
  * The canon on this device and in the account. The device keeps one copy for
@@ -266,4 +268,85 @@ export async function saveCloudCanonInstructions(value: CanonInstructions): Prom
   const { data, error } = await api.rpc('save_my_canon_instructions', { p_instructions: value.text, p_written_at: value.updatedAt });
   if (error) throw new Error(error.message || 'Unable to save the canon’s instructions.');
   return fromAccount(data);
+}
+
+// ─── Sharing parts of the canon ─────────────────────────────────────────────
+
+/**
+ * A copy of some of the canon's items under a link the believer hands out
+ * (cv-api's create_canon_share and the rest, workers/api/src/rpc/canonShares.ts),
+ * for a friend or a support group to read and take into their own canon.
+ */
+export interface CanonShare {
+  id: string;
+  sharerName: string | null;
+  message: string | null;
+  items: CanonItem[];
+  instructions: string | null;
+  createdAt: string;
+}
+
+/**
+ * An item as it is shared: its own reminders left behind (each keeps their
+ * own), and nothing of when it was set down.
+ */
+export function sharedCanonItem(item: CanonItem): CanonItem {
+  const stamp = new Date(0).toISOString();
+  const base = { ...item, createdAt: stamp, updatedAt: stamp };
+  if (base.kind === 'agpeya') {
+    const quiet = (plans: typeof base.hours) => plans.map((plan) => ({ ...plan, remind: false }));
+    return { ...base, hours: quiet(base.hours), days: base.days.map(quiet) };
+  }
+  return { ...base, remind: false } as CanonItem;
+}
+
+/** A shared item taken into one's own canon: an item of its own, with a new id and written now. */
+export function adoptedCanonItem(item: CanonItem, now = new Date()): CanonItem {
+  const stamp = now.toISOString();
+  return { ...sharedCanonItem(item), id: newCanonId(), createdAt: stamp, updatedAt: stamp };
+}
+
+/** The link to a shared canon, to send. */
+export function canonShareUrl(id: string): string {
+  return publicUrl(`/canon/shared/${encodeURIComponent(id)}`);
+}
+
+function shareFromAccount(data: unknown): CanonShare {
+  const row = (data ?? {}) as Record<string, unknown>;
+  return {
+    id: String(row.id ?? ''),
+    sharerName: typeof row.sharerName === 'string' ? row.sharerName : null,
+    message: typeof row.message === 'string' ? row.message : null,
+    items: (Array.isArray(row.items) ? row.items : []).map((item) => normalizeCanonItem(item)).filter((item): item is CanonItem => Boolean(item)),
+    instructions: typeof row.instructions === 'string' ? row.instructions : null,
+    createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(0).toISOString(),
+  };
+}
+
+export async function createCanonShare(share: { items: CanonItem[]; name: string; message: string; instructions: string | null }): Promise<CanonShare> {
+  const { data, error } = await api.rpc('create_canon_share', {
+    p_items: share.items.map(sharedCanonItem),
+    p_name: share.name.trim() || null,
+    p_message: share.message.trim() || null,
+    p_instructions: share.instructions?.trim() || null,
+  });
+  if (error) throw new Error(error.message || 'Unable to share your canon.');
+  return shareFromAccount(data);
+}
+
+export async function loadCanonShare(id: string): Promise<CanonShare> {
+  const { data, error } = await api.rpc('get_canon_share', { p_id: id });
+  if (error) throw new Error(error.message || 'Unable to open this shared canon.');
+  return shareFromAccount(data);
+}
+
+export async function listMyCanonShares(): Promise<CanonShare[]> {
+  const { data, error } = await api.rpc('list_my_canon_shares');
+  if (error) throw new Error(error.message || 'Unable to load your shared links.');
+  return (Array.isArray(data) ? data : []).map(shareFromAccount);
+}
+
+export async function deleteMyCanonShare(id: string): Promise<void> {
+  const { error } = await api.rpc('delete_my_canon_share', { p_id: id });
+  if (error) throw new Error(error.message || 'Unable to stop sharing.');
 }
