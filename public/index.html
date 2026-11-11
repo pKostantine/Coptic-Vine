@@ -80,6 +80,15 @@
         -webkit-text-size-adjust: none;
         text-size-adjust: none;
       }
+      /* A card's background is often a gradient laid over the whole card
+         (absoluteFill), which the browser paints above anything unpositioned
+         drawn after it: a field in such a card (an Other Canon's name, Beta
+         Feedback #4) took taps but its box and text were hidden. Fields are
+         positioned, so they paint in their place, above the card's ground. */
+      input,
+      textarea {
+        position: relative;
+      }
       /* Follow Safari's visible viewport as its toolbars expand or collapse. */
       @supports (height: 100dvh) {
         body {
