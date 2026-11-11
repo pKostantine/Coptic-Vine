@@ -8,6 +8,7 @@ import { BackHandler, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import BookSyncBootstrap from '@/components/BookSyncBootstrap';
+import DayInUrl from '@/components/DayInUrl';
 import NotificationBootstrap from '@/components/NotificationBootstrap';
 import GlobalNowPlayingOverlay from '@/components/playback/GlobalNowPlayingOverlay';
 import LessonVideoHome from '@/components/playback/LessonVideoHome';
@@ -21,6 +22,7 @@ import { MusicPlayerProvider } from '@/context/MusicPlayerContext';
 import { readStoredReading, ReadingPreferencesProvider, useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { SpiritualCanonProvider } from '@/context/SpiritualCanonContext';
 import { VideoStageProvider } from '@/context/VideoStageContext';
+import { readDayFromAddress } from '@/utils/dayInUrl';
 import { keepsWholeWindow } from '@/utils/desktopChrome';
 import { preloadCollapsedSectionStates } from '@/utils/collapseStateStorage';
 import { settleWithin } from '@/utils/settleWithin';
@@ -33,6 +35,8 @@ SplashScreen.preventAutoHideAsync();
 // is drawn in the reader's own language, theme and orientation, not in the
 // defaults and then all over again (ReadingPreferencesContext).
 const storedReading = readStoredReading();
+// A web address opened on a chosen day (`?day=8nov2026-evening`) opens the app on it.
+const dayFromAddress = readDayFromAddress();
 
 /**
  * A page that throws while rendering is shown as a notice with a way back,
@@ -207,7 +211,8 @@ export default function RootLayout() {
         <ReadingPreferencesProvider>
           <SpiritualCanonProvider>
             <LiturgicalClockProvider>
-              <CalendarProvider>
+              <CalendarProvider initialDate={dayFromAddress?.date ?? null} initialPeriod={dayFromAddress?.period ?? null}>
+                <DayInUrl />
                 <MusicPlayerProvider>
                   <VideoStageProvider>
                     <StatusBar style="light" />

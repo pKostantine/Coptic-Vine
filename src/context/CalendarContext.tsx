@@ -40,11 +40,20 @@ function addOneDay(date: Date): Date {
  * (`initialDate`), where a day is chosen apart from the app's (the Sermon
  * Planner's carry over).
  */
-export function CalendarProvider({ children, initialDate = null }: { children: React.ReactNode; initialDate?: Date | null }) {
+export function CalendarProvider({
+  children,
+  initialDate = null,
+  initialPeriod = null,
+}: {
+  children: React.ReactNode;
+  initialDate?: Date | null;
+  /** The eve or the day of `initialDate` (a web address's `?day=`: utils/dayInUrl.ts). */
+  initialPeriod?: LiturgicalDayPeriod | null;
+}) {
   const clock = useLiturgicalClock();
   const [selectedDate, setSelectedDate] = useState<Date | null>(initialDate);
   // The eve toggle's choice; null leaves the period to the clock while live, and to the morning on a chosen day.
-  const [manualPeriod, setManualPeriod] = useState<LiturgicalDayPeriod | null>(null);
+  const [manualPeriod, setManualPeriod] = useState<LiturgicalDayPeriod | null>(initialDate ? initialPeriod : null);
 
   const isLive = selectedDate === null;
   const rawDate = selectedDate ?? clock.today;
