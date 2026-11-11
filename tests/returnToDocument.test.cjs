@@ -105,4 +105,5 @@ test('the swipe wraps the app, and goes back in through reopenDocumentAt', () =>
   assert.match(swipe, /gesture\.dx < -14/, 'only a swipe to the left claims the gesture');
   assert.match(swipe, /touchAction: 'pan-y'/, 'the web browser leaves the sideways touch to it');
   assert.match(swipe, /onPanResponderTerminationRequest: \(\) => false/);
+  assert.doesNotMatch(swipe, /Pressable|Animated|Back to /, 'no tab or button is drawn for it: the swipe alone');
 });
