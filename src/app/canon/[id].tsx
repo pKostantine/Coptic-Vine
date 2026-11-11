@@ -41,7 +41,7 @@ import { tr } from '@/utils/appText';
 import { goBack } from '@/utils/navigation';
 import {
   ABSTINENCE_DEFAULT_UNTIL,
-  ABSTINENCE_FASTS,
+  ABSTINENCE_CHOICES,
   AGPEYA_PSALM_COUNTS,
   agpeyaHourDefaultTime,
   CANON_AGPEYA_PRAYERS,
@@ -434,7 +434,7 @@ function AbstinenceEditor({ item, arabic, remindersNote, onChange }: {
           arabic={arabic}
           label={tr('Fasts', 'Jeûnes', 'الأصوام')}
           summary={abstinenceFastsLabel(item.frequency.fasts)}
-          options={ABSTINENCE_FASTS.map((fast) => ({ key: fast.id, label: abstinenceFastName(fast.id) }))}
+          options={ABSTINENCE_CHOICES.map((fast) => ({ key: fast, label: abstinenceFastName(fast) }))}
           selected={item.frequency.fasts}
           onChange={(fasts) => onChange({ ...item, frequency: { kind: 'fasts', fasts } })}
         />

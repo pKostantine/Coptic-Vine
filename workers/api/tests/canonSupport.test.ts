@@ -131,3 +131,15 @@ test('too long, or too many links, are refused', async () => {
   refused(await call(BUSY, 'create_canon_support_invite', {}), 'the links an account may keep');
   assert.equal(ok<CanonSupportInvite[]>(await call(BUSY, 'list_my_canon_support_invites')).length, CANON_INVITES_PER_ACCOUNT);
 });
+
+test('a supported week comes with the canon kept after it, so its days ask what they asked then', async () => {
+  const link = ok<CanonSupportInvite>(await call(BELIEVER, 'create_canon_support_invite', {}));
+  const supporter = ok<CanonSupportPerson>(await call(GROUP, 'accept_canon_support_invite', { p_id: link.id }));
+  const kept = { done: false, at: '2026-11-20T08:00:00.000Z', items: [BIBLE] };
+  for (const [day, marks] of [['2026-11-19', { 'canon-1': MARKS['canon-1'], $canon: kept }], ['2026-11-25', { $canon: { ...kept, items: [] } }]] as const) {
+    worker.db.prepare('INSERT INTO "public.spiritual_canon_days" ("user_id", "day", "marks") VALUES (?, ?, ?)').run(BELIEVER, day, JSON.stringify(marks));
+  }
+  const seen = ok<SupportedCanon>(await call(GROUP, 'get_supported_canon', { p_id: supporter.id, ...WEEK }));
+  assert.deepEqual(Object.keys(seen.days), ['2026-11-05', '2026-11-19'], 'the week, and the first later day that kept the canon');
+  assert.deepEqual(seen.days['2026-11-19'], { $canon: kept }, 'of it, only what it kept');
+});

@@ -371,7 +371,8 @@ test('the Bible is measured in chapters, verses, time, or not at all; verses ste
 });
 
 test('metanias are kept on the days they are made: not on Saturdays, Sundays or feasts, as the calendar says', () => {
-  const item = canon.newCanonItem('metania');
+  // Set down before the weeks asked about (an item is never asked before the day it was set down).
+  const item = { ...canon.newCanonItem('metania'), createdAt: STAMP };
   assert.deepEqual(item.frequency, { kind: 'applicable' });
   assert.deepEqual(item.goal, { kind: 'metanias', count: 10 });
   // Before the calendar is read, a weekday is assumed to be one (a feast is not yet known)…
@@ -453,7 +454,7 @@ test('the time of day is set on wheels: the system’s own on iOS, scrolling col
 });
 
 test('metanias on fasting days only: the calendar’s fasting days that are not weekends or feasts', () => {
-  const item = { ...canon.newCanonItem('metania'), frequency: { kind: 'fastingDays' } };
+  const item = { ...canon.newCanonItem('metania'), frequency: { kind: 'fastingDays' }, createdAt: STAMP };
   const week = ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24'];
   const asked = (calendar) => week.filter((day) => canon.canonTasksForDay(doc([item]), day, calendar).length);
   // A fasting day is never assumed: before the calendar is read, none is asked.
@@ -695,10 +696,70 @@ test('abstinence is added from the canon’s list, its fasts chosen from a drop-
   assert.match(read('src/components/canon/canonText.ts'), /abstinence: 'time-outline',/);
   const editor = read('src/app/canon/[id].tsx');
   assert.match(editor, /params\.kind === 'abstinence'/);
-  assert.match(editor, /<CheckboxDropdown[\s\S]+?options=\{ABSTINENCE_FASTS\.map\(\(fast\) => \(\{ key: fast\.id, label: abstinenceFastName\(fast\.id\) \}\)\)\}/);
+  assert.match(editor, /<CheckboxDropdown[\s\S]+?options=\{ABSTINENCE_CHOICES\.map\(\(fast\) => \(\{ key: fast, label: abstinenceFastName\(fast\) \}\)\)\}/);
   assert.match(editor, /<TimeAndReminder[\s\S]+?label=\{tr\('Abstain until'[\s\S]+?required\n/);
   const parts = read('src/components/canon/CanonEditorParts.tsx');
   assert.match(parts, /export function CheckboxDropdown/);
   assert.match(parts, /accessibilityState=\{\{ expanded: open \}\}/);
   assert.match(parts, /\{time && !required \? \(/, 'a required time has no clearing it');
+});
+
+test('abstinence may be kept on every applicable day: a box of its own, off to begin with, any weekday not a feast', () => {
+  assert.deepEqual([...canon.ABSTINENCE_CHOICES], ['applicable', 'wedFri', 'nativity', 'paramoun', 'jonah', 'lent', 'holyWeek', 'apostles', 'stMary']);
+  assert.ok(!canon.normalizeCanonItem({ id: 'abstinence-1', kind: 'abstinence', createdAt: STAMP, updatedAt: STAMP }).frequency.fasts.includes('applicable'), 'off to begin with');
+  assert.deepEqual(canon.normalizeCanonFrequency({ kind: 'fasts', fasts: ['lent', 'applicable'] }, 'abstinence'), { kind: 'fasts', fasts: ['applicable', 'lent'] });
+  assert.equal(canon.isAbstinenceFast('applicable'), false, 'never one of the calendar’s fasts');
+  const item = { id: 'abstinence-1', kind: 'abstinence', frequency: { kind: 'fasts', fasts: ['applicable'] }, goal: { kind: 'none' }, time: '14:00', remind: false, createdAt: STAMP, updatedAt: STAMP };
+  const days = {
+    '2027-01-13': { applicable: true, fasting: false, agpeya: 'all', fasts: [] }, // an ordinary Wednesday, in no fast
+    '2027-01-07': { applicable: false, fasting: false, agpeya: 'all', fasts: [] }, // Nativity, a feast
+    '2027-01-16': { applicable: false, fasting: false, agpeya: 'all', fasts: [] }, // a Saturday
+  };
+  const calendar = { calendarDay: (day) => days[day] ?? null };
+  const tasks = (day) => canon.canonTasksForDay(doc([item]), day, calendar);
+  assert.equal(tasks('2027-01-13').length, 1);
+  assert.equal(tasks('2027-01-07').length, 0);
+  assert.equal(tasks('2027-01-16').length, 0);
+  assert.equal(tasks('2027-01-14').length, 0, 'none before the calendar has read the day');
+  const text = read('src/components/canon/canonText.ts');
+  assert.match(text, /case 'applicable': return tr\('All applicable days'/);
+  assert.match(text, /if \(fasts\.includes\('applicable'\)\) return abstinenceFastName\('applicable'\);/);
+});
+
+test('a change to the canon counts from today: the days before keep what they asked', () => {
+  const now = new Date(2026, 10, 11, 9, 0); // 11 November
+  const first = plan('first_hour');
+  const twelfth = plan('twelfth_hour');
+  const sixth = plan('sixth_hour');
+  const start = doc([agpeya({ hours: [first, twelfth] })], {
+    '2026-11-10': { 'agpeya-1:first_hour': { done: true, at: STAMP }, 'agpeya-1:twelfth_hour': { done: true, at: STAMP } },
+  });
+  const keys = (document, day) => canon.canonTasksForDay(document, day).map((task) => task.key);
+  // The father of confession adds the Sixth Hour today.
+  const changed = canon.withCanonItem(start, agpeya({ hours: [first, sixth, twelfth] }), now);
+  assert.deepEqual(keys(changed, '2026-11-10'), ['agpeya-1:first_hour', 'agpeya-1:twelfth_hour'], 'yesterday asked what it asked');
+  assert.deepEqual(canon.canonDayProgress(canon.canonTasksForDay(changed, '2026-11-10')), { done: 2, total: 2 }, 'and was kept');
+  assert.deepEqual(keys(changed, '2026-11-01'), ['agpeya-1:first_hour', 'agpeya-1:twelfth_hour']);
+  assert.deepEqual(keys(changed, '2026-11-11'), ['agpeya-1:first_hour', 'agpeya-1:sixth_hour', 'agpeya-1:twelfth_hour'], 'today asks the new canon');
+  assert.equal(keys(changed, '2026-11-12').length, 3);
+  assert.equal(canon.canonKeptDay(now), '2026-11-10');
+
+  // Another change the same day keeps yesterday's canon as it stood before both; a removal too.
+  const again = canon.withoutCanonItem(canon.withCanonItem(changed, bible({ createdAt: now.toISOString() }), now), 'agpeya-1', now);
+  assert.deepEqual(keys(again, '2026-11-10'), ['agpeya-1:first_hour', 'agpeya-1:twelfth_hour']);
+  assert.deepEqual(keys(again, '2026-11-11'), ['bible-1']);
+  // An item set down today was never asked before it.
+  assert.deepEqual(keys(doc([bible({ createdAt: now.toISOString() })]), '2026-11-10'), []);
+
+  // Kept through the account: read back clean, and of two copies the first kept wins.
+  const kept = changed.days['2026-11-10'][canon.CANON_SNAPSHOT_KEY];
+  assert.deepEqual(canon.normalizeCanonDayMarks({ [canon.CANON_SNAPSHOT_KEY]: kept })[canon.CANON_SNAPSHOT_KEY].items.map((item) => item.id), ['agpeya-1']);
+  const later = { ...kept, at: '2026-11-11T20:00:00.000Z', items: [] };
+  const merged = canon.mergeCanonDayMarks({ [canon.CANON_SNAPSHOT_KEY]: later }, { [canon.CANON_SNAPSHOT_KEY]: kept });
+  assert.equal(merged[canon.CANON_SNAPSHOT_KEY], kept);
+  assert.equal(canon.mergeCanonDayMarks({ [canon.CANON_SNAPSHOT_KEY]: kept }, { [canon.CANON_SNAPSHOT_KEY]: later })[canon.CANON_SNAPSHOT_KEY], kept);
+
+  // The canon's context sends yesterday's marks with each change.
+  const context = read('src/context/SpiritualCanonContext.tsx');
+  assert.equal((context.match(/dirtyDays\.current\.add\(canonKeptDay\(\)\);/g) || []).length, 2);
 });

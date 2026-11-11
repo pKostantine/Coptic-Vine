@@ -62,8 +62,12 @@ export const METANIA_CONDITION = '!((Feasts && !HolyWeek) || Weekends)';
 /** The same days, the fasting days among them only: Holy Week's are, though the calendar doesn't mark them Fasts. */
 export const METANIA_FASTING_CONDITION = '!((Feasts && !HolyWeek) || Weekends) && (Fasts || HolyWeek)';
 
-/** A fast abstinence can be kept in: the Church's fasts, and Wednesdays and Fridays. */
-export type AbstinenceFast = 'wedFri' | 'nativity' | 'paramoun' | 'jonah' | 'lent' | 'holyWeek' | 'apostles' | 'stMary';
+/**
+ * A fast abstinence can be kept in: the Church's fasts, and Wednesdays and
+ * Fridays; or 'applicable', every day abstinence may be kept at all
+ * (ABSTINENCE_DAY_CONDITION), fast or not.
+ */
+export type AbstinenceFast = 'applicable' | 'wedFri' | 'nativity' | 'paramoun' | 'jonah' | 'lent' | 'holyWeek' | 'apostles' | 'stMary';
 
 /**
  * The days abstinence is kept on at all: Monday to Friday (Weekdays), never
@@ -92,6 +96,15 @@ export const ABSTINENCE_FASTS: readonly { id: AbstinenceFast; condition: string 
 ];
 const ABSTINENCE_FAST_IDS: readonly AbstinenceFast[] = ABSTINENCE_FASTS.map((fast) => fast.id);
 
+/**
+ * What abstinence may be kept on, in the order of the list to choose from:
+ * every applicable day (a box of its own, off to begin with), then the fasts.
+ * The applicable days are those metanias are made on too (METANIA_CONDITION
+ * is ABSTINENCE_DAY_CONDITION), so the calendar's `applicable` answers them.
+ */
+export const ABSTINENCE_CHOICES: readonly AbstinenceFast[] = ['applicable', ...ABSTINENCE_FAST_IDS];
+
+/** One of the Church's fasts, as the calendar lists a day's (never 'applicable'). */
 export function isAbstinenceFast(value: unknown): value is AbstinenceFast {
   return ABSTINENCE_FAST_IDS.includes(value as AbstinenceFast);
 }
@@ -173,8 +186,20 @@ export interface CanonMark {
   skipped?: boolean;
   /** When it was last changed: the newest change wins a merge. */
   at: string;
+  /** Under CANON_SNAPSHOT_KEY only: the canon as it stood through this day (canonItemsForDay). */
+  items?: CanonItem[];
 }
 export type CanonDayMarks = Record<string, CanonMark>;
+
+/**
+ * The key a day's marks keep the canon under, as it stood through that day,
+ * when it is changed the next day: changes count from the day they are made,
+ * so the days before still ask what they asked then (canonItemsForDay). Never
+ * a task's key, which is an item's id.
+ */
+export const CANON_SNAPSHOT_KEY = '$canon';
+/** A canon too large to keep in a day's marks (the account holds 50 KB a day) is not kept; the days before it then follow the canon as it is. */
+const MAX_SNAPSHOT_LENGTH = 40_000;
 
 export interface CanonDocument {
   version: 1;
@@ -471,10 +496,10 @@ export function normalizeCanonGoal(value: unknown, kind: CanonKind, hourId?: str
   return { kind: goalKind, count } as CanonGoal;
 }
 
-/** The fasts chosen, each once, in the list's order. */
+/** The fasts chosen (and every applicable day, when it is), each once, in the list's order. */
 function normalizeAbstinenceFasts(value: unknown): AbstinenceFast[] {
   const chosen = Array.isArray(value) ? value : [];
-  return ABSTINENCE_FAST_IDS.filter((fast) => chosen.includes(fast));
+  return ABSTINENCE_CHOICES.filter((fast) => chosen.includes(fast));
 }
 
 export function normalizeCanonFrequency(value: unknown, kind: CanonKind = 'custom'): CanonFrequency {
@@ -578,6 +603,12 @@ export function normalizeCanonDayMarks(value: unknown): CanonDayMarks {
     if (!key || key.length > 200 || !entry || typeof entry !== 'object') continue;
     const mark = entry as Partial<CanonMark>;
     if (typeof mark.at !== 'string' || Number.isNaN(Date.parse(mark.at))) continue;
+    if (key === CANON_SNAPSHOT_KEY) {
+      if (!Array.isArray(mark.items)) continue;
+      const items = mark.items.map(normalizeCanonItem).filter((item): item is CanonItem => Boolean(item)).slice(0, MAX_CANON_ITEMS);
+      marks[key] = { done: false, at: mark.at, items };
+      continue;
+    }
     marks[key] = mark.skipped === true && !mark.done ? { done: false, skipped: true, at: mark.at } : { done: Boolean(mark.done), at: mark.at };
     if (Object.keys(marks).length >= MAX_MARKS_PER_DAY) break;
   }
@@ -637,12 +668,13 @@ export function pruneCanonDays(days: Record<string, CanonDayMarks>, today: strin
 
 // —— Merging the device's copy with the account's —————————————————————————
 
-/** Newest copy of each mark wins. */
+/** Newest copy of each mark wins; of the canon kept for a day, the first kept (as it stood before that day's changes). */
 export function mergeCanonDayMarks(a: CanonDayMarks = {}, b: CanonDayMarks = {}): CanonDayMarks {
   const merged: CanonDayMarks = { ...a };
   for (const [key, mark] of Object.entries(b)) {
     const current = merged[key];
-    if (!current || Date.parse(mark.at) > Date.parse(current.at)) merged[key] = mark;
+    const later = Date.parse(mark.at) > Date.parse(current?.at ?? '');
+    if (!current || (key === CANON_SNAPSHOT_KEY ? !later && mark.at !== current.at : later)) merged[key] = mark;
   }
   return merged;
 }
@@ -773,7 +805,9 @@ function keptOn(frequency: CanonFrequency, day: string, calendar?: CanonCalendar
   if (frequency.kind === 'fastingDays') return calendar?.calendarDay(day)?.fasting ?? false;
   // So are the fasts: no day is one of abstinence before then.
   if (frequency.kind === 'fasts') {
-    const fasts = calendar?.calendarDay(day)?.fasts ?? [];
+    const read = calendar?.calendarDay(day);
+    if (frequency.fasts.includes('applicable') && read?.applicable) return true;
+    const fasts = read?.fasts ?? [];
     return frequency.fasts.some((fast) => fasts.includes(fast));
   }
   return true;
@@ -855,8 +889,45 @@ export function canonSkippedTasksForDay(document: Pick<CanonDocument, 'items' | 
   return everyTaskForDay(document, day, calendar).filter((task) => task.skipped);
 }
 
+/**
+ * The canon a day asks: as it stood that day. A change counts from the day it
+ * is made, so a day before it follows the canon kept in the marks of the
+ * nearest day on or after it (CANON_SNAPSHOT_KEY); with none, the canon as it
+ * is. Either way an item set down after the day was not part of it.
+ */
+export function canonItemsForDay(document: Pick<CanonDocument, 'items' | 'days'>, day: string): CanonItem[] {
+  let nearest: string | null = null;
+  for (const [candidate, marks] of Object.entries(document.days)) {
+    if (candidate >= day && marks[CANON_SNAPSHOT_KEY]?.items && (nearest === null || candidate < nearest)) nearest = candidate;
+  }
+  const items = nearest ? document.days[nearest][CANON_SNAPSHOT_KEY].items ?? [] : document.items;
+  return items.filter((item) => {
+    const created = new Date(item.createdAt);
+    return Number.isNaN(created.getTime()) || canonDayKey(created) <= day;
+  });
+}
+
+/**
+ * Before the canon is changed: the days gone by keep it as it stood. Yesterday
+ * keeps the canon (as it stood through it) in its marks, unless it already
+ * does, from an earlier change today, which stood before both.
+ */
+function withPastKept(document: CanonDocument, now: Date): CanonDocument {
+  const yesterday = addCanonDays(canonDayKey(now), -1);
+  if (document.days[yesterday]?.[CANON_SNAPSHOT_KEY]) return document;
+  const items = canonItemsForDay(document, yesterday);
+  if (JSON.stringify(items).length > MAX_SNAPSHOT_LENGTH) return document;
+  const marks = { ...(document.days[yesterday] ?? {}), [CANON_SNAPSHOT_KEY]: { done: false, at: now.toISOString(), items } };
+  return { ...document, days: { ...document.days, [yesterday]: marks } };
+}
+
+/** The day whose marks keep the canon as it stood, when it is changed now (withPastKept): yesterday. */
+export function canonKeptDay(now = new Date()): string {
+  return addCanonDays(canonDayKey(now), -1);
+}
+
 function everyTaskForDay(document: Pick<CanonDocument, 'items' | 'days'>, day: string, calendar?: CanonCalendar): CanonTask[] {
-  const templates = templatesFor(document.items, day, calendar);
+  const templates = templatesFor(canonItemsForDay(document, day), day, calendar);
   const tasks: CanonTask[] = [];
   for (const template of templates) {
     const done = isDone(document, day, template.key);
@@ -905,17 +976,19 @@ export function withCanonSkip(document: CanonDocument, day: string, key: string,
 }
 
 /** The document with an item added or replaced (stamped now). */
-export function withCanonItem(document: CanonDocument, item: CanonItem, now = new Date()): CanonDocument {
+export function withCanonItem(given: CanonDocument, item: CanonItem, now = new Date()): CanonDocument {
   const stamped = { ...item, updatedAt: now.toISOString() } as CanonItem;
-  const exists = document.items.some((candidate) => candidate.id === item.id);
-  if (!exists && document.items.length >= MAX_CANON_ITEMS) return document;
+  const exists = given.items.some((candidate) => candidate.id === item.id);
+  if (!exists && given.items.length >= MAX_CANON_ITEMS) return given;
+  const document = withPastKept(given, now);
   const items = exists ? document.items.map((candidate) => (candidate.id === item.id ? stamped : candidate)) : [...document.items, stamped];
   const itemDeletions = { ...document.itemDeletions };
   delete itemDeletions[item.id];
   return { ...document, items: sortCanonItems(items), itemDeletions, updatedAt: now.toISOString() };
 }
 
-export function withoutCanonItem(document: CanonDocument, id: string, now = new Date()): CanonDocument {
+export function withoutCanonItem(given: CanonDocument, id: string, now = new Date()): CanonDocument {
+  const document = withPastKept(given, now);
   return {
     ...document,
     items: document.items.filter((item) => item.id !== id),
