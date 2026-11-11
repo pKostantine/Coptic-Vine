@@ -10,7 +10,7 @@ import {
 } from '@/services/bookContentDatabase';
 import { contentApi } from '@/services/contentSource';
 import type { api } from '@/utils/api';
-import { homeSynaxariumEvents, saintsOfDay, synaxariumDayJson, synaxariumYearRows } from '../utils/synaxariumLocal';
+import { homeSynaxariumEvents, keptSynaxariumDay, saintsOfDay, synaxariumDayJson, synaxariumYearRows } from '../utils/synaxariumLocal';
 
 type Filter = { kind: 'eq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'ilike'; column: string; value: unknown };
 type Ordering = { column: string; ascending: boolean };
@@ -315,7 +315,7 @@ async function localSynaxariumRpc(schemaName: string, functionName: string, args
     return { found: true, data: synaxariumYearRows(days, entries) };
   }
   if (functionName === 'get_home_synaxarium_events') return { found: true, data: homeSynaxariumEvents(day, entries) };
-  const saints = saintsOfDay(entries, day.coptic_month, day.coptic_day);
+  const saints = saintsOfDay(entries, day.coptic_month, keptSynaxariumDay(day));
   const texts = (await Promise.all(saints.map((saint) => localRowsWhere('synaxarium', 'entry_texts', [{ column: 'entry_key', value: String(saint.entry_key) }]))))
     .flatMap((lines) => lines ?? []);
   const monthNames = ((await readLocalTable('synaxarium', 'coptic_days')) ?? []).find((row) => String(row.coptic_month) === String(day.coptic_month)) ?? null;

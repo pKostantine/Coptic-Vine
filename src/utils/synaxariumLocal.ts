@@ -9,6 +9,28 @@
 
 type Row = Record<string, unknown>;
 
+const PARAMOUN_OFFSETS: Record<number, number[]> = { 0: [-2, -1], 1: [-3, -2, -1], 2: [-1], 3: [-1], 4: [-1], 5: [-1], 6: [-1] };
+
+/**
+ * The Coptic day whose Synaxarium a day keeps: its own, but for the Nativity
+ * in the Coptic year after a leap year, when Kiahk 29 falls on 8 January. The
+ * Synod keeps the feast on 7 January (Kiahk 28) with Kiahk 29's readings, and
+ * its Paramoun on the days before with theirs. The content Worker's
+ * readingCopticDay (workers/content-api/src/rpc/calendar.ts), the same rule.
+ */
+export function readingCopticDay(gregorianDate: string, copticMonth: number, copticDay: number): number {
+  if (copticMonth !== 4) return copticDay;
+  const [y, m, d] = gregorianDate.split('-').map(Number);
+  if (m !== 1 || d > 7 || copticDay !== d + 21) return copticDay;
+  const paramoun = PARAMOUN_OFFSETS[new Date(Date.UTC(y, 0, 7)).getUTCDay()].map((offset) => 7 + offset);
+  return d === 7 || paramoun.includes(d) ? copticDay + 1 : copticDay;
+}
+
+/** The Coptic day a calendar row's Synaxarium is read from (readingCopticDay). */
+export function keptSynaxariumDay(day: Row): number {
+  return readingCopticDay(String(day.gregorian_date), Number(day.coptic_month), Number(day.coptic_day));
+}
+
 const ORDINALS_ARABIC = [
   'الأول', 'الثانى', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر',
   'الحادى عشر', 'الثانى عشر', 'الثالث عشر', 'الرابع عشر', 'الخامس عشر', 'السادس عشر', 'السابع عشر',
@@ -95,7 +117,7 @@ export function synaxariumYearRows(days: Row[], entries: Row[]) {
 /** public.get_home_synaxarium_events: a day's saints for Home, or none for a day the calendar doesn't have. */
 export function homeSynaxariumEvents(day: Row | null, entries: Row[]) {
   if (!day) return [];
-  return saintsOfDay(entries, day.coptic_month, day.coptic_day).map((saint) => ({
+  return saintsOfDay(entries, day.coptic_month, keptSynaxariumDay(day)).map((saint) => ({
     entryKey: saint.entry_key,
     titleEnglish: saint.title_english,
     titleArabic: saint.title_arabic,
@@ -148,7 +170,7 @@ export function synaxariumDayJson(day: Row | null, saints: Row[], texts: Row[], 
     gregorian_date: day.gregorian_date,
     coptic_year: day.coptic_year,
     coptic_date: day.coptic_date_label,
-    intro: synaxariumIntro(day.coptic_month == null ? null : Number(day.coptic_month), day.coptic_day == null ? null : Number(day.coptic_day), monthNames),
+    intro: synaxariumIntro(day.coptic_month == null ? null : Number(day.coptic_month), day.coptic_day == null ? null : keptSynaxariumDay(day), monthNames),
     entries: saints.map((saint) => {
       const lines = linesByEntry.get(String(saint.entry_key)) ?? [];
       return {
