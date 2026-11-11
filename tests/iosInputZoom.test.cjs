@@ -31,3 +31,13 @@ test('an iPhone or iPad stops zooming into a field as it is focused; nothing els
   assert.ok(html.indexOf('name="viewport"') < html.indexOf('// Safari on iPhone'));
   assert.ok(html.indexOf('// Safari on iPhone') < html.indexOf('</head>'));
 });
+
+test('a field in a card with a gradient ground is drawn above that ground (Beta Feedback #4)', () => {
+  // EditorCard and many cards lay a LinearGradient over the whole card; on
+  // the web it painted over the unpositioned <input>, hiding the box and
+  // what was typed into it.
+  const reset = html.match(/<style id="expo-reset">[\s\S]*?<\/style>/)[0];
+  assert.match(reset, /input,\s*textarea\s*\{\s*position: relative;\s*\}/);
+  const card = fs.readFileSync('src/components/canon/CanonEditorParts.tsx', 'utf8');
+  assert.match(card, /<LinearGradient [^>]*style=\{StyleSheet\.absoluteFill\}/, 'the case it guards against is still there');
+});
