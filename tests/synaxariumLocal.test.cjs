@@ -182,3 +182,21 @@ test('Home and the Synaxarium page ask through the client that reads downloads f
   assert.match(home, /contentDataClient\.rpc\('get_synaxarium_year', \{ p_reference_date: referenceDate \}\)/);
   assert.doesNotMatch(home, /contentApi\.rpc\('get_(home_synaxarium_events|synaxarium_year)'/);
 });
+
+test("in the year after a Coptic leap year, the Nativity's feast and Paramoun read their every-year Synaxarium, as the Worker does", () => {
+  // 7 January 2024 is Kiahk 28 (Nesi 6 on 11 September 2023), a Sunday: its
+  // Paramoun is the Friday and Saturday.
+  const kiahk = (gregorian_date, coptic_day) => day(gregorian_date, 4, coptic_day, { coptic_year: 1740, coptic_month_name: 'Kiahk' });
+  const entries = [28, 29].map((d) => ({ entry_key: `synax_04_${d}`, coptic_month: 4, coptic_day: d, entry_order: 1, title_english: `Kiahk ${d}`, title_arabic: null }));
+  assert.deepEqual(local.homeSynaxariumEvents(kiahk('2024-01-07', 28), entries).map((e) => e.entryKey), ['synax_04_29'], 'the feast reads Kiahk 29');
+  assert.deepEqual(local.homeSynaxariumEvents(kiahk('2024-01-06', 27), entries).map((e) => e.entryKey), ['synax_04_28'], 'its eve, the Paramoun');
+  assert.deepEqual(local.homeSynaxariumEvents(kiahk('2024-01-08', 29), entries).map((e) => e.entryKey), ['synax_04_29'], '8 January keeps Kiahk 29');
+  assert.deepEqual(local.homeSynaxariumEvents(kiahk('2025-01-07', 29), entries).map((e) => e.entryKey), ['synax_04_29'], 'an ordinary year');
+  assert.equal(local.readingCopticDay('2024-01-05', 4, 26), 27);
+  assert.equal(local.readingCopticDay('2028-01-05', 4, 26), 26, "2028's feast is a Friday: one day of Paramoun");
+  // The same rule as the Worker's, word for word.
+  const body = (source) => source.slice(source.indexOf('export function readingCopticDay')).split('\n}\n')[0].replace(/^\s*\/\/.*\n/gm, '').replace(/\s+/g, ' ');
+  const worker = fs.readFileSync('workers/content-api/src/rpc/calendar.ts', 'utf8');
+  const app = fs.readFileSync('src/utils/synaxariumLocal.ts', 'utf8');
+  assert.equal(body(app).replace(/const paramoun = .*?;/, ''), body(worker).replace(/const feastWeekday = .*?; const paramoun = .*?;/, ''));
+});

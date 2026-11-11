@@ -64,22 +64,54 @@ async function readSlice(context: ContentContext, date: string): Promise<Slice> 
       LEFT JOIN ${t('calendar', 'coptic_date_conversions')} c ON c.${col('gregorian_date')} = i.${col('gregorian_date')}
       WHERE i.${col('event_key')} IN ('TheHolyNativityFeast', 'TheHolyEpiphany') ORDER BY i.rowid`),
     db.prepare(`SELECT ${col('event_key')} FROM ${t('calendar', 'calendar_event_instances')} WHERE ${col('gregorian_date')} = ?`).bind(date),
-    db.prepare(`SELECT f.${col('condition_key')} AS flag_key, 'saint' AS flag_type, f.${col('title_english')} FROM ${t('calendar', 'fixed_coptic_day_flags')} f
-      JOIN ${t('calendar', 'coptic_date_conversions')} d ON f.${col('coptic_month')} = d.${col('coptic_month')} AND f.${col('coptic_day')} = d.${col('coptic_day')}
+    // The day's own saints and the next day's: a day of the Nativity's
+    // Paramoun or feast may keep the next day's (readingCopticDay).
+    db.prepare(`SELECT f.${col('condition_key')} AS flag_key, 'saint' AS flag_type, f.${col('title_english')}, f.${col('coptic_day')} FROM ${t('calendar', 'fixed_coptic_day_flags')} f
+      JOIN ${t('calendar', 'coptic_date_conversions')} d ON f.${col('coptic_month')} = d.${col('coptic_month')} AND f.${col('coptic_day')} IN (d.${col('coptic_day')}, d.${col('coptic_day')} + 1)
       WHERE d.${col('gregorian_date')} = ? ORDER BY f.rowid`).bind(date),
   ]);
   const rows = conversions.results as unknown as Conversion[];
+  const own = rows.find((row) => row.gregorian_date === date);
+  const keptDay = own ? readingCopticDay(date, own.coptic_month, own.coptic_day) : null;
   return {
     conversions: rows,
     byDate: new Map(rows.map((row) => [row.gregorian_date, row])),
     seasons: seasons.results as unknown as Season[],
     feasts: feasts.results as unknown as Instance[],
     eventsToday: new Set((today.results as { event_key: string }[]).map((row) => row.event_key)),
-    saints: saints.results as unknown as Flag[],
+    saints: (saints.results as unknown as (Flag & { coptic_day: number })[])
+      .filter((saint) => saint.coptic_day === keptDay)
+      .map(({ flag_key, flag_type, title_english }) => ({ flag_key, flag_type, title_english })),
   };
 }
 
 const year = (iso: string) => Number(iso.slice(0, 4));
+
+/** The Paramoun's days before a feast, by the feast's weekday (0 Sunday): two from Sunday, three from Monday, else one. */
+const PARAMOUN_OFFSETS: Record<number, number[]> = { 0: [-2, -1], 1: [-3, -2, -1], 2: [-1], 3: [-1], 4: [-1], 5: [-1], 6: [-1] };
+
+/**
+ * The Coptic day whose readings and Synaxarium a day keeps.
+ *
+ * In the Coptic year after a leap year (whose Nesi has six days: 11 September
+ * 2023, 2027…, before a Gregorian 29 February), every day until 29 February
+ * falls a day later than usual, and Kiahk 29 on 8 January. The Synod keeps the
+ * Feast of the Nativity on 7 January all the same, so that year 7 January
+ * (Kiahk 28) is the feast with all of Kiahk 29's readings, and its Paramoun
+ * stays on the days before it, keeping the readings it has every other year
+ * (the eve's, Kiahk 28's, and so on back). 8 January, Kiahk 29, keeps its own
+ * readings, in the Nativity's period rather than its feast. Every other day
+ * reads its own date.
+ */
+export function readingCopticDay(gregorianDate: string, copticMonth: number, copticDay: number): number {
+  if (copticMonth !== 4) return copticDay;
+  const [y, m, d] = gregorianDate.split('-').map(Number);
+  // Kiahk 29 on 7 January (day + 22): an ordinary year, nothing moves.
+  if (m !== 1 || d > 7 || copticDay !== d + 21) return copticDay;
+  const feastWeekday = new Date(Date.UTC(y, 0, 7)).getUTCDay();
+  const paramoun = PARAMOUN_OFFSETS[feastWeekday].map((offset) => 7 + offset);
+  return d === 7 || paramoun.includes(d) ? copticDay + 1 : copticDay;
+}
 
 /** calendar.get_paramoun_dates(p_year): the Paramoun days before Nativity and Theophany falling in that year's feasts. */
 function paramounDates(slice: Slice, gregorianYear: number): { date: number; flagKey: string }[] {
@@ -87,7 +119,7 @@ function paramounDates(slice: Slice, gregorianYear: number): { date: number; fla
   for (const feast of slice.feasts) {
     if (year(feast.gregorian_date) !== gregorianYear) continue;
     if (feast.weekday_number === null) continue;
-    const offsets = ({ 0: [-2, -1], 1: [-3, -2, -1], 2: [-1], 3: [-1], 4: [-1], 5: [-1], 6: [-1] } as Record<number, number[]>)[feast.weekday_number] ?? [];
+    const offsets = PARAMOUN_OFFSETS[feast.weekday_number] ?? [];
     for (const offset of offsets) {
       out.push({ date: day(feast.gregorian_date) + offset, flagKey: feast.event_key === 'TheHolyNativityFeast' ? 'ParamounNativity' : 'ParamounTheophany' });
     }
@@ -404,8 +436,9 @@ export async function getActiveFlagsForDate(context: ContentContext, date: strin
   else if (md >= 210 && md <= 510) emit(feast('SeasonOfPlants', 'Season of Plants'));
   else emit(feast('SeasonOfAir', 'Season of Air'));
 
-  // ══ O. EXACT COPTIC DATE
-  emit([`${c.coptic_month_name}.${c.coptic_day}`, 'coptic_date', `${c.coptic_month_name} ${c.coptic_day}`]);
+  // ══ O. EXACT COPTIC DATE (the day it keeps: readingCopticDay)
+  const keptDay = readingCopticDay(date, c.coptic_month, c.coptic_day);
+  emit([`${c.coptic_month_name}.${keptDay}`, 'coptic_date', `${c.coptic_month_name} ${keptDay}`]);
 
   // ══ P. DAY OF WEEK
   emit([`${c.weekday}s`, 'weekday', `${c.weekday}s`]);
@@ -469,7 +502,7 @@ export async function getCalendarReadings(context: ContentContext, date: string)
       OR (${col('cycle_type')} = 'GreatLent' AND ?5 IS NOT NULL AND ${col('lent_week')} = ?5 AND (${col('day_of_week')} IS NULL OR ${col('day_of_week')} = ?3))
       OR (${col('cycle_type')} = 'Pentecost' AND ?6 IS NOT NULL AND ${col('pentecost_week')} = ?6 AND (${col('day_of_week')} IS NULL OR ${col('day_of_week')} = ?3))
       ORDER BY rowid`)
-    .bind(conversion.coptic_month, conversion.coptic_day, weekday, conversion.sunday_ordinal_in_coptic_month, lentWeek, pentWeek)
+    .bind(conversion.coptic_month, readingCopticDay(date, conversion.coptic_month, conversion.coptic_day), weekday, conversion.sunday_ordinal_in_coptic_month, lentWeek, pentWeek)
     .all<ReadingRule>()).results;
 
   // DISTINCT ON (service, reading_type) ... ORDER BY priority DESC: the

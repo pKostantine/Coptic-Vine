@@ -45,6 +45,19 @@
     <meta name="twitter:image:alt" content="The Coptic Vine seal" />
     <!-- COPTIC_VINE_SHARE_META_END -->
     <!-- web.output: "single" uses this template, not src/app/+html.tsx. -->
+    <script>
+      // Safari on iPhone and iPad zooms the page into a field set smaller
+      // than 16px as it is focused, and keeps scrolling with the caret, so
+      // only the end of what is typed stays in view (Beta Feedback #4, an
+      // Other Canon's name). maximum-scale=1 stops that zoom; iOS still lets
+      // the reader pinch to zoom. Android would lose pinching to it, so it
+      // is set on iOS alone (an iPad asks as a Mac with a touch screen).
+      (function () {
+        var ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var viewport = document.querySelector('meta[name="viewport"]');
+        if (ios && viewport && !/maximum-scale/.test(viewport.content)) viewport.content += ', maximum-scale=1';
+      })();
+    </script>
     <style id="expo-reset">
       html,
       body,

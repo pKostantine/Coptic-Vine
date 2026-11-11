@@ -2,12 +2,13 @@
  * calendar.get_active_flags_for_date on Coptic year 1743's fasts, with D1's
  * own rows for them: season_ranges ends each fast on its last day, and
  * calendar_event_instances has its feast the day after. Dates are converted
- * as coptic_date_conversions does (Thoout 1 on 11 September).
+ * as coptic_date_conversions does (tests/copticDates.ts).
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getActiveFlagsForDate } from '../src/rpc/calendar.ts';
 import type { ContentContext } from '../src/types.ts';
+import { conversionRows } from './copticDates.ts';
 
 const SEASONS = [
   { range_key: 'nativity-fast', active_season: 'Nativity Fast', start_date: '2026-11-25', end_date: '2027-01-06' },
@@ -25,31 +26,10 @@ const EVENTS = [
   { event_key: 'TheApostlesFeastMartyrdomOfStPeterAndStPaul', gregorian_date: '2027-07-12' },
   { event_key: 'AssumptionOfStMarysBody', gregorian_date: '2027-08-22' },
 ];
-const MONTHS = ['Thoout', 'Paopi', 'Hathor', 'Kiahk', 'Tobi', 'Meshir', 'Paremhat', 'Parmouti', 'Pashons', 'Paoni', 'Epep', 'Mesore', 'Nesi'];
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /** 11 Sep 2025 to 10 Sep 2028, as coptic_date_conversions has those days. */
 function conversions() {
-  const rows = [];
-  for (let date = new Date(Date.UTC(2025, 8, 11)); date < new Date(Date.UTC(2028, 8, 11)); date.setUTCDate(date.getUTCDate() + 1)) {
-    const year = date.getUTCMonth() > 8 || (date.getUTCMonth() === 8 && date.getUTCDate() >= 11) ? date.getUTCFullYear() : date.getUTCFullYear() - 1;
-    const index = Math.round((date.getTime() - Date.UTC(year, 8, 11)) / 86_400_000);
-    const month = Math.min(13, Math.floor(index / 30) + 1);
-    const copticDay = index - (month - 1) * 30 + 1;
-    const weekday = date.getUTCDay();
-    rows.push({
-      gregorian_date: date.toISOString().slice(0, 10),
-      gregorian_year: date.getUTCFullYear(),
-      weekday: WEEKDAYS[weekday],
-      weekday_number: weekday,
-      coptic_year: year - 283,
-      coptic_month: month,
-      coptic_month_name: MONTHS[month - 1],
-      coptic_day: copticDay,
-      sunday_ordinal_in_coptic_month: weekday === 0 ? Math.ceil(copticDay / 7) : null,
-    });
-  }
-  return rows;
+  return conversionRows('2025-09-11', '2028-09-10');
 }
 
 /** The statements readSlice batches, answered from the rows above. */

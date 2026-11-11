@@ -83,6 +83,30 @@ export function captureDocumentRestore(
   setLastDocumentPosition(key, sectionId);
 }
 
+/**
+ * A document left a moment ago is opened again where it was read (a swipe to
+ * the left, utils/returnToDocument.ts): no longer forgotten, its hymn kept,
+ * and a restore to that hymn and verse waiting for it as it opens. Marked
+ * changed, so the freshly opened reader is sent there rather than taken to be
+ * there already.
+ */
+export function reopenDocumentAt(
+  key: string,
+  sectionId: string | null | undefined,
+  sections: readonly (string | DocumentSectionRef)[],
+  signature?: string,
+  verseIndex: number | null = null,
+): void {
+  closedDocuments.delete(key);
+  pendingRestores.delete(key);
+  captureDocumentRestore(key, sectionId, sections, signature, verseIndex);
+  const pending = pendingRestores.get(key);
+  if (pending) {
+    pending.dirty = true;
+    pending.revision += 1;
+  }
+}
+
 export function markPendingDocumentRestoresDirty(): void {
   pendingRestores.forEach(snapshot => {
     snapshot.dirty = true;

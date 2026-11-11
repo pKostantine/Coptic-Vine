@@ -7,6 +7,7 @@
 import { col, t } from '../db/names.ts';
 import { jsonb, trimmedOrNull } from '../pg.ts';
 import type { ContentContext, Row } from '../types.ts';
+import { readingCopticDay } from './calendar.ts';
 
 const ORDINALS_ARABIC = [
   'الأول', 'الثانى', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر',
@@ -51,18 +52,22 @@ export async function getIntro(context: ContentContext, month: number | null, da
 /** synaxarium.get_day_json(p_date): the day's Synaxarium, or null for a date the calendar doesn't have. */
 export async function getDayJson(context: ContentContext, date: string): Promise<unknown> {
   const db = context.db;
-  const [days, entries, texts] = await db.batch([
-    db.prepare(`SELECT ${['gregorian_date', 'coptic_year', 'coptic_date_label', 'coptic_month', 'coptic_day'].map(col).join(', ')} FROM ${t('calendar', 'coptic_date_conversions')} WHERE ${col('gregorian_date')} = ?`).bind(date),
-    db.prepare(`SELECT e.${col('entry_key')}, e.${col('entry_order')}, e.${col('title_english')}, e.${col('title_arabic')} FROM ${t('synaxarium', 'entries')} e
-      JOIN ${t('calendar', 'coptic_date_conversions')} d ON e.${col('coptic_month')} = d.${col('coptic_month')} AND e.${col('coptic_day')} = d.${col('coptic_day')}
-      WHERE d.${col('gregorian_date')} = ? ORDER BY e.${col('entry_order')} NULLS LAST`).bind(date),
+  const dayRow = await db
+    .prepare(`SELECT ${['gregorian_date', 'coptic_year', 'coptic_date_label', 'coptic_month', 'coptic_day'].map(col).join(', ')} FROM ${t('calendar', 'coptic_date_conversions')} WHERE ${col('gregorian_date')} = ?`)
+    .bind(date)
+    .first<Row>();
+  if (!dayRow) return null;
+  // The day it keeps: the Nativity's feast and Paramoun keep theirs in a
+  // year that moves them off their Coptic days (calendar.ts).
+  const month = dayRow.coptic_month as number;
+  const kept = readingCopticDay(date, month, dayRow.coptic_day as number);
+  const [entries, texts] = await db.batch([
+    db.prepare(`SELECT ${col('entry_key')}, ${col('entry_order')}, ${col('title_english')}, ${col('title_arabic')} FROM ${t('synaxarium', 'entries')}
+      WHERE ${col('coptic_month')} = ? AND ${col('coptic_day')} = ? ORDER BY ${col('entry_order')} NULLS LAST`).bind(month, kept),
     db.prepare(`SELECT t.${col('entry_key')}, t.${col('line_order')}, t.${col('english')}, t.${col('arabic')} FROM ${t('synaxarium', 'entry_texts')} t
       JOIN ${t('synaxarium', 'entries')} e ON e.${col('entry_key')} = t.${col('entry_key')}
-      JOIN ${t('calendar', 'coptic_date_conversions')} d ON e.${col('coptic_month')} = d.${col('coptic_month')} AND e.${col('coptic_day')} = d.${col('coptic_day')}
-      WHERE d.${col('gregorian_date')} = ? ORDER BY t.${col('line_order')} NULLS LAST`).bind(date),
+      WHERE e.${col('coptic_month')} = ? AND e.${col('coptic_day')} = ? ORDER BY t.${col('line_order')} NULLS LAST`).bind(month, kept),
   ]);
-  const dayRow = days.results[0] as Row | undefined;
-  if (!dayRow) return null;
   const textsByEntry = new Map<string, Row[]>();
   for (const text of texts.results as Row[]) {
     const key = String(text.entry_key);
@@ -91,18 +96,22 @@ export async function getDayJson(context: ContentContext, date: string): Promise
     gregorian_date: dayRow.gregorian_date,
     coptic_year: dayRow.coptic_year,
     coptic_date: dayRow.coptic_date_label,
-    intro: await getIntro(context, dayRow.coptic_month as number, dayRow.coptic_day as number),
+    intro: await getIntro(context, month, kept),
     entries: entryObjects,
   });
 }
 
 /** public.get_home_synaxarium_events(p_date): the day's saints for the home screen. */
 export async function getHomeSynaxariumEvents(context: ContentContext, date: string): Promise<unknown[]> {
-  const { results } = await context.db
-    .prepare(`SELECT e.${col('entry_key')}, e.${col('title_english')}, e.${col('title_arabic')}, e.${col('entry_order')} FROM ${t('calendar', 'coptic_date_conversions')} d
-      JOIN ${t('synaxarium', 'entries')} e ON e.${col('coptic_month')} = d.${col('coptic_month')} AND e.${col('coptic_day')} = d.${col('coptic_day')}
-      WHERE d.${col('gregorian_date')} = ? ORDER BY e.${col('entry_order')} NULLS LAST`)
+  const day = await context.db
+    .prepare(`SELECT ${col('coptic_month')}, ${col('coptic_day')} FROM ${t('calendar', 'coptic_date_conversions')} WHERE ${col('gregorian_date')} = ?`)
     .bind(date)
+    .first<{ coptic_month: number; coptic_day: number }>();
+  if (!day) return [];
+  const { results } = await context.db
+    .prepare(`SELECT ${col('entry_key')}, ${col('title_english')}, ${col('title_arabic')}, ${col('entry_order')} FROM ${t('synaxarium', 'entries')}
+      WHERE ${col('coptic_month')} = ? AND ${col('coptic_day')} = ? ORDER BY ${col('entry_order')} NULLS LAST`)
+    .bind(day.coptic_month, readingCopticDay(date, day.coptic_month, day.coptic_day))
     .all<Row>();
   return results.map((entry) => jsonb({ entryKey: entry.entry_key, titleEnglish: entry.title_english, titleArabic: entry.title_arabic, entryOrder: entry.entry_order }));
 }
