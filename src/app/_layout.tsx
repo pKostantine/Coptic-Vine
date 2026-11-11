@@ -1,5 +1,6 @@
 import { useFonts as useLocalFonts } from 'expo-font';
 import { Stack, usePathname, useSegments } from 'expo-router';
+import ReturnToDocumentSwipe from '@/components/vine/ui/ReturnToDocumentSwipe';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
@@ -135,7 +136,10 @@ function AppFrame() {
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: COLORS.black }}>
       {showSideBar ? <SideBar pathname={pathname} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <AppStack />
+        {/* A swipe to the left goes back into a document just left (utils/returnToDocument.ts). */}
+        <ReturnToDocumentSwipe>
+          <AppStack />
+        </ReturnToDocumentSwipe>
         <GlobalNowPlayingOverlay />
       </View>
       {/* Where a lesson's player waits, out of sight, while no surface shows

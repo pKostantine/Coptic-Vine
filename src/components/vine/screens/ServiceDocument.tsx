@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Href, Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { Href, Stack, useFocusEffect, useLocalSearchParams, useNavigation, usePathname, useRouter, useSegments } from 'expo-router';
 import Head from 'expo-router/head';
 import { Animated, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,6 +53,7 @@ import {
 import { goBack } from '../../../utils/navigation';
 import { getServiceWeekdayConditionDate } from '../../../utils/serviceConditionDates';
 import { useReaderSwipes } from '../../../hooks/useReaderSwipes';
+import { rememberLeftDocument } from '../../../utils/returnToDocument';
 import { getUserConditionFlags } from '../../../utils/userConditionFlags';
 
 interface ServiceDocumentProps {
@@ -286,17 +287,38 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // unmount it on the web; cleared when it is in front again. Unmounted any
   // other way, it was left.
   const coveredRef = useRef(false);
+  // Going back by its own swipe or back button (leaveDocument), and replaced
+  // by a hyperlink's service: what the navigator alone can't always tell.
+  const leavingBackRef = useRef(false);
+  const replacedRef = useRef(false);
   useFocusEffect(useCallback(() => {
     coveredRef.current = false;
   }, []));
+  // Left by going back -- its own swipe or back button, iOS's back swipe,
+  // the browser's Back -- it can be swiped back into from the page beneath,
+  // where it was (utils/returnToDocument.ts). Not when a hyperlink replaced it
+  // with another service, nor when a section opened from the tab bar took the
+  // whole stack. 'back' or 'elsewhere' once the navigator says how it goes;
+  // unmounted without a word from it (iOS's back swipe can be), it went back.
+  const leftHowRef = useRef<'back' | 'elsewhere' | null>(null);
+  const rememberWhereLeft = useRef<() => void>(() => {});
   useEffect(() => () => {
-    if (!coveredRef.current) forgetDocumentPosition(documentPositionKey);
+    if (!coveredRef.current) {
+      if (leftHowRef.current === 'back' || (leftHowRef.current === null && !replacedRef.current)) rememberWhereLeft.current();
+      forgetDocumentPosition(documentPositionKey);
+    }
   }, [documentPositionKey]);
   // Taken off the stack -- even from under the Seasons, left for elsewhere --
   // it was left too.
   const navigation = useNavigation();
   useEffect(
-    () => navigation.addListener('beforeRemove', () => forgetDocumentPosition(documentPositionKey)),
+    () => navigation.addListener('beforeRemove', (event) => {
+      const type = event.data.action.type;
+      const back = !replacedRef.current && (leavingBackRef.current || type === 'GO_BACK' || type === 'POP' || type === 'POP_TO_TOP');
+      leftHowRef.current = back ? 'back' : 'elsewhere';
+      if (back) rememberWhereLeft.current();
+      forgetDocumentPosition(documentPositionKey);
+    }),
     [navigation, documentPositionKey],
   );
   // Seeded from the same module-level store selectedSlideSectionId is (see
@@ -364,6 +386,31 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   latestSettingsSignatureRef.current = restoreSettingsSignature;
   const latestSectionOrderRef = useRef<DocumentSectionRef[]>([]);
   if (readySections) latestSectionOrderRef.current = readySections.map(section => ({ id: section.id, hymnKey: section.hymnKey ?? null }));
+  // Where the document opens, as it was opened: its path, and any query
+  // (?at=, ?sub=, ?reading=) that isn't one of the path's own segments.
+  const pathname = usePathname();
+  const routeSegments = useSegments() as string[];
+  const routeParams = useLocalSearchParams();
+  const documentHref = useMemo(() => {
+    const ownSegments = new Set(routeSegments.filter((segment) => /^\[.+\]$/.test(segment)).map((segment) => segment.replace(/^\[(\.\.\.)?|\]$/g, '')));
+    const query = Object.entries(routeParams)
+      .filter(([name, value]) => !ownSegments.has(name) && value != null)
+      .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(Array.isArray(value) ? value.join(',') : String(value))}`)
+      .join('&');
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, routeSegments, routeParams]);
+  // What is kept of it as it is left (see leftHowRef), from where it is now.
+  useEffect(() => {
+    rememberWhereLeft.current = () => rememberLeftDocument({
+      key: documentPositionKey,
+      href: documentHref,
+      title: documentTitle,
+      sectionId: currentSectionIdRef.current ?? getLastDocumentPosition(documentPositionKey) ?? null,
+      verseIndex: currentVerseIndexRef.current,
+      sections: latestSectionOrderRef.current,
+      signature: latestSettingsSignatureRef.current,
+    });
+  });
   // Blur is authoritative; never trust background scroll/page callbacks while
   // Settings or Calendar is covering the reader, even on a slow device.
   useFocusEffect(useCallback(() => {
@@ -420,6 +467,9 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
   // Bookmarks, and so on), so every exit should pop back to that existing route.
   // The fallback still handles a direct deep link with no history.
   const leaveDocument = useCallback(() => {
+    // Gone back, even where there is no history and the page beneath is put
+    // in its place (a link opened straight to the document).
+    leavingBackRef.current = true;
     goBack(router, backHref);
   }, [router, backHref]);
   const initialSubOpenedRef = useRef(false);
@@ -798,6 +848,7 @@ export default function ServiceDocument({ schema, table, title, arabic, french, 
     setTimeout(() => {
       navigatingAwayRef.current = false;
     }, 3000);
+    replacedRef.current = true;
     router.replace(destination.href as Href);
   };
 

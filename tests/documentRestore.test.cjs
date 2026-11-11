@@ -358,8 +358,10 @@ test('a document left opens again at the top; its place is kept only while it is
   assert.match(store, /if \(closedDocuments\.has\(key\) \|\| pendingRestores\.has\(key\)/);
   const screen = fs.readFileSync('src/components/vine/screens/ServiceDocument.tsx', 'utf8');
   assert.match(screen, /useState\(\(\) => openDocumentPosition\(documentPositionKey\)\);/);
-  assert.match(screen, /if \(!coveredRef\.current\) forgetDocumentPosition\(documentPositionKey\);/);
-  assert.match(screen, /navigation\.addListener\('beforeRemove', \(\) => forgetDocumentPosition\(documentPositionKey\)\)/);
+  // Left (unmounted while not covered, or taken off the stack), it is
+  // forgotten, after noting where it was for a swipe back into it.
+  assert.match(screen, /if \(!coveredRef\.current\) \{[\s\S]{0,200}rememberWhereLeft\.current\(\);\n      forgetDocumentPosition\(documentPositionKey\);/);
+  assert.match(screen, /navigation\.addListener\('beforeRemove', \(event\) => \{[\s\S]{0,400}forgetDocumentPosition\(documentPositionKey\);\n    \}\)/);
   // Opening the Seasons over it covers it rather than leaving it.
   assert.match(screen, /navigatingAwayRef\.current = true;\n    coveredRef\.current = true;/);
 });
