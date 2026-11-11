@@ -33,6 +33,7 @@ import {
   canonDayKey,
   canonDefinitionSignature,
   canonHasReminders,
+  canonKeptDay,
   canonTaskRoute,
   canonTasksForDay,
   canonWeekStart,
@@ -429,13 +430,16 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     setState((current) => (current.identity ? { ...current, document: withCanonMark(current.document, day, key, done) } : current));
   }, []);
 
+  // A change counts from today: yesterday's marks keep the canon as it stood (withPastKept), to send too.
   const saveItem = useCallback((item: CanonItem) => {
     dirtyDefinition.current = true;
+    dirtyDays.current.add(canonKeptDay());
     setState((current) => (current.identity ? { ...current, document: withCanonItem(current.document, item) } : current));
   }, []);
 
   const deleteItem = useCallback((id: string) => {
     dirtyDefinition.current = true;
+    dirtyDays.current.add(canonKeptDay());
     setState((current) => (current.identity ? { ...current, document: withoutCanonItem(current.document, id) } : current));
   }, []);
 

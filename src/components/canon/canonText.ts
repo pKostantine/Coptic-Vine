@@ -65,6 +65,7 @@ function abstinenceTitle(): string {
 /** A fast abstinence is kept in, by its name: "Wednesdays and Fridays", "Jonah’s Fast". */
 export function abstinenceFastName(fast: AbstinenceFast): string {
   switch (fast) {
+    case 'applicable': return tr('All applicable days', 'Tous les jours prévus', 'كل الأيام المسموح بها');
     case 'wedFri': return tr('Wednesdays and Fridays', 'Mercredis et vendredis', 'الأربعاء والجمعة');
     case 'nativity': return tr('Nativity Fast (Advent)', 'Jeûne de la Nativité (Avent)', 'صوم الميلاد');
     case 'paramoun': return tr('Paramoun Days', 'Jours du Paramoun', 'أيام البرامون');
@@ -76,9 +77,11 @@ export function abstinenceFastName(fast: AbstinenceFast): string {
   }
 }
 
-/** The fasts chosen, in a few words: "All fasts", "Lent, Holy Week", "5 fasts". */
+/** The fasts chosen, in a few words: "All applicable days", "All fasts", "Lent, Holy Week", "5 fasts". */
 export function abstinenceFastsLabel(fasts: readonly AbstinenceFast[]): string {
   if (!fasts.length) return tr('No fasts chosen', 'Aucun jeûne choisi', 'لم تُختر أصوام');
+  // Every applicable day holds every fast's days too.
+  if (fasts.includes('applicable')) return abstinenceFastName('applicable');
   if (fasts.length === ABSTINENCE_FASTS.length) return tr('All fasts', 'Tous les jeûnes', 'كل الأصوام');
   if (fasts.length <= 2) return fasts.map(abstinenceFastName).join(arabic() ? '، ' : ', ');
   return plural(fasts.length, ['fast', 'fasts'], ['jeûne', 'jeûnes'], { one: 'صوم واحد', two: 'صومان', few: 'أصوام', many: 'صومًا' });

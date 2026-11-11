@@ -300,6 +300,16 @@ export async function getSupportedCanon(ctx: ApiContext, args: Args): Promise<Su
     .prepare(`SELECT ${col('day')} AS day, ${col('marks')} AS marks FROM ${DAYS} WHERE ${col('user_id')} = ? AND ${col('day')} BETWEEN ? AND ? ORDER BY ${col('day')}`)
     .bind(row.owner, from, to)
     .all<{ day: string; marks: string }>();
+  // A change to the canon counts from the day it is made: the days before
+  // follow the canon kept in the nearest later day's marks ("$canon", the
+  // app's CANON_SNAPSHOT_KEY). Past the last day asked for, only the first such
+  // day matters, and of it only what it kept.
+  const kept = await ctx.db
+    .prepare(`SELECT ${col('day')} AS day, json_object('$canon', json(json_extract(${col('marks')}, '$."$canon"'))) AS marks FROM ${DAYS}
+      WHERE ${col('user_id')} = ? AND ${col('day')} > ? AND json_extract(${col('marks')}, '$."$canon"') IS NOT NULL ORDER BY ${col('day')} LIMIT 1`)
+    .bind(row.owner, to)
+    .first<{ day: string; marks: string }>();
+  if (kept) results.push(kept);
   const notes = row.with_instructions === 1
     ? await ctx.db.prepare(`SELECT ${col('instructions')} AS instructions FROM ${NOTES} WHERE ${col('user_id')} = ?`).bind(row.owner).first<{ instructions: string }>()
     : null;
