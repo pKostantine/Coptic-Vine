@@ -12,6 +12,7 @@ import {
   clearCanonReminders,
   scheduleCanonReminders,
 } from '@/services/canonReminders';
+import { setCanonOpenTaskCheck } from '@/services/canonReminderGate';
 import { localNotificationPermission, type LocalNotificationPermission } from '@/services/notificationService';
 import {
   clearLocalCanon,
@@ -460,6 +461,19 @@ export function SpiritualCanonProvider({ children }: { children: ReactNode }) {
     if (skipped) void cancelCanonRemindersFor(day, key).catch(() => undefined);
     setState((current) => (current.identity ? { ...current, document: withCanonSkip(current.document, day, key, skipped) } : current));
   }, []);
+
+  // Which tasks are settled, for the reminders as they come due
+  // (services/canonReminderGate.ts): one found ticked off or skipped is not
+  // reminded of. One not found (its day's calendar not yet read) still is.
+  useEffect(() => {
+    if (!loaded) return undefined;
+    setCanonOpenTaskCheck((day, key, forIdentity) => {
+      if (forIdentity !== identity) return true;
+      if (canonSkippedTasksForDay(document, day, calendar).some((task) => task.key === key)) return false;
+      return !canonTasksForDay(document, day, calendar).some((task) => task.key === key && task.done);
+    });
+    return () => setCanonOpenTaskCheck(null);
+  }, [calendar, document, identity, loaded]);
 
   const tasksFor = useCallback((day: string) => canonTasksForDay(document, day, calendar), [calendar, document]);
   const skippedFor = useCallback((day: string) => canonSkippedTasksForDay(document, day, calendar), [calendar, document]);

@@ -201,6 +201,12 @@ test('reminders: each task’s time on each day it is asked, soonest first, not 
   assert.ok(reminders.every((entry) => /^canon_[A-Za-z0-9_]+$/.test(entry.identifier)));
   assert.equal(new Set(reminders.map((entry) => entry.identifier)).size, reminders.length);
   assert.equal(canon.upcomingCanonReminders(doc(items), now, { horizonDays: 14, limit: 4 }).length, 4);
+  // Ticked off in the morning, the evening's hour is not reminded of that day; the next day's still is.
+  const early = { '2026-10-18': { 'agpeya-1:twelfth_hour': { done: true, at: STAMP } } };
+  assert.deepEqual(
+    canon.upcomingCanonReminders(doc(items, early), now, { horizonDays: 2 }).map((entry) => `${entry.day} ${entry.task.key}`),
+    ['2026-10-18 custom-1', '2026-10-19 agpeya-1:first_hour', '2026-10-19 custom-1', '2026-10-19 agpeya-1:twelfth_hour'],
+  );
   assert.equal(canon.canonHasReminders(items), true);
   assert.equal(canon.canonHasReminders([bible()]), false);
   assert.equal(canon.canonTaskRoute({ kind: 'agpeya', hourId: 'ninth_hour' }), '/agpeya/ninth_hour');
@@ -271,7 +277,9 @@ test('the account keeps the canon in its own rows only, and the app is wired to 
 test('reminders touch only the canon’s own notifications and open the task’s page', () => {
   const reminders = read('src/services/canonReminders.ts');
   assert.match(reminders, /const PREFIX = 'canon_';/);
-  assert.equal((reminders.match(/cancelScheduledNotificationAsync/g) || []).length, 4);
+  assert.equal((reminders.match(/cancelScheduledNotificationAsync/g) || []).length, 5);
+  // A put-off reminder goes on rescheduling only once its task is settled (canonReminderGate.ts).
+  assert.match(reminders, /startsWith\(CANON_SNOOZE_PREFIX\)\s*&& !canonReminderStillWanted\(/);
   // Rescheduling touches only first reminders; clearing and finishing take put-off ones too — and nothing else.
   assert.equal((reminders.match(/request\.identifier\.startsWith\(PREFIX\)/g) || []).length, 1);
   assert.match(reminders, /return identifier\.startsWith\(PREFIX\) \|\| identifier\.startsWith\(CANON_SNOOZE_PREFIX\);/);
@@ -322,6 +330,7 @@ test('rescheduling keeps what is unchanged, replaces what moved, and never touch
   const reminders = load('src/services/canonReminders.ts', {
     'react-native': { Platform: { OS: 'ios' } },
     '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'cv-default' },
+    '@/services/canonReminderGate': { canonReminderStillWanted: () => true },
     'expo-notifications': Notifications,
   });
   const at = new Date('2026-10-19T11:00:00.000Z');
@@ -352,6 +361,7 @@ test('rescheduling keeps what is unchanged, replaces what moved, and never touch
   const web = load('src/services/canonReminders.ts', {
     'react-native': { Platform: { OS: 'web' } },
     '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'cv-default' },
+    '@/services/canonReminderGate': { canonReminderStillWanted: () => true },
   });
   assert.equal(await web.scheduleCanonReminders([occurrence('canon_new')], describe, 'user-1'), 'unsupported');
 });

@@ -48,6 +48,7 @@ function device({ platform = 'ios', status = 'undetermined', signedIn = true } =
     'expo-notifications': Notifications,
     '@/services/accountAuth': { accountAuth: { getUser: async () => (signedIn ? { id: 'user-1' } : null) } },
     '@/utils/legacyNames': load('src/utils/legacyNames.ts', {}),
+    '@/services/canonReminderGate': load('src/services/canonReminderGate.ts', {}),
     '@/utils/api': {
       api: {
         rpc: async (name, args) => {

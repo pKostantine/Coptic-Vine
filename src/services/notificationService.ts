@@ -3,6 +3,7 @@ import type { DevicePushToken, NotificationResponse } from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { accountAuth } from '@/services/accountAuth';
+import { canonReminderStillWanted } from '@/services/canonReminderGate';
 import { api } from '@/utils/api';
 import { moveLegacyStorageKey } from '@/utils/legacyNames';
 
@@ -45,12 +46,12 @@ async function prepareNativeNotifications(requestPermission: boolean) {
 
   if (!handlerConfigured) {
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
+      // A canon reminder for a task already done or skipped (ticked on another
+      // device, say, before this one rescheduled) is not shown.
+      handleNotification: async (notification) => {
+        const show = canonReminderStillWanted(notification.request.content.data as Record<string, unknown> | undefined);
+        return { shouldPlaySound: show, shouldSetBadge: false, shouldShowBanner: show, shouldShowList: show };
+      },
     });
     handlerConfigured = true;
   }
