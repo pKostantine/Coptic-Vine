@@ -1,6 +1,7 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Icon from '@/components/vine/ui/Icon';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
@@ -146,7 +147,6 @@ export function CanonTaskRow({ task, arabic, disabled = false, readOnly = false,
           onPress={onSkip}
           style={({ pressed }) => [styles.skip, pressed && styles.pressed]}
         >
-          <Icon name="play-skip-forward" size={12} color={COLORS.muted} />
           <Text style={[styles.skipText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{tr('Skip', 'Passer', 'تخطَّ')}</Text>
         </Pressable>
       ) : null}
@@ -333,8 +333,29 @@ export function CanonWeekCard({ day, today, arabic, stateOf, onChoose }: {
 }) {
   const weekStart = canonWeekStart(day);
   const weekDays = Array.from({ length: 7 }, (_, offset) => addCanonDays(weekStart, offset));
+  // Swiped across, the week turns as its arrows do, as the books' calendar
+  // turns its month (CalendarPanel): to the left the next, to the right the
+  // one before. Taken only once the finger has clearly gone sideways, so a
+  // tap still picks a day.
+  const turn = useRef({ day, onChoose });
+  useEffect(() => {
+    turn.current = { day, onChoose };
+  });
+  // eslint-disable-next-line react-hooks/refs -- refs are read in gesture callbacks, not during render
+  const [weekSwipe] = useState(() => {
+    const sideways = (gesture: { dx: number; dy: number }) => Math.abs(gesture.dx) > 16 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5;
+    return PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, gesture) => sideways(gesture),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: (_, gesture) => {
+        if (!sideways(gesture) || (Math.abs(gesture.dx) < 40 && Math.abs(gesture.vx) < 0.4)) return;
+        const { day: shown, onChoose: choose } = turn.current;
+        choose(addCanonDays(shown, gesture.dx < 0 ? 7 : -7));
+      },
+    });
+  });
   return (
-    <View style={styles.weekCard}>
+    <View style={[styles.weekCard, styles.noSelect]} {...weekSwipe.panHandlers}>
       <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <View style={styles.weekHead}>
         <WeekArrow direction="back" label={tr('The week before', 'La semaine précédente', 'الأسبوع السابق')} onPress={() => onChoose(addCanonDays(day, -7))} />
@@ -375,8 +396,9 @@ const styles = StyleSheet.create({
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '600', lineHeight: 21 },
   titleDone: { color: COLORS.muted, opacity: 0.75, textDecorationLine: 'line-through' },
   detail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
-  skip: { alignItems: 'center', borderColor: 'rgba(255, 255, 255, 0.22)', borderRadius: 99, borderWidth: 1, flexDirection: 'row', gap: 5, height: 30, paddingHorizontal: 11 },
-  skipText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
+  // Pray's and Read's pill (lineAction), in white.
+  skip: { alignItems: 'center', borderColor: 'rgba(255, 255, 255, 0.75)', borderRadius: 99, borderWidth: 1.5, height: 30, justifyContent: 'center', paddingHorizontal: 12 },
+  skipText: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, fontWeight: '700' },
   rowSkipped: { gap: 10, paddingVertical: 8 },
   skippedTitle: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14.5, minWidth: 0 },
   restore: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 99, height: 28, justifyContent: 'center', paddingHorizontal: 12 },
@@ -422,6 +444,8 @@ const styles = StyleSheet.create({
   weekDotDone: { backgroundColor: COLORS.gold },
   weekDotDoneActive: { backgroundColor: COLORS.greenDeep },
 
+  // A drag across the week turns it rather than selecting its text (web).
+  noSelect: { userSelect: 'none' } as object,
   weekCard: { borderRadius: 20, gap: 12, overflow: 'hidden', paddingBottom: 12, paddingHorizontal: 12, paddingTop: 12 },
   weekHead: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   weekRange: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '700', textAlign: 'center' },
