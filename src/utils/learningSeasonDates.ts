@@ -1,4 +1,5 @@
 import type { CopticDate, SeasonYear } from './calendarService';
+import { nativityFeastDate } from './fixedFeasts';
 import { daysBetween } from './nextSeason';
 
 /**
@@ -130,12 +131,16 @@ function spansInYear(slug: string, index: YearIndex): DaySpan[] {
       const fast = range('nativity-fast');
       return fast ? [{ start: fast.startDate, end: fast.endDate }] : [];
     }
+    // The feast is kept on 7 January even when Kiahk 29 is the 8th (nativityFeastDate).
     case 'nativity-paramoun': {
-      const nativity = day('Kiahk', 29);
-      return nativity ? [paramounSpan(nativity)] : [];
+      const kiahk29 = day('Kiahk', 29);
+      return kiahk29 ? [paramounSpan(nativityFeastDate(kiahk29))] : [];
     }
     // The Nativity's own days run to Tobe 5, as the calendar's NativityPeriod does.
-    case 'nativity': return between(day('Kiahk', 29), day('Tobe', 5));
+    case 'nativity': {
+      const kiahk29 = day('Kiahk', 29);
+      return between(kiahk29 ? nativityFeastDate(kiahk29) : null, day('Tobe', 5));
+    }
     case 'circumcision': return single(day('Tobe', 6));
     case 'theophany-paramoun': {
       const theophany = day('Tobe', 11);

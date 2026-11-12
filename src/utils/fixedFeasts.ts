@@ -53,6 +53,20 @@ export const FIXED_FEASTS: FixedFeast[] = [
   { monthName: 'Mesore', day: 13, key: 'transfiguration', title: 'Transfiguration', overridesSeasonalReadings: true },
 ];
 
+/**
+ * The Feast of the Nativity's own day, from its Kiahk 29. The Synod keeps it
+ * on 7 January every year. In the Coptic year after a leap year (Nesi of six
+ * days), Kiahk 29 falls on 8 January, and that year the feast itself moves
+ * to Kiahk 28, 7 January: the Nativity is kept then, with Kiahk 29's
+ * readings, and its Paramoun before it, while 8 January is a day of the
+ * Nativity's period. The Nativity alone is kept so; every other fixed feast
+ * (the Nayrouz, the Cross, the Circumcision, the Theophany…) keeps its
+ * Coptic date and moves a day on the Gregorian calendar.
+ */
+export function nativityFeastDate(kiahk29IsoDate: string): string {
+  return kiahk29IsoDate.endsWith('-01-08') ? `${kiahk29IsoDate.slice(0, 4)}-01-07` : kiahk29IsoDate;
+}
+
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 type WeekdayName = (typeof WEEKDAY_NAMES)[number];
 
