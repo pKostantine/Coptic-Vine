@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 
+import { canonReminderStillWanted } from '@/services/canonReminderGate';
 import { LOCAL_NOTIFICATION_CHANNEL_ID } from '@/services/notificationService';
 import type { CanonReminderOccurrence } from '@/utils/spiritualCanon';
 
@@ -7,7 +8,9 @@ import type { CanonReminderOccurrence } from '@/utils/spiritualCanon';
  * The spiritual canon's reminders, as the device's own scheduled
  * notifications. Each device schedules them from the canon it has (the
  * account's, synced), a fortnight ahead: a task already done today, or kept a
- * number of times a week and done enough, is not reminded of. They are
+ * number of times a week and done enough, or skipped, is not reminded of,
+ * and one that comes due while the app is open for a task settled since is
+ * not shown (canonReminderGate.ts). They are
  * rescheduled whenever the canon or its marks change, and when the app comes
  * back, so the fortnight keeps rolling forward.
  *
@@ -64,6 +67,13 @@ export function scheduleCanonReminders(
     const permission = await Notifications.getPermissionsAsync();
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     const ours = scheduled.filter((request) => request.identifier.startsWith(PREFIX));
+    // A reminder put off an hour goes once its task is done or skipped, however
+    // that came (another device, the account, the notification's own button
+    // with the app closed).
+    await Promise.all(scheduled
+      .filter((request) => request.identifier.startsWith(CANON_SNOOZE_PREFIX)
+        && !canonReminderStillWanted(request.content.data as Record<string, unknown> | undefined))
+      .map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)));
     if (!permission.granted) {
       await Promise.all(ours.map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)));
       return 'permission_required';

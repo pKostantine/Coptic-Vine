@@ -61,6 +61,7 @@ function device({ platform = 'ios', lastResponse = null } = {}) {
       cancelCanonRemindersFor: async (day, taskKey) => { calls.cancelledFor.push(`${day}/${taskKey}`); },
     },
     '@/services/notificationService': { LOCAL_NOTIFICATION_CHANNEL_ID: 'cv-default' },
+    '@/services/canonReminderGate': { canonReminderStillWanted: () => true },
   });
   return { actions, calls, files, listen: () => listener, task: () => task };
 }
