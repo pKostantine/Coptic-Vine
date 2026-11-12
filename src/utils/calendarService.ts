@@ -1,5 +1,5 @@
 import { contentDataClient as supabase, isContentSchemaInstalled } from '../services/contentDataClient';
-import { computeMovableFeastDates, FIXED_FEASTS } from './fixedFeasts';
+import { computeMovableFeastDates, FIXED_FEASTS, nativityFeastDate } from './fixedFeasts';
 import { localDateAtUtcMidnight, toIsoDate } from './dateUtils';
 import { getSeasonIndicatorKey } from '../constants/seasonNames';
 import { pickNextSeason } from './nextSeason';
@@ -377,7 +377,9 @@ export async function getSingleDayEventsForCopticYear(copticYear: number, period
   const [fixed, kiahkSundays] = await Promise.all([
     Promise.all(
       FIXED_FEASTS.map(async (feast) => {
-        const date = await resolveCopticDate(copticYear, feast.monthName, feast.day);
+        const coptic = await resolveCopticDate(copticYear, feast.monthName, feast.day);
+        // The Nativity stays on 7 January when Kiahk 29 falls on the 8th (nativityFeastDate).
+        const date = coptic && feast.key === 'nativity' ? nativityFeastDate(coptic) : coptic;
         return date ? { key: feast.key, title: feast.title, date } : null;
       }),
     ),

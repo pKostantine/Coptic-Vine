@@ -14,7 +14,7 @@ function load(path, moduleRequire = require) {
 
 const nextSeason = load('src/utils/nextSeason.ts');
 const { computeMovableFeastDates } = load('src/utils/fixedFeasts.ts');
-const { scheduleLearningSeasons } = load('src/utils/learningSeasonDates.ts', (name) => (name === './nextSeason' ? nextSeason : require(name)));
+const { scheduleLearningSeasons } = load('src/utils/learningSeasonDates.ts', (name) => (name === './nextSeason' ? nextSeason : name === './fixedFeasts' ? load('src/utils/fixedFeasts.ts') : require(name)));
 
 const MONTHS = ['Thoout', 'Paope', 'Hathor', 'Kiahk', 'Tobe', 'Meshir', 'Paremhotep', 'Parmoute', 'Pashons', 'Paone', 'Epep', 'Mesore', 'Nesi'];
 

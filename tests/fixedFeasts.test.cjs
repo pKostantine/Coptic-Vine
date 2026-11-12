@@ -83,3 +83,22 @@ test('every feast has a display name and an indicator rank', () => {
     assert.ok(declares(priorities, feast.key), `${feast.key} missing from EVENT_INDICATOR_PRIORITIES`);
   }
 });
+
+test('the Nativity stays on 7 January, moving to Kiahk 28 the years Kiahk 29 is the 8th; no other feast does', () => {
+  const feasts = loadNativityModule();
+  assert.equal(feasts.nativityFeastDate('2027-01-07'), '2027-01-07');
+  assert.equal(feasts.nativityFeastDate('2028-01-08'), '2028-01-07');
+  assert.equal(feasts.nativityFeastDate('2024-01-08'), '2024-01-07');
+  const calendar = fs.readFileSync('src/utils/calendarService.ts', 'utf8');
+  assert.match(calendar, /feast\.key === 'nativity' \? nativityFeastDate\(coptic\) : coptic/);
+  const learn = fs.readFileSync('src/utils/learningSeasonDates.ts', 'utf8');
+  assert.match(learn, /paramounSpan\(nativityFeastDate\(kiahk29\)\)/);
+});
+
+function loadNativityModule() {
+  const ts = require('typescript');
+  const js = ts.transpileModule(fs.readFileSync('src/utils/fixedFeasts.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const module = { exports: {} };
+  new Function('exports', 'require', 'module', js)(module.exports, require, module);
+  return module.exports;
+}
