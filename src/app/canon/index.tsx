@@ -9,7 +9,7 @@ import CanonInstructions from '@/components/canon/CanonInstructions';
 import { CanonProgressBar, CanonSkippedRow, CanonTaskRow, CanonWeekCard, type CanonDayState } from '@/components/canon/CanonParts';
 import { dayProgressLabel, paschaAgpeyaNote } from '@/components/canon/canonText';
 import { NowPlayingAwareScrollView } from '@/components/playback/NowPlayingAwareScroll';
-import { PageGlow, SectionHeading } from '@/components/vine/screens/BookPage';
+import { PageGlow } from '@/components/vine/screens/BookPage';
 import BleedPage from '@/components/vine/ui/BleedPage';
 import BottomTabBar from '@/components/vine/ui/BottomTabBar';
 import Icon from '@/components/vine/ui/Icon';
@@ -125,6 +125,41 @@ export default function CanonScreen() {
       />
       <NowPlayingAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.column}>
+          {signedIn && supporting.length ? (
+            // Those whose canon this account supports: a card of its own at the
+            // top, apart from the reader's own canon below it.
+            <View style={styles.supporting}>
+              <LinearGradient colors={['#173A1F', COLORS.greenDeep]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+              <View style={styles.supportingHead}>
+                <View><Icon name="people-outline" size={18} color={COLORS.gold} /></View>
+                <Text style={[styles.kicker, styles.flex, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                  {tr('People you support', 'Ceux que vous soutenez', 'من تدعمهم')}
+                </Text>
+                <Text style={styles.supportingCount} maxFontSizeMultiplier={MAX_FONT_SCALE}>{supporting.length}</Text>
+              </View>
+              {supporting.map((person) => {
+                const name = person.name || tr('Someone you support', 'Une personne que vous soutenez', 'شخص تدعمه');
+                return (
+                  <Pressable
+                    key={person.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr(`${name}'s canon`, `Canon de ${name}`, `قانون ${name}`)}
+                    onPress={() => router.push(`/canon/supporting/${encodeURIComponent(person.id)}` as never)}
+                    style={({ pressed }) => [styles.personRow, pressed && styles.pressed]}
+                  >
+                    <View style={styles.personInitial}><Text style={styles.personInitialText}>{(name.trim()[0] || '?').toUpperCase()}</Text></View>
+                    <View style={styles.flex}>
+                      <Text style={[styles.personName, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{name}</Text>
+                      <Text style={[styles.personSub, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+                        {tr('See their canon', 'Voir son canon', 'اطّلع على قانونه')}
+                      </Text>
+                    </View>
+                    <View><Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} /></View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           {instructions.loaded ? <CanonInstructions text={instructions.text} arabic={arabic} onChange={instructions.setText} /> : null}
           {canon.loaded && !canon.items.length ? (
             <EmptyCanon arabic={arabic} onStart={() => router.push('/canon/edit' as never)} />
@@ -194,30 +229,6 @@ export default function CanonScreen() {
             </>
           )}
 
-          {signedIn && supporting.length ? (
-            <View style={styles.supporting}>
-              <SectionHeading size="page" title={tr('People You Support', 'Ceux que vous soutenez', 'من تدعمهم')} arabic={arabic} />
-              <View style={styles.rows}>
-                {supporting.map((person) => (
-                  <Pressable
-                    key={person.id}
-                    accessibilityRole="button"
-                    onPress={() => router.push(`/canon/supporting/${encodeURIComponent(person.id)}` as never)}
-                    style={({ pressed }) => [styles.personRow, pressed && styles.pressed]}
-                  >
-                    <LinearGradient colors={[COLORS.surfaceDeep, COLORS.surface]} style={StyleSheet.absoluteFill} pointerEvents="none" />
-                    {/* Icons in Views of their own: beside the absolute gradient, a bare icon paints under it on the web. */}
-                    <View><Icon name="person-circle-outline" size={22} color={COLORS.gold} /></View>
-                    <Text style={[styles.personName, arabic && styles.arabic]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-                      {person.name || tr('Someone you support', 'Une personne que vous soutenez', 'شخص تدعمه')}
-                    </Text>
-                    <View><Icon name="chevron-forward" size={16} color={COLORS.muted} /></View>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
           {canon.loaded && !canon.signedIn ? (
             <Pressable accessibilityRole="button" onPress={() => router.push('/account' as never)} style={({ pressed }) => [styles.account, pressed && styles.pressed]}>
               <Icon name="person-circle-outline" size={22} color={COLORS.gold} />
@@ -277,9 +288,15 @@ const styles = StyleSheet.create({
   progress: { gap: 6, marginTop: 6 },
   progressText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13 },
   rows: { gap: 8 },
-  supporting: { marginTop: 10 },
-  personRow: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, minHeight: 56, overflow: 'hidden', paddingHorizontal: 14 },
-  personName: { color: COLORS.white, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '600' },
+  flex: { flex: 1, minWidth: 0 },
+  supporting: { borderColor: COLORS.goldLine, borderRadius: 20, borderWidth: 1, gap: 4, overflow: 'hidden', paddingBottom: 6, paddingHorizontal: 14, paddingTop: 12 },
+  supportingHead: { alignItems: 'center', flexDirection: 'row', gap: 8, paddingBottom: 4 },
+  supportingCount: { backgroundColor: COLORS.goldSoft, borderRadius: 99, color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, fontWeight: '700', minWidth: 24, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, textAlign: 'center' },
+  personRow: { alignItems: 'center', borderTopColor: 'rgba(255, 255, 255, 0.07)', borderTopWidth: 1, flexDirection: 'row', gap: 12, minHeight: 58, paddingVertical: 8 },
+  personInitial: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
+  personInitialText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 17, fontWeight: '700' },
+  personName: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '600' },
+  personSub: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 12.5, marginTop: 1 },
   note: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
   noteText: { color: COLORS.muted, flex: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14.5 },
   skipped: { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },

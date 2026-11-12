@@ -20,9 +20,11 @@ const CHIP_SIZE = 58;
 type LoadedBibleChapters = { requestKey: string; chapters: number[] };
 type BibleLoadError = { requestKey: string; message: string };
 
+// Named for what they change, the Psalms' numbering: every source is in the
+// Psalter whichever is chosen (Beta Feedback #5).
 const PSALM_NUMBERING_OPTIONS: { key: PsalmNumbering; label: string; arabic: string; french?: string }[] = [
-  { key: 'septuagint', label: 'Septuagint', arabic: 'السبعيني', french: 'Septante' },
-  { key: 'masoretic', label: 'Masoretic', arabic: 'العبري', french: 'Massorétique' },
+  { key: 'septuagint', label: 'Septuagint Numbering', arabic: 'الترقيم السبعيني', french: 'Numérotation de la Septante' },
+  { key: 'masoretic', label: 'Masoretic Numbering', arabic: 'الترقيم العبري', french: 'Numérotation massorétique' },
 ];
 
 /** `/bible/OT` and `/bible/NT` list a testament's books; any other key is a book, and lists its chapters. */
@@ -119,7 +121,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
             <View style={[styles.segmented, { borderColor: `${accent}33` }]}>
               {PSALM_NUMBERING_OPTIONS.map((option) => {
                 const isSelected = psalmNumbering === option.key;
-                const label = showArabic ? option.arabic : option.label;
+                const label = tr(option.label, option.french ?? option.label, option.arabic);
                 return (
                   <Pressable
                     key={option.key}
@@ -129,7 +131,7 @@ function BibleChapterList({ bookKey }: { bookKey: string }) {
                     style={[styles.segment, isSelected && { backgroundColor: accent }]}
                     onPress={() => setPsalmNumbering(option.key)}
                   >
-                    <Text style={[styles.segmentText, showArabic && styles.segmentArabic, { color: isSelected ? COLORS.greenDeep : accent }]}>
+                    <Text numberOfLines={2} style={[styles.segmentText, showArabic && styles.segmentArabic, { color: isSelected ? COLORS.greenDeep : accent }]}>
                       {label}
                     </Text>
                   </Pressable>

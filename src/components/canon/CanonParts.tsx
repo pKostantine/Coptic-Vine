@@ -88,10 +88,10 @@ export function CanonTaskRow({ task, arabic, disabled = false, readOnly = false,
           <Text style={[styles.detail, arabic && styles.arabic]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SCALE}>{detail}</Text>
         ) : null}
       </View>
-      {opens ? (
-        <View style={[styles.open, task.done && styles.openDone]}>
-          <Icon name={task.kind === 'agpeya' ? 'play' : 'book-outline'} size={12} color={task.done ? COLORS.muted : COLORS.gold} />
-          <Text style={[styles.openText, task.done && styles.openTextDone, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{action}</Text>
+      {/* Home's Pray and Read (CanonTimelineRow): a gold outline, until the task is done. */}
+      {opens && !task.done ? (
+        <View style={styles.lineAction}>
+          <Text style={[styles.lineActionText, arabic && styles.arabicTight]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{action}</Text>
         </View>
       ) : null}
     </>
@@ -375,10 +375,6 @@ const styles = StyleSheet.create({
   title: { color: COLORS.white, fontFamily: TYPOGRAPHY.body, fontSize: 16, fontWeight: '600', lineHeight: 21 },
   titleDone: { color: COLORS.muted, opacity: 0.75, textDecorationLine: 'line-through' },
   detail: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, marginTop: 2 },
-  open: { alignItems: 'center', borderColor: COLORS.goldLine, borderRadius: 99, borderWidth: 1, flexDirection: 'row', gap: 5, height: 30, paddingHorizontal: 11 },
-  openDone: { borderColor: 'rgba(255, 255, 255, 0.14)' },
-  openText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
-  openTextDone: { color: COLORS.muted },
   skip: { alignItems: 'center', borderColor: 'rgba(255, 255, 255, 0.22)', borderRadius: 99, borderWidth: 1, flexDirection: 'row', gap: 5, height: 30, paddingHorizontal: 11 },
   skipText: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13, fontWeight: '700' },
   rowSkipped: { gap: 10, paddingVertical: 8 },

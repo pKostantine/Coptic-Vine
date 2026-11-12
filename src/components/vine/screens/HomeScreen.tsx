@@ -1,8 +1,8 @@
 'use no memo'; // Renders App Language text — see src/utils/appText.ts.
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
@@ -20,6 +20,7 @@ import { useReadingPreferences } from '@/context/ReadingPreferencesContext';
 import { useSpiritualCanon } from '@/context/SpiritualCanonContext';
 import { useLiturgicalNow } from '@/hooks/useLiturgicalNow';
 import { homeService, type HomeSynaxariumEvent } from '@/services/homeService';
+import { listCanonsISupport, type CanonSupportPerson } from '@/services/spiritualCanonService';
 import { getCopticDate, type CopticDate } from '@/utils/calendarService';
 import { useIsCompactLandscape } from '../../../utils/useIsCompactLandscape';
 import { useSidePadding } from '../../../utils/useSidePadding';
@@ -85,6 +86,18 @@ export default function HomeScreen() {
   const compactLandscape = useIsCompactLandscape();
   const { preferences } = useReadingPreferences();
   const canon = useSpiritualCanon();
+  // Those whose canon this account supports, shown on the canon's card (read again each time Home is in front).
+  const [supporting, setSupporting] = useState<CanonSupportPerson[]>([]);
+  const canonSignedIn = canon.signedIn;
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    if (canonSignedIn) {
+      listCanonsISupport()
+        .then((people) => { if (live) setSupporting(people); })
+        .catch(() => undefined);
+    } else setSupporting([]);
+    return () => { live = false; };
+  }, [canonSignedIn]));
   const live = useLiturgicalNow();
   const arabic = preferences.appLanguage === 'ar';
 
@@ -262,7 +275,11 @@ export default function HomeScreen() {
           <Text style={[styles.eyebrow, arabic && styles.arabicTight]} numberOfLines={1}>{eyebrow}</Text>
           <VineRule height={16} />
         </View>
-        <Text style={[styles.cardTitle, arabic && styles.arabic]} accessibilityRole="header">{title}</Text>
+        <View style={styles.cardTitleRow}>
+          <Text style={[styles.cardTitle, arabic && styles.arabic]} accessibilityRole="header">{title}</Text>
+          {/* A card that opens its own page says so beside its name. */}
+          {open ? <View style={styles.cardTitleChevron}><Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.gold} /></View> : null}
+        </View>
         <Text style={[styles.cardSub, arabic && styles.arabic]}>{sub}</Text>
       </>
     );
@@ -371,6 +388,45 @@ export default function HomeScreen() {
           </Text>
         ) : null}
       </View>
+      {supporting.length ? (
+        <View style={styles.canonPeople}>
+          <Text style={[styles.canonPeopleHeading, arabic && styles.arabicTight]} numberOfLines={1}>
+            {tr('People you support', 'Ceux que vous soutenez', 'من تدعمهم')}
+          </Text>
+          <View style={styles.canonPeopleRow}>
+            {supporting.map((person) => {
+              const name = person.name || tr('Someone you support', 'Une personne que vous soutenez', 'شخص تدعمه');
+              return (
+                <Pressable
+                  key={person.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr(`${name}'s canon`, `Canon de ${name}`, `قانون ${name}`)}
+                  onPress={() => router.push(`/canon/supporting/${encodeURIComponent(person.id)}` as never)}
+                  style={({ pressed }) => [styles.canonPerson, pressed && styles.pressed]}
+                >
+                  <View style={styles.canonPersonInitial}>
+                    <Text style={styles.canonPersonInitialText}>{(name.trim()[0] || '?').toUpperCase()}</Text>
+                  </View>
+                  <Text style={[styles.canonPersonName, arabic && styles.arabicTight]} numberOfLines={1}>{name}</Text>
+                  <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={14} color={COLORS.gold} />
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+      {canon.loaded && canon.items.length ? (
+        // The card opens the canon's own page: the week, the days gone by, and its support people.
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/canon' as never)}
+          style={({ pressed }) => [styles.canonOpen, pressed && styles.pressed]}
+        >
+          <Icon name="calendar-outline" size={16} color={COLORS.gold} />
+          <Text style={[styles.canonOpenText, arabic && styles.arabicTight]}>{tr('Open your canon', 'Ouvrir votre canon', 'افتح قانونك')}</Text>
+          <Icon name={arabic ? 'chevron-back' : 'chevron-forward'} size={16} color={COLORS.gold} />
+        </Pressable>
+      ) : null}
     </View>
   );
 
@@ -621,7 +677,18 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: COLORS.surface, borderRadius: 22, overflow: 'hidden', padding: 18 },
   cardHead: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
-  cardTitle: { color: COLORS.white, fontFamily: TYPOGRAPHY.title, fontSize: 23, fontWeight: '700', lineHeight: 26.5, marginTop: 8 },
+  cardTitle: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.title, fontSize: 23, fontWeight: '700', lineHeight: 26.5, marginTop: 8 },
+  cardTitleRow: { alignItems: 'flex-end', flexDirection: 'row', gap: 6 },
+  cardTitleChevron: { paddingBottom: 3 },
+  canonPeople: { borderTopColor: 'rgba(255, 255, 255, 0.08)', borderTopWidth: 1, gap: 10, marginTop: 14, paddingTop: 12 },
+  canonPeopleHeading: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' },
+  canonPeopleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  canonPerson: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 99, flexDirection: 'row', gap: 8, maxWidth: '100%', paddingLeft: 4, paddingRight: 12, paddingVertical: 4 },
+  canonPersonInitial: { alignItems: 'center', backgroundColor: COLORS.goldSoft, borderRadius: 14, height: 28, justifyContent: 'center', width: 28 },
+  canonPersonInitialText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.title, fontSize: 14, fontWeight: '700' },
+  canonPersonName: { color: COLORS.white, flexShrink: 1, fontFamily: TYPOGRAPHY.body, fontSize: 14, fontWeight: '600' },
+  canonOpen: { alignItems: 'center', borderColor: COLORS.gold, borderRadius: 12, borderWidth: 1.5, flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 14, minHeight: 44, paddingHorizontal: 16 },
+  canonOpenText: { color: COLORS.gold, fontFamily: TYPOGRAPHY.body, fontSize: 15, fontWeight: '700' },
   cardSub: { color: COLORS.muted, fontFamily: TYPOGRAPHY.body, fontSize: 13.5, marginTop: 4 },
   roundButton: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.07)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   segmentsGap: { marginTop: 14 },
